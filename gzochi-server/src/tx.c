@@ -1,0 +1,249 @@
+/* tx.c: Application-level transactions implementation for gzochid
+ * Copyright (C) 2011 Julian Graham
+ *
+ * gzochi is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <assert.h>
+#include <glib.h>
+#include <gmp.h>
+#include <stdlib.h>
+
+#include "log.h"
+#include "tx.h"
+
+static GStaticMutex transaction_mutex = G_STATIC_MUTEX_INIT;
+static GStaticPrivate thread_transaction_key = G_STATIC_PRIVATE_INIT;
+static mpz_t transaction_counter;
+static gboolean transactions_initialized;
+
+enum gzochid_transaction_state
+  {
+    GZOCHID_TRANSACTION_STATE_ACTIVE,
+    GZOCHID_TRANSACTION_STATE_PREPARING,
+    GZOCHID_TRANSACTION_STATE_COMMITTING,
+    GZOCHID_TRANSACTION_STATE_ROLLING_BACK,
+    GZOCHID_TRANSACTION_STATE_COMMITTED,
+    GZOCHID_TRANSACTION_STATE_ROLLED_BACK
+  };
+
+typedef struct _gzochid_transaction 
+{
+  mpz_t id;
+  char *name;
+  GHashTable *participants;
+  enum gzochid_transaction_state state;
+} gzochid_transaction;
+
+static gzochid_transaction *transaction_new (void)
+{
+  gzochid_transaction *transaction = calloc (1, sizeof (gzochid_transaction));
+  transaction->participants = g_hash_table_new_full 
+    (g_str_hash, g_str_equal, NULL, free);
+
+  g_static_mutex_lock (&transaction_mutex);
+  if (!transactions_initialized)
+    {
+      mpz_init (transaction_counter);
+      transactions_initialized = TRUE;
+    }
+  mpz_set (transaction->id, transaction_counter);
+  mpz_add_ui (transaction_counter, transaction_counter, 1);
+  g_static_mutex_unlock (&transaction_mutex);
+
+  transaction->name = mpz_get_str (NULL, 16, transaction->id);
+  transaction->state = GZOCHID_TRANSACTION_STATE_ACTIVE;
+
+  return transaction;
+}
+
+static void transaction_free (gzochid_transaction *transaction)
+{
+  mpz_clear (transaction->id);
+  free (transaction->name);
+  g_hash_table_destroy (transaction->participants);
+  free (transaction);
+}
+
+typedef struct _gzochid_transaction_participant_registration
+{
+  gzochid_transaction_participant *participant;
+  gpointer data;
+} gzochid_transaction_participant_registration;
+
+gzochid_transaction_participant *gzochid_transaction_participant_new 
+(char *name, gzochid_transaction_prepare prepare, 
+ gzochid_transaction_commit commit, gzochid_transaction_rollback rollback)
+{
+  gzochid_transaction_participant *participant = calloc 
+    (1, sizeof (gzochid_transaction_participant));
+
+  participant->name = name;
+  participant->prepare = prepare;
+  participant->commit = commit;
+
+  return participant;
+}
+
+void gzochid_transaction_participant_free
+(gzochid_transaction_participant *participant)
+{
+  free (participant);
+}
+
+void gzochid_transaction_join 
+(gzochid_transaction_participant *participant, gpointer user_data)
+{
+  gzochid_transaction *transaction = (gzochid_transaction *) 
+    g_static_private_get (&thread_transaction_key);
+  if (transaction == NULL)
+    {
+      transaction = transaction_new ();   
+      g_static_private_set (&thread_transaction_key, transaction, NULL);
+    }
+  else assert (transaction->state == GZOCHID_TRANSACTION_STATE_ACTIVE);
+
+  if (g_hash_table_lookup 
+      (transaction->participants, participant->name) == NULL)
+    {
+      gzochid_transaction_participant_registration *registration =
+	calloc (1, sizeof (gzochid_transaction_participant_registration));
+      
+      registration->participant = participant;
+      registration->data = user_data;
+
+      g_hash_table_insert 
+	(transaction->participants, participant->name, registration);
+
+      gzochid_debug ("Participant '%s' joined transaction '%s'.", 
+		     participant->name, transaction->name);
+    }
+}
+
+gpointer gzochid_transaction_context 
+(gzochid_transaction_participant *participant)
+{
+  gzochid_transaction *transaction = (gzochid_transaction *) 
+    g_static_private_get (&thread_transaction_key);
+  gzochid_transaction_participant_registration *registration = NULL;
+
+  assert (transaction != NULL);
+
+  registration = (gzochid_transaction_participant_registration *)
+    g_hash_table_lookup (transaction->participants, participant->name);
+  return registration == NULL ? NULL : registration->data;
+}
+
+static int prepare (gzochid_transaction *transaction)
+{
+  GList *participants = g_hash_table_get_values (transaction->participants);
+  GList *participant_ptr = participants;
+
+  transaction->state = GZOCHID_TRANSACTION_STATE_PREPARING;
+  gzochid_debug ("Preparing transaction '%s' for commit.", transaction->name);
+  
+  while (participant_ptr != NULL)
+    {
+      gzochid_transaction_participant_registration *participant = 
+	(gzochid_transaction_participant_registration *) participant_ptr->data;
+      if (!participant->participant->prepare (participant->data))
+	{
+	  gzochid_info 
+	    ("Participant '%s' in transaction '%s' failed to prepare.",
+	     participant->participant->name, transaction->name);
+
+	  g_list_free (participants);	  
+	  return FALSE;
+	}
+
+      participant_ptr = participant_ptr->next;
+    }
+
+  g_list_free (participants);
+  return TRUE;
+}
+
+static void commit (gzochid_transaction *transaction)
+{
+  GList *participants = g_hash_table_get_values (transaction->participants);
+  GList *participant_ptr = participants;
+
+  transaction->state = GZOCHID_TRANSACTION_STATE_COMMITTING;
+
+  while (participant_ptr != NULL)
+    {
+      gzochid_transaction_participant_registration *participant = 
+	(gzochid_transaction_participant_registration *) participant_ptr->data;
+      participant->participant->commit (participant->data);
+      participant_ptr = participant_ptr->next;
+    }
+
+  transaction->state = GZOCHID_TRANSACTION_STATE_COMMITTED;
+  gzochid_debug ("Committed transaction '%s'.", transaction->name);
+
+  g_list_free (participants);
+}
+
+static void rollback (gzochid_transaction *transaction)
+{
+  GList *participants = g_hash_table_get_values (transaction->participants);
+  GList *participant_ptr = participants;
+
+  transaction->state = GZOCHID_TRANSACTION_STATE_ROLLING_BACK;
+  
+  while (participant_ptr != NULL)
+    {
+      gzochid_transaction_participant_registration *participant = 
+	(gzochid_transaction_participant_registration *) participant_ptr->data;
+      participant->participant->rollback (participant->data);
+      participant_ptr = participant_ptr->next;
+    }
+
+  transaction->state = GZOCHID_TRANSACTION_STATE_ROLLED_BACK;
+  gzochid_debug ("Rolled back transaction '%s'.", transaction->name);
+
+  g_list_free (participants);
+}
+
+int gzochid_transaction_execute (void (*func) (gpointer), gpointer data)
+{
+  gzochid_transaction *transaction = NULL;
+
+  func (data);
+
+  transaction = g_static_private_get (&thread_transaction_key);
+  if (transaction == NULL)
+    return TRUE;
+
+  if (!prepare (transaction))
+    {
+      rollback (transaction);
+      transaction_free (transaction);
+      return FALSE;
+    }
+  
+  commit (transaction);
+  g_static_private_set (&thread_transaction_key, NULL, NULL);
+
+  transaction_free (transaction);
+  return TRUE;
+}
+
+int gzochid_transaction_active ()
+{
+  gzochid_transaction *transaction = (gzochid_transaction *) 
+    g_static_private_get (&thread_transaction_key);
+  return transaction != NULL 
+    && transaction->state == GZOCHID_TRANSACTION_STATE_ACTIVE;
+}

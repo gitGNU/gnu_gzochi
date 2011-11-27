@@ -1,0 +1,74 @@
+;; gzochi/private/app.scm: Private infrastructure for application support
+;; Copyright (C) 2011 Julian Graham
+;;
+;; gzochi is free software: you can redistribute it and/or modify it
+;; under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;; 
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#!r6rs
+
+(library (gzochi private app)
+  (export gzochi:execute-disconnected
+	  gzochi:execute-initialized
+	  gzochi:execute-logged-in
+	  gzochi:execute-received-message)
+
+  (import (rnrs)
+	  (gzochi app)
+	  (gzochi client)
+	  (gzochi task)
+	  (gzochi private reflect))
+
+  (define (gzochi:execute-initialized callback properties)
+    (or (gzochi:callback? callback)
+	(raise (make-assertion-violation)))
+
+    (let ((procedure (gzochi:resolve-procedure
+		      (gzochi:callback-procedure callback)
+		      (gzochi:callback-module callback))))
+      (procedure properties)))
+
+  (define (gzochi:execute-logged-in callback client-session)
+    (or (gzochi:callback? callback)
+	(raise (make-assertion-violation)))
+      
+    (let* ((procedure (gzochi:resolve-procedure 
+		       (gzochi:callback-procedure callback)
+		       (gzochi:callback-module callback)))
+	   (handler (procedure client-session)))
+      (cond ((not handler) #t)
+	    ((gzochi:client-session-listener? handler) handler)
+	    (raise (condition
+		    (make-assertion-violation)
+		    (make-message-condition
+		     "logged-in callback must return a session listener"))))))
+
+  (define (gzochi:execute-disconnected callback)
+    (or (gzochi:callback? callback)
+	(raise (make-assertion-violation)))
+
+    (let ((procedure (gzochi:resolve-procedure
+		      (gzochi:callback-procedure callback)
+		      (gzochi:callback-module callback)))
+	  (data (gzochi:callback-data callback)))
+      (if data (procedure data) (procedure))))
+
+  (define (gzochi:execute-received-message callback msg)
+    (or (gzochi:callback? callback)
+	(raise (make-assertion-violation)))
+ 
+    (let* ((procedure (gzochi:resolve-procedure 
+		       (gzochi:callback-procedure callback)
+		       (gzochi:callback-module callback)))
+	   (data (gzochi:callback-data callback)))
+      (if data (procedure msg data) (procedure msg))))
+)

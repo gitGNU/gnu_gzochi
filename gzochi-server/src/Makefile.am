@@ -1,0 +1,60 @@
+## Process this file with automake to produce Makefile.in
+#
+# Makefile.am: Automake input file.
+#
+# Copyright (C) 2011 Julian Graham
+#
+# This is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3, or (at your option)
+# any later version.
+#
+# This software is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this package.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+SUBDIRS = api
+
+GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
+GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.a
+
+AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ \
+	@MICROHTTPD_CFLAGS@ @ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ \
+	$(GZOCHI_COMMON_CFLAGS) \
+	-Wall -pedantic
+
+bin_PROGRAMS = gzochid
+
+gzochid_SOURCES = admin.c app.c auth.c config.c context.c data.c fsm.c game.c \
+	guile.c gzochid.c httpd.c log.c protocol.c scheme.c session.c socket.c \
+	storage.c task.c threads.c tx.c util.c
+gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
+	@GLIB_LIBS@ @GTHREAD_LIBS@ @MICROHTTPD_LIBS@ @ZLIB_LIBS@ \
+	@SERVEEZ_LDFLAGS@
+
+admin.c: admin.h
+app.c: app.h
+auth.c: auth.h
+config.c: config.h
+context.c: context.h
+data.c: data.h
+fsm.c: fsm.h
+game.c: game.h
+guile.c: guile.h
+gzochid.c: gzochid.h
+httpd.c: httpd.h
+log.c: log.h
+protocol.c: protocol.h
+scheme.c: scheme.h
+session.c: session.h
+socket.c: socket.h
+storage.c: storage.h
+task.c: task.h
+threads.c: threads.h
+tx.c: tx.h
+util.c: util.h
