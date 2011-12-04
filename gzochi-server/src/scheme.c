@@ -45,6 +45,11 @@ static SCM scm_callback_data;
 
 static SCM scm_make_managed_hashtable;
 
+static SCM scm_hashtable_keys;
+static SCM scm_hashtable_set_x;
+static SCM scm_hashtable_ref;
+static SCM scm_make_hashtable;
+
 static SCM scm_managed_record_p;
 static SCM scm_managed_record_serialize;
 static SCM scm_managed_record_deserialize;
@@ -427,6 +432,47 @@ GList *gzochid_scheme_list_to_glist (SCM lst, gpointer (*transformer) (SCM))
   return ret;
 }
 
+SCM gzochid_scheme_string_hash;
+SCM gzochid_scheme_string_equiv;
+
+SCM gzochid_scheme_ghashtable_to_hashtable 
+(GHashTable *ht, SCM hash_func, SCM key_equal_func,
+ SCM (*key_transformer) (gpointer), SCM (*value_transformer) (gpointer))
+{
+  SCM ret = scm_call_2 (scm_make_hashtable, hash_func, key_equal_func);
+  GHashTableIter iter;
+  gpointer key, value;
+
+  g_hash_table_iter_init (&iter, ht);
+  while (g_hash_table_iter_next (&iter, &key, &value)) 
+    scm_call_3 (scm_hashtable_set_x, ret, key_transformer (key), 
+		value_transformer (value));
+
+  return ret;
+}
+
+GHashTable *gzochid_scheme_hashtable_to_ghashtable
+(SCM ht, GHashFunc hash_func, GEqualFunc key_equal_func, 
+ gpointer (*key_transformer) (SCM), gpointer (*value_transformer) (SCM))
+{
+  GHashTable *ret = g_hash_table_new (hash_func, key_equal_func);
+  SCM key_list = scm_vector_to_list (scm_call_1 (scm_hashtable_keys, ht));
+  
+  while (key_list != SCM_EOL)
+    {
+      SCM key = SCM_CAR (key_list);
+      SCM value = scm_call_2 (scm_hashtable_ref, ht, key);
+
+      g_hash_table_insert 
+	(ret, key_transformer (key), value_transformer (value));
+
+      key_list = SCM_CDR (key_list);
+    }
+  
+
+  return ret;
+}
+
 char *gzochid_scheme_callback_procedure (SCM callback)
 {
   return scm_symbol_to_locale_string 
@@ -543,6 +589,8 @@ static void initialize_binding (SCM module, SCM *binding, char *name)
 
 static void *initialize_bindings (void *ptr)
 {
+  SCM rnrs_hashtables = scm_c_resolve_module ("rnrs hashtables");
+
   SCM gzochi_app = scm_c_resolve_module ("gzochi app");
   SCM gzochi_client = scm_c_resolve_module ("gzochi client");
   SCM gzochi_data = scm_c_resolve_module ("gzochi data");
@@ -556,6 +604,15 @@ static void *initialize_bindings (void *ptr)
     scm_c_resolve_module ("gzochi private app");
   scm_gc_protect_object (gzochid_scheme_scm_module_gzochi_private_app);
   
+  initialize_binding 
+    (rnrs_hashtables, &gzochid_scheme_string_hash, "string-hash");
+  initialize_binding (rnrs_hashtables, &gzochid_scheme_string_equiv, "equal?");
+
+  initialize_binding (rnrs_hashtables, &scm_hashtable_keys, "hashtable-keys");
+  initialize_binding (rnrs_hashtables, &scm_hashtable_ref, "hashtable-ref");
+  initialize_binding (rnrs_hashtables, &scm_hashtable_set_x, "hashtable-set!");
+  initialize_binding (rnrs_hashtables, &scm_make_hashtable, "make-hashtable");
+
   initialize_binding (gzochi_app, &scm_make_callback, "gzochi:make-callback");
   initialize_binding 
     (gzochi_app, &scm_callback_module, "gzochi:callback-module");

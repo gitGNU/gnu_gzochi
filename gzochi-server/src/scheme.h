@@ -44,6 +44,13 @@ gzochid_task *gzochid_scheme_task_new
 SCM gzochid_scheme_glist_to_list (GList *, SCM (*) (gpointer));
 GList *gzochid_scheme_list_to_glist (SCM, gpointer (*) (SCM));
 
+SCM gzochid_scheme_string_hash;
+SCM gzochid_scheme_string_equiv;
+SCM gzochid_scheme_ghashtable_to_hashtable 
+(GHashTable *, SCM, SCM, SCM (*) (gpointer), SCM (*) (gpointer));
+GHashTable *gzochid_scheme_hashtable_to_ghashtable 
+(SCM, GHashFunc, GEqualFunc, gpointer (*) (SCM), gpointer (*) (SCM));
+
 SCM gzochid_scheme_create_callback (gzochid_application_callback *, ...);
 char *gzochid_scheme_callback_procedure (SCM);
 GList *gzochid_scheme_callback_module (SCM);
