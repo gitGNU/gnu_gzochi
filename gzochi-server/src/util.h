@@ -27,11 +27,22 @@ void gzochid_util_serialize_bytes (char *, int, GString *);
 void gzochid_util_serialize_string (char *, GString *);
 void gzochid_util_serialize_list 
 (GList *, void (*) (gpointer, GString *), GString *);
+void gzochid_util_serialize_hash_table
+(GHashTable *, 
+ void (*) (gpointer, GString *), 
+ void (*) (gpointer, GString *), 
+ GString *);
 
 gboolean gzochid_util_deserialize_boolean (GString *);
 void gzochid_util_deserialize_mpz (GString *, mpz_t);
 char *gzochid_util_deserialize_bytes (GString *, int *);
 char *gzochid_util_deserialize_string (GString *);
 GList *gzochid_util_deserialize_list (GString *, gpointer (*) (GString *));
+GHashTable *gzochid_util_deserialize_hash_table
+(GString *, 
+ GHashFunc, 
+ GEqualFunc, 
+ gpointer (*) (GString *), 
+ gpointer (*) (GString *));
 
 #endif /* GZOCHID_UTIL_H */
