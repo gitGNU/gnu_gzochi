@@ -33,6 +33,7 @@
 #define PENDING_TASK_PREFIX "s.pendingTask."
 #define DELAYED_TASK_PREFIX "s.delayedTask."
 
+extern gzochid_task_serialization gzochid_initialized_task_serialization;
 extern gzochid_task_serialization gzochid_client_logged_in_task_serialization;
 extern gzochid_task_serialization 
 gzochid_client_received_message_task_serialization;
@@ -82,6 +83,8 @@ void gzochid_task_initialize_serialization_registry (void)
 
   gzochid_task_register_serialization 
     ("scheme", &gzochid_scheme_task_serialization);
+  gzochid_task_register_serialization
+    ("initialized", &gzochid_initialized_task_serialization);
   gzochid_task_register_serialization
     ("logged-in", &gzochid_client_logged_in_task_serialization);
   gzochid_task_register_serialization

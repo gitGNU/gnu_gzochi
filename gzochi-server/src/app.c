@@ -88,58 +88,129 @@ static void initialize_complete
     (game_context->pool, initialize_async, user_data, NULL);
 }
 
+static void initialized_worker 
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gpointer data)
+{
+  mpz_t oid;
+
+  void **ptrs = (void **) data;
+  char *oid_str = (char *) ptrs[0];
+  GHashTable *properties = (GHashTable *) ptrs[1];
+
+  gzochid_data_managed_reference *callback_reference = NULL;
+
+  mpz_init (oid);
+  mpz_set_str (oid, oid_str, 16);
+  
+  callback_reference = gzochid_data_create_reference_to_oid 
+    (context, &gzochid_scheme_data_serialization, oid);
+  gzochid_data_dereference (callback_reference);
+
+  gzochid_scheme_invoke 
+    (context,
+     identity,
+     "gzochi:execute-initialized",
+     g_list_append
+     (g_list_append
+      (g_list_append (NULL, "gzochi"), "private"), "app"),
+     scm_list_2 ((SCM) callback_reference->obj,
+		 gzochid_scheme_ghashtable_to_hashtable 
+		 (properties, 
+		  gzochid_scheme_string_hash,
+		  gzochid_scheme_string_equiv,
+		  (SCM (*) (gpointer)) scm_from_locale_string,
+		  (SCM (*) (gpointer)) scm_from_locale_string)),
+     SCM_BOOL_F);
+
+  gzochid_data_set_binding_to_oid (context, "s.initializer", oid);
+  mpz_clear (oid);
+}
+
+static void initialized_worker_serializer 
+(gzochid_application_context *context, gzochid_application_worker worker, 
+ GString *out)
+{
+}
+
+static gzochid_application_worker initialized_worker_deserializer
+(gzochid_application_context *context, GString *in)
+{
+  return initialized_worker;
+}
+
+static void initialized_data_serializer
+(gzochid_application_context *context, void *ptr, GString *out)
+{
+  void **data = (void **) ptr;
+  gzochid_util_serialize_string ((char *) data[0], out);
+  gzochid_util_serialize_hash_table 
+    ((GHashTable *) data[1], 
+     (void (*) (gpointer, GString *)) gzochid_util_serialize_string, 
+     (void (*) (gpointer, GString *)) gzochid_util_serialize_string, 
+     out);
+}
+
+static void *initialized_data_deserializer
+(gzochid_application_context *context, GString *in)
+{
+  void **data = malloc (sizeof (void *) * 2);
+  data[0] = gzochid_util_deserialize_string (in);
+  data[1] = gzochid_util_deserialize_hash_table 
+    (in, g_str_hash, g_str_equal,
+     (gpointer (*) (GString *)) gzochid_util_deserialize_string, 
+     (gpointer (*) (GString *)) gzochid_util_deserialize_string);
+  return data;
+}
+
+static gzochid_data_worker_serialization initialized_worker_serialization =
+  { initialized_worker_serializer, initialized_worker_deserializer };
+static gzochid_io_serialization initialized_data_serialization =
+  { initialized_data_serializer, initialized_data_deserializer };
+gzochid_task_serialization gzochid_initialized_task_serialization = 
+  { &initialized_worker_serialization, &initialized_data_serialization };
+
 static gzochid_task *initialized_callback_to_task 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gzochid_application_callback *callback, 
  GHashTable *properties)
 {
   SCM cb = gzochid_scheme_create_callback (callback, NULL);
-  SCM mht = gzochid_scheme_create_managed_hashtable (properties);
-  GList *gpa = NULL;
+  gzochid_task *task = calloc (1, sizeof (gzochid_task));
+  void **data = malloc (sizeof (void *) * 2);
 
-  gzochid_data_managed_reference *cb_ref = 
-    gzochid_data_create_reference_sync 
-    (context, identity, &gzochid_scheme_data_serialization, cb);
-  gzochid_data_managed_reference *mht_ref = 
-    gzochid_data_create_reference_sync 
-    (context, identity, &gzochid_scheme_data_serialization, mht);
+  gzochid_data_managed_reference *cb_ref = gzochid_data_create_reference_sync 
+    (context, identity, &gzochid_scheme_data_serialization, cb);  
 
-  cb_ref = gzochid_data_create_reference_to_oid 
-    (context, &gzochid_scheme_data_serialization, cb_ref->oid);
-  mht_ref = gzochid_data_create_reference_to_oid
-    (context, &gzochid_scheme_data_serialization, mht_ref->oid);
-  
-  gzochid_data_dereference (cb_ref);
-  gzochid_data_dereference (mht_ref);
+  data[0] = mpz_get_str (NULL, 16, cb_ref->oid);
+  data[1] = properties;
 
-  gpa = g_list_append 
-    (g_list_append (g_list_append (gpa, "gzochi"), "private"), "app");
+  task->worker = initialized_worker;
+  task->data = data;
 
-  return gzochid_scheme_task_new 
-    (context, "gzochi:execute-initialized", gpa, 
-     scm_list_2 ((SCM) cb_ref->obj, (SCM) mht_ref->obj));
+  return task;
 }
 
 static void run_async_transactional (gpointer data)
 {
   gzochid_application_context *context = (gzochid_application_context *) data;
-  gzochid_task_descriptor *persisted_descriptor = 
-    gzochid_task_get (context, "s.initializer");
+  SCM persisted_callback = (gzochid_application_callback *) 
+    gzochid_data_get_binding 
+    (context, "s.initializer", &gzochid_scheme_data_serialization);
 
   gzochid_auth_identity *system_identity = calloc 
     (1, sizeof (gzochid_auth_identity));
   system_identity->name = "[SYSTEM]";
 
-  if (persisted_descriptor == NULL)
+  if (persisted_callback == NULL)
     {
       gzochid_task *task = initialized_callback_to_task
 	(context, system_identity, context->descriptor->initialized, 
 	 context->descriptor->properties);
 
       gzochid_run_durable_task
-	(context, system_identity, task, &gzochid_scheme_task_serialization);
-      
-      /* gzochid_task_free (task); */
+	(context, system_identity, task, 
+	 &gzochid_initialized_task_serialization);
     }
 }
 
