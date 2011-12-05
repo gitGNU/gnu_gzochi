@@ -296,6 +296,7 @@ gzochid_application_descriptor *gzochid_config_parse_application_descriptor
     return NULL;
 
   descriptor = calloc (1, sizeof (gzochid_application_descriptor));
+  descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);
   descriptor->load_paths = g_list_append 
     (NULL, strdup (dirname (filename_copy)));
   free (filename_copy);
