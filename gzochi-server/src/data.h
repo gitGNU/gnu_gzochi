@@ -90,6 +90,8 @@ void *gzochid_data_get_binding
 (gzochid_application_context *, char *, gzochid_io_serialization *);
 void gzochid_data_set_binding
 (gzochid_application_context *, char *, gzochid_io_serialization *, void *);
+void gzochid_data_set_binding_to_oid
+(gzochid_application_context *, char *, mpz_t);
 void gzochid_data_remove_binding (gzochid_application_context *, char *);
 gzochid_data_managed_reference *gzochid_data_create_reference
 (gzochid_application_context *, gzochid_io_serialization *, void *);

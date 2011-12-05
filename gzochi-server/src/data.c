@@ -217,18 +217,23 @@ static void get_binding
 (gzochid_data_transaction_context *context, char *name, mpz_t oid)
 {
   char *oid_str = gzochid_storage_transaction_get 
-    (context->oids_transaction, name, strlen (name) + 1, NULL);
+    (context->names_transaction, name, strlen (name) + 1, NULL);
 
   if (oid_str != NULL)
     {
       mpz_set_str (oid, oid_str, 16);
       free (oid_str);
     }
-  else mpz_set_ui (oid, -1);
+  else mpz_set_si (oid, -1);
 }
 
-void set_binding (gzochid_application_context *context, char *name, mpz_t oid)
+static void set_binding 
+(gzochid_data_transaction_context *context, char *name, mpz_t oid)
 {
+  char *oid_str = mpz_get_str (NULL, 16, oid);
+  gzochid_storage_transaction_put 
+    (context->names_transaction, name, strlen (name) + 1, oid_str, 
+     strlen (oid_str) + 1);
 }
 
 static gzochid_data_managed_reference *create_empty_reference
@@ -382,16 +387,28 @@ void *gzochid_data_get_binding
 
   mpz_init (oid);
   get_binding (tx_context, name, oid);
+
+  if (mpz_cmp_si (oid, -1) == 0)
+    {
+      mpz_clear (oid);
+      return NULL;
+    }
+
   reference = get_reference_by_oid (context, oid, serialization);  
   mpz_clear (oid);
 
-  if (reference->state == GZOCHID_MANAGED_REFERENCE_STATE_EMPTY)
-    return NULL;
-  else 
-    {
-      dereference (tx_context, reference);
-      return reference->obj;
-    }
+  dereference (tx_context, reference);
+  return reference->obj;
+}
+
+void gzochid_data_set_binding_to_oid
+(gzochid_application_context *context, char *name, mpz_t oid)
+{
+  gzochid_data_transaction_context *tx_context = NULL;
+ 
+  join_transaction (context);
+  tx_context = gzochid_transaction_context (&data_participant);
+  set_binding (tx_context, name, oid);
 }
 
 void gzochid_data_set_binding 
@@ -399,11 +416,13 @@ void gzochid_data_set_binding
  gzochid_io_serialization *serialization, void *data)
 {
   gzochid_data_managed_reference *reference = NULL;
+  gzochid_data_transaction_context *tx_context = NULL;
  
   join_transaction (context);
+  tx_context = gzochid_transaction_context (&data_participant);
 
   reference = get_reference_by_ptr (context, data, serialization);
-  set_binding (context, name, reference->oid);
+  set_binding (tx_context, name, reference->oid);
 }
 
 gzochid_data_managed_reference *gzochid_data_create_reference
