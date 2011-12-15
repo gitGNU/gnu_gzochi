@@ -22,6 +22,7 @@
 
 #include "app.h"
 #include "context.h"
+#include "schedule.h"
 #include "socket.h"
 
 enum gzochid_game_state 
@@ -35,6 +36,7 @@ typedef struct _gzochid_game_context
 {
   gzochid_context base;
   GThreadPool *pool;
+  gzochid_task_queue *task_queue;
   
   int port;
   char *apps_dir;
