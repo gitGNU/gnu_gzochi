@@ -80,6 +80,8 @@ void gzochid_storage_unlock (gzochid_storage_store *);
 char *gzochid_storage_get (gzochid_storage_store *, char *, int, int *);
 void gzochid_storage_put (gzochid_storage_store *, char *, int, char *, int);
 void gzochid_storage_delete (gzochid_storage_store *, char *, int);
+char *gzochid_storage_first_key (gzochid_storage_store *, int *);
+char *gzochid_storage_next_key (gzochid_storage_store *, char *, int, int *);
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin
 (gzochid_storage_store *);
@@ -92,5 +94,9 @@ void gzochid_storage_transaction_put
 (gzochid_storage_transaction *, char *, int, char *, int);
 void gzochid_storage_transaction_delete 
 (gzochid_storage_transaction *, char *, int);
+char *gzochid_storage_transaction_first_key 
+(gzochid_storage_transaction *, int *);
+char *gzochid_storage_transaction_next_key 
+(gzochid_storage_transaction *, char *, int, int *);
 
 #endif /* GZOCHID_STORAGE_H */

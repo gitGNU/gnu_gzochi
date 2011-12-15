@@ -117,6 +117,41 @@ void gzochid_storage_put
 void gzochid_storage_delete 
 (gzochid_storage_store *store, char *key, int key_len)
 {
+  datum dkey;
+
+  dkey.dptr = key;
+  dkey.dsize = key_len;
+
+  assert (gdbm_delete (store->database, dkey) == 0);
+}
+
+char *gzochid_storage_first_key (gzochid_storage_store *store, int *len)
+{
+  datum dkey = gdbm_firstkey (store->database);
+  
+  if (len != NULL)
+    *len = dkey.dsize;
+
+  return dkey.dptr;
+}
+
+char *gozchid_storage_next_key 
+(gzochid_storage_store *store, char *key, int key_len, int *len)
+{
+  datum dkey, dnext;
+
+  dkey.dptr = key;
+  dkey.dsize = key_len;
+
+  dnext = gdbm_nextkey (store->database, dkey);
+  
+  if (dnext.dptr == NULL)
+    return NULL;
+
+  if (len != NULL)
+    *len = dnext.dsize;
+
+  return dnext.dptr;
 }
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin
@@ -301,4 +336,18 @@ void gzochid_storage_transaction_delete
   set_write_lock (tx, k);
   g_hash_table_insert (tx->cache, k, v);  
   tx->operations = g_list_append (tx->operations, make_delete (key, key_len));
+}
+
+char *gzochid_storage_transaction_first_key 
+(gzochid_storage_transaction *tx, int *len)
+{
+  assert (1 == 0);
+  return NULL;
+}
+
+char *gozchid_storage_transaction_next_key 
+(gzochid_storage_transaction *tx, char *key, int key_len, int *len)
+{
+  assert (1 == 0);
+  return NULL;
 }
