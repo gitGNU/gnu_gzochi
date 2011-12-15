@@ -17,6 +17,7 @@
 
 #include <libguile.h>
 
+#include "../app.h"
 #include "../data.h"
 #include "../session.h"
 #include "../scheme.h"
