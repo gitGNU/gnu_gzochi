@@ -236,7 +236,7 @@ static void serialize_client_session
 {
   gzochid_client_session *session = (gzochid_client_session *) obj;
 
-  gzochid_auth_identity_serializer (context, session, out);
+  gzochid_auth_identity_serializer (context, session->identity, out);
   gzochid_util_serialize_mpz (session->scm_oid, out);
   if (session->handler != NULL)
     {
