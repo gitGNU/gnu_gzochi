@@ -23,6 +23,7 @@
 
 #include "app.h"
 #include "data.h"
+#include "game.h"
 #include "io.h"
 #include "log.h"
 #include "storage.h"
@@ -480,16 +481,21 @@ gzochid_data_managed_reference *gzochid_data_create_reference_sync
 
   if (gzochid_transaction_active ())
     {
-      gzochid_application_work_unit *unit = 
-	gzochid_application_work_unit_new 
-	(application_persist_data, &reference_holder);
+      gzochid_game_context *game_context = 
+	(gzochid_game_context *) ((gzochid_context *) context)->parent;
 
-      g_mutex_lock (unit->lock);
-      gzochid_application_schedule_work_unit (context, identity, unit);
-      g_cond_wait (unit->cond, unit->lock);
-      g_mutex_unlock (unit->lock);
+      gzochid_application_task application_task;
+      gzochid_task task;
 
-      gzochid_application_work_unit_free (unit);
+      application_task.worker = application_persist_data;
+      application_task.context = context;
+      application_task.identity = identity;
+      application_task.data = &reference_holder;
+
+      task.worker = gzochid_application_task_worker;
+      task.data = &application_task;
+
+      gzochid_schedule_run_task (game_context->task_queue, &task);
 
       /* Clone the reference in to the current transaction. */
       

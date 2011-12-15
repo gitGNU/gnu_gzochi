@@ -17,6 +17,7 @@
 
 #include <libguile.h>
 
+#include "../app.h"
 #include "../auth.h"
 #include "../scheme.h"
 #include "../task.h"
@@ -32,6 +33,7 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 2, 0, 0,
 
   gzochid_task *scheme_task = gzochid_scheme_task_new 
     (context, 
+     identity,
      gzochid_scheme_task_procedure (task),
      gzochid_scheme_task_module (task), 
      gzochid_scheme_task_data (task));

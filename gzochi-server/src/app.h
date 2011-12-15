@@ -77,27 +77,56 @@ typedef struct _gzochid_application_context
 
 typedef void (*gzochid_application_worker) 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
-typedef struct _gzochid_application_work_unit
+
+void gzochid_application_task_worker (gpointer, gpointer);
+
+typedef struct _gzochid_application_worker_serialization
 {
-  GMutex *lock;
-  GCond *cond;
+  void (*serializer) 
+  (gzochid_application_context *, gzochid_application_worker, GString *);
+  gzochid_application_worker (*deserializer) 
+  (gzochid_application_context *, GString *);
+} gzochid_application_worker_serialization;
+
+typedef struct _gzochid_application_task_serialization
+{
+  char *name;
+  gzochid_application_worker_serialization *worker_serialization;
+  gzochid_io_serialization *data_serialization;
+} gzochid_application_task_serialization;
+
+typedef struct _gzochid_application_task
+{
+  gzochid_application_worker worker;
+  gzochid_application_context *context;
+  gzochid_auth_identity *identity;
+  gpointer data;
+
+} gzochid_application_task;
+
+typedef struct _gzochid_durable_application_task
+{
+  gzochid_application_task *task;
+  gzochid_application_task_serialization *serialization;
+
+  gboolean repeats;
+  long period;
+  long delay;
+
+  mpz_t oid;
+} gzochid_durable_application_task;
+
+typedef struct _gzochid_transactional_application_task
+{
   gzochid_application_worker worker;
   gpointer data;
-} gzochid_application_work_unit;
+} gzochid_transactional_application_task;
 
 gzochid_io_serialization gzochid_application_callback_serialization;
 
 gzochid_application_callback *gzochid_application_callback_new 
 (char *, GList *, mpz_t);
 void gzochid_application_callback_free (gzochid_application_callback *);
-
-void gzochid_application_schedule_work_unit 
-(gzochid_application_context *, gzochid_auth_identity *,
- gzochid_application_work_unit *);
-void gzochid_application_work_unit_worker (gpointer, gpointer);
-gzochid_application_work_unit *gzochid_application_work_unit_new 
-(gzochid_application_worker, gpointer);
-void gzochid_application_work_unit_free (gzochid_application_work_unit *);
 
 gzochid_application_descriptor *gzochid_application_parse_descriptor (char *);
 

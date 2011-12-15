@@ -32,14 +32,14 @@
 SCM gzochid_scheme_scm_module_gzochi_private_app;
 
 gzochid_io_serialization gzochid_scheme_data_serialization;
-gzochid_task_serialization gzochid_scheme_task_serialization;
+gzochid_application_task_serialization gzochid_scheme_task_serialization;
 
 SCM gzochid_scheme_invoke 
 (gzochid_application_context *, gzochid_auth_identity *, char *, GList *, SCM, 
  SCM);
 
-gzochid_task *gzochid_scheme_task_new
-(gzochid_application_context *, char *, GList *, SCM);
+gzochid_application_task *gzochid_scheme_task_new
+(gzochid_application_context *, gzochid_auth_identity *, char *, GList *, SCM);
 
 SCM gzochid_scheme_glist_to_list (GList *, SCM (*) (gpointer));
 GList *gzochid_scheme_list_to_glist (SCM, gpointer (*) (SCM));

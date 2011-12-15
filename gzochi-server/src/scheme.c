@@ -50,6 +50,7 @@ static SCM scm_hashtable_set_x;
 static SCM scm_hashtable_ref;
 static SCM scm_make_hashtable;
 
+static SCM scm_make_managed_reference;
 static SCM scm_managed_record_p;
 static SCM scm_managed_record_serialize;
 static SCM scm_managed_record_deserialize;
@@ -60,8 +61,6 @@ static SCM scm_handler_disconnected;
 
 static SCM scm_make_client_session;
 static SCM scm_client_session_oid;
-
-static SCM scm_make_managed_reference;
 
 static SCM scm_make_task;
 static SCM scm_task_procedure;
@@ -338,14 +337,18 @@ static void *scheme_deserializer
   return scm_with_guile (scheme_deserializer_inner, args);
 }
 
-static gzochid_data_worker_serialization scheme_worker_serialization =
+static gzochid_application_worker_serialization scheme_worker_serialization =
   { scheme_worker_serializer, scheme_worker_deserializer };
 
 gzochid_io_serialization gzochid_scheme_data_serialization =
   { scheme_serializer, scheme_deserializer };
 
-gzochid_task_serialization gzochid_scheme_task_serialization = 
-  { &scheme_worker_serialization, &gzochid_scheme_data_serialization };
+gzochid_application_task_serialization gzochid_scheme_task_serialization = 
+  { 
+    "scheme", 
+    &scheme_worker_serialization, 
+    &gzochid_scheme_data_serialization 
+  };
 
 void *init_scheme_task (gpointer ptr)
 {
@@ -357,14 +360,11 @@ void *init_scheme_task (gpointer ptr)
 		      scm_list_ref (lst, scm_from_short (2)));
 }
 
-gzochid_task *gzochid_scheme_task_new 
-(gzochid_application_context *context, char *procedure, GList *module_name, 
- SCM data)
+gzochid_application_task *gzochid_scheme_task_new 
+(gzochid_application_context *context, gzochid_auth_identity *identity,
+ char *procedure, GList *module_name, SCM data)
 {
-  gzochid_task *task = calloc (1, sizeof (gzochid_task));
-  
-  task->worker = scheme_worker;
-  task->data = gzochid_scheme_invoke 
+  SCM scm_data = gzochid_scheme_invoke 
     (context,
      NULL,
      "gzochi:make-task", 
@@ -375,9 +375,11 @@ gzochid_task *gzochid_scheme_task_new
 		(module_name, (SCM (*) (gpointer)) scm_from_locale_symbol),
 		data)), 
      SCM_BOOL_F);
+
+  gzochid_application_task *task = gzochid_application_task_new
+    (context, identity, scheme_worker, scm_data);
   
   scm_gc_protect_object (task->data);
-
   return task;
 }
 

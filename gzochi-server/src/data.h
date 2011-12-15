@@ -38,15 +38,6 @@ enum gzochid_data_managed_reference_state
     GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED
   };
 
-typedef struct _gzochid_data_worker_serialization
-{
-  void (*serializer) 
-  (gzochid_application_context *, gzochid_application_worker, GString *);
-  
-  gzochid_application_worker (*deserializer) 
-  (gzochid_application_context *, GString *);
-} gzochid_data_worker_serialization;
-
 typedef struct _gzochid_data_managed_reference
 {
   gzochid_application_context *context;
