@@ -69,6 +69,23 @@ void gzochid_util_serialize_list
     }
 }
 
+void gzochid_util_serialize_sequence
+(GSequence *sequence, void (*serializer) (gpointer, GString *), GString *out)
+{
+  char len_str[4];
+  int len = g_sequence_get_length (sequence);
+  GSequenceIter *iter = g_sequence_get_begin_iter (sequence);
+  
+  gzochi_common_io_write_int (len, len_str, 0);
+  g_string_append_len (out, len_str, 4);
+
+  while (!g_sequence_iter_is_end (iter))
+    {
+      serializer (g_sequence_get (iter), out);
+      iter = g_sequence_iter_next (iter);
+    }
+}
+
 void gzochid_util_serialize_hash_table
 (GHashTable *hashtable, void (*key_serializer) (gpointer, GString *), 
  void (*value_serializer) (gpointer, GString *), GString *out)
@@ -136,6 +153,22 @@ GList *gzochid_util_deserialize_list
   return ret;
 }
 
+GSequence *gzochid_util_deserialize_sequence
+(GString *in, gpointer (*deserializer) (GString *))
+{
+  GSequence *ret = g_sequence_new (NULL);
+  int len = gzochi_common_io_read_int (in->str, 0);
+  g_string_erase (in, 0, 4);
+
+  while (len > 0)
+    {
+      g_sequence_append (ret, deserializer (in));
+      len--;
+    }
+
+  return ret;
+}
+
 GHashTable *gzochid_util_deserialize_hash_table
 (GString *in, GHashFunc hash_func, GEqualFunc key_equal_func, 
  gpointer (*key_deserializer) (GString *), 
@@ -152,4 +185,10 @@ GHashTable *gzochid_util_deserialize_hash_table
     }
 
   return ret;
+}
+
+gint gzochid_util_string_data_compare 
+(gconstpointer a, gconstpointer b, gpointer user_data)
+{
+  return g_strcmp0 ((const char *) a, (const char *) b);
 }
