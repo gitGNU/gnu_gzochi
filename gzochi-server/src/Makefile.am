@@ -31,8 +31,8 @@ AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ \
 bin_PROGRAMS = gzochid
 
 gzochid_SOURCES = admin.c app.c auth.c config.c context.c data.c fsm.c game.c \
-	guile.c gzochid.c httpd.c log.c protocol.c scheme.c session.c socket.c \
-	storage.c task.c threads.c tx.c util.c
+	guile.c gzochid.c httpd.c log.c protocol.c schedule.c scheme.c \
+	session.c socket.c storage.c task.c threads.c tx.c util.c
 gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
 	@GLIB_LIBS@ @GTHREAD_LIBS@ @MICROHTTPD_LIBS@ @ZLIB_LIBS@ \
 	@SERVEEZ_LDFLAGS@
@@ -50,6 +50,7 @@ gzochid.c: gzochid.h
 httpd.c: httpd.h
 log.c: log.h
 protocol.c: protocol.h
+schedule.c: schedule.h
 scheme.c: scheme.h
 session.c: session.h
 socket.c: socket.h
