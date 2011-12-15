@@ -32,6 +32,6 @@ includedir = $(prefix)/include
 dist_include_HEADERS = libgzochi.h
 
 channel.c: channel.h
-client.c: client.h
+client.c:
 protocol.c: protocol.h
 session.c: session.h

@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <gzochi-common.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -23,7 +24,6 @@
 #include <sys/socket.h>
 
 #include "channel.h"
-#include "client.h"
 #include "io.h"
 #include "protocol.h"
 #include "session.h"
