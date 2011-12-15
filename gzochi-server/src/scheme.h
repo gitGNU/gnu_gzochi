@@ -24,6 +24,7 @@
 
 #include "app.h"
 #include "auth.h"
+#include "channel.h"
 #include "data.h"
 #include "io.h"
 #include "session.h"
@@ -67,9 +68,11 @@ SCM gzochid_scheme_create_bytevector (unsigned char *, size_t);
 SCM gzochid_scheme_create_client_session (gzochid_client_session *, mpz_t);
 SCM gzochid_scheme_create_managed_hashtable (GHashTable *);
 SCM gzochid_scheme_create_managed_reference (gzochid_data_managed_reference *);
+SCM gzochid_scheme_create_channel (gzochid_channel *, mpz_t);
 
 void gzochid_scheme_managed_reference_oid (SCM, mpz_t);
 void gzochid_scheme_client_session_oid (SCM, mpz_t);
+void gzochid_scheme_channel_oid (SCM, mpz_t);
 
 void gzochid_scheme_initialize_bindings (void);
 

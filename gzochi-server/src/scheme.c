@@ -31,6 +31,7 @@
 #include "session.h"
 #include "task.h"
 
+#include "api/channel.h"
 #include "api/data.h"
 #include "api/session.h"
 #include "api/task.h"
@@ -61,6 +62,9 @@ static SCM scm_handler_disconnected;
 
 static SCM scm_make_client_session;
 static SCM scm_client_session_oid;
+
+static SCM scm_make_channel;
+static SCM scm_channel_oid;
 
 static SCM scm_make_task;
 static SCM scm_task_procedure;
@@ -582,6 +586,21 @@ SCM gzochid_scheme_create_managed_reference
   return ret;
 }
 
+SCM gzochid_scheme_create_channel (gzochid_channel *channel, mpz_t oid)
+{
+  char *oid_str = mpz_get_str (NULL, 16, oid);
+  
+  SCM scm_oid = scm_string_to_number
+    (scm_from_locale_string (oid_str), scm_from_short (16));
+  SCM ret = scm_call_2 
+    (scm_make_channel, scm_oid, scm_from_locale_string (channel->name));
+
+  free (oid_str);
+  scm_gc_protect_object (ret);
+
+  return ret;
+}
+
 static void initialize_binding (SCM module, SCM *binding, char *name)
 {
   SCM var = scm_c_module_lookup (module, name);
@@ -594,6 +613,7 @@ static void *initialize_bindings (void *ptr)
   SCM rnrs_hashtables = scm_c_resolve_module ("rnrs hashtables");
 
   SCM gzochi_app = scm_c_resolve_module ("gzochi app");
+  SCM gzochi_channel = scm_c_resolve_module ("gzochi channel");
   SCM gzochi_client = scm_c_resolve_module ("gzochi client");
   SCM gzochi_data = scm_c_resolve_module ("gzochi data");
   SCM gzochi_task = scm_c_resolve_module ("gzochi task");
@@ -621,6 +641,9 @@ static void *initialize_bindings (void *ptr)
   initialize_binding
     (gzochi_app, &scm_callback_procedure, "gzochi:callback-procedure");
   initialize_binding (gzochi_app, &scm_callback_data, "gzochi:callback-data");
+
+  initialize_binding (gzochi_channel, &scm_make_channel, "gzochi:make-channel");
+  initialize_binding (gzochi_channel, &scm_channel_oid, "gzochi:channel-oid");
 
   initialize_binding
     (gzochi_client, &scm_handler_received_message,
@@ -664,6 +687,7 @@ static void *initialize_bindings (void *ptr)
     (gzochi_private_task, &scm_task_module, "gzochi:task-module");
   initialize_binding (gzochi_private_task, &scm_run_task, "gzochi:run-task");
  
+  gzochid_api_channel_init ();
   gzochid_api_data_init ();
   gzochid_api_session_init ();
   gzochid_api_task_init ();
@@ -675,6 +699,17 @@ void gzochid_scheme_managed_reference_oid (SCM reference, mpz_t oid)
 {
   SCM num = scm_call_1 (scm_managed_reference_oid, reference);
   char *oid_str = scm_to_locale_string 
+    (scm_number_to_string (num, scm_from_short (16)));
+  
+  mpz_set_str (oid, oid_str, 16);
+
+  free (oid_str);
+}
+
+void gzochid_scheme_channel_oid (SCM channel, mpz_t oid)
+{
+  SCM num = scm_call_1 (scm_channel_oid, channel);
+  char *oid_str = scm_to_locale_string
     (scm_number_to_string (num, scm_from_short (16)));
   
   mpz_set_str (oid, oid_str, 16);
