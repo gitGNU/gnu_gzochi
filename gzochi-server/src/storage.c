@@ -232,7 +232,8 @@ static datum *make_key (char *key, int key_len)
 {
   datum *d = malloc (sizeof (datum));
 
-  d->dptr = key;
+  d->dptr = malloc (sizeof (char) * key_len);
+  memcpy (d->dptr, key, key_len);
   d->dsize = key_len;
 
   return d;
@@ -341,13 +342,34 @@ void gzochid_storage_transaction_delete
 char *gzochid_storage_transaction_first_key 
 (gzochid_storage_transaction *tx, int *len)
 {
-  assert (1 == 0);
-  return NULL;
+  datum dkey = gdbm_firstkey (tx->store->database);
+
+  if (dkey.dptr != NULL)
+    {
+      set_read_lock (tx, make_key (dkey.dptr, dkey.dsize));
+      if (len != NULL)
+	*len = dkey.dsize;
+      return dkey.dptr;
+    }
+  else return NULL;
 }
 
-char *gozchid_storage_transaction_next_key 
+char *gzochid_storage_transaction_next_key 
 (gzochid_storage_transaction *tx, char *key, int key_len, int *len)
 {
-  assert (1 == 0);
-  return NULL;
+  datum dkey, lkey;
+
+  dkey.dptr = key;
+  dkey.dsize = key_len;
+
+  lkey = gdbm_nextkey (tx->store->database, dkey);
+
+  if (lkey.dptr != NULL)
+    {
+      set_read_lock (tx, make_key (lkey.dptr, lkey.dsize));
+      if (len != NULL)
+	*len = lkey.dsize;
+      return lkey.dptr;
+    }
+  else return NULL;
 }
