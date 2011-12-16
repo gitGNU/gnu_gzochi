@@ -18,6 +18,10 @@
 #ifndef GZOCHID_LOG_H
 #define GZOCHID_LOG_H
 
+#include <stdarg.h>
+
+void gzochid_vlog (int, char *, va_list);
+void gzochid_log (int, char *, ...);
 void gzochid_err (char *, ...);
 void gzochid_warning (char *, ...);
 void gzochid_notice (char *, ...);

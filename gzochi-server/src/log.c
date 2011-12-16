@@ -23,7 +23,7 @@
 
 #include "log.h"
 
-static void gzochid_vlog (int priority, char *msg, va_list ap)
+void gzochid_vlog (int priority, char *msg, va_list ap)
 {
   char *severity = NULL;
   struct timeval tv;
