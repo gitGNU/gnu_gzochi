@@ -20,6 +20,7 @@
 
 #include <glib.h>
 #include <gmp.h>
+#include <sys/time.h>
 
 void gzochid_util_serialize_boolean (gboolean, GString *);
 void gzochid_util_serialize_mpz (mpz_t, GString *);
@@ -34,6 +35,7 @@ void gzochid_util_serialize_hash_table
  void (*) (gpointer, GString *), 
  void (*) (gpointer, GString *), 
  GString *);
+void gzochid_util_serialize_timeval (struct timeval, GString *);
 
 gboolean gzochid_util_deserialize_boolean (GString *);
 void gzochid_util_deserialize_mpz (GString *, mpz_t);
@@ -48,6 +50,7 @@ GHashTable *gzochid_util_deserialize_hash_table
  GEqualFunc, 
  gpointer (*) (GString *), 
  gpointer (*) (GString *));
+struct timeval gzochid_util_deserialize_timeval (GString *);
 
 gint gzochid_util_string_data_compare (gconstpointer, gconstpointer, gpointer);
 

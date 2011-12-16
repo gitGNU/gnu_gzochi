@@ -106,6 +106,17 @@ void gzochid_util_serialize_hash_table
     }
 }
 
+void gzochid_util_serialize_timeval (struct timeval tv, GString *out)
+{
+  char str[4];
+
+  gzochi_common_io_write_int (tv.tv_sec, str, 0);
+  g_string_append_len (out, str, 4);
+
+  gzochi_common_io_write_int (tv.tv_usec, str, 0);
+  g_string_append_len (out, str, 4);
+}
+
 gboolean gzochid_util_deserialize_boolean (GString *in)
 {
   gboolean ret = in->str[0] == 0x1 ? TRUE : FALSE;
@@ -185,6 +196,18 @@ GHashTable *gzochid_util_deserialize_hash_table
     }
 
   return ret;
+}
+
+struct timeval gzochid_util_deserialize_timeval (GString *in)
+{
+  struct timeval tv;
+
+  tv.tv_sec = gzochi_common_io_read_int (in->str, 0);
+  g_string_erase (in, 0, 4);
+  tv.tv_usec = gzochi_common_io_read_int (in->str, 0);
+  g_string_erase (in, 0, 4);
+
+  return tv;
 }
 
 gint gzochid_util_string_data_compare 
