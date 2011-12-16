@@ -84,6 +84,9 @@ void gzochid_data_set_binding
 void gzochid_data_set_binding_to_oid
 (gzochid_application_context *, char *, mpz_t);
 void gzochid_data_remove_binding (gzochid_application_context *, char *);
+char *gzochid_data_next_binding_oid 
+(gzochid_application_context *, char *, mpz_t);
+
 gzochid_data_managed_reference *gzochid_data_create_reference
 (gzochid_application_context *, gzochid_io_serialization *, void *);
 gzochid_data_managed_reference *gzochid_data_create_reference_sync

@@ -235,6 +235,8 @@ static void set_binding
   gzochid_storage_transaction_put 
     (context->names_transaction, name, strlen (name) + 1, oid_str, 
      strlen (oid_str) + 1);
+
+  free (oid_str);
 }
 
 static gzochid_data_managed_reference *create_empty_reference
@@ -410,6 +412,28 @@ void gzochid_data_set_binding_to_oid
   join_transaction (context);
   tx_context = gzochid_transaction_context (&data_participant);
   set_binding (tx_context, name, oid);
+}
+
+char *gzochid_data_next_binding_oid
+(gzochid_application_context *context, char *key, mpz_t oid)
+{
+  char *next_key = NULL;
+  gzochid_data_transaction_context *tx_context = NULL;
+ 
+  join_transaction (context);
+  tx_context = gzochid_transaction_context (&data_participant);
+  next_key = gzochid_storage_transaction_next_key 
+    (tx_context->names_transaction, key, strlen (key) + 1, NULL);
+
+  if (next_key != NULL)
+    {
+      char *next_value = gzochid_storage_transaction_get 
+	(tx_context->names_transaction, next_key, strlen (next_key + 1), NULL);
+      mpz_set_str (oid, next_value, 16);
+      free (next_value);
+      return next_key;
+    }
+  else return NULL;
 }
 
 void gzochid_data_set_binding 
