@@ -43,6 +43,7 @@ AC_SERVEEZ
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
-		 src/api/Makefile])
+		 src/api/Makefile
+		 src/tests/Makefile])
 
 AC_OUTPUT
