@@ -82,5 +82,6 @@ void gzochid_cancel_periodic_task (gzochid_periodic_task_handle *);
 void gzochid_task_initialize_serialization_registry (void);
 void gzochid_task_register_serialization 
 (char *, gzochid_application_task_serialization *);
+void gzochid_restart_tasks (gzochid_application_context *);
 
 #endif /* GZOCHID_TASK_H */

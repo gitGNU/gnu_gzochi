@@ -185,6 +185,7 @@ static void run_async_transactional (gpointer data)
 
       gzochid_schedule_run_task (game_context->task_queue, &task);
     }
+  else gzochid_restart_tasks (context);
 }
 
 static void run_async (gpointer data, gpointer user_data)

@@ -252,6 +252,38 @@ static gzochid_task *rebuild_durable_task
      task->target_execution_time);
 }
 
+void gzochid_restart_tasks (gzochid_application_context *context)
+{
+  mpz_t oid;
+  char *next_binding = NULL;
+  int prefix_len = strlen (PENDING_TASK_PREFIX);
+  gzochid_game_context *game_context = (gzochid_game_context *)
+    ((gzochid_context *) context)->parent;
+  int num_tasks = 0;
+
+  mpz_init (oid);
+  gzochid_tx_info (context, "Resubmitting durable tasks.");
+  next_binding = gzochid_data_next_binding_oid 
+    (context, PENDING_TASK_PREFIX, oid);
+
+  while (next_binding != NULL 
+	 && strncmp (PENDING_TASK_PREFIX, next_binding, prefix_len) == 0)
+    {
+      char *next_next_binding = 
+	gzochid_data_next_binding_oid (context, next_binding, oid);
+      gzochid_task *task = rebuild_durable_task (context, oid);
+      
+      gzochid_schedule_submit_task (game_context->task_queue, task);
+
+      free (next_binding);
+      next_binding = next_next_binding;
+      num_tasks++;
+    }
+
+  gzochid_tx_info (context, "Resubmitted %d tasks.", num_tasks);
+  mpz_clear (oid);  
+}
+
 gzochid_task *build_durable_task 
 (gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization)
