@@ -181,6 +181,7 @@ static void run_async_transactional (gpointer data)
 
       task.worker = gzochid_application_task_worker;
       task.data = &application_task;
+      gettimeofday (&task.target_execution_time, NULL);
 
       gzochid_schedule_run_task (game_context->task_queue, &task);
     }
@@ -572,8 +573,12 @@ void gzochid_application_client_disconnected
 	(context, client->identity, 
 	 gzochid_application_transactional_task_worker, transactional_task);
 
-      gzochid_task *task = 
-	gzochid_task_new (gzochid_application_task_worker, application_task);
+      gzochid_task *task = NULL;
+      struct timeval now;
+      gettimeofday (&now, NULL);
+      
+      task = gzochid_task_new 
+	(gzochid_application_task_worker, application_task, now);
       
       gzochid_schedule_submit_task (game_context->task_queue, task);
       g_mutex_unlock (context->client_mapping_lock);
@@ -674,7 +679,8 @@ void gzochid_application_session_received_message
       
       task.worker = gzochid_application_task_worker;
       task.data = &application_task;
-      
+      gettimeofday (&task.target_execution_time, NULL);
+
       gzochid_schedule_run_task (game_context->task_queue, &task);
     }
 }

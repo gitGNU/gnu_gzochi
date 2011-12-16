@@ -57,8 +57,6 @@ void gzochid_schedule_task_queue_start (gzochid_task_queue *);
 
 gzochid_pending_task *gzochid_schedule_submit_task 
 (gzochid_task_queue *, gzochid_task *);
-gzochid_pending_task *gzochid_schedule_submit_delayed_task 
-(gzochid_task_queue *, gzochid_task *, long);
 void gzochid_schedule_run_task (gzochid_task_queue *, gzochid_task *);
 
 #endif /* GZOCHID_SCHEDULE_H */

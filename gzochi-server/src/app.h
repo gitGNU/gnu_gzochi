@@ -111,7 +111,8 @@ typedef struct _gzochid_durable_application_task
 
   gboolean repeats;
   long period;
-  long delay;
+
+  struct timeval target_execution_time;
 
   mpz_t oid;
 } gzochid_durable_application_task;

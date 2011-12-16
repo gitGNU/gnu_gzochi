@@ -88,14 +88,7 @@ void gzochid_schedule_task_queue_start (gzochid_task_queue *task_queue)
       (gzochid_schedule_task_executor, task_queue, FALSE, NULL);
 }
 
-gzochid_pending_task *gzochid_schedule_submit_task
-(gzochid_task_queue *task_queue, gzochid_task *task)
-{
-  return gzochid_schedule_submit_delayed_task (task_queue, task, 0);
-}
-
-gzochid_pending_task *gzochid_pending_task_new 
-(gzochid_task *task, struct timeval scheduled_execution_time)
+gzochid_pending_task *gzochid_pending_task_new (gzochid_task *task)
 {
   gzochid_pending_task *pending_task = malloc (sizeof (gzochid_pending_task));
 
@@ -104,7 +97,7 @@ gzochid_pending_task *gzochid_pending_task_new
   pending_task->cond = g_cond_new ();
   pending_task->mutex = g_mutex_new ();
 
-  pending_task->scheduled_execution_time = scheduled_execution_time;
+  pending_task->scheduled_execution_time = task->target_execution_time;
   
   return pending_task;
 }
@@ -124,18 +117,10 @@ gint pending_task_compare (gconstpointer a, gconstpointer b, gpointer user_data)
 	 - pending_task_b->scheduled_execution_time.tv_usec;
 }
 
-gzochid_pending_task *gzochid_schedule_submit_delayed_task
-(gzochid_task_queue *task_queue, gzochid_task *task, long delay)
+gzochid_pending_task *gzochid_schedule_submit_task
+(gzochid_task_queue *task_queue, gzochid_task *task)
 {
-  struct timeval target_time;
-  gzochid_pending_task *pending_task = NULL;
-
-  gettimeofday (&target_time, NULL);
-
-  target_time.tv_sec += delay / 1000;
-  target_time.tv_usec += (delay % 1000) * 1000;
-
-  pending_task = gzochid_pending_task_new (task, target_time);
+  gzochid_pending_task *pending_task = gzochid_pending_task_new (task);
   
   g_mutex_lock (task_queue->mutex);
   g_queue_insert_sorted 

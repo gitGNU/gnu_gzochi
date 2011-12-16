@@ -20,6 +20,7 @@
 
 #include <glib.h>
 #include <gmp.h>
+#include <sys/time.h>
 
 #include "app.h"
 #include "auth.h"
@@ -37,6 +38,7 @@ typedef struct _gzochid_task
 {
   gzochid_thread_worker worker;
   gpointer data;
+  struct timeval target_execution_time;
 } gzochid_task;
 
 typedef struct _gzochid_task_transaction_context
@@ -50,7 +52,8 @@ typedef struct _gzochid_task_transaction_context
   GList *canceled_recurring_tasks;
 } gzochid_task_transaction_context;
 
-gzochid_task *gzochid_task_new (gzochid_thread_worker, gpointer);
+gzochid_task *gzochid_task_new 
+(gzochid_thread_worker, gpointer, struct timeval);
 
 gzochid_transactional_application_task *
 gzochid_transactional_application_task_new 
@@ -79,8 +82,5 @@ void gzochid_cancel_periodic_task (gzochid_periodic_task_handle *);
 void gzochid_task_initialize_serialization_registry (void);
 void gzochid_task_register_serialization 
 (char *, gzochid_application_task_serialization *);
-void gzochid_restart_all_tasks (gzochid_application_context *);
-void gzochid_restart_tasks 
-(gzochid_application_context *, gzochid_auth_identity *);
 
 #endif /* GZOCHID_TASK_H */

@@ -139,13 +139,16 @@ void serialize_application_task
 
 gzochid_durable_application_task *gzochid_durable_application_task_new 
 (gzochid_application_task *task, 
- gzochid_application_task_serialization *serialization)
+ gzochid_application_task_serialization *serialization, 
+ struct timeval target_execution_time)
 {
   gzochid_durable_application_task *durable_task = 
     malloc (sizeof (gzochid_durable_application_task));
 
   durable_task->task = task;
   durable_task->serialization = serialization;
+  durable_task->target_execution_time = target_execution_time;
+
   mpz_init (durable_task->oid);
   
   return durable_task;
@@ -164,9 +167,12 @@ gpointer deserialize_durable_task
   char *serialization_name = gzochid_util_deserialize_string (in);
   gzochid_application_task_serialization *serialization = 
     gzochid_lookup_task_serialization (serialization_name);
-  gzochid_application_task *task = 
+  gzochid_application_task *task =
     deserialize_application_task (context, serialization, in);
-  return gzochid_durable_application_task_new (task, serialization);
+  struct timeval target_execution_time = gzochid_util_deserialize_timeval (in);
+
+  return gzochid_durable_application_task_new 
+    (task, serialization, target_execution_time);
 }
 
 void serialize_durable_task 
@@ -176,17 +182,21 @@ void serialize_durable_task
     (gzochid_durable_application_task *) data;
   gzochid_util_serialize_string (task->serialization->name, out);  
   serialize_application_task (context, task->serialization, task->task, out);
+  gzochid_util_serialize_timeval (task->target_execution_time, out);
 }
 
 gzochid_io_serialization durable_task_serialization = 
   { serialize_durable_task, deserialize_durable_task };
 
-gzochid_task *gzochid_task_new (gzochid_thread_worker worker, gpointer data)
+gzochid_task *gzochid_task_new 
+(gzochid_thread_worker worker, gpointer data, 
+ struct timeval target_execution_time)
 {
   gzochid_task *task = malloc (sizeof (gzochid_task));
   
   task->worker = worker;
   task->data = data;
+  task->target_execution_time = target_execution_time;
 
   return task;
 }
@@ -217,32 +227,71 @@ static void gzochid_transactional_application_task_worker
   gzochid_transaction_execute (transactional_task_worker, args);  
 }
 
-void gzochid_task_resubmit (gzochid_application_context *context)
-{
-  
-}
-
 static void durable_task_application_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
+
+static gzochid_task *rebuild_durable_task 
+(gzochid_application_context *context, mpz_t oid)
+{
+  gzochid_data_managed_reference *task_reference = 
+    gzochid_data_create_reference_to_oid 
+    (context, &durable_task_serialization, oid);
+  gzochid_durable_application_task *task = 
+    (gzochid_durable_application_task *) task_reference->obj;
+  gzochid_transactional_application_task *transactional_task =
+    gzochid_transactional_application_task_new 
+    (durable_task_application_worker, task);
+  gzochid_application_task *application_task = gzochid_application_task_new
+    (context, task->task->identity, 
+     gzochid_transactional_application_task_worker, transactional_task);
+
+  mpz_set (task->oid, oid);
+
+  return gzochid_task_new 
+    (gzochid_application_task_worker, application_task, 
+     task->target_execution_time);
+}
 
 gzochid_task *build_durable_task 
 (gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization)
 {
-  gzochid_durable_application_task *durable_task = 
-    gzochid_durable_application_task_new (task, serialization);
-  gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (task->context, &durable_task_serialization, durable_task);
-  gzochid_transactional_application_task *transactional_task =
-    gzochid_transactional_application_task_new
-    (durable_task_application_worker, durable_task);
-  gzochid_application_task *application_task = gzochid_application_task_new
-    (task->context, task->identity, 
-     gzochid_transactional_application_task_worker, transactional_task);
+  struct timeval now;
 
-  mpz_set (durable_task->oid, reference->oid);
+  gettimeofday (&now, NULL);
 
-  return gzochid_task_new (gzochid_application_task_worker, application_task);
+  {
+    gzochid_durable_application_task *durable_task = 
+      gzochid_durable_application_task_new (task, serialization, now);
+    gzochid_data_managed_reference *reference = gzochid_data_create_reference 
+      (task->context, &durable_task_serialization, durable_task);
+    
+    char *oid_str = mpz_get_str (NULL, 16, reference->oid);
+    int oid_str_len = strlen (oid_str), 
+      prefix_len = strlen (PENDING_TASK_PREFIX);
+    char *binding_name = calloc (oid_str_len + prefix_len + 1, sizeof (char));
+    
+    gzochid_transactional_application_task *transactional_task =
+      gzochid_transactional_application_task_new
+      (durable_task_application_worker, durable_task);
+    gzochid_application_task *application_task = gzochid_application_task_new
+      (task->context, task->identity, 
+       gzochid_transactional_application_task_worker, transactional_task);
+    
+    gzochid_task *ret = gzochid_task_new 
+      (gzochid_application_task_worker, application_task, now);
+
+    mpz_set (durable_task->oid, reference->oid);
+    binding_name = strncat (binding_name, PENDING_TASK_PREFIX, prefix_len);
+    binding_name = strncat (binding_name, oid_str, oid_str_len);
+    gzochid_data_set_binding_to_oid 
+      (task->context, binding_name, reference->oid);
+
+    free (oid_str);
+    free (binding_name);
+
+    return ret;
+  }
 }
 
 static void durable_task_application_worker 
@@ -263,25 +312,6 @@ static void durable_task_application_worker
        build_durable_task (inner_task, task->serialization));
 }
 
-gzochid_task *rebuild_durable_task 
-(gzochid_application_context *context, mpz_t oid)
-{
-  gzochid_data_managed_reference *task_reference = 
-    gzochid_data_create_reference_to_oid 
-    (context, &durable_task_serialization, oid);
-  gzochid_durable_application_task *task = 
-    (gzochid_durable_application_task *) task_reference->obj;
-  gzochid_transactional_application_task *transactional_task =
-    gzochid_transactional_application_task_new 
-    (durable_task_application_worker, task);
-  gzochid_application_task *application_task = gzochid_application_task_new
-    (context, task->task->identity, 
-     gzochid_transactional_application_task_worker, transactional_task);
-
-  mpz_set (task->oid, oid);
-
-  return gzochid_task_new (gzochid_application_task_worker, application_task);
-}
 
 static void commit_scheduled_task (gpointer data, gpointer user_data)
 {
