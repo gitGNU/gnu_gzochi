@@ -1,4 +1,4 @@
-/* txlog.h: Prototypes and declarations for txlog.c
+/* log.h: Prototypes and declarations for log.c
  * Copyright (C) 2011 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -15,16 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef GZOCHID_TX_LOG_H
-#define GZOCHID_TX_LOG_H
+#ifndef GZOCHID_API_LOG_H
+#define GZOCHID_API_LOG_H
 
-#include "app.h"
+void gzochid_api_log_init (void);
 
-void gzochid_tx_log (gzochid_application_context *, int, char *, ...);
-void gzochid_tx_err (gzochid_application_context *, char *, ...);
-void gzochid_tx_warning (gzochid_application_context *, char *, ...);
-void gzochid_tx_notice (gzochid_application_context *, char *, ...);
-void gzochid_tx_info (gzochid_application_context *, char *, ...);
-void gzochid_tx_debug (gzochid_application_context *, char *, ...);
-
-#endif /* GZOCHID_TX_LOG_H */
+#endif /* GZOCHID_API_LOG_H */

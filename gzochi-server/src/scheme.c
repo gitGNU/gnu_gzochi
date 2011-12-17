@@ -33,6 +33,7 @@
 
 #include "api/channel.h"
 #include "api/data.h"
+#include "api/log.h"
 #include "api/session.h"
 #include "api/task.h"
 
@@ -689,6 +690,7 @@ static void *initialize_bindings (void *ptr)
  
   gzochid_api_channel_init ();
   gzochid_api_data_init ();
+  gzochid_api_log_init ();
   gzochid_api_session_init ();
   gzochid_api_task_init ();
   

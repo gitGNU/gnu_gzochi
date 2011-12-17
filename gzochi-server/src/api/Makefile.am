@@ -23,20 +23,22 @@ AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ \
 
 noinst_LIBRARIES = libgzochid-server-api.a
 
-libgzochid_server_api_a_SOURCES = channel.c data.c session.c task.c
+libgzochid_server_api_a_SOURCES = channel.c data.c log.c session.c task.c
 
 SUFFIXES = .x
 .c.x:
 	guile-snarf -o $@ $< @DEFS@ @CFLAGS@ @GLIB_CFLAGS@ @GUILE_CFLAGS@
 
-BUILT_SOURCES = channel.x data.x session.x task.x
+BUILT_SOURCES = channel.x data.x log.x session.x task.x
 
 channel.c: channel.h
 data.c: data.h
+log.c: log.h
 session.c: session.h
 task.c: task.h
 
 channel.x: channel.c
 data.x: data.c
+log.x: log.c
 session.x: session.c
 task.x: task.c

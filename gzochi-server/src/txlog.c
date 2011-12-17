@@ -124,6 +124,15 @@ static void gzochid_tx_vlog
      gzochid_log_message_new (priority, g_strdup_vprintf (msg, ap)));
 }
 
+void gzochid_tx_log
+(gzochid_application_context *context, int priority, char *msg, ...)
+{
+  va_list args;
+  va_start (args, msg);
+  gzochid_tx_vlog (context, priority, msg, args);
+  va_end (args);
+}
+
 void gzochid_tx_err (gzochid_application_context *context, char *msg, ...)
 {
   va_list args;
