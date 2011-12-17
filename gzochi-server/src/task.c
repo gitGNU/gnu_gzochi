@@ -31,6 +31,7 @@
 #include "scheme.h"
 #include "task.h"
 #include "tx.h"
+#include "txlog.h"
 #include "util.h"
 
 #define PENDING_TASK_PREFIX "s.pendingTask."
