@@ -161,8 +161,7 @@ gzochid_storage_transaction *gzochid_storage_transaction_begin
     calloc (1, sizeof (gzochid_storage_transaction));
 
   transaction->store = store;
-  transaction->cache = g_hash_table_new_full
-    (g_datum_hash, g_datum_equal, free, free);
+  transaction->cache = g_hash_table_new (g_datum_hash, g_datum_equal);
 
   return transaction;
 }
@@ -239,6 +238,28 @@ static datum *make_key (char *key, int key_len)
   return d;
 }
 
+static extended_datum *make_extended_key (char *key, int key_len)
+{
+  extended_datum *ed = malloc (sizeof (extended_datum));
+  datum *d = (datum *) ed;
+
+  if (key_len > 0)
+    {
+      d->dptr = malloc (sizeof (char) * key_len);
+      memcpy (d->dptr, key, key_len);
+      d->dsize = key_len;
+      ed->null = FALSE;
+    }
+  else
+    {
+      d->dptr = NULL;
+      d->dsize = 0;
+      ed->null = TRUE;
+    }
+
+  return ed;
+}
+
 static gzochid_storage_operation *make_delete (char *key, int key_len)
 {
   gzochid_storage_operation *delete = 
@@ -251,18 +272,17 @@ static gzochid_storage_operation *make_delete (char *key, int key_len)
   return delete;
 }
 
-static gzochid_storage_operation *make_put 
-(char *key, int key_len, char *value, int value_len)
+static gzochid_storage_operation *make_put (datum *key, datum *value)
 {
   gzochid_storage_operation_put *put = 
     malloc (sizeof (gzochid_storage_operation_put));
   gzochid_storage_operation *op = (gzochid_storage_operation *) put;
 
-  op->key = key;
-  op->key_len = key_len;
+  op->key = key->dptr;
+  op->key_len = key->dsize;
   
-  put->value = value;
-  put->value_len = value_len;
+  put->value = value->dptr;
+  put->value_len = value->dsize;
   
   op->type = GZOCHID_STORAGE_OPERATION_PUT;
 
@@ -282,15 +302,12 @@ char *gzochid_storage_transaction_get
     { 
       datum db_value = gdbm_fetch (tx->store->database, *k);
 
-      value = calloc (1, sizeof (extended_datum));
-
       if (db_value.dptr != NULL)
-	{
-	  value->dptr = db_value.dptr;
-	  value->dsize = db_value.dsize;
-	}
+	value = (datum *) make_extended_key (db_value.dptr, db_value.dsize);
+      else value = (datum *) make_extended_key (NULL, 0);
 	  
       g_hash_table_insert (tx->cache, k, value);
+      free (db_value.dptr);
     }
   else
     {
@@ -314,28 +331,22 @@ void gzochid_storage_transaction_put
 (gzochid_storage_transaction *tx, char *key, int key_len, char *data, 
  int data_len)
 {
-  datum *k = make_key (key, key_len);  
-  datum *v = calloc (1, sizeof (extended_datum));
+  datum *k = make_key (key, key_len);
+  datum *v = (datum *) make_extended_key (data, data_len);
   
-  v->dptr = key;
-  v->dsize = key_len;
-
   set_write_lock (tx, k);
   g_hash_table_insert (tx->cache, k, v);  
-  tx->operations = g_list_append 
-    (tx->operations, make_put (key, key_len, data, data_len));
+  tx->operations = g_list_append (tx->operations, make_put (k, v));
 }
 
 void gzochid_storage_transaction_delete
 (gzochid_storage_transaction *tx, char *key, int key_len)
 {
   datum *k = make_key (key, key_len);
-  extended_datum *v = calloc (1, sizeof (extended_datum));
-
-  v->null = TRUE;
+  datum *v = (datum *) make_extended_key (NULL, 0);
   
   set_write_lock (tx, k);
-  g_hash_table_insert (tx->cache, k, v);  
+  g_hash_table_insert (tx->cache, k, v);
   tx->operations = g_list_append (tx->operations, make_delete (key, key_len));
 }
 
