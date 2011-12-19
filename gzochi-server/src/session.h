@@ -38,6 +38,8 @@ typedef struct _gzochid_client_session
   gzochid_client_session_handler *handler;
   gboolean connected;
 
+  GSequence *channels;
+
   mpz_t scm_oid;
 } gzochid_client_session;
 

@@ -17,14 +17,17 @@
 #!r6rs
 
 (library (gzochi channel)
-  (import)
-  (export gzochi:make-channel
+  (export gzochi:create-channel
+	  gzochi:get-channel
 
 	  gzochi:channel-name
 	  gzochi:channel-delivery
 	  gzochi:channel-sessions
 
-	  gzochi:join-channel!
-	  gzochi:leave-channel!
-	  gzochi:send-channel!)
+	  gzochi:join-channel
+	  gzochi:leave-channel
+	  gzochi:send-channel
+	  gzochi:close-channel)
+
+  (import (gzochi private channel))
 )
