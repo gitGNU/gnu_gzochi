@@ -58,6 +58,6 @@ void gzochi_client_channel_send
 void gzochi_client_channel_set_disconnected_callback 
 (gzochi_client_channel *, gzochi_client_channel_disconnected_callback);
 void gzochi_client_channel_set_received_message_callback 
-(gzochi_client_channel *, gzochi_client_channel_disconnected_callback);
-				
+(gzochi_client_channel *, gzochi_client_channel_received_message_callback);
+
 #endif /* LIBGZOCHI_H */
