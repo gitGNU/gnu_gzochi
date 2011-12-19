@@ -42,6 +42,29 @@ static void received_message
   fprintf (stderr, "[Message] %.*s\n", len, (char *) msg);
 }
 
+static void left_channel (gzochi_client_channel *channel)
+{
+  char *name = gzochi_client_channel_name (channel);
+  fprintf (stderr, "[Left channel \"%s\"]\n", name);
+}
+
+static void received_channel_message
+(gzochi_client_channel *channel, unsigned char *msg, short len)
+{
+  char *name = gzochi_client_channel_name (channel);
+  fprintf (stderr, "[Channel message/%s] %.*s\n", name, len, (char *) msg);
+}
+
+static void joined_channel (gzochi_client_channel *channel)
+{
+  char *name = gzochi_client_channel_name (channel);
+  fprintf (stderr, "[Joined channel \"%s\"]\n", name);
+  
+  gzochi_client_channel_set_disconnected_callback (channel, left_channel);
+  gzochi_client_channel_set_received_message_callback 
+    (channel, received_channel_message);
+}
+
 int main (int argc, char *argv[])
 {
   gzochi_client_session *session = NULL;
@@ -62,6 +85,9 @@ int main (int argc, char *argv[])
 
       gzochi_client_session_set_received_message_callback 
 	(session, received_message);
+      gzochi_client_session_set_joined_channel_callback 
+	(session, joined_channel);
+
       pthread_create (&reader_thread, NULL, reader_loop, session);
       gzochi_client_run (session);
     }
