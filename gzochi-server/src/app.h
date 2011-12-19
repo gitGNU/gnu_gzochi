@@ -78,7 +78,8 @@ typedef struct _gzochid_application_context
 typedef void (*gzochid_application_worker) 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
-void gzochid_application_task_worker (gpointer, gpointer);
+void gzochid_application_task_worker (gpointer);
+void gzochid_application_task_thread_worker (gpointer, gpointer);
 
 typedef struct _gzochid_application_worker_serialization
 {

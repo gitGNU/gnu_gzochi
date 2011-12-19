@@ -146,10 +146,15 @@ static void gzochid_application_transactional_task_worker
   gzochid_transaction_execute (transactional_task_worker, args);  
 }
 
-void gzochid_application_task_worker (gpointer data, gpointer user_data)
+void gzochid_application_task_worker (gpointer data)
 {
   gzochid_application_task *task = (gzochid_application_task *) data;
   task->worker (task->context, task->identity, task->data);
+}
+
+void gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
+{
+  gzochid_application_task_worker (data);
 }
 
 static void run_async_transactional (gpointer data)
@@ -179,7 +184,7 @@ static void run_async_transactional (gpointer data)
       application_task.identity = system_identity;
       application_task.data = &transactional_task;
 
-      task.worker = gzochid_application_task_worker;
+      task.worker = gzochid_application_task_thread_worker;
       task.data = &application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
@@ -487,7 +492,7 @@ void gzochid_application_client_logged_in
   application_task.identity = client->identity;
   application_task.data = &transactional_task;
 
-  task.worker = gzochid_application_task_worker;
+  task.worker = gzochid_application_task_thread_worker;
   task.data = &application_task;
 
   gzochid_schedule_run_task (game_context->task_queue, &task);  
@@ -506,7 +511,7 @@ void gzochid_application_client_logged_in
   application_task.identity = client->identity;
   application_task.data = &transactional_task;
 
-  task.worker = gzochid_application_task_worker;
+  task.worker = gzochid_application_task_thread_worker;
   task.data = &application_task;
 
   gzochid_schedule_run_task (game_context->task_queue, &task);
@@ -579,7 +584,7 @@ void gzochid_application_client_disconnected
       gettimeofday (&now, NULL);
       
       task = gzochid_task_new 
-	(gzochid_application_task_worker, application_task, now);
+	(gzochid_application_task_thread_worker, application_task, now);
       
       gzochid_schedule_submit_task (game_context->task_queue, task);
       g_mutex_unlock (context->client_mapping_lock);
@@ -678,7 +683,7 @@ void gzochid_application_session_received_message
       application_task.identity = client->identity;
       application_task.data = &transactional_task;
       
-      task.worker = gzochid_application_task_worker;
+      task.worker = gzochid_application_task_thread_worker;
       task.data = &application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
