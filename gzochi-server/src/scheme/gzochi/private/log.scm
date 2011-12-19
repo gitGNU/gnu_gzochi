@@ -36,14 +36,14 @@
 
   (define (gzochi:log priority msg . args)
     (let ((formatted-msg (apply simple-format (cons* #f msg args))))
-    (case priority
-      ((err) (primitive-log 'err formatted-msg))
-      ((warning) (primitive-log 'warning formatted-msg))
-      ((notice) (primitive-log 'notice formatted-msg))
-      ((info) (primitive-log 'info formatted-msg))
-      ((debug) (primitive-log 'debug formatted-msg))
-      (else (raise (make-assertion-violation)
-		   (make-irritants-condition priority)))))
+      (case priority
+	((err) (primitive-log 'err formatted-msg))
+	((warning) (primitive-log 'warning formatted-msg))
+	((notice) (primitive-log 'notice formatted-msg))
+	((info) (primitive-log 'info formatted-msg))
+	((debug) (primitive-log 'debug formatted-msg))
+	(else (raise (condition (make-assertion-violation)
+				(make-irritants-condition priority)))))))
 
   (define (gzochi:log-err msg . args)
     (apply gzochi:log (cons* (gzochi:log-priority err) msg args)))
