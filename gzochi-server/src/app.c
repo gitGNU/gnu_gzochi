@@ -494,6 +494,7 @@ void gzochid_application_client_logged_in
 
   task.worker = gzochid_application_task_thread_worker;
   task.data = &application_task;
+  gettimeofday (&task.target_execution_time, NULL);
 
   gzochid_schedule_run_task (game_context->task_queue, &task);  
 
@@ -513,6 +514,7 @@ void gzochid_application_client_logged_in
 
   task.worker = gzochid_application_task_thread_worker;
   task.data = &application_task;
+  gettimeofday (&task.target_execution_time, NULL);
 
   gzochid_schedule_run_task (game_context->task_queue, &task);
 }
@@ -645,6 +647,7 @@ gzochid_io_serialization received_message_data_serialization =
 gzochid_application_task_serialization 
 gzochid_client_received_message_task_serialization = 
   { 
+    "received-message",
     &received_message_worker_serialization, 
     &received_message_data_serialization 
   };
