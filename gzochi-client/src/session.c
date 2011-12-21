@@ -56,7 +56,13 @@ void gzochi_client_session_set_received_message_callback
 
 gzochi_client_session *gzochi_client_session_new (void)
 {
-  return calloc (1, sizeof (gzochi_client_session));
+  gzochi_client_session *session = calloc (1, sizeof (gzochi_client_session));
+
+  session->channels_length = 10;
+  session->channels = 
+    calloc (session->channels_length, sizeof (gzochi_client_channel *));
+
+  return session;
 }
 
 void gzochi_client_session_free (gzochi_client_session *session)

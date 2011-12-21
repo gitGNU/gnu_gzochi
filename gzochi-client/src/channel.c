@@ -17,6 +17,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "channel.h"
 #include "protocol.h"
@@ -28,9 +29,10 @@ gzochi_client_channel *gzochi_client_channel_new
   gzochi_client_channel *channel = calloc (1, sizeof (gzochi_client_channel));
 
   channel->session = session;
-  channel->name = name;
+  channel->name = strdup (name);
 
-  channel->id = id;
+  channel->id = malloc (sizeof (unsigned char) * id_len);
+  channel->id = memcpy (channel->id, id, id_len);
   channel->id_len = id_len;
 
   return channel;
@@ -38,6 +40,7 @@ gzochi_client_channel *gzochi_client_channel_new
 
 void gzochi_client_channel_free (gzochi_client_channel *channel)
 {
+  free (channel->id);
   free (channel);
 }
 

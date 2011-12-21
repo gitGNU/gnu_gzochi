@@ -113,11 +113,35 @@ int gzochi_protocol_send_channel_message
 static void dispatch_channel_join 
 (gzochi_client_session *session, char *name, unsigned char *id, short id_len)
 {
+  int i;
   gzochi_client_channel *channel = gzochi_client_channel_new 
     (session, name, id, id_len);
 
   channel->connected = TRUE;
 
+  for (i = 0; i < session->channels_length; i++)
+    {
+      if (session->channels[i] == NULL)
+	{
+	  session->channels[i] = channel;
+	  break;
+	}
+    }
+  
+  if (i == session->channels_length)
+    {
+      gzochi_client_channel **new_channels = 
+	calloc (session->channels_length * 2, sizeof (gzochi_client_channel *));
+
+      memcpy (new_channels, session->channels, 
+	      sizeof (gzochi_client_channel *) * session->channels_length);
+      free (session->channels);
+      session->channels = new_channels;
+      session->channels_length *= 2;
+
+      session->channels[i] = channel;
+    }
+  
   if (session->joined_channel_callback != NULL)
     session->joined_channel_callback (channel);
 }
