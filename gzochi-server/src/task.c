@@ -196,6 +196,7 @@ gzochid_durable_application_task *gzochid_durable_application_task_new
   durable_task->task = task;
   durable_task->serialization = serialization;
   durable_task->target_execution_time = target_execution_time;
+  durable_task->repeats = FALSE;
 
   mpz_init (durable_task->oid);
   
