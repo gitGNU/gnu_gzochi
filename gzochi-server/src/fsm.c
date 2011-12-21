@@ -19,6 +19,7 @@
 #include <stdlib.h>
 
 #include "fsm.h"
+#include "log.h"
 
 typedef struct _gzochid_fsm_state 
 {
