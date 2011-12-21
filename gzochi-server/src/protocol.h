@@ -48,9 +48,11 @@ void gzochid_protocol_client_login_success (gzochid_protocol_client *);
 void gzochid_protocol_client_login_failure (gzochid_protocol_client *);
 void gzochid_protocol_client_send 
 (gzochid_protocol_client *, unsigned char *, short);
-void gzochid_protocol_client_joined_channel (gzochid_protocol_client *, char *);
-void gzochid_protocol_client_left_channel (gzochid_protocol_client *, char *);
-void gzochid_protocol_client_channel_send 
+void gzochid_protocol_client_joined_channel 
 (gzochid_protocol_client *, char *, unsigned char *, short);
+void gzochid_protocol_client_left_channel 
+(gzochid_protocol_client *, unsigned char *, short);
+void gzochid_protocol_client_channel_send 
+(gzochid_protocol_client *, unsigned char *, short, unsigned char *, short);
 
 #endif /* GZOCHID_PROTOCOL_H */

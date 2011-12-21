@@ -23,6 +23,10 @@
 typedef struct _gzochi_client_channel 
 {
   char *name;
+
+  unsigned char *id;
+  int id_len;
+
   struct _gzochi_client_session *session;
 
   int connected;

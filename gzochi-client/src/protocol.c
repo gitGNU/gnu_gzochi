@@ -27,12 +27,13 @@
 
 #define CHUNK_SIZE 512
 
-static int send_fully (int sock, char *data, int len)
+static int send_fully (int sock, unsigned char *data, int len)
 {
   int total_sent = 0;
   while (total_sent < len)
     {
-      int bytes_sent = send (sock, data + total_sent, len - total_sent, 0);
+      int bytes_sent = send 
+	(sock, (char *) data + total_sent, len - total_sent, 0);
       
       if (bytes_sent < 0)
 	return -1;
@@ -44,9 +45,9 @@ static int send_fully (int sock, char *data, int len)
 }
 
 static int send_protocol_message 
-(int sock, char opcode, char *message, short len)
+(int sock, unsigned char opcode, unsigned char *message, short len)
 {
-  char len_bytes[2] = { 0, 0 };
+  unsigned char len_bytes[2] = { 0, 0 };
   gzochi_common_io_write_short (len, len_bytes, 0);
   if (send_fully (sock, len_bytes, 2) < 0)
     return -1;
@@ -64,7 +65,7 @@ int gzochi_protocol_send_login_request
   int ret = 0;
   int endpoint_len = strlen (endpoint) + 1;
   int buffer_len = endpoint_len + len;
-  char *buffer = malloc (sizeof (char) * buffer_len);
+  unsigned char *buffer = malloc (sizeof (unsigned char) * buffer_len);
 
   memcpy (buffer, endpoint, endpoint_len);
   memcpy (buffer + endpoint_len, credentials, len);
@@ -86,8 +87,8 @@ int gzochi_protocol_send_session_message
 (gzochi_client_session *session, unsigned char *msg, short len)
 {
   return send_protocol_message
-    (session->socket, GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE, (char *) msg, 
-     len);
+    (session->socket, GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE, 
+     (unsigned char *) msg, len);
 }
 
 int gzochi_protocol_send_channel_message
@@ -96,7 +97,7 @@ int gzochi_protocol_send_channel_message
   int ret = 0;
   int channel_len = strlen (channel) + 1;
   int buffer_len = channel_len + len;
-  char *buffer = malloc (sizeof (char) * buffer_len);
+  unsigned char *buffer = malloc (sizeof (char) * buffer_len);
 
   memcpy (buffer, channel, channel_len);
   memcpy (buffer + channel_len, msg, len);
@@ -109,9 +110,11 @@ int gzochi_protocol_send_channel_message
   return ret;
 }
 
-static void dispatch_channel_join (gzochi_client_session *session, char *name)
+static void dispatch_channel_join 
+(gzochi_client_session *session, char *name, unsigned char *id, short id_len)
 {
-  gzochi_client_channel *channel = gzochi_client_channel_new (session, name);
+  gzochi_client_channel *channel = gzochi_client_channel_new 
+    (session, name, id, id_len);
 
   channel->connected = TRUE;
 
@@ -120,13 +123,13 @@ static void dispatch_channel_join (gzochi_client_session *session, char *name)
 }
 
 static void dispatch_channel_disconnected 
-(gzochi_client_session *session, char *name)
+(gzochi_client_session *session, unsigned char *id, short id_len)
 {
   int i;
   gzochi_client_channel *channel = NULL;
   for (i = 0; i < session->channels_length; i++)
     if (session->channels[i] != NULL 
-	&& strcmp (session->channels[i]->name, name) == 0)
+	&& memcmp (session->channels[i]->id, id, id_len) == 0)
       {
 	channel = session->channels[i];
 	session->channels[i] = NULL;
@@ -143,14 +146,15 @@ static void dispatch_channel_disconnected
 }
 
 static void dispatch_channel_message
-(gzochi_client_session *session, char *name, unsigned char *message, short len)
+(gzochi_client_session *session, unsigned char *id, short id_len, 
+ unsigned char *message, short message_len)
 {
   int i;
   gzochi_client_channel *channel = NULL;
 
   for (i = 0; i < session->channels_length; i++)
     if (session->channels[i] != NULL 
-	&& strcmp (session->channels[i]->name, name) == 0)
+	&& memcmp (session->channels[i]->id, id, id_len) == 0)
       {
 	channel = session->channels[i];
 	break;
@@ -158,7 +162,7 @@ static void dispatch_channel_message
 
   if (channel != NULL)
     if (channel->received_message_callback != NULL)
-      channel->received_message_callback (channel, message, len);
+      channel->received_message_callback (channel, message, message_len);
 }
 
 static void dispatch_session_message 
@@ -177,7 +181,11 @@ static void dispatch_session_disconnected (gzochi_client_session *session)
 static void dispatch 
 (gzochi_client_session *session, int opcode, unsigned char *payload, short len)
 {
-  char *channel = NULL;
+  unsigned short channel_name_len;
+  char *channel_name;
+
+  unsigned short channel_id_len;
+  unsigned short channel_message_len;
 
   switch (opcode)
     {
@@ -185,12 +193,39 @@ static void dispatch
       dispatch_session_message (session, payload, len); break;
     case GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECTED:
       dispatch_session_disconnected (session); break;
+
     case GZOCHI_COMMON_PROTOCOL_CHANNEL_JOIN:
-      dispatch_channel_join (session, channel);
+      channel_name_len = gzochi_common_io_read_short (payload, 0);
+      channel_name = calloc (channel_name_len + 1, sizeof (char));
+      channel_name = memcpy (channel_name, payload + 2, channel_name_len);
+      
+      channel_id_len = gzochi_common_io_read_short 
+	(payload, channel_name_len + 2);
+      
+      dispatch_channel_join 
+	(session, channel_name, payload + channel_name_len + 4, channel_id_len);
+      
+      free (channel_name);
+
+      break;
+
     case GZOCHI_COMMON_PROTOCOL_CHANNEL_DISCONNECTED:
-      dispatch_channel_disconnected (session, channel);
+
+      channel_id_len = gzochi_common_io_read_short (payload, 0);
+      dispatch_channel_disconnected (session, payload + 2, channel_id_len); 
+
+      break;
+    
     case GZOCHI_COMMON_PROTOCOL_CHANNEL_MESSAGE:
-      dispatch_channel_message (session, channel, NULL, 0);
+      channel_id_len = gzochi_common_io_read_short (payload, 0);
+      channel_message_len = gzochi_common_io_read_short
+	(payload, channel_id_len + 2);
+
+      dispatch_channel_message 
+	(session, 
+	 payload + 2, channel_id_len, 
+	 payload + channel_id_len + 4, channel_message_len);
+
     default:
       break;
     }
@@ -210,8 +245,7 @@ static int attempt_dispatch (gzochi_client_session *session, int limit)
       if (session->buffer_length - offset < 3)
 	break;
       
-      message_len = gzochi_common_io_read_short 
-	((char *) session->buffer, offset);
+      message_len = gzochi_common_io_read_short (session->buffer, offset);
       if (session->buffer_length - offset < message_len + 3)
 	break;
 

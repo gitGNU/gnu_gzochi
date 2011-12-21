@@ -21,7 +21,7 @@
 #include "session.h"
 
 gzochi_client_channel *gzochi_client_channel_new 
-(gzochi_client_session *, char *);
+(gzochi_client_session *, char *, unsigned char *, int);
 void gzochi_client_channel_free (gzochi_client_channel *);
 
 #endif /* GZOCHI_CHANNEL_H */

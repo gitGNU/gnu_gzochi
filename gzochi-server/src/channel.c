@@ -72,7 +72,6 @@ typedef struct _gzochid_channel_message
 {
   enum gzochid_channel_message_type type;
   gzochid_protocol_client *client;
-  gzochid_channel *channel;
 } gzochid_channel_message;
 
 typedef struct _gzochid_channel_payload_message
@@ -148,23 +147,24 @@ static void commit_channel_side_effect_message
 {
   gzochid_channel_message *message = (gzochid_channel_message *) data;
   gzochid_channel_payload_message *payload_message = NULL;
+  gzochid_channel *channel = (gzochid_channel *) user_data;
 
   switch (message->type)
     {
     case GZOCHID_CHANNEL_MESSAGE_JOIN:
       gzochid_protocol_client_joined_channel 
-	(message->client, message->channel->name);
+	(message->client, channel->name, channel->id, channel->id_len);
       break;
 
     case GZOCHID_CHANNEL_MESSAGE_LEAVE:
-      gzochid_protocol_client_left_channel
-	(message->client, message->channel->name);
+      gzochid_protocol_client_left_channel 
+	(message->client, channel->id, channel->id_len);
       break;
 
     case GZOCHID_CHANNEL_MESSAGE_SEND:
       payload_message = (gzochid_channel_payload_message *) message;
       gzochid_protocol_client_channel_send
-	(message->client, message->channel->name, payload_message->msg,
+	(message->client, channel->id, channel->id_len, payload_message->msg,
 	 payload_message->len);
       break;
     }
@@ -257,7 +257,7 @@ static void close_channel
       session_iter = g_sequence_lookup
 	(session->channels, channel_oid_str, gzochid_util_string_data_compare,
 	 NULL);
-      if (!g_sequence_iter_is_end (session_iter))
+      if (session_iter != NULL)
 	{
 	  gzochid_protocol_client *client = g_hash_table_lookup
 	    (context->oids_to_clients, session_oid_str);
@@ -348,7 +348,7 @@ static void join_channel
   gzochid_data_dereference (session_reference);
 
   channel = (gzochid_channel *) channel_reference->obj;
-  session = (gzochid_client_session *) channel_reference->obj;
+  session = (gzochid_client_session *) session_reference->obj;
 
   tx_context = join_side_effects_transaction (context, channel);
 
@@ -356,7 +356,7 @@ static void join_channel
     (channel->sessions, session_oid_str, gzochid_util_string_data_compare, 
      NULL);
 
-  if (g_sequence_iter_is_end (iter))
+  if (iter == NULL)
     { 
       gzochid_protocol_client *client = (gzochid_protocol_client *)
 	g_hash_table_lookup (context->oids_to_clients, session_oid_str);
@@ -410,7 +410,7 @@ static void leave_channel
     (channel->sessions, session_oid_str, gzochid_util_string_data_compare, 
      NULL);
 
-  if (!g_sequence_iter_is_end (iter))
+  if (iter != NULL)
     {
       char *channel_oid_str = mpz_get_str (NULL, 16, channel_reference->oid);
       gzochid_protocol_client *client = (gzochid_protocol_client *)
@@ -506,7 +506,7 @@ static gzochid_channel_pending_send_operation *create_send_operation
 (mpz_t channel_oid, unsigned char *message, short len)
 {
   gzochid_channel_pending_send_operation *send_operation = malloc 
-    (sizeof (gzochid_channel_pending_operation));
+    (sizeof (gzochid_channel_pending_send_operation));
   gzochid_channel_pending_operation *operation = 
     (gzochid_channel_pending_operation *) send_operation;
 
@@ -604,6 +604,8 @@ static gpointer deserialize_channel
   gzochid_channel *channel = gzochid_channel_new 
     (gzochid_util_deserialize_string (in));
 
+  channel->id = gzochid_util_deserialize_bytes (in, (int *) &channel->id_len);
+
   channel->sessions = gzochid_util_deserialize_sequence 
     (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string);
 
@@ -619,6 +621,8 @@ static void serialize_channel
   gzochid_channel *channel = (gzochid_channel *) obj;
   gzochid_util_serialize_string (channel->name, out);
 
+  gzochid_util_serialize_bytes (channel->id, channel->id_len, out);
+  
   gzochid_util_serialize_sequence
     (channel->sessions, 
      (void (*) (gpointer, GString *)) gzochid_util_serialize_string, out);
@@ -694,6 +698,9 @@ gzochid_channel *gzochid_channel_create
     (context, &gzochid_scheme_data_serialization, scm_channel);
   mpz_set (channel->scm_oid, scm_reference->oid);
   
+  channel->id = (unsigned char *) mpz_get_str (NULL, 16, channel->oid);
+  channel->id_len = strlen ((char *) channel->id);
+
   gzochid_data_set_binding_to_oid (context, binding, reference->oid);
   free (binding);
 

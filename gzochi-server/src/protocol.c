@@ -203,43 +203,70 @@ void gzochid_protocol_client_login_failure (gzochid_protocol_client *client)
 void gzochid_protocol_client_send 
 (gzochid_protocol_client *client, unsigned char *msg, short len)
 {
-  char len_str[3];
+  unsigned char len_str[3];
 
   gzochi_common_io_write_short (len, len_str, 0);
   len_str[2] = GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE;
 
-  svz_sock_write (client->sock, len_str, 3);
+  svz_sock_write (client->sock, (char *) len_str, 3);
   svz_sock_write (client->sock, (char *) msg, len);
 }
 
 void gzochid_protocol_client_joined_channel 
-(gzochid_protocol_client *client, char *channel_name)
+(gzochid_protocol_client *client, char *name, unsigned char *id, short id_len)
 {
-  char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_CHANNEL_JOIN };
+  short name_len = strlen (name);
 
-  svz_sock_write (client->sock, buf, 3);
-  svz_sock_write (client->sock, channel_name, strlen (channel_name) + 1);
+  unsigned char name_len_str[2];
+  unsigned char id_len_str[2];
+  unsigned char len_str[3];
+  
+  gzochi_common_io_write_short (name_len + id_len + 4, len_str, 0);
+  len_str[2] = GZOCHI_COMMON_PROTOCOL_CHANNEL_JOIN;
+
+  gzochi_common_io_write_short (name_len, name_len_str, 0);
+  gzochi_common_io_write_short (id_len, id_len_str, 0);
+
+  svz_sock_write (client->sock, (char *) len_str, 3);
+  svz_sock_write (client->sock, (char *) name_len_str, 2);
+  svz_sock_write (client->sock, name, name_len);
+  svz_sock_write (client->sock, (char *) id_len_str, 2);
+  svz_sock_write (client->sock, (char *) id, id_len);
 }
 
 void gzochid_protocol_client_left_channel 
-(gzochid_protocol_client *client, char *channel_name)
+(gzochid_protocol_client *client, unsigned char *id, short id_len)
 {
-  char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_CHANNEL_DISCONNECTED };
+  unsigned char id_len_str[2];
+  unsigned char len_str[3];
 
-  svz_sock_write (client->sock, buf, 3);
-  svz_sock_write (client->sock, channel_name, strlen (channel_name) + 1);
+  gzochi_common_io_write_short (id_len + 2, len_str, 0);
+  gzochi_common_io_write_short (id_len, id_len_str, 0);
+
+  len_str[2] = GZOCHI_COMMON_PROTOCOL_CHANNEL_DISCONNECTED;
+
+  svz_sock_write (client->sock, (char *) len_str, 3);
+  svz_sock_write (client->sock, (char *) id_len_str, 2);
+  svz_sock_write (client->sock, (char *) id, id_len);
 }
 
 void gzochid_protocol_client_channel_send 
-(gzochid_protocol_client *client, char *channel_name, unsigned char *msg,
- short len)
+(gzochid_protocol_client *client, unsigned char *id, short id_len, 
+ unsigned char *msg, short msg_len)
 {
-  char len_str[3];
+  unsigned char id_len_str[2];
+  unsigned char msg_len_str[2];
+  unsigned char len_str[3];
+  
+  gzochi_common_io_write_short (id_len + msg_len + 4, len_str, 0);
+  gzochi_common_io_write_short (id_len, id_len_str, 0);
+  gzochi_common_io_write_short (msg_len, msg_len_str, 0);
 
-  gzochi_common_io_write_short (len, len_str, 0);
   len_str[2] = GZOCHI_COMMON_PROTOCOL_CHANNEL_MESSAGE;
 
-  svz_sock_write (client->sock, len_str, 3);
-  svz_sock_write (client->sock, channel_name, strlen (channel_name) + 1);
-  svz_sock_write (client->sock, (char *) msg, len);
+  svz_sock_write (client->sock, (char *) len_str, 3);
+  svz_sock_write (client->sock, (char *) id_len_str, 2);
+  svz_sock_write (client->sock, (char *) id, id_len);
+  svz_sock_write (client->sock, (char *) msg_len_str, 2);
+  svz_sock_write (client->sock, (char *) msg, msg_len);
 }

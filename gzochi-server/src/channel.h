@@ -29,6 +29,10 @@
 typedef struct _gzochid_channel
 {
   char *name;
+
+  unsigned char *id;
+  short id_len;
+
   GSequence *sessions;
 
   mpz_t oid;

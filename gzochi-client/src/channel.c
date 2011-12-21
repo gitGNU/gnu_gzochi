@@ -23,12 +23,15 @@
 #include "session.h"
 
 gzochi_client_channel *gzochi_client_channel_new 
-(gzochi_client_session *session, char *name)
+(gzochi_client_session *session, char *name, unsigned char *id, int id_len)
 {
   gzochi_client_channel *channel = calloc (1, sizeof (gzochi_client_channel));
 
   channel->session = session;
   channel->name = name;
+
+  channel->id = id;
+  channel->id_len = id_len;
 
   return channel;
 }
