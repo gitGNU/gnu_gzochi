@@ -26,7 +26,7 @@
 
 	  gzochi:join-channel
 	  gzochi:leave-channel
-	  gzochi:send-channel
+	  gzochi:send-channel-message
 	  gzochi:close-channel)
 
   (import (gzochi private channel))

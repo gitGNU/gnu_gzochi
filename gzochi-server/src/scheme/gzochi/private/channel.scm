@@ -28,7 +28,7 @@
 	  gzochi:join-channel
 	  gzochi:leave-channel
 	  gzochi:close-channel
-	  gzochi:send-channel)
+	  gzochi:send-channel-message)
 
   (import (gzochi client)
 	  (gzochi conditions)
@@ -80,7 +80,7 @@
 
     (primitive-leave-channel channel session))
 
-  (define (gzochi:send-channel channel msg)
+  (define (gzochi:send-channel-message channel msg)
     (or (gzochi:channel? channel)
 	(raise (condition (make-assertion-violation)
 			  (make-irritants-condition channel))))
@@ -88,7 +88,7 @@
 	(raise (condition (make-assertion-violation)
 			  (make-irritants-condition msg))))
     
-    (primitive-send-channel channel msg))
+    (primitive-send-channel-message channel msg))
 
   (define (gzochi:close-channel channel)
     (or (gzochi:channel? channel)
@@ -101,6 +101,6 @@
   (define primitive-get-channel #f)
   (define primitive-join-channel #f)
   (define primitive-leave-channel #f)
-  (define primitive-send-channel #f)
+  (define primitive-send-channel-message #f)
   (define primitive-close-channel #f)
 )

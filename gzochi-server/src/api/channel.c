@@ -122,8 +122,8 @@ SCM_DEFINE (primitive_leave_channel, "primitive-leave-channel", 2, 0, 0,
   return SCM_UNSPECIFIED;
 }
 
-SCM_DEFINE (primitive_send_channel, "primitive-send-channel", 2, 0, 0,
-	    (SCM channel, SCM bv), 
+SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message", 
+	    2, 0, 0, (SCM channel, SCM bv), 
 	    "Send a message to the sessions that belong to a channel.")
 {
   gzochid_application_context *context = 
