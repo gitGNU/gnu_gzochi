@@ -26,18 +26,6 @@
 #include "gzochid.h"
 #include "threads.h"
 
-static void stop_async (gpointer data, gpointer user_data)
-{
-  gzochid_context *context = (gzochid_context *) user_data;
-  gzochid_fsm_to_state (context->fsm, GZOCHID_STATE_STOPPED);
-}
-
-static void stop (int from_state, int to_state, gpointer user_data)
-{
-  gzochid_server_context *context = (gzochid_server_context *) user_data;
-  gzochid_thread_pool_push (context->pool, stop_async, NULL, NULL);
-}
-
 static void initialize_async (gpointer data, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
