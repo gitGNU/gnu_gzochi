@@ -24,7 +24,7 @@
 
 void gzochid_util_serialize_boolean (gboolean, GString *);
 void gzochid_util_serialize_mpz (mpz_t, GString *);
-void gzochid_util_serialize_bytes (char *, int, GString *);
+void gzochid_util_serialize_bytes (unsigned char *, int, GString *);
 void gzochid_util_serialize_string (char *, GString *);
 void gzochid_util_serialize_list 
 (GList *, void (*) (gpointer, GString *), GString *);
@@ -39,7 +39,7 @@ void gzochid_util_serialize_timeval (struct timeval, GString *);
 
 gboolean gzochid_util_deserialize_boolean (GString *);
 void gzochid_util_deserialize_mpz (GString *, mpz_t);
-char *gzochid_util_deserialize_bytes (GString *, int *);
+unsigned char *gzochid_util_deserialize_bytes (GString *, int *);
 char *gzochid_util_deserialize_string (GString *);
 GList *gzochid_util_deserialize_list (GString *, gpointer (*) (GString *));
 GSequence *gzochid_util_deserialize_sequence 

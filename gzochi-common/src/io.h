@@ -18,10 +18,10 @@
 #ifndef GZOCHI_COMMON_IO_H
 #define GZOCHI_COMMON_IO_H
 
-int gzochi_common_io_read_int (char *, int);
-short gzochi_common_io_read_short (char *, int);
+int gzochi_common_io_read_int (unsigned char *, int);
+short gzochi_common_io_read_short (unsigned char *, int);
 
-void gzochi_common_io_write_int (int, char *, int);
-void gzochi_common_io_write_short (short, char *, int);
+void gzochi_common_io_write_int (int, unsigned char *, int);
+void gzochi_common_io_write_short (short, unsigned char *, int);
 
 #endif /* GZOCHI_COMMON_IO_H */

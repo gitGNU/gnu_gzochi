@@ -241,7 +241,7 @@ gboolean for_all (SCM lst, gboolean (*pred) (SCM))
 static void scheme_managed_record_serializer
 (gzochid_application_context *context, SCM arg, GString *out)
 {
-  char vec_len_str[4];
+  unsigned char vec_len_str[4];
   GList *gpd = g_list_append 
     (g_list_append (g_list_append (NULL, "gzochi"), "private"), "data");
   SCM vec = SCM_EOL, port = SCM_EOL, proc = SCM_EOL;
@@ -265,7 +265,7 @@ static void scheme_managed_record_serializer
 
   gzochi_common_io_write_int (vec_len, vec_len_str, 0);
 
-  g_string_append_len (out, vec_len_str, 4);
+  g_string_append_len (out, (char *) vec_len_str, 4);
   g_string_append_len (out, (char *) SCM_BYTEVECTOR_CONTENTS (vec), vec_len);
 
   g_list_free (gpd);
@@ -274,7 +274,7 @@ static void scheme_managed_record_serializer
 static void *scheme_managed_record_deserializer
 (gzochid_application_context *context, GString *in)
 {
-  int vec_len = gzochi_common_io_read_int (in->str, 0);
+  int vec_len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   SCM vec = SCM_EOL, port = SCM_EOL, record = SCM_EOL;
   
   g_string_erase (in, 0, 4);

@@ -31,18 +31,18 @@ void gzochid_util_serialize_boolean (gboolean bool, GString *out)
   g_string_append_len (out, bool_str, 1);
 }
 
-void gzochid_util_serialize_bytes (char *str, int len, GString *out)
+void gzochid_util_serialize_bytes (unsigned char *str, int len, GString *out)
 {
-  char len_str[4];
+  unsigned char len_str[4];
 
   gzochi_common_io_write_int (len, len_str, 0);
-  g_string_append_len (out, len_str, 4);
-  g_string_append_len (out, str, len);
+  g_string_append_len (out, (char *) len_str, 4);
+  g_string_append_len (out, (char *) str, len);
 }
 
 void gzochid_util_serialize_string (char *str, GString *out)
 {
-  gzochid_util_serialize_bytes (str, strlen (str), out);
+  gzochid_util_serialize_bytes ((unsigned char *) str, strlen (str) + 1, out);
 }
 
 void gzochid_util_serialize_mpz (mpz_t i, GString *out)
@@ -55,12 +55,12 @@ void gzochid_util_serialize_mpz (mpz_t i, GString *out)
 void gzochid_util_serialize_list 
 (GList *list, void (*serializer) (gpointer, GString *), GString *out)
 {
-  char len_str[4];
+  unsigned char len_str[4];
   int len = g_list_length (list);
   GList *list_ptr = list;
 
   gzochi_common_io_write_int (len, len_str, 0);
-  g_string_append_len (out, len_str, 4);
+  g_string_append_len (out, (char *) len_str, 4);
   
   while (list_ptr != NULL)
     {
@@ -72,12 +72,12 @@ void gzochid_util_serialize_list
 void gzochid_util_serialize_sequence
 (GSequence *sequence, void (*serializer) (gpointer, GString *), GString *out)
 {
-  char len_str[4];
+  unsigned char len_str[4];
   int len = g_sequence_get_length (sequence);
   GSequenceIter *iter = g_sequence_get_begin_iter (sequence);
   
   gzochi_common_io_write_int (len, len_str, 0);
-  g_string_append_len (out, len_str, 4);
+  g_string_append_len (out, (char *) len_str, 4);
 
   while (!g_sequence_iter_is_end (iter))
     {
@@ -90,13 +90,13 @@ void gzochid_util_serialize_hash_table
 (GHashTable *hashtable, void (*key_serializer) (gpointer, GString *), 
  void (*value_serializer) (gpointer, GString *), GString *out)
 {
-  char len_str[4];
+  unsigned char len_str[4];
   int len = g_hash_table_size (hashtable);
   GHashTableIter iter;
   gpointer key, value;
 
   gzochi_common_io_write_int (len, len_str, 0);
-  g_string_append_len (out, len_str, 4);
+  g_string_append_len (out, (char *) len_str, 4);
 
   g_hash_table_iter_init (&iter, hashtable);
   while (g_hash_table_iter_next (&iter, &key, &value))
@@ -108,13 +108,13 @@ void gzochid_util_serialize_hash_table
 
 void gzochid_util_serialize_timeval (struct timeval tv, GString *out)
 {
-  char str[4];
+  unsigned char str[4];
 
   gzochi_common_io_write_int (tv.tv_sec, str, 0);
-  g_string_append_len (out, str, 4);
+  g_string_append_len (out, (char *) str, 4);
 
   gzochi_common_io_write_int (tv.tv_usec, str, 0);
-  g_string_append_len (out, str, 4);
+  g_string_append_len (out, (char *) str, 4);
 }
 
 gboolean gzochid_util_deserialize_boolean (GString *in)
@@ -124,10 +124,12 @@ gboolean gzochid_util_deserialize_boolean (GString *in)
   return ret;
 }
 
-char *gzochid_util_deserialize_bytes (GString *in, int *len)
+unsigned char *gzochid_util_deserialize_bytes (GString *in, int *len)
 {
-  int str_len = gzochi_common_io_read_int (in->str, 0);
-  char *i_str = strndup (in->str + 4, str_len);
+  int str_len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
+  unsigned char *i_str = malloc (sizeof (unsigned char) * str_len);
+
+  memcpy (i_str, in->str + 4, str_len);
   g_string_erase (in, 0, 4 + str_len);
 
   if (len != NULL)
@@ -138,7 +140,7 @@ char *gzochid_util_deserialize_bytes (GString *in, int *len)
 
 char *gzochid_util_deserialize_string (GString *in)
 {
-  return gzochid_util_deserialize_bytes (in, NULL);
+  return (char *) gzochid_util_deserialize_bytes (in, NULL);
 }
 
 void gzochid_util_deserialize_mpz (GString *in, mpz_t o)
@@ -152,7 +154,7 @@ GList *gzochid_util_deserialize_list
 (GString *in, gpointer (*deserializer) (GString *))
 {
   GList *ret = NULL;
-  int len = gzochi_common_io_read_int (in->str, 0);
+  int len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   g_string_erase (in, 0, 4);
 
   while (len > 0)
@@ -168,7 +170,7 @@ GSequence *gzochid_util_deserialize_sequence
 (GString *in, gpointer (*deserializer) (GString *))
 {
   GSequence *ret = g_sequence_new (NULL);
-  int len = gzochi_common_io_read_int (in->str, 0);
+  int len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   g_string_erase (in, 0, 4);
 
   while (len > 0)
@@ -186,7 +188,7 @@ GHashTable *gzochid_util_deserialize_hash_table
  gpointer (*value_deserializer) (GString *))
 {
   GHashTable *ret = g_hash_table_new (hash_func, key_equal_func);
-  int len = gzochi_common_io_read_int (in->str, 0);
+  int len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   g_string_erase (in, 0, 4);
 
   while (len > 0)
@@ -202,9 +204,9 @@ struct timeval gzochid_util_deserialize_timeval (GString *in)
 {
   struct timeval tv;
 
-  tv.tv_sec = gzochi_common_io_read_int (in->str, 0);
+  tv.tv_sec = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   g_string_erase (in, 0, 4);
-  tv.tv_usec = gzochi_common_io_read_int (in->str, 0);
+  tv.tv_usec = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   g_string_erase (in, 0, 4);
 
   return tv;
