@@ -516,7 +516,7 @@ gzochid_data_managed_reference *gzochid_data_create_reference_sync
       application_task.identity = identity;
       application_task.data = &reference_holder;
 
-      task.worker = gzochid_application_task_worker;
+      task.worker = gzochid_application_task_thread_worker;
       task.data = &application_task;
 
       gzochid_schedule_run_task (game_context->task_queue, &task);
