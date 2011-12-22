@@ -1,3 +1,5 @@
+SUBDIRS = tests
+
 lib_LIBRARIES = libgzochi-common.a
 
 libgzochi_common_a_SOURCES = io.c
