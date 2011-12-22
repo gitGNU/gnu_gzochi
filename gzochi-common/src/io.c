@@ -15,12 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <sys/types.h>
-#include <sys/socket.h>
-
 #include "io.h"
-
-#define BUFFER_SIZE 512
 
 int gzochi_common_io_read_int (unsigned char *bytes, int offset)
 {
