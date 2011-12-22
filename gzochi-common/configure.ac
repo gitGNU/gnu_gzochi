@@ -23,6 +23,7 @@ AM_INIT_AUTOMAKE(1.6)
 AC_LANG(C)
 AC_PROG_CC
 AC_PROG_RANLIB
+AC_PROG_LIBTOOL
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile

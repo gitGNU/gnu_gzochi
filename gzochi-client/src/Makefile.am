@@ -19,7 +19,7 @@
 #
 
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
-GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.a
+GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
 AM_CFLAGS = @CFLAGS@ $(GZOCHI_COMMON_CFLAGS) -Wall -pedantic
 
