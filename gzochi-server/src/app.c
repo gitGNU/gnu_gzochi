@@ -584,6 +584,9 @@ void gzochid_application_client_disconnected
       gzochid_task *task = NULL;
       struct timeval now;
       gettimeofday (&now, NULL);
+
+      g_hash_table_remove (context->clients_to_oids, client);
+      g_hash_table_remove (context->oids_to_clients, session_oid_str);
       
       task = gzochid_task_new 
 	(gzochid_application_task_thread_worker, application_task, now);
