@@ -350,8 +350,6 @@ static void join_channel
   channel = (gzochid_channel *) channel_reference->obj;
   session = (gzochid_client_session *) session_reference->obj;
 
-  tx_context = join_side_effects_transaction (context, channel);
-
   iter = g_sequence_lookup 
     (channel->sessions, session_oid_str, gzochid_util_string_data_compare, 
      NULL);
@@ -360,6 +358,8 @@ static void join_channel
     { 
       gzochid_protocol_client *client = (gzochid_protocol_client *)
 	g_hash_table_lookup (context->oids_to_clients, session_oid_str);
+
+      tx_context = join_side_effects_transaction (context, channel);
 
       g_sequence_insert_sorted 
 	(channel->sessions, session_oid_str, gzochid_util_string_data_compare,
@@ -370,11 +370,11 @@ static void join_channel
       tx_context->messages = g_list_append 
 	(tx_context->messages, 
 	 gzochid_channel_message_new (GZOCHID_CHANNEL_MESSAGE_JOIN, client));
+
+      gzochid_data_mark (context, channel);
+      gzochid_data_mark (context, session);
     }
   else free (session_oid_str);
-
-  gzochid_data_mark (context, channel);
-  gzochid_data_mark (context, session);
 }
 
 static void leave_channel
@@ -404,7 +404,7 @@ static void leave_channel
   gzochid_data_dereference (session_reference);
 
   channel = (gzochid_channel *) channel_reference->obj;
-  session = (gzochid_client_session *) channel_reference->obj;
+  session = (gzochid_client_session *) session_reference->obj;
 
   iter = g_sequence_lookup 
     (channel->sessions, session_oid_str, gzochid_util_string_data_compare, 
@@ -415,6 +415,8 @@ static void leave_channel
       char *channel_oid_str = mpz_get_str (NULL, 16, channel_reference->oid);
       gzochid_protocol_client *client = (gzochid_protocol_client *)
 	g_hash_table_lookup (context->oids_to_clients, session_oid_str);
+
+      tx_context = join_side_effects_transaction (context, channel);
 
       g_sequence_remove (iter);
       iter = g_sequence_lookup
@@ -427,12 +429,12 @@ static void leave_channel
 	 gzochid_channel_message_new (GZOCHID_CHANNEL_MESSAGE_LEAVE, client));
 
       free (channel_oid_str);
+
+      gzochid_data_mark (context, channel);
+      gzochid_data_mark (context, session);
     }
 
   free (session_oid_str);
-
-  gzochid_data_mark (context, channel);
-  gzochid_data_mark (context, session);
 }
 
 static void commit_channel_operation (gpointer data, gpointer user_data)
