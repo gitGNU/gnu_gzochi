@@ -27,6 +27,9 @@ typedef struct _gzochid_server_context
 {
   gzochid_context base;
   GThreadPool *pool;
+
+  gzochid_admin_context *admin_context;
+  gzochid_game_context *game_context;
 } gzochid_server_context;
 
 enum gzochid_state 

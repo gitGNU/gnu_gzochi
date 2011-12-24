@@ -29,9 +29,10 @@
 static void initialize_async (gpointer data, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_server_context *server_context = (gzochid_server_context *) context;
 
-  gzochid_admin_context *admin_context = gzochid_admin_context_new ();
-  gzochid_game_context *game_context = gzochid_game_context_new ();
+  server_context->admin_context = gzochid_admin_context_new ();
+  server_context->game_context = gzochid_game_context_new ();
 
   GKeyFile *key_file = g_key_file_new ();
   GHashTable *admin_config = NULL;
@@ -43,13 +44,17 @@ static void initialize_async (gpointer data, gpointer user_data)
   admin_config = gzochid_config_keyfile_extract_config (key_file, "admin");
   game_config = gzochid_config_keyfile_extract_config (key_file, "game");
 
-  gzochid_admin_context_init (admin_context, context, admin_config);
-  gzochid_game_context_init (game_context, context, game_config);
+  gzochid_admin_context_init 
+    (server_context->admin_context, context, admin_config);
+  gzochid_game_context_init 
+    (server_context->game_context, context, game_config);
 
   gzochid_context_until 
-    ((gzochid_context *) admin_context, GZOCHID_ADMIN_STATE_RUNNING);
+    ((gzochid_context *) server_context->admin_context, 
+     GZOCHID_ADMIN_STATE_RUNNING);
   gzochid_context_until 
-    ((gzochid_context *) game_context, GZOCHID_GAME_STATE_RUNNING);
+    ((gzochid_context *) server_context->game_context, 
+     GZOCHID_GAME_STATE_RUNNING);
 
   gzochid_fsm_to_state (context->fsm, GZOCHID_STATE_RUNNING);
 }
