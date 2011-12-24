@@ -50,13 +50,7 @@
 	  gzochi:deserialize-managed-record
 
 	  gzochi:mark-for-write!
-	  gzochi:mark-for-read!
-
-	  gzochi:register-serialization!
-	  gzochi:uid->serialization
-	  
-	  gzochi:register-record-type
-	  gzochi:uid->record-type)
+	  gzochi:mark-for-read!)
 
   (import (gzochi io)
 	  (only (guile) and=> gensym macroexpand) 
@@ -485,10 +479,18 @@
 			     (let ((p (n)))
 			       (apply p (deserialize rtd))))))))
     
-    (let* ((rtd (gzochi:uid->record-type (gzochi:read-symbol port)))
-	   (rctd (constructor-descriptor rtd))
-	   (ctor (record-constructor rctd)))
-      (ctor)))
+    (let* ((uid (gzochi:read-symbol port))
+	   (rtd (gzochi:uid->record-type uid)))
+      (or rtd (raise (condition 
+		      (make-assertion-violation)
+		      (make-message-condition 
+		       (string-append 
+			"Attempting to deserialize unknown type " 
+			(symbol->string uid))))))
+
+      (let* ((rctd (constructor-descriptor rtd))
+	     (ctor (record-constructor rctd)))
+	(ctor))))
   
   (define record-type-registry (make-eq-hashtable))
 
