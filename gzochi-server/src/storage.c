@@ -135,7 +135,7 @@ char *gzochid_storage_first_key (gzochid_storage_store *store, int *len)
   return dkey.dptr;
 }
 
-char *gozchid_storage_next_key 
+char *gzochid_storage_next_key 
 (gzochid_storage_store *store, char *key, int key_len, int *len)
 {
   datum dkey, dnext;
