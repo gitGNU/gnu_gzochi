@@ -16,6 +16,7 @@
  */
 
 #include <libguile.h>
+#include <stdlib.h>
 
 #include "../app.h"
 #include "../data.h"
@@ -53,6 +54,35 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
   gzochid_data_dereference (reference);
 
   return reference->obj;
+}
+
+SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
+	    "Retrieve a managed record bound to a name.")
+{
+  gzochid_application_context *context =
+    gzochid_scheme_current_application_context ();
+  char *cname = scm_to_locale_string (name);
+  SCM obj = (SCM) gzochid_data_get_binding 
+    (context, cname, &gzochid_scheme_data_serialization);
+
+  free (cname);
+
+  return obj;
+}
+
+SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
+	    (SCM name, SCM obj), "Bind a managed record to a name.")
+{
+  gzochid_application_context *context =
+    gzochid_scheme_current_application_context ();
+  char *cname = scm_to_locale_string (name);
+  
+  gzochid_data_set_binding 
+    (context, cname, &gzochid_scheme_data_serialization, obj);
+
+  free (cname);
+  
+  return SCM_UNSPECIFIED;
 }
 
 void gzochid_api_data_init (void)

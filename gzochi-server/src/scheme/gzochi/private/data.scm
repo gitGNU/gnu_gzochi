@@ -36,6 +36,9 @@
 	  gzochi:create-reference
 	  gzochi:dereference
 
+	  gzochi:get-binding
+	  gzochi:set-binding!
+
 	  gzochi:make-managed-reference
 	  gzochi:managed-reference?
 
@@ -515,9 +518,6 @@
 		     gzochi:managed-reference-record 
 		     gzochi:managed-reference-set-record!)))
 
-  (define primitive-create-reference #f)
-  (define primitive-dereference #f)
-
   (define (gzochi:create-reference obj)
     (or (gzochi:managed-record? obj)
 	(raise (condition (make-assertion-violation)
@@ -537,4 +537,24 @@
 	  (let ((data (primitive-dereference reference)))
 	    (gzochi:managed-reference-set-record! reference data)
 	    data))))
+
+  (define (gzochi:get-binding name)
+    (or (string? name) (raise (condition (make-assertion-violation))))
+    (primitive-get-binding name))
+  
+  (define (gzochi:set-binding! name obj)
+    (or (string? name) (raise (condition (make-assertion-violation))))
+    (or (gzochi:managed-record? obj)
+	(raise (condition 
+		(make-assertion-violation)
+		(make-message-condition
+		 "Bindings may only be created for managed records."))))
+
+    (primitive-set-binding! name obj))
+
+  (define primitive-create-reference #f)
+  (define primitive-dereference #f)
+
+  (define primitive-get-binding #f)
+  (define primitive-set-binding! #f)
 )
