@@ -39,6 +39,7 @@
 	  gzochi:managed-vector?
 	  gzochi:managed-vector-ref
 	  gzochi:managed-vector-set!
+	  gzochi:managed-vector->list
 
 	  gzochi:make-managed-hashtable
 	  gzochi:managed-hashtable?
@@ -79,37 +80,42 @@
     (nongenerative gzochi:managed-pair)
     (sealed #t))
 
-  (define (serialize-managed-vector port obj)
-    (let ((v (gzochi:managed-vector-vector obj)))
-      (gzochi:write-integer port (vector-length v))
-      (vector-for-each
-       (lambda (ref) (gzochi:serialize-managed-reference port ref)) v)))
-
+  (define (serialize-managed-vector port vec)
+    (gzochi:write-integer port (vector-length vec))
+    (vector-for-each
+     (lambda (ref) (gzochi:serialize-managed-reference port ref)) vec))
+  
   (define (deserialize-managed-vector port)
-    (let* ((n (gzochi:read-integer port))
-	   (refs (let loop ((i n) (refs '()))
-		   (if (zero? i)
-		       (reverse refs)
-		       (cons (gzochi:deserialize-managed-reference port) 
-			     refs)))))
-      (apply gzochi:make-managed-vector (map gzochi:dereference refs))))
+    (let* ((n (gzochi:read-integer port)))
+      (let loop ((i n) (refs '()))
+	(if (zero? i)
+	    (list->vector (reverse refs))
+	    (loop (- i 1) 
+		  (cons (gzochi:deserialize-managed-reference port) refs))))))
   
   (define (gzochi:managed-vector-ref vec i)
     (gzochi:dereference (vector-ref (gzochi:managed-vector-vector vec) i)))
+
+  (define (gzochi:managed-vector->list vec)
+    (map gzochi:dereference (vector->list (gzochi:managed-vector-vector vec))))
 
   (define (gzochi:managed-vector-set! vec i obj)
     (vector-set! (gzochi:managed-vector-vector vec) i 
 		 (gzochi:create-reference obj)))
 
   (gzochi:define-managed-record-type
-    (gzochi:managed-vector gzochi:make-managed-vector gzochi:managed-vector?)
+   (gzochi:managed-vector gzochi:make-managed-vector gzochi:managed-vector?)
 
-    (fields vector)
+    (fields (immutable vector 
+		       (serialization (gzochi:make-serialization 
+				       serialize-managed-vector
+				       deserialize-managed-vector))))
+
     (nongenerative gzochi:managed-vector)
     (protocol (lambda (n)
 		(lambda args
 		  (let ((p (n)))
-		    (p (vector (map gzochi:create-reference args)))))))
+		    (p (apply vector (map gzochi:create-reference args)))))))
     (sealed #t))
 
   (define (gzochi:managed-hashtable-set! ht key value) (if #f #f))
