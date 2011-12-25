@@ -23,12 +23,15 @@
 #include "app.h"
 #include "auth.h"
 #include "data.h"
+#include "game.h"
 #include "io.h"
 #include "protocol.h"
 #include "scheme.h"
 #include "session.h"
 #include "tx.h"
 #include "util.h"
+
+#define SESSION_PREFIX "s.session."
 
 enum gzochid_client_session_operation
   {
@@ -356,4 +359,23 @@ void gzochid_client_session_send_message
   tx_context->operations = g_list_append 
     (tx_context->operations, 
      create_message_operation (reference->oid, msg, len));
+}
+
+void gzochid_client_session_persist 
+(gzochid_application_context *context, gzochid_client_session *session, 
+ mpz_t oid)
+{
+  gzochid_game_context *game_context = 
+    (gzochid_game_context *) ((gzochid_context *) context)->parent;
+  gzochid_oid_holder *holder = gzochid_oid_holder_new ();
+  gzochid_task *task = gzochid_data_prefix_binding_persistence_task_new
+    (context, session->identity, &gzochid_client_session_serialization, 
+     session, holder, SESSION_PREFIX);
+
+  gzochid_schedule_run_task (game_context->task_queue, task);  
+
+  mpz_set (oid, holder->oid);
+
+  gzochid_oid_holder_free (holder);
+  gzochid_data_prefix_binding_persistence_task_free (task);
 }

@@ -58,4 +58,7 @@ void gzochid_client_session_send_message
 (gzochid_application_context *, gzochid_client_session *, unsigned char *, 
  short);
 
+void gzochid_client_session_persist 
+(gzochid_application_context *, gzochid_client_session *, mpz_t);
+
 #endif /* GZOCHID_SESSION_H */

@@ -33,6 +33,21 @@
 
 #define NEXT_OID_KEY 0x00
 
+gzochid_oid_holder *gzochid_oid_holder_new (void)
+{
+  gzochid_oid_holder *holder = malloc (sizeof (gzochid_oid_holder));
+
+  mpz_init (holder->oid);
+
+  return holder;
+}
+
+void gzochid_oid_holder_free (gzochid_oid_holder *holder)
+{
+  mpz_clear (holder->oid);
+  free (holder);
+}
+
 static gzochid_data_transaction_context *create_transaction_context 
 (gzochid_application_context *app_context)
 {
@@ -554,4 +569,149 @@ void gzochid_data_mark (gzochid_application_context *context, void *ptr)
   reference = g_hash_table_lookup (tx_context->ptrs_to_references, ptr);
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
   reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
+}
+
+typedef struct _gzochid_persistence_task_data
+{
+  gpointer data;
+  gzochid_io_serialization *serialization;
+  gzochid_oid_holder *holder;
+} gzochid_persistence_task_data;
+
+typedef struct _gzochid_prefix_binding_persistence_task_data
+{
+  gzochid_persistence_task_data base;
+
+  char *prefix;
+} gzochid_prefix_binding_persistence_task_data;
+
+static void init_persistence_task 
+(gzochid_persistence_task_data *task, gzochid_io_serialization *serialization, 
+ gpointer data, gzochid_oid_holder *holder)
+{
+  task->data = data;
+  task->serialization = serialization;
+  task->holder = holder;
+} 
+
+static gzochid_persistence_task_data *gzochid_persistence_task_data_new
+(gzochid_io_serialization *serialization, gpointer data,
+ gzochid_oid_holder *holder)
+{
+  gzochid_persistence_task_data *task = 
+    malloc (sizeof (gzochid_persistence_task_data));
+  init_persistence_task (task, serialization, data, holder);
+  return task;
+}
+
+static gzochid_prefix_binding_persistence_task_data *
+gzochid_prefix_binding_persistence_task_data_new
+(gzochid_io_serialization *serialization, gpointer data,
+ gzochid_oid_holder *holder, char *prefix)
+{
+  gzochid_prefix_binding_persistence_task_data *task = 
+    malloc (sizeof (gzochid_prefix_binding_persistence_task_data));
+
+  init_persistence_task 
+    ((gzochid_persistence_task_data *) task, serialization, data, holder);
+  task->prefix = prefix;
+
+  return task;
+}
+
+void gzochid_persistence_task_data_free (gzochid_persistence_task_data *task)
+{
+  free (task);
+}
+
+static void persistence_task_worker
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gpointer data)
+{
+  gzochid_persistence_task_data *persistence_task = 
+    (gzochid_persistence_task_data *) data;
+
+  gzochid_data_managed_reference *reference = 
+    gzochid_data_create_reference 
+    (context, persistence_task->serialization, persistence_task->data);
+  
+  mpz_set (persistence_task->holder->oid, reference->oid);
+}
+
+static void prefix_binding_persistence_task_worker
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gpointer data)
+{
+  gzochid_prefix_binding_persistence_task_data *
+    prefix_binding_persistence_task = 
+    (gzochid_prefix_binding_persistence_task_data *) data;
+  gzochid_persistence_task_data *persistence_task =
+    (gzochid_persistence_task_data *) prefix_binding_persistence_task;
+  GString *binding = g_string_new (prefix_binding_persistence_task->prefix);
+  char *oid_str = NULL;
+
+  persistence_task_worker (context, identity, data);
+  
+  oid_str = mpz_get_str (NULL, 16, persistence_task->holder->oid);
+  g_string_append (binding, oid_str);
+  free (oid_str);
+
+  gzochid_data_set_binding_to_oid 
+    (context, binding->str, persistence_task->holder->oid);
+  g_string_free (binding, FALSE);
+}
+
+gzochid_task *gzochid_data_persistence_task_new 
+(gzochid_application_context *context, gzochid_auth_identity *identity,
+ gzochid_io_serialization *serialization, gpointer data,
+ gzochid_oid_holder *holder)
+{
+  gzochid_persistence_task_data *task_data =
+    gzochid_persistence_task_data_new (serialization, data, holder);
+  gzochid_transactional_application_task *transactional_task = 
+    gzochid_transactional_application_task_new 
+    (persistence_task_worker, task_data);
+  gzochid_application_task *application_task = gzochid_application_task_new 
+    (context, identity, gzochid_application_transactional_task_worker,
+     transactional_task);
+  return gzochid_task_immediate_new 
+    (gzochid_application_task_thread_worker, application_task);
+}
+
+void gzochid_data_persistence_task_free (gzochid_task *task)
+{
+  gzochid_application_task *application_task = 
+    (gzochid_application_task *) task->data;
+  gzochid_transactional_application_task *transactional_task = 
+    (gzochid_transactional_application_task *) application_task->data;
+  gzochid_persistence_task_data *data = 
+    (gzochid_persistence_task_data *) transactional_task->data;
+
+  free (data);
+  free (transactional_task);
+  free (application_task);
+  free (task);
+}
+
+gzochid_task *gzochid_data_prefix_binding_persistence_task_new
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gzochid_io_serialization *serialization, gpointer data, 
+ gzochid_oid_holder *holder, char *prefix)
+{
+  gzochid_prefix_binding_persistence_task_data *task_data =
+    gzochid_prefix_binding_persistence_task_data_new 
+    (serialization, data, holder, prefix);
+  gzochid_transactional_application_task *transactional_task = 
+    gzochid_transactional_application_task_new 
+    (prefix_binding_persistence_task_worker, task_data);
+  gzochid_application_task *application_task = gzochid_application_task_new 
+    (context, identity, gzochid_application_transactional_task_worker,
+     transactional_task);
+  return gzochid_task_immediate_new 
+    (gzochid_application_task_thread_worker, application_task);
+}
+
+void gzochid_data_prefix_binding_persistence_task_free (gzochid_task *task)
+{
+  gzochid_data_persistence_task_free (task);
 }

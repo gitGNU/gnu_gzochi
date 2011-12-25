@@ -25,6 +25,12 @@
 #include "auth.h"
 #include "io.h"
 #include "storage.h"
+#include "task.h"
+
+typedef struct _gzochid_oid_holder
+{
+  mpz_t oid;
+} gzochid_oid_holder;
 
 enum gzochid_data_managed_reference_state
   {
@@ -77,6 +83,9 @@ typedef struct _gzochid_data_managed_reference_holder
   void *data;
 } gzochid_data_managed_reference_holder;
 
+gzochid_oid_holder *gzochid_oid_holder_new (void);
+void gzochid_oid_holder_free (gzochid_oid_holder *);
+
 void *gzochid_data_get_binding 
 (gzochid_application_context *, char *, gzochid_io_serialization *);
 void gzochid_data_set_binding
@@ -97,5 +106,15 @@ gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
 void gzochid_data_dereference (gzochid_data_managed_reference *reference);
 
 void gzochid_data_mark (gzochid_application_context *, void *);
+
+gzochid_task *gzochid_data_persistence_task_new 
+(gzochid_application_context *, gzochid_auth_identity *, 
+ gzochid_io_serialization *, void *, gzochid_oid_holder *);
+void gzochid_data_persistence_task_free (gzochid_task *);
+
+gzochid_task *gzochid_data_prefix_binding_persistence_task_new 
+(gzochid_application_context *, gzochid_auth_identity *, 
+ gzochid_io_serialization *, void *, gzochid_oid_holder *, char *);
+void gzochid_data_prefix_binding_persistence_task_free (gzochid_task *);
 
 #endif /* GZOCHID_DATA_H */
