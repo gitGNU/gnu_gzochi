@@ -24,7 +24,6 @@
 
 #include "app.h"
 #include "auth.h"
-#include "data.h"
 #include "io.h"
 #include "threads.h"
 
@@ -54,6 +53,7 @@ typedef struct _gzochid_task_transaction_context
 
 gzochid_task *gzochid_task_new 
 (gzochid_thread_worker, gpointer, struct timeval);
+gzochid_task *gzochid_task_immediate_new (gzochid_thread_worker, gpointer);
 
 gzochid_transactional_application_task *
 gzochid_transactional_application_task_new 

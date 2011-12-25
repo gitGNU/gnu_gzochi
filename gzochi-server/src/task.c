@@ -250,6 +250,15 @@ gzochid_task *gzochid_task_new
   return task;
 }
 
+gzochid_task *gzochid_task_immediate_new 
+(gzochid_thread_worker worker, gpointer data)
+{
+  struct timeval now;
+  gettimeofday (&now, NULL);
+
+  return gzochid_task_new (worker, data, now);
+}
+
 static void durable_task_application_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
