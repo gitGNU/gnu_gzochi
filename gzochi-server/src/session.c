@@ -307,6 +307,8 @@ static void join_transaction (gzochid_application_context *context)
 void gzochid_client_session_disconnect 
 (gzochid_application_context *context, gzochid_client_session *session)
 {
+  char *oid_str = NULL;
+  GString *binding = g_string_new (SESSION_PREFIX);
   gzochid_client_session_transaction_context *tx_context = NULL;
   gzochid_data_managed_reference *reference = NULL;
   
@@ -316,6 +318,12 @@ void gzochid_client_session_disconnect
     (context, &gzochid_client_session_serialization, session);
 
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
+
+  oid_str = mpz_get_str (NULL, 16, reference->oid);
+  g_string_append (binding, oid_str);
+  gzochid_data_remove_binding (context, binding->str);
+  g_string_free (binding, FALSE);
+  free (oid_str);
 
   tx_context->operations = g_list_append 
     (tx_context->operations, create_disconnect_operation (reference->oid));
