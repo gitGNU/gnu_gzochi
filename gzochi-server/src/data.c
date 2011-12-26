@@ -443,7 +443,7 @@ char *gzochid_data_next_binding_oid
   if (next_key != NULL)
     {
       char *next_value = gzochid_storage_transaction_get 
-	(tx_context->names_transaction, next_key, strlen (next_key + 1), NULL);
+	(tx_context->names_transaction, next_key, strlen (next_key) + 1, NULL);
       mpz_set_str (oid, next_value, 16);
       free (next_value);
       return next_key;
@@ -463,6 +463,30 @@ void gzochid_data_set_binding
 
   reference = get_reference_by_ptr (context, data, serialization);
   set_binding (tx_context, name, reference->oid);
+}
+
+void gzochid_data_remove_binding
+(gzochid_application_context *context, char *name)
+{
+  mpz_t oid;
+  char *oid_str = NULL;
+  gzochid_data_transaction_context *tx_context = NULL;
+
+  mpz_init (oid);
+
+  join_transaction (context);
+  tx_context = gzochid_transaction_context (&data_participant);
+
+  get_binding (tx_context, name, oid);
+  oid_str = mpz_get_str (NULL, 16, oid);
+  mpz_clear (oid);
+
+  gzochid_storage_transaction_delete 
+    (tx_context->names_transaction, name, strlen (name) + 1);
+  gzochid_storage_transaction_delete
+    (tx_context->oids_transaction, oid_str, strlen (oid_str) + 1);
+
+  free (oid_str);
 }
 
 gzochid_data_managed_reference *gzochid_data_create_reference
