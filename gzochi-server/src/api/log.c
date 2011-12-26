@@ -25,7 +25,7 @@
 
 #include "log.h"
 
-SCM_DEFINE (primitive_log, "primitive-log", 1, 0, 0, (SCM priority, SCM msg), 
+SCM_DEFINE (primitive_log, "primitive-log", 2, 0, 0, (SCM priority, SCM msg), 
 	    "Log a message for the current application")
 {
   gzochid_application_context *context = 
