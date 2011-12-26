@@ -25,6 +25,7 @@
 #include "channel.h"
 #include "game.h"
 #include "io.h"
+#include "log.h"
 #include "protocol.h"
 #include "scheme.h"
 #include "session.h"
@@ -263,12 +264,20 @@ static void close_channel
 	    (context->oids_to_clients, session_oid_str);
 
 	  g_sequence_remove (session_iter);
-	  gzochid_data_mark (context, session);
 
-	  tx_context->messages = g_list_append
-	    (tx_context->messages,
-	     gzochid_channel_message_new
-	     (GZOCHID_CHANNEL_MESSAGE_LEAVE, client));
+	  if (client == NULL)
+	    gzochid_warning 
+	      ("Client not found for closed channel session '%s'; skipping.", 
+	       session_oid_str);
+	  else
+	    {
+	      gzochid_data_mark (context, session);
+
+	      tx_context->messages = g_list_append
+		(tx_context->messages,
+		 gzochid_channel_message_new
+		 (GZOCHID_CHANNEL_MESSAGE_LEAVE, client));
+	    }
 	}
       
       iter = g_sequence_iter_next (iter);
@@ -314,6 +323,9 @@ static void send_channel_message
 	   gzochid_channel_payload_message_new 
 	   (GZOCHID_CHANNEL_MESSAGE_SEND, client, send_op->message, 
 	    send_op->len));
+      else gzochid_warning 
+	     ("Client not found for messaged channel session '%s'; skipping.", 
+	      session_oid_str);
 
       iter = g_sequence_iter_next (iter);
     }
@@ -359,20 +371,26 @@ static void join_channel
       gzochid_protocol_client *client = (gzochid_protocol_client *)
 	g_hash_table_lookup (context->oids_to_clients, session_oid_str);
 
-      tx_context = join_side_effects_transaction (context, channel);
+      if (client != NULL)
+	{
+	  tx_context = join_side_effects_transaction (context, channel);
 
-      g_sequence_insert_sorted 
-	(channel->sessions, session_oid_str, gzochid_util_string_data_compare,
-	 NULL);
-      g_sequence_insert_sorted
-	(session->channels, mpz_get_str (NULL, 16, channel_reference->oid), 
-	 gzochid_util_string_data_compare, NULL);
-      tx_context->messages = g_list_append 
-	(tx_context->messages, 
-	 gzochid_channel_message_new (GZOCHID_CHANNEL_MESSAGE_JOIN, client));
+	  g_sequence_insert_sorted 
+	    (channel->sessions, session_oid_str, 
+	     gzochid_util_string_data_compare, NULL);
+	  g_sequence_insert_sorted
+	    (session->channels, mpz_get_str (NULL, 16, channel_reference->oid), 
+	     gzochid_util_string_data_compare, NULL);
+	  tx_context->messages = g_list_append 
+	    (tx_context->messages, gzochid_channel_message_new 
+	     (GZOCHID_CHANNEL_MESSAGE_JOIN, client));
 
-      gzochid_data_mark (context, channel);
-      gzochid_data_mark (context, session);
+	  gzochid_data_mark (context, channel);
+	  gzochid_data_mark (context, session);
+	}
+      else gzochid_warning 
+	     ("Client not found for joined channel session '%s'; skipping.", 
+	      session_oid_str);
     }
   else free (session_oid_str);
 }
@@ -416,22 +434,28 @@ static void leave_channel
       gzochid_protocol_client *client = (gzochid_protocol_client *)
 	g_hash_table_lookup (context->oids_to_clients, session_oid_str);
 
-      tx_context = join_side_effects_transaction (context, channel);
+      if (client != NULL)
+	{
+	  tx_context = join_side_effects_transaction (context, channel);
 
-      g_sequence_remove (iter);
-      iter = g_sequence_lookup
-	(session->channels, channel_oid_str, gzochid_util_string_data_compare,
-	 NULL);
-      g_sequence_remove (iter);
+	  g_sequence_remove (iter);
+	  iter = g_sequence_lookup
+	    (session->channels, channel_oid_str, 
+	     gzochid_util_string_data_compare, NULL);
+	  g_sequence_remove (iter);
+	  
+	  tx_context->messages = g_list_append 
+	    (tx_context->messages, gzochid_channel_message_new 
+	     (GZOCHID_CHANNEL_MESSAGE_LEAVE, client));
 
-      tx_context->messages = g_list_append 
-	(tx_context->messages, 
-	 gzochid_channel_message_new (GZOCHID_CHANNEL_MESSAGE_LEAVE, client));
-
-      free (channel_oid_str);
-
-      gzochid_data_mark (context, channel);
-      gzochid_data_mark (context, session);
+	  free (channel_oid_str);
+	  
+	  gzochid_data_mark (context, channel);
+	  gzochid_data_mark (context, session);
+	}
+      else gzochid_warning 
+	     ("Client not found for parting channel session '%s'; skipping.", 
+	      session_oid_str);
     }
 
   free (session_oid_str);
