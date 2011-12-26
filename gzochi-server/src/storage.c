@@ -317,11 +317,12 @@ char *gzochid_storage_transaction_get
       datum db_value = gdbm_fetch (tx->store->database, *k);
 
       if (db_value.dptr != NULL)
-	value = (datum *) make_extended_key (db_value.dptr, db_value.dsize);
-      else value = (datum *) make_extended_key (NULL, 0);
-	  
-      g_hash_table_insert (tx->cache, k, value);
-      free (db_value.dptr);
+	{ 
+	  value = (datum *) make_extended_key (db_value.dptr, db_value.dsize);
+	  g_hash_table_insert (tx->cache, k, value);
+	  free (db_value.dptr);
+	}
+      else g_hash_table_insert (tx->cache, k, make_extended_key (NULL, 0));
     }
   else
     {
