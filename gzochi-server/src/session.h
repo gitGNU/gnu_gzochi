@@ -60,5 +60,6 @@ void gzochid_client_session_send_message
 
 void gzochid_client_session_persist 
 (gzochid_application_context *, gzochid_client_session *, mpz_t);
+void gzochid_sweep_client_sessions (gzochid_application_context *);
 
 #endif /* GZOCHID_SESSION_H */

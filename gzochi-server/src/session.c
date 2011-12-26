@@ -19,16 +19,19 @@
 #include <glib.h>
 #include <gmp.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "app.h"
 #include "auth.h"
 #include "data.h"
 #include "game.h"
 #include "io.h"
+#include "log.h"
 #include "protocol.h"
 #include "scheme.h"
 #include "session.h"
 #include "tx.h"
+#include "txlog.h"
 #include "util.h"
 
 #define SESSION_PREFIX "s.session."
@@ -154,6 +157,16 @@ static void session_commit_operation (gpointer data, gpointer user_data)
   g_mutex_lock (context->client_mapping_lock);
   client = (gzochid_protocol_client *) g_hash_table_lookup 
     (context->oids_to_clients, oid_str);
+
+  if (client == NULL)
+    {
+      gzochid_warning 
+	("Client not found for session '%s'; skipping operation.", oid_str);
+      g_mutex_unlock (context->client_mapping_lock);
+      free (oid_str);
+      return;
+    }
+
   free (oid_str);
 
   switch (op->type)
@@ -378,4 +391,32 @@ void gzochid_client_session_persist
 
   gzochid_oid_holder_free (holder);
   gzochid_data_prefix_binding_persistence_task_free (task);
+}
+
+void gzochid_sweep_client_sessions (gzochid_application_context *context)
+{
+  mpz_t oid;
+  char *next_binding = NULL;
+  int prefix_len = strlen (SESSION_PREFIX), num_sessions = 0;
+
+  mpz_init (oid);
+  gzochid_tx_info (context, "Sweeping old client sessions.");
+  next_binding = gzochid_data_next_binding_oid (context, SESSION_PREFIX, oid);
+
+  while (next_binding != NULL 
+         && strncmp (SESSION_PREFIX, next_binding, prefix_len) == 0)
+    {
+      char *next_next_binding = NULL;
+
+      gzochid_data_remove_binding (context, next_binding);
+      next_next_binding = gzochid_data_next_binding_oid 
+	(context, next_binding, oid);
+
+      free (next_binding);
+      next_binding = next_next_binding;
+      num_sessions++;
+    }
+
+  gzochid_tx_info (context, "Swept %d session(s).", num_sessions);
+  mpz_clear (oid);  
 }
