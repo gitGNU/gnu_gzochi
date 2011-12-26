@@ -506,7 +506,13 @@
   (define (gzochi:uid->serialization uid) 
     (hashtable-ref serializer-registry uid #f))
 
-  (define (gzochi:mark-for-write! managed-record) (if #f #f))
+  (define (gzochi:mark-for-write! managed-record)
+    (or (gzochi:managed-record? managed-record)
+	(raise (condition (make-assertion-violation)
+			  (make-message-condition 
+			   "Only managed records may be marked."))))
+    (primitive-mark-for-write! managed-record))
+    
   (define (gzochi:mark-for-read! managed-record) (if #f #f))
 
   (define-record-type 
@@ -553,6 +559,8 @@
 		 "Bindings may only be created for managed records."))))
 
     (primitive-set-binding! name obj))
+
+  (define primitive-mark-for-write! #f)
 
   (define primitive-create-reference #f)
   (define primitive-dereference #f)

@@ -85,6 +85,15 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
   return SCM_UNSPECIFIED;
 }
 
+SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
+	    (SCM obj), "Mark a managed record that has been modified.")
+{
+  gzochid_data_mark 
+    (gzochid_scheme_current_application_context (), 
+     &gzochid_scheme_data_serialization, obj);
+  return SCM_UNSPECIFIED;
+}
+
 void gzochid_api_data_init (void)
 {
   SCM current_module = scm_current_module ();
