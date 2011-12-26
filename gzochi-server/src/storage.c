@@ -138,20 +138,33 @@ char *gzochid_storage_first_key (gzochid_storage_store *store, int *len)
 char *gzochid_storage_next_key 
 (gzochid_storage_store *store, char *key, int key_len, int *len)
 {
-  datum dkey, dnext;
+  datum next, best_match = { NULL, 0 };
 
-  dkey.dptr = key;
-  dkey.dsize = key_len;
+  next = gdbm_firstkey (store->database);
+  while (next.dptr != NULL)
+    {
+      if (strncmp (key, next.dptr, MIN (key_len, next.dsize)) < 0)
+	{
+	  if (best_match.dptr == NULL)
+	    best_match = next;
+	  else if (strncmp (next.dptr, best_match.dptr, 
+			    MIN (next.dsize, best_match.dsize)) > 0)
+	    {
+	      free (best_match.dptr);
+	      best_match = next;
+	    }
+	}
 
-  dnext = gdbm_nextkey (store->database, dkey);
+      next = gdbm_nextkey (store->database, next);
+    }
   
-  if (dnext.dptr == NULL)
+  if (best_match.dptr == NULL)
     return NULL;
 
   if (len != NULL)
-    *len = dnext.dsize;
+    *len = best_match.dsize;
 
-  return dnext.dptr;
+  return best_match.dptr;
 }
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin
@@ -368,19 +381,40 @@ char *gzochid_storage_transaction_first_key
 char *gzochid_storage_transaction_next_key 
 (gzochid_storage_transaction *tx, char *key, int key_len, int *len)
 {
-  datum dkey, lkey;
+  datum next, best_match = { NULL, 0 };
 
-  dkey.dptr = key;
-  dkey.dsize = key_len;
+  next = gdbm_firstkey (tx->store->database);
+  while (next.dptr != NULL)
+    {      
+      extended_datum *value = g_hash_table_lookup (tx->cache, &next);
+      if (value != NULL && value->null)
+	{
+	  free (next.dptr);
+	  continue;
+	}
 
-  lkey = gdbm_nextkey (tx->store->database, dkey);
+      if (strncmp (key, next.dptr, MIN (key_len, next.dsize)) < 0)
+	{
+	  if (best_match.dptr == NULL)
+	    best_match = next;
+	  else if (strncmp (next.dptr, best_match.dptr, 
+			    MIN (next.dsize, best_match.dsize)) > 0)
+	    {
+	      free (best_match.dptr);
+	      best_match = next;
+	    }
+	}
 
-  if (lkey.dptr != NULL)
-    {
-      set_read_lock (tx, make_key (lkey.dptr, lkey.dsize));
-      if (len != NULL)
-	*len = lkey.dsize;
-      return lkey.dptr;
+      next = gdbm_nextkey (tx->store->database, next);
     }
-  else return NULL;
+  
+  if (best_match.dptr == NULL)
+    return NULL;
+
+  set_read_lock (tx, make_key (best_match.dptr, best_match.dsize));
+
+  if (len != NULL)
+    *len = best_match.dsize;
+
+  return best_match.dptr;
 }
