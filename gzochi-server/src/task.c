@@ -268,12 +268,17 @@ static gzochid_task *rebuild_durable_task
   gzochid_data_managed_reference *task_reference = 
     gzochid_data_create_reference_to_oid 
     (context, &durable_task_serialization, oid);
-  gzochid_durable_application_task *task = 
-    (gzochid_durable_application_task *) task_reference->obj;
-  gzochid_transactional_application_task *transactional_task =
-    gzochid_transactional_application_task_new 
+
+  gzochid_durable_application_task *task = NULL;
+  gzochid_transactional_application_task *transactional_task = NULL;
+  gzochid_application_task *application_task = NULL;
+
+  gzochid_data_dereference (task_reference);
+
+  task = (gzochid_durable_application_task *) task_reference->obj;
+  transactional_task = gzochid_transactional_application_task_new 
     (durable_task_application_worker, task);
-  gzochid_application_task *application_task = gzochid_application_task_new
+  application_task = gzochid_application_task_new
     (context, task->task->identity, 
      gzochid_transactional_application_task_worker, transactional_task);
 
@@ -312,7 +317,12 @@ void gzochid_restart_tasks (gzochid_application_context *context)
       num_tasks++;
     }
 
-  gzochid_tx_info (context, "Resubmitted %d tasks.", num_tasks);
+  if (num_tasks == 1)
+    gzochid_tx_info (context, "Resubmitted 1 task.", num_tasks);
+  else if (num_tasks > 1)
+    gzochid_tx_info (context, "Resubmitted %d tasks.", num_tasks);
+  else gzochid_tx_info (context, "No tasks found to resubmit.");
+
   mpz_clear (oid);  
 }
 
@@ -374,8 +384,19 @@ static void durable_task_application_worker
     gzochid_schedule_submit_task 
       (game_context->task_queue, 
        build_durable_task (inner_task, task->serialization));
-}
+  else 
+    {
+      char *oid_str = mpz_get_str (NULL, 16, task->oid);
+      GString *binding = g_string_new (PENDING_TASK_PREFIX);
+      
+      g_string_append (binding, oid_str);
 
+      gzochid_data_remove_binding (context, binding->str);
+
+      g_string_free (binding, FALSE);
+      free (oid_str);
+    }  
+}
 
 static void commit_scheduled_task (gpointer data, gpointer user_data)
 {
