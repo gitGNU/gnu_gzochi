@@ -271,7 +271,8 @@ static void close_channel
 	       session_oid_str);
 	  else
 	    {
-	      gzochid_data_mark (context, session);
+	      gzochid_data_mark 
+		(context, &gzochid_channel_serialization, session);
 
 	      tx_context->messages = g_list_append
 		(tx_context->messages,
@@ -385,8 +386,9 @@ static void join_channel
 	    (tx_context->messages, gzochid_channel_message_new 
 	     (GZOCHID_CHANNEL_MESSAGE_JOIN, client));
 
-	  gzochid_data_mark (context, channel);
-	  gzochid_data_mark (context, session);
+	  gzochid_data_mark (context, &gzochid_channel_serialization, channel);
+	  gzochid_data_mark 
+	    (context, &gzochid_client_session_serialization, session);
 	}
       else gzochid_warning 
 	     ("Client not found for joined channel session '%s'; skipping.", 
@@ -450,8 +452,9 @@ static void leave_channel
 
 	  free (channel_oid_str);
 	  
-	  gzochid_data_mark (context, channel);
-	  gzochid_data_mark (context, session);
+	  gzochid_data_mark (context, &gzochid_channel_serialization, channel);
+	  gzochid_data_mark 
+	    (context, &gzochid_client_session_serialization, session);
 	}
       else gzochid_warning 
 	     ("Client not found for parting channel session '%s'; skipping.", 

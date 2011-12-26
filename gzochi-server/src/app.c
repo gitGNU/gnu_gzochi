@@ -424,7 +424,8 @@ static void client_logged_in_worker
 
       session->handler = session_handler;
 
-      gzochid_data_mark (context, session);
+      gzochid_data_mark 
+	(context, &gzochid_client_session_serialization, session);
       gzochid_client_session_send_login_success (context, session);
     }
 }

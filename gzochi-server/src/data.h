@@ -105,7 +105,8 @@ gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
 (gzochid_application_context *, gzochid_io_serialization *, mpz_t);
 void gzochid_data_dereference (gzochid_data_managed_reference *reference);
 
-void gzochid_data_mark (gzochid_application_context *, void *);
+void gzochid_data_mark 
+(gzochid_application_context *, gzochid_io_serialization *, void *);
 
 gzochid_task *gzochid_data_persistence_task_new 
 (gzochid_application_context *, gzochid_auth_identity *, 

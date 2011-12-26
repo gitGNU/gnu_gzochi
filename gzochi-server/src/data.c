@@ -583,16 +583,15 @@ void gzochid_data_dereference (gzochid_data_managed_reference *reference)
   dereference (gzochid_transaction_context (&data_participant), reference);
 }
 
-void gzochid_data_mark (gzochid_application_context *context, void *ptr)
+void gzochid_data_mark 
+(gzochid_application_context *context, gzochid_io_serialization *serialization,
+ void *ptr)
 {
-  gzochid_data_managed_reference *reference = NULL;
-  gzochid_data_transaction_context *tx_context = NULL;
-  join_transaction (context);
+  gzochid_data_managed_reference *reference =
+    get_reference_by_ptr (context, ptr, serialization);
 
-  tx_context = gzochid_transaction_context (&data_participant);
-  reference = g_hash_table_lookup (tx_context->ptrs_to_references, ptr);
-  assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
-  reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
+  if (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW)
+    reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
 }
 
 typedef struct _gzochid_persistence_task_data
