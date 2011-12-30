@@ -20,6 +20,7 @@
   (export gzochi:create-channel
 	  gzochi:get-channel
 
+	  gzochi:channel?
 	  gzochi:channel-name
 	  gzochi:channel-delivery
 	  gzochi:channel-sessions
