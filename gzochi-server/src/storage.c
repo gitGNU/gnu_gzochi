@@ -127,12 +127,8 @@ void gzochid_storage_delete
 
 char *gzochid_storage_first_key (gzochid_storage_store *store, int *len)
 {
-  datum dkey = gdbm_firstkey (store->database);
-  
-  if (len != NULL)
-    *len = dkey.dsize;
-
-  return dkey.dptr;
+  char z = '\0';
+  return gzochid_storage_next_key (store, &z, 1, len);
 }
 
 char *gzochid_storage_next_key 
@@ -148,7 +144,7 @@ char *gzochid_storage_next_key
 	  if (best_match.dptr == NULL)
 	    best_match = next;
 	  else if (strncmp (next.dptr, best_match.dptr, 
-			    MIN (next.dsize, best_match.dsize)) > 0)
+			    MIN (next.dsize, best_match.dsize)) < 0)
 	    {
 	      free (best_match.dptr);
 	      best_match = next;
@@ -371,16 +367,8 @@ void gzochid_storage_transaction_delete
 char *gzochid_storage_transaction_first_key 
 (gzochid_storage_transaction *tx, int *len)
 {
-  datum dkey = gdbm_firstkey (tx->store->database);
-
-  if (dkey.dptr != NULL)
-    {
-      set_read_lock (tx, make_key (dkey.dptr, dkey.dsize));
-      if (len != NULL)
-	*len = dkey.dsize;
-      return dkey.dptr;
-    }
-  else return NULL;
+  char z = '\0';
+  return gzochid_storage_transaction_next_key (tx, &z, 1, len);
 }
 
 char *gzochid_storage_transaction_next_key 
@@ -405,7 +393,7 @@ char *gzochid_storage_transaction_next_key
 	  if (best_match.dptr == NULL)
 	    best_match = next;
 	  else if (strncmp (next.dptr, best_match.dptr, 
-			    MIN (next.dsize, best_match.dsize)) > 0)
+			    MIN (next.dsize, best_match.dsize)) < 0)
 	    {
 	      free (best_match.dptr);
 	      best_match = next;
