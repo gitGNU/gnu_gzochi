@@ -66,6 +66,7 @@ typedef struct _gzochid_data_transaction_context
   gzochid_application_context *context;
 
   gzochid_data_oid_block *free_oids;
+  GList *used_oid_blocks;
 
   gzochid_storage_transaction *oids_transaction;
   gzochid_storage_transaction *names_transaction;

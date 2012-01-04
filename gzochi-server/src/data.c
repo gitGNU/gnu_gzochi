@@ -68,8 +68,22 @@ static gzochid_data_transaction_context *create_transaction_context
   return tx_context;
 }
 
-static void transaction_context_free (gzochid_data_transaction_context *context)
+static void free_oid_block (void *ptr)
 {
+  gzochid_data_oid_block *block = (gzochid_data_oid_block *) ptr;
+
+  mpz_clear (block->first);
+  mpz_clear (block->next);
+  mpz_clear (block->last);
+} 
+
+static void transaction_context_free (gzochid_data_transaction_context *context)
+{  
+  if (context->free_oids != NULL)
+    free_oid_block (context->free_oids);
+
+  g_list_free_full (context->used_oid_blocks, free_oid_block);
+
   g_hash_table_destroy (context->oids_to_references);
   g_hash_table_destroy (context->ptrs_to_references);
 
@@ -280,6 +294,13 @@ static int next_object_id
 
   mpz_set (oid, context->free_oids->next);
   mpz_add_ui (context->free_oids->next, context->free_oids->next, 1);
+
+  if (mpz_cmp (context->free_oids->next, context->free_oids->last) > 0)
+    {
+      context->used_oid_blocks = g_list_append 
+	(context->used_oid_blocks, context->free_oids);
+      context->free_oids = reserve_oids (context->context);
+    }
 
   return 0;
 }
