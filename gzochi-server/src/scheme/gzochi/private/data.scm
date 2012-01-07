@@ -111,6 +111,12 @@
   (define (gzochi:make-managed-record-type-descriptor 
 	   name parent uid sealed? opaque? fields)
     
+    (or uid 
+	(raise 
+	 (condition
+	  (make-assertion-violation)
+	  (make-message-condition "Managed records must be nongenerative"))))
+
     (let* ((fields (vector->list fields))
 	   (field-names (map (lambda (f) (take f 2)) fields))
 	   (field-serializations (map last fields))
@@ -341,13 +347,7 @@
 			    (else #`(record-type-descriptor 
 				     gzochi:managed-record))))
                      (protocol (if (unspecified? _protocol) #f _protocol))
-                     (uid
-		      (if (unspecified? _nongenerative) 
-			  (raise (condition 
-				  (make-assertion-violation)
-				  (make-message-condition
-				   "Managed records must be nongenerative")))
-			  _nongenerative))
+                     (uid (if (unspecified? _nongenerative) #f _nongenerative))
                      (sealed? (if (unspecified? _sealed) #f _sealed))
                      (opaque? (if (unspecified? _opaque) #f _opaque)))
 
