@@ -16,7 +16,8 @@ dnl You should have received a copy of the GNU General Public License
 dnl along with this package.  If not, see <http://www.gnu.org/licenses/>.
 dnl
 
-AC_INIT([libgzochi-common],[0.0.1],[julian.graham@aya.yale.edu])
+AC_INIT([libgzochi-common], [0.0.1], [julian.graham@aya.yale.edu], [].
+        [http://www.nongnu.org/])
 AC_CONFIG_SRCDIR([src/gzochi-common.h])
 AM_INIT_AUTOMAKE(1.6)
 
