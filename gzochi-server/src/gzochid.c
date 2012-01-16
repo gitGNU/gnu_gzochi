@@ -15,6 +15,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <config.h>
+#include <getopt.h>
+#include <locale.h>
+#include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -26,18 +30,27 @@
 #include "gzochid.h"
 #include "threads.h"
 
+#define _(String) gettext (String)
+
+static const struct option longopts[] =
+  {
+    { "help", no_argument, NULL, 'h' },
+    { "version", no_argument, NULL, 'v' },
+    { NULL, 0, NULL, 0 }
+  };
+
 static void initialize_async (gpointer data, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
   gzochid_server_context *server_context = (gzochid_server_context *) context;
 
-  server_context->admin_context = gzochid_admin_context_new ();
-  server_context->game_context = gzochid_game_context_new ();
-
   GKeyFile *key_file = g_key_file_new ();
   GHashTable *admin_config = NULL;
   GHashTable *game_config = NULL;  
   
+  server_context->admin_context = gzochid_admin_context_new ();
+  server_context->game_context = gzochid_game_context_new ();
+
   g_key_file_load_from_file 
     (key_file, "/etc/gzochid/server.conf", G_KEY_FILE_NONE, NULL);
 
@@ -99,9 +112,69 @@ void gzochid_server_context_free (gzochid_server_context *context)
   free (context);
 }
 
+static void
+print_help (const char *program_name)
+{
+  printf (_("\
+Usage: %s [OPTION]...\n"), program_name);
+  
+  puts ("");
+  fputs (_("\
+  -h, --help          display this help and exit\n\
+  -v, --version       display version information and exit\n"), stdout);
+
+  puts ("");
+  printf (_("\
+Report bugs to: %s\n"), PACKAGE_BUGREPORT);
+#ifdef PACKAGE_PACKAGER_BUG_REPORTS
+  printf (_("Report %s bugs to: %s\n"), PACKAGE_PACKAGER,
+          PACKAGE_PACKAGER_BUG_REPORTS);
+#endif /* PACKAGE_PACKAGER_BUG_REPORTS */
+
+#ifdef PACKAGE_URL
+  printf (_("%s home page: <%s>\n"), PACKAGE_NAME, PACKAGE_URL);
+#else
+  printf (_("%s home page: <http://www.nongnu.org/%s/>\n"),
+          PACKAGE_NAME, PACKAGE);
+#endif /* PACKAGE_URL */
+}
+
+static void
+print_version (void)
+{
+  printf ("gzochid (gzochi) %s\n", VERSION);
+
+  puts ("");
+  printf (_("\
+Copyright (C) %s Julian Graham\n\
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\
+This is free software: you are free to change and redistribute it.\n\
+There is NO WARRANTY, to the extent permitted by law.\n"),
+	  "2011");
+}
+
 int main (int argc, char *argv[])
 {
-  gzochid_server_context *context = gzochid_server_context_new ();
+  gzochid_server_context *context = NULL;
+  const char *program_name = argv[0];
+  int optc = 0;
+
+  setlocale (LC_ALL, "");
+
+  while ((optc = getopt_long (argc, argv, "hv", longopts, NULL)) != -1)
+    switch (optc)
+      {
+      case 'v':
+	print_version ();
+	exit (EXIT_SUCCESS);
+	break;
+      case 'h':
+	print_help (program_name);
+	exit (EXIT_SUCCESS);
+	break;
+      }
+
+  context = gzochid_server_context_new ();
 
   g_thread_init (NULL);
 
