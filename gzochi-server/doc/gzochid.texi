@@ -1,0 +1,1572 @@
+\input texinfo	@c -*-texinfo-*-
+
+@c %**start of header
+@setfilename gzochid.info
+@include version.texi
+@settitle GZOCHID MANUAL-EDITION @value{EDITION}
+@defcodeindex op
+@c %**end of header
+     
+@copying
+This manual describes gzochid, the gzochi server.
+
+Copyright @copyright{} @value{UPDATED} Julian Graham.
+     
+@quotation
+Permission is granted to copy, distribute and/or modify this document 
+under the terms of the GNU Free Documentation License, Version 1.2 or 
+any later version published by the Free Software Foundation; with no 
+Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.  A 
+copy of the license is included in the section entitled ``GNU Free 
+Documentation License''.
+@end quotation
+@end copying
+     
+@dircategory Servers
+@direntry
+* gzochid: (gzochid).	gzochid, the gzochi server
+@end direntry
+
+@titlepage
+@title gzochid Manual
+@subtitle Edition @value{EDITION}
+@author Julian Graham
+
+@c  The following two commands
+@c  start the copyright page.
+@page
+@vskip 0pt plus 1filll
+@insertcopying
+@end titlepage
+     
+@c So the toc is printed at the start.
+@contents
+     
+@ifnottex
+@node Top
+@top The gzochid Manual
+     
+@insertcopying
+@end ifnottex
+
+This reference manual documents gzochid, the server component
+of the gzochi massively multiplayer online game development 
+framework.
+
+@menu
+
+Getting started
+
+* Introduction::
+* Conceptual overview::
+* Installation::
+* Running gzochid::
+
+The gzochid container
+
+* Application deployment::
+* Application services::
+* Communication protocol::
+* User authentication::
+* Monitoring::
+
+Writing applications for gzochid
+
+* Application design with gzochid::
+* Scheme API reference::
+* An example application::
+
+Appendices
+
+* GNU Free Documentation License::
+
+Indices
+
+* Concept index::
+* Procedure index::
+@end menu
+
+@contents
+
+@node Introduction
+@chapter Introduction
+
+gzochid is the server component for the gzochi massively multiplayer
+online game development framework. It is responsible for hosting the 
+server-side portions of game applications developed against the 
+framework, for managing the data persisted by these applications and
+provisioning computing resources for their needs at run-time, and 
+for exposing a set of container services that are especially useful 
+for online game development.
+
+gzochid is a container for game server applications the same way
+that a web container is a container for web applications: It manages
+the lifecycles of the applications it hosts, routes client requests
+to application endpoints, and provides services to ease the 
+interaction of the applications with external resources.
+
+This manual expects a familiarity with the Scheme programming 
+language, which is the language used to write applications that can 
+be hosted by gzochid. gzochid uses the GNU GUile extension language 
+platform to provide its Scheme run-time environment; the Guile 
+manual is an excellent resource for users who are new to Scheme or 
+to functional programming in general.
+
+New users of gzochi may wish to pay special attention to the 
+following section of this manual, ``Conceptual overview,'' which
+explores some of the rationale for the design of the gzochi 
+framework and the services it provides.
+
+@node Conceptual overview
+@chapter Conceptual overview
+
+Developing games that are played over a computer network poses
+challenges distinct from those that arise from games whose extent is
+limited to a single process or a single machine. The characteristics 
+of the network link that connects the machines involved the game
+give rise, by necessity, to some primary constraints on the design 
+of the game: To create a dynamic model of the game state that is 
+shared between the client and the server, those systems must 
+exchange messages, and this process is naturally limited by the rate
+of message delivery. Will messages be delivered reliably? Is message
+order guaranteed to be preserved? Answers to these questions will 
+also have an impact on game server architecture.
+
+When multiple players are allowed to interact with a networked game 
+system simultaneously, an additional set of difficulties emerges. 
+How can their interactions with components of the game system be 
+properly synchronized such that each player receives a fair and 
+consistent view of the world? How can this synchronization be scaled
+to maintain a responsive user interface for up to thousands of
+simultaneously connected clients?
+
+Some additional background is presented in the following sections. 
+To address these issues, gzochid provides a unified set of software 
+tools, which are described in a subsequent chapter 
+(@pxref{Application services}).
+
+@menu
+* Data persistence::
+* Transactions and atomicity::
+* Network communication::
+* Concurrent execution::
+@end menu
+
+@node Data persistence
+@section Data persistence
+
+If the state of a game is to ``outlive'' the server process that 
+manages it, the data that makes up the state must be written to
+non-volatile storage, such as a hard disk. There are many reasons 
+for a server process to terminate. Some shutdowns, such as those 
+performed for system maintenance or upgrades; others are 
+spontaneous---software bugs are inevitable, and whether they cause
+the server process to terminate outright or leave the game system
+in an unplayable state, the net effect is the same. When a player's
+commitment to an online game can span months or even years, losing
+their play history can be quite disheartening.
+
+Several questions must be answered in order for persistence to be
+implemented: How often must data be persisted? If players are 
+notified of changes to game state before these changes are made
+persistent, then the potential exists for a recovered game state to
+``erase'' progress made by players between the last persistence 
+event and the shutdown of the game. On the other hand, non-volatile
+storage media are often quite a bit slower than random-access 
+memory, and thus forcing persistence too often can create a
+bottleneck on game performance. How much of the game state must
+be persisted at each persistence point to ensure that the entire
+state can be reconstituted at some later date? For large, complex
+games, the game state may be so large that persisting the entire
+state takes so long that even infrequent persistence events must 
+cause the game to ``pause.'' If only portions of the game state are
+persisted, then care must be taken to ensure that enough state is 
+persisted to ensure logical consistency between entities within
+the game.
+
+gzochid addresses these issues with an automatic persistence
+mechanism that treats game state as an object graph in which updates
+are tracked and persisted transparently, with full transactional
+semantics. @xref{Managed records}, for more information.
+
+@node Transactions and atomicity
+@section Transactions and atomicity
+
+It is often important that certain sequences of events occur as a 
+unit, such that either every event in the sequence takes place (and
+players receive notification) or, in the event of an error, none of
+the events take place---no matter where in the sequence the error 
+arises. One example of this is transferring an object from one the 
+inventory of one player to the inventory of another. Depending on 
+how the transfer is implemented, there may be an interval between 
+the object being taken from the first player but before it is given 
+to the second player. If the execution of game code is interrupted 
+at this point, the object may be destroyed. A similar problem arises
+if a reference to the object is given to the second player before 
+being removed from the first.
+
+Even when errors are detected, recovery can difficult: It may not be
+possible to determine what the state of individual connected clients
+is once they have lost consistency with the server's model of the
+game world, and enabling clients to resolve conflicting updates to
+game state presents significant architectural challenges. In 
+general, once the side effects---e.g, client notifications or 
+persistent changes to data---have been committed, they cannot easily
+be undone.
+
+gzochid executes all game application code in a @emph{transactional}
+context, meaning that the side effects produced by a portion of code
+are delayed until its successful completion, at which point all of 
+them guaranteed to take effect together; or the side effects are 
+``rolled back'' and the block of code is either retried, with no 
+external indication that an error occurred, or abandoned. And other 
+portions of code that are concurrently accessing the same bits of 
+data are guaranteed a consistent view of that data for the duration
+of their execution.
+
+@node Network communication
+@section Network communication
+
+The reliable delivery of messages between clients and the server is 
+fundamental to the operation of an online game, but the network
+communication services provided by most programming languages and 
+operating systems expose game applications to nuanced, unpredictable
+behaviors. Some communication channels do not guarantee packet
+delivery; nor is in-order delivery alway ensured. Even if a system
+promises ordered and reliable ordered delivery of packets, it is 
+difficult to predict their time of delivery. 
+
+When a packet of data arrives on the client or server, the bytes it
+contains must be interpreted, a process that is governed by a shared
+protocol. The set of possible communications between hosts in an 
+online game is naturally dependent upon the specific mechanics of 
+that game, but some types of messages are likely common to all 
+games: Clients need to establish their identities with the server;
+the server needs to respond to authentication attempts. The client
+and server may need messages representing attempts to disconnect or
+log out of the game gracefully. Some types of messages, which 
+trigger transitions in the state of a client's connection to the 
+server, are only valid when the connection is in a particular
+state. What should be the response from the server if it receives a
+login request from an already-authenticated client in the course of
+regular gameplay? If there are multiple points in the flow of 
+game execution at which messages can be received, does semantic
+validation of message content have to be applied at all of them?
+
+Because the state of a network connection is dependent on the state
+of multiple independent hosts and their operators, it is inherently
+asynchronous with game state. In the likely case that a protocol
+message is larger than a single packet, an entire message may not
+become available all at once, and thus participants in the 
+communication will need to keep a buffer of partial messages while
+they wait for the remaining bytes. A connection may be interrupted 
+before all of the message's consituent packets have been delivered,
+and if the processing of network data is mixed in with the 
+processing of game application logic, recovery from a network 
+failure may be complicated. 
+
+There are aspects of multiplayer games for which it is not very
+important that every player have a view of the world that is 
+consistent with that of every other player. For example, depending
+on the context, it may not be critical that every player have the
+same information about the scenery in a particular 
+region---this is information that is related to the game world, but 
+has no bearing on the outcome of the game. There are other elements 
+of gameplay for which it is necessary that all involved players are 
+kept in a consistent state. If some but not all players receive 
+notification of a change that does affect the outcome of the game,
+not only are they at a strategic disadvantage, but losing 
+synchronization with the server's model of the world may make it
+difficult for them to interpet subsequent notifications.
+
+gzochid provides a network management layer and a low-level 
+client-server protocol that work in concert to hide the tricky
+details of message deliery. Reasonably large messages may be 
+transactionally queued for delivery to the server or its clients, 
+and messages can be addressed to individual clients or to 
+arbitrarily large groups of clients with a single procedure 
+invocation. @xref{Client session management}, for information on
+gzochid's representation of client connections; 
+@xref{Channel management}, for a description of efficient message
+broadcast services.
+
+@node Concurrent execution
+@section Concurrent execution
+
+While some portions of a game can be driven entirely by 
+client-generated events, there are often flows of execution that
+are best managed as ``background processes'' that proceed 
+independent of any action by a client. Some examples of this type of
+processing include: Time and weather systems, in which regular 
+changes to the game world take place at scheduled intervals; or the
+actions of non-player characters that act as autonomous agents
+within the game world, with a flow of logic that determines their
+behavior based on various dynamic game states.
+
+As you can infer from these examples, different modes of scheduling 
+and execution are possible for tasks within the same application.
+Some tasks need to begin executing at predetermined points in the
+future. Others need to run as soon as CPU time can be allocated to
+them. Certain tasks, such as those implementing an in-game timer 
+tick, for example, may need to execute on a repeating basis.
+
+This type of asynchronous parallelism could be implemented using a
+an explicitly threaded execution model, but this approach has some
+significant limitations. For one, allocating a new thread for every 
+asynchronous bit of processing to be done consumes valuable process 
+memory and CPU cycles, and effectively constrains the amount of work
+that can be . A thread pool can some of these issues, but few 
+low-level thread libraries include time-based scheduling as part of
+their thread management APIs---you can specify that some bit of code
+should run in a separate thread but, but you usually can't control
+when it runs or how often it repeats without building some
+abstractions around the system's thread primitives.
+
+gzochid provides scheduling and execution services that allow tasks
+to be queued for immediate or deferred processing, either one time 
+only or repeating on a configurable interval. Furthermore, gzochid
+provides durability guarantees about scheduled tasks to the effect
+that tasks that fail with a recoverable error can be retried, and
+that the universe of scheduled tasks can survive a failure and 
+restart of the application server. @xref{Task scheduling}, for more 
+information.
+
+@node Installation
+@chapter Installation
+
+See the @file{INSTALL} file included in the gzochid distribution for
+detailed instructions on how to build gzochid. In most cases, if you
+have the requisite toolchain and dependences in place, you should 
+simply be able to run
+
+@example
+./configure
+make
+make install
+@end example
+
+This will install the gzochid executable @file{gzochid} to a 
+standard location, depending on the installation prefix---on most
+Unix-like systems, this will be @file{/usr/local}, with executable
+files being copied to @file{/usr/local/bin}. A server configuration
+file with the default settings will be installed to the @file{/etc/}
+directory under the installation prefix.
+
+This configuration file (@file{gzochid.conf}) will be processed
+prior to installation to set references to the gzochid deployment
+and data directories---where the server looks for deployed games and
+where it stores game state data, respectively---to locations 
+relative to the installation prefix. 
+@xref{The server configuration file}, for more information.
+
+@node Running gzochid
+@chapter Running gzochid
+
+The format for running the @command{gzochid} program is:
+
+@example
+gzochid @var{option} @dots{}
+@end example
+
+With no options, @command{gzochid} scans its deployment directory
+looking for game applications, each of which is configured and
+initialized or restarted depending on its state, and then begins
+listening for client connections. By default, the monitoring web
+application is also started. 
+
+In the absence of command line arguments, the port numbers on which
+these servers listen for connections, as well as other aspects of 
+their behavior, are modifiable via a configuration file (see below).
+
+@command{gzochid} supports the following options:
+
+@table @option
+@item --help
+@itemx -h
+@opindex --help
+@opindex -h
+Print an informative help message on standard output and exit
+successfully.
+
+@item --version
+@itemx -v
+@opindex --version
+@opindex -v
+Print the version number and licensing information of gzochid on
+standard output and then exit successfully.
+
+@end table
+
+@menu
+* The server configuration file::
+@end menu
+
+@node The server configuration file
+@section The server configuration file
+
+The gzochid server configuration file is usually named 
+@file{gzochid.conf} and is installed (and searched for) by default 
+in the @file{/etc/} directory of the installation prefix. It is an
+.ini-style configuration file, meaning it consists of several named
+sections of key-value pairs, like so:
+
+@example
+[section]
+
+key1 = value1
+key2 = value2
+@end example
+
+The configuration options currently understood by gzochid are as
+follows, organized by section.
+
+@emph{admin}
+
+These settings control various aspects of gzochid's administrative
+and monitoring functionality.
+
+@table @samp
+@item context.enabled
+Set to @code{true} to enable the administrative context, which is
+responsible for collecting and reporting on a variety of statistics
+about the state of a running gzochid server and its hosted games.
+Disabling this feature (by setting this key to @code{false}) will
+net a small improvement in process memory consumption and CPU
+performance.
+
+@item module.httpd.enabled
+Set to @code{true} to enable the monitoring web server. Has no
+effect if @samp{context.enabled} is not @code{true}.
+
+@item module.httpd.port
+The local port on which the monitoring web server should listen for
+incoming HTTP connections.
+
+@end table
+
+@emph{game}
+
+These settings control the primary game server module of gzochid.
+
+@table @samp
+@item server.port
+The local port on which to listen for incoming TCP connections from
+gzochi clients.
+
+@item server.fs.data
+The filesystem directory in which to store game state data for 
+hosted game applications. The user associated with the gzochid 
+process must have read and write access to this directory, as the
+server will attempt to create sub-directories rooted at this 
+location for each game, and will read and write data files in those
+sub-directories.
+
+@item server.fs.apps
+The filesystem directory to search for deployed game applications.
+The user associated with the gzochid process must have read and
+execute access to this directory---but it does not need to be able
+to write files here.
+
+@end table
+
+@node Application deployment
+@chapter Application deployment
+
+Game applications hosted by gzochid are discovered by the server
+when it scans its deployment directory for sub-directories 
+containing game application descriptor files, which are discussed in
+the following section. If gzochid's game deployment directory is 
+``/var/gzochid/deploy'' (the default), then the server will scan
+and discover the game descriptor file
+``/var/gzochid/deploy/my-game/game.xml'' on startup.
+
+The other required components of a game application are the Guile
+Scheme modules that contain the game logic and callbacks. These are 
+typically included in sub-directory trees rooted in the game 
+application directory, but alternate locations to search for modules
+can be specified in the game application descriptor file. 
+
+@menu
+* The game application descriptor::
+@end menu
+
+@node The game application descriptor
+@section The game application descriptor
+
+``game.xml,'' the game application descriptor, is an XML document 
+that is deployed as part of a game application and provides game 
+configuration information and metadata to gzochid. It is a rough 
+analog to the ``web.xml'' descriptor file that accompanies Java web
+applications. Like ``web.xml,'' ``game.xml'' is used by the server
+to find the locations of the application's code libraries and the
+entry points to the application. The game descriptor file must
+appear in the deployed application's root directory.
+
+A DTD that can be used to validate the structure of your application
+descriptors is included in the gzochid source distribution. Some 
+explanation of the semantics of the descriptor file follows.
+
+The application descriptor's document element is @code{game}, and it
+must include a @code{name} attribute that specifies a unique 
+``short name'' for the application; among other things, this name 
+will be used to identifier your application in log messages.
+
+The @code{description} element allows you to specify as its content
+some longer, more descriptive text to identify your game. (This text
+will be displayed in the gzochid monitoring console.)
+
+The @code{load-paths} element is a wrapper element for zero or more
+@code{load-path} element, each of which specifies as its content an
+absolute or relative path to be (temporarily) added to the default 
+Guile @code{%load-path} variable, which contains the locations that
+are searched during module resolution. Note that the game 
+application root directory is always added to the load path, so you 
+can leave the @code{load-paths} element empty if your application 
+library tree is rooted at the application root.
+
+Next there are two ``lifecycle callbacks'' that must be specified, 
+procedures for handling the ``initialization'' and ``logged in''
+events. Callbacks are specified via a @code{callback} element, which
+has no content but requires the @code{procedure} and @code{module}
+arguments which specify a publicly-visible Scheme procedure to be 
+used to handle an event. For example, the following XML snippet:
+
+@example
+<callback procedure="handler" module="my-code app handlers" />
+@end example
+
+...identifies the @code{handler} procedure exported from the Guile
+module @code{(my-code app handlers)}. Modules are resolved via the
+configured load paths.
+
+Initialization occurs once per application---even across server
+restarts---and the initialization callback is passed an R6RS 
+hashtable containing application properties. (In the current 
+release, this table will always be empty.) The logged in callback
+will be called when a client connects and successfully 
+authenticates, and it will be passed a client session record that
+can be used to communicate with the connected client.
+
+@node Application services
+@chapter Application services
+
+The follow sections describe the services that gzochid exposes to
+the applications it hosts. As an application author, you are free to
+employ or ignore them in whatever proportion you choose, but the
+expectation is that most non-trivial games will depend heavily on
+all of the services the container provides.
+
+@menu
+* Managed records::
+* Data binding and storage::
+* Client session management::
+* Channel management::
+* Task scheduling::
+* Transactional logging::
+@end menu
+
+@node Managed records
+@section Managed records
+
+gzochid exposes its transactional persistence services via 
+flexible, user-defined data structures called ``managed records.''
+A managed record is just like an R6RS record---in fact, a managed
+record @emph{is} an R6RS record that has the record-type
+@code{gzochi:managed-record} as its parent---with a few additional
+rules. First of all, managed record-type definitions must be unique
+according to the R6RS record specification, meaning that they are
+defined with a @code{nongenerative} clause if using a syntactic
+record definition form or a @var{uid} argument that is not @code{#f}
+if they are defined procedurally. 
+
+Second, the fields of a managed record must be annotated to assist 
+the container in persisting them to the data store. This is done via
+a serialization clause added to every field sub-clause in the 
+managed record definition. The serialization clause gives a 
+reference to the serialization to use to convert the field value to 
+and from a stream of bytes as it is written to and read from the 
+data store. A serialization is a record that provides serializer and
+deserializer procedures that are called by the container during the
+persistence phrase for managed records that have been modified in
+a transaction. The serialization clause may be omitted for fields 
+whose value will always be a managed record. In this case, a 
+built-in managed record serialization will be used.
+@xref{gzochi io}, for more information on serialization.
+
+For parity with the R6RS record libraries, the gzochid Scheme API 
+provides both syntactic and procedural facilities for working with
+managed records. @xref{gzochi data}, for more information on
+creating managed records.
+
+@node Data binding and storage
+@section Data binding and storage
+
+gzochid provides a few different ways of accessing data persisted as
+managed records. You can access persistent data implicitly, in the
+form of a managed record used as a callback for a lifecycle event
+(e.g., client messages); or you can bind managed objects to names
+for explicitly retrieval. In either case, the container will also 
+manage the persistence of managed records reachable from the root 
+record---that is to say, gzochid knows when a field in one managed
+record contains a reference to another managed record and only
+persists the portions of the object graph that change during the
+execution of application code.
+
+Bindings can be manipulated using the @code{gzochid:set-binding!},
+@code{gzochid:get-binding} and @code{gzochid:remove-binding!}
+procedures. For example, the following code snippet introduces a new
+binding that refers to a field of the managed record @var{obj}:
+
+@example
+(define obj (gzochi:get-binding "my-object"))
+(gzochi:set-binding! "f" (my-object-field obj))
+@end example
+
+Note that the container tracks references to managed records such 
+that at any subsequent point (provided the bindings above are not 
+mutated), the following expression will evaluate to @code{#t}:
+
+@example
+(eq? (my-object-field (gzochi:get-binding "my-object"))
+     (gzochi:get-binding "f"))
+@end example
+
+@xref{gzochi data}, for more information.
+
+@node Client session management
+@section Client session management
+
+A connected and authenticated user is exposed to game code in the
+form of a client session, a managed record that can be used to
+manipulate the state of that user. Messages may be queued 
+transactionally for delivery to individual client sessions or to
+groups of sessions (see below); sessions can be explicitly
+disconnected; and handlers may be registered for session-related
+events, such as incoming messages and client-side disconnections.
+
+Because client sessions are managed records, they can be used 
+any place in game application code that managed records may be used,
+such as automatically serialized fields of other managed records or
+as the data for an event handler. @xref{gzochi client}, for more
+information.
+
+@node Channel management
+@section Channel management
+
+Message broadcasting is a pattern that appears frequently in
+massively multiplayer game development. There may be a logical set
+of players that should be managed and addressed by the server as a
+group for the purposes of messaging. This group may include every
+player in the game, in the case of system notifications that need to
+be sent globally; or it may correspond to a logical grouping arising
+from game logic, such as broadcasting messages only to players 
+gathered in a particular room or region.
+
+gzochid addresses this case by providing an abstraction for managing
+communication with arbitrarily large numbers of grouped client
+sessions. gzochid ``channels'' are managed records, and, like client
+sessions, can be used any place in game application code that
+supports managed records. @xref{gzochi channel}, for more 
+information.
+
+@node Task scheduling
+@section Task scheduling
+
+gzochid provides an explicit task scheduling API that is used in 
+place of other mechanisms for asynchronous processing, such as 
+threads. A task in gzochid is a callback similar to the ones invoked
+for application lifecycle events, such as initialization; it 
+specifies a procedure to execute (qualified by a Guile module name),
+accompanied optionally by an arbitrary managed record to supply
+contextual information.
+
+The task API provides several options for task scheduling. 
+Scheduling is a transactional operation with respect to the code 
+doing the scheduling, so the earliest a scheduled task can run is
+following a successful commit of the transactional code (a task or a
+lifecycle callback) that scheduled it. Additionally, the execution 
+of a task may be delayed by a user-specified number of milliseconds.
+If a task needs to run more than once, you can reschedule it 
+explicitly as part of its execution, or you can schedule it as a
+periodic task. Periodic tasks are automatically rescheduled to run
+on a repeating basis with each execution following the previous one
+after a specified number of milliseconds.
+
+Task scheduling is persistent, such that the schedule of pending
+tasks will survive a restart of the gzochid container. 
+@xref{gzochi task}, for more information.
+
+@node Transactional logging
+@section Transactional logging
+
+Because gzochid executes application code transactionally, any side
+effects (e.g., queued messages, scheduled tasks) will be rolled back
+if the enclosing transaction fails to commit. And a single task may 
+be executed several times before committing successfully if there is
+heavy contention for data or other resources. As such, if log 
+messages are written non-transactionally, it can be difficult to use 
+them to trace application events.
+
+The gzochid container provides an API for writing log messages that
+will only be flushed on a successful commit. For example, if the
+following segment of transactional code is attempted and rolled back 
+twice before committing:
+
+@example
+(display "A log message.") (newline)
+(gzochi:info "A transactional log message.")
+@end example
+
+...the output might include:
+
+@example
+A log message.
+A log message.
+A log message.
+A transactional log message.
+@end example
+
+@xref{gzochi log}, for more information.
+
+@node Communication protocol
+@chapter Communication protocol
+
+The protocol used for gzochi client-server communication is 
+documented below. Note that this description is provided merely for
+the curious; the responsibility of gzochi game developers is to
+handle the messages that this underlying protocol delivers---in the
+form of byte arrays---to the client or server. The format and 
+encoding of these byte arrays is left up to game developers to
+determine.
+
+The low-level protocol described below conforms to a general pattern
+of a two-byte prefix encoding the length of the message payload, if 
+any, followed by an ``opcode'' indicating the purpose of the 
+message. (The opcode byte is not included in the length prefix.) The
+maximum size of a message body sent between components in a gzochi 
+game is thus 65535. Note that this is not necessarily the size of 
+the packet that delivers the message; the client and server may 
+break a larger protocol up into smaller packets that are 
+re-assembled by the recipient. (Naturally, this behavior is 
+transparent to gzochi game developers.)
+
+The following table lists the message types and structures that make
+up the low-level gzochi byte protocol.
+
+@table @code
+@item LOGIN_REQUEST (0x10)
+A request from a client to login to a gzochid application endpoint.
+The message payload must include the UTF-8-encoded endpoint name
+followed by a null byte (0x0), followed by a byte sequence that will
+be passed uninterpreted to the authentication plugin configured for
+the specified endpoint.
+
+@item LOGIN_SUCCESS (0x11)
+A message from the server indicating that a @code{LOGIN_REQUEST} was 
+received and that authentication was successful. There is no message
+payload for this message.
+
+@item LOGIN_FAILURE (0x12)
+A message from the server indicating that a @code{LOGIN_REQUEST} was
+received but that the login could not be completed successfully.
+
+@item LOGOUT_REQUEST (0x20)
+A request from an authenticated client to perform a graceful 
+disconnect from a gzochid server. There is no message payload for 
+this message.
+
+@item LOGOUT_SUCCESS (0x21)
+A message from the server indicating that a @code{LOGOUT_REQUEST}
+message was received. There is no message payload for this message. 
+Following the dispatch of this message, the server will close the 
+client's socket connection.
+
+@item SESSION_DISCONNECTED (0x30)
+A message from the server notifying the client that the server will
+be immediately closing the client's socket connection. There is no
+message payload for this message.
+
+@item SESSION_MESSAGE (0x31)
+A message that may be sent from the server or the client that 
+carries a message to be delivered, respectively, to a gzochid 
+game application endpoint or to client application code. The message
+payload follows the opcode as a byte sequence that will be passed
+uninterpreted to a handler registered by game code.
+
+@end table
+
+@node User authentication
+@chapter User authentication
+
+gzochid employs a pluggable authentication mechanism to allow each
+game application endpoint to specify an authentication scheme that
+meets its security requirements. The plugins currently available
+are listed below.
+
+@itemize @bullet
+@item
+@dfn{pass-thru}: This is the default authentication plugin. No
+actual authentication is performed---all login requests are 
+accepted---and the contents of the byte sequence included as part of
+the login request are interpeted as a UTF-8-encoded text string and
+are used as the name portion of the identity for the resulting 
+client sessions.
+@end itemize
+
+@node Monitoring
+@chapter Monitoring
+
+When enabled, the gzochid administrative module collect various bits
+of statistical information and makes resources related to active
+game applications available for reporting. The module's architecture 
+supports the registration of sub-modules---described below---that 
+expose this information in different ways.
+
+@emph{The monitoring web server}
+
+When the monitoring web server is enabled, it listens for HTTP 
+connections on its configured port (8080 by default) and serves HTML
+pages with information about the server and the games it runs. In
+particular, a browser for the game applications' data stores is 
+provided, which renders the contents of the store in a format similar
+to a ``hex editor'' application. There are two ways of accessing the 
+data store through the monitoring web server. The binding list can
+be accessed by visiting the following URL in a web browser:
+
+@example
+http://localhost:8080/app/my-game/names/
+@end example
+
+Provided the server is running on the local machine and listening on
+port 8080, the URL above will return a list of bound names in the
+data store for @samp{my-game}, with links to the data bound to each
+name. For a lower-level view of the store, you can visit the URL:
+
+@example
+http://localhost:8080/app/my-game/oids/
+@end example
+
+...which serves a list of all of the managed records in the store,
+indexed by the internal object identifiers the container uses to 
+track them.
+
+Future plans for the monitoring web server include per-game 
+statistical reporting on data such as transactional throughput,
+client session volume, and 
+
+@node Application design with gzochid
+@chapter Application design with gzochid
+
+As the introduction to this manual explains, gzochid is a server
+container for gzochi game applications. To take full advantage of
+this architecture, it may be useful to understand the way gzochid
+interacts with your application.
+
+There are several entry points to a game application. When an 
+application is started for the first time, its initialization
+procedure is invoked. This procedure is responsible for setting up
+any global state required by the game and creating any managed 
+record bindings that must be present before client connections can
+be accepted. The game application descriptor also registers a 
+callback procedure that is invoked when a new, authenticated client
+connection is established. See the 
+
+The following paragraphs are describe some best practices for game
+programming in gzochid.
+
+@emph{Avoid top-level Scheme bindings for application state.}
+
+Modifications to data accessed via bindings in the top-level module
+environment (i.e., variables created using @code{define}) cannot be
+tracked by gzochid, whether the data is part of a managed record or
+not. To share mutable state between different execution paths in a
+game application, bind the state to a name with the gzochid binding
+API and retrieve and modify its value---creating a local definition
+via a @code{let} form, perhaps---within the scope of the code that
+needs it. There is no need to synchronize access to data managed by
+gzochid; the container will prevent race conditions by rolling back
+task execution as necessary. 
+
+@emph{Express concurrency through task scheduling.}
+
+Likewise, you should never need to explicitly launch a thread to
+handle a bit of application work. Scheduling work via gzochid's task
+API ensures that it is executed in the proper transactional context 
+and that it will be transparently rescheduled following a non-fatal
+error and that its status will survive the failure and restart of
+the container.
+
+@emph{Limit task scope.}
+
+The longer a task runs and the more resources it accesses, the more
+likely it is to disrupt the behavior of other 
+simultaneously-executing tasks, and the less likely its transaction
+will be able to commit successfully. If there is a lot of work to be
+done or there are many objects to be modified, try breaking a large
+task into a series of smaller tasks, each of which does a portion of
+the work and then schedules the next portion to run as soon as
+possible.
+
+@emph{Avoid external side effects.}
+
+Because application tasks are executed within the scope of a 
+transaction that may be rolled back and re-attempted arbitrarily
+many times, any side effects these tasks have that are not managed
+by gzochid may be ``played back'' multiple times along with the rest
+of the task's execution, possibly duplicating their impact.
+
+@node Scheme API reference
+@chapter Scheme API reference
+
+The following sections describe the Scheme API exposed to the
+server-side components of gzochi applications by the gzochid 
+container. The API consists of a set of use-specific R6RS libraries
+that can be imported independently or all together via the 
+@code{(gzochi)} composite library.
+
+@menu
+* gzochi app::
+* gzochi channel::
+* gzochi client::
+* gzochi conditions::
+* gzochi data::
+* gzochi io::
+* gzochi log::
+* gzochi task::
+
+* gzochi::
+@end menu
+
+@node gzochi app
+@section gzochi app
+
+The @code{(gzochi app)} module exports procedures and data types
+common to other components of the API.
+
+Callbacks are serializable references to Scheme procedures with some
+optionally associated data. They are used in several places to
+indicate actions to be taken by game application code upon 
+notification of an asynchronous event such as a new autheticated 
+client connection. Procedures are represented within callbacks as 
+Scheme symbols; the modules that export them are represented as
+lists of symbols. The data associated with a callback---if 
+any---must take the form of a managed record, so that its lifecycle
+may be managed by the container.
+
+@deffn {Scheme Procedure} gzochi:make-callback procedure module [data]
+Constructs a new @code{gzochi:callback} with the specified 
+procedure, module, and optional data.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:callback? obj
+Returns @code{#t} if @var{obj} is a @code{gzochi:callback}, 
+@code{#f} otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:callback-module callback
+Returns the module specification for the @code{gzochi:callback}
+@var{callback} as a list of symbols.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:callback-procedure callback
+Returns the procedure name for the @code{gzochi:callback} 
+@var{callback} as a symbol.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:callback-data callback
+Returns the managed record that encapsulates the data for the
+@code{gzochi:callback} @var{callback} or @code{#f} if the callback
+was created without any.
+@end deffn
+
+@node gzochi channel
+@section gzochi channel
+
+The @code{(gzochi channel)} library exports procedures that are
+useful for managing client communication channels.
+
+@deffn {Scheme Procedure} gzochi:create-channel name
+Creates and returns a new channel bound to the string specified by
+@var{name}. A @code{&gzochi:name-exists} condition will be raised if
+there is already a channel with that name.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:get-channel name
+Returns the channel bound to the specified string @var{name}, which
+must have been created previously via a call to 
+@code{gzochi:create-channel}. A @code{&gzochi:name-not-bound} 
+condition will be raised if there is no channel wit
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:channel? obj
+Returns @code{#t} if @var{obj} is a channel, @code{#f} otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:channel-name channel
+Returns the name of the channel @var{channel} as a string.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:join-channel channel session
+Adds the client session @var{session} to the channel @var{channel}.
+@var{session} is guaranteed to receive any messages successfully
+committed following the successful commit of the join operation.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:leave-channel channel session
+Removes the client session @var{session} from the channel 
+@var{channel}. @var{session} is guaranteed not to receive any
+messages committed following the successful commit of the leave
+operation.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:send-channel-message channel msg
+Enqueues a message to be sent, in the form of the bytevector 
+@var{msg}, to all client sessions that are members of the channel
+@var{channel} at the time this procedure is called.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:close-channel channel
+Destroys the channel @var{channel}, unbinding its associated name
+and removing all constituent client sessions.
+@end deffn
+
+@node gzochi client
+@section gzochi client
+
+The @code{(gzochi client)} library provides procedures that are 
+useful for working with individual client sessions. 
+@xref{(gzochi channel)}, for functionality related to groups of
+client sessions. 
+
+Client sessions are managed records; as such, you may store a 
+session as the value of fields in other managed records or as the 
+data for tasks or other callbacks. When a client is disconnected, 
+the session record is removed from the data store, and attempts to 
+access it will result in a @code{&gzochi:object-removed} condition
+being raised.
+
+@deffn {Scheme Procedure} gzochi:client-session? obj
+Returns @code{#t} if @var{obj} is a client session record, @code{#f}
+otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:client-session-name session
+Returns the identity associated with the session @var{session} as a
+string. The game's authentication plugin is responsible for setting
+the session's identity.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:send-message session msg
+Enqueues a message to be sent, in the form of the bytevector 
+@var{msg}, to the client session @var{session}.
+@end deffn
+
+Client session listeners are managed records that are used by the
+gzochid container to notify game application code of events related
+to client sessions. A listener is returned from the callback for the
+@emph{logged in} event to indicate a successful login handshake 
+(@code{#f} may be returned instead to signal a login failure.) This 
+listener must in turn be configured with two @code{gzochi:callback} 
+objects, one to be invoked when a new message is received from the
+spcified session, the other to be invoked when the session 
+disconnects from the sevrver.
+
+@deffn {Managed Record Type} gzochi:client-session-listener
+The record type, for introspection or use as a base type. 
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-client-session-listener received-message disconnected
+Constructs a new @code{gzochi:client-session-listener} with the
+specified @code{gzochi:callback} objects @var{received-message} and
+@var{disconnected}, which will be invoked, respectively, when a
+message is received from a client and when a client disconnects from
+the server.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:client-session-listener? obj
+Returns @code{#t} if @var{obj} is a 
+@code{gzochi:client-session-listener}, @code{#f} otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:client-session-listener-received-message listener
+Returns the @code{gzochi:callback} registered with the 
+@code{gzochi:client-session-listener} @var{listener} for handling 
+received messages.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:client-session-listener-disconnected listener
+Returns the @code{gzochi:callback} registered with the
+@code{gzochi:client-session-listener} @var{listener} for handling
+session disconnection.
+@end deffn
+
+@node gzochi conditions
+@section gzochi conditions
+
+The @code{(gzochi conditions)} library exposes condition types and 
+related procedures for conditions that may be raised during the
+execution of game application code.
+
+A @code{&gzochi:name-exists} condition is raised in contexts in 
+which an attempt is being made to introduce a new binding, but the 
+target name is already bound.
+
+@deffn {Condition Type} &gzochi:name-exists
+The condition type, for introspection or use as a base type for 
+other conditions.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-name-exists-condition name
+Contructs a new @code{&gzochi:name-exists} condition for the 
+specified name string @var{name}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:name-exists-condition? obj
+Returns @code{#t} of @var{obj} is a @code{&gzochi:name-exists}
+condition, @code{#f} otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:name-exists-condition-name cond
+Returns the name associated with the specified 
+@code{&gzochi:name-exists} condition @var{cond}.
+@end deffn
+
+A @code{&gzochi:name-not-bound} condition is raised in contexts in
+which a non-existent named binding is looked up.
+
+@deffn {Condition Type} &gzochi:name-not-bound
+The condition type, for introspection or use as a base type for 
+other conditions.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-name-not-bound-condition name
+Contructs a new @code{&gzochi:name-not-bound} condition for the 
+specified name string @var{name}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:name-not-bound-condition?
+Returns @code{#t} of @var{obj} is a @code{&gzochi:name-not-bound}
+condition, @code{#f} otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:name-not-bound-condition-name cond
+Returns the name associated with the specified 
+@code{&gzochi:name-not-bound} condition @var{cond}.
+@end deffn
+
+A @code{&gzochi:object-removed} condition is raised in contexts
+when a reference to a managed record is accessed after the record 
+has been removed. This may happen for a number of reasons: A client
+session record used as a field value or binding and which is 
+subsequently disconnected; a named binding whose target value is
+explicitly removed; or a managed record used as a value that is 
+accessed after it is has been explicitly removed.
+
+@deffn {Condition Type} &gzochi:object-removed
+The condition type, for introspection or use as a base type for 
+other conditions.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-object-removed-condition
+Contructs a new @code{&gzochi:object-removed} condition.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:object-removed-condition? obj
+Returns @code{#t} of @var{obj} is a @code{&gzochi:object-removed}
+condition, @code{#f} otherwise.
+@end deffn
+
+@node gzochi data
+@section gzochi data
+
+The @code{(gzochi data)} library exports the data structures and
+procedures that make up gzochid's data storage and serialization
+API. As discussed in a previous section, managed records are the
+foundation of any game application's interaction with container's
+data services. The syntactic and procedural APIs for managed records
+are discussed below. 
+
+Note that because managed records are implemented on top of R6RS 
+records, they may be treated as such for the purposes of the 
+procedures in the @code{(rnrs records inspection)} library.
+
+@deffn {Scheme Syntax} gzochi:define-managed-record-type name-spec record-clause*
+Defines a new managed record type, introducing bindings for a 
+record-type descriptor, a record constructor descriptor, a 
+constructor procedure, a record predicate, and managed accessor and
+mutator procedures for the new managed record type's fields.
+
+The structure of @var{name-spec} and the @var{record-clause} 
+sub-forms are the same as in the R6RS @code{define-record-type},
+with the following exceptions:
+
+First, as all managed records are nongenerative, a 
+@code{nongenerative} clause must be present as one of the 
+@var{record-clause} sub-forms. Note that the record uid is used 
+internally by the data serialization system, so, while you are free
+to omit the @code{uid} component of this clause, doing so may lead
+to corruption of your persisted data if the 
+@code{gzochi:define-managed-record-type} form is re-expanded and a
+new uid is generated.
+
+Second, each field definition that appears in a @code{fields} 
+declaration of a @code{record-clause} sub-form of a managed record
+definition may include a serialization specification that 
+provides the serialization to use for the field when it is 
+marshalled to or from persistent storage. This specification has the
+form @code{(serialization s)}, where s is a 
+@code{gzochi:serialization} record. If the serialization 
+specification is omitted, the container will use a default 
+serialization that requires all field values to be managed records 
+themselves or @code{#f}.
+@end deffn
+
+@deffn {Scheme Syntax} gzochi:managed-record-type-descriptor record-name
+Evaluates to the managed record-type descriptor associated with the
+type specified by @var{record-name}.
+@end deffn
+
+@deffn {Scheme Syntax} gzochi:managed-record-constructor-descriptor record-name
+Evaluates to the managed record-constructor descriptor associated 
+with the type specified by @var{record-name}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-managed-record-type-descriptor name parent uid sealed? opaque? fields
+Returns a new record-type descriptor for the managed record with the
+specified properties, which have the same semantics as they do when
+passed to R6RS's @code{make-record-type-descriptor}, with the 
+following exceptons that if @var{uid} may not be @code{#f}, an 
+@code{&assertion} condition will be raised; and the field 
+descriptors in @var{fields} may contain serialization specifiers as
+described above.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-record-accessor mrtd k
+Returns the managed record field accessor procedure for the @var{k}th
+field of the managed record-type descriptor @var{mrtd}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-record-mutator mrtd k
+Returns the managed record field mutator procedure for the @var{k}th
+field of the managed record-type descriptor @var{mrtd}. An 
+@code{&assertion} condition will be raised if this field is not
+mutable.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-record-constructor mrcd
+Returns a constructor procedure for the managed record constructor 
+descriptor @var{mrcd}. This procedure returns the same value as the
+@code{record-constructor} procedure in the 
+@code{(rnrs records procedural)} library.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-record-predicate mrtd
+Returns the record predicate procedure for the managed record-type
+descriptor @var{mrtd}. This procedure returns the same value as the
+@code{record-predicate} procedure in the 
+@code{(rnrs records procedural)} library.
+@end deffn
+
+References to managed records within an object graph of other 
+managed records will be tracked transparently by the container. The
+following procedures can be used to explicitly store and retrieve 
+references to managed records by name.
+
+@deffn {Scheme Procedure} gzochi:get-binding name
+Returns the managed record associated with the strig name @var{name}.
+A @code{&gzochi:name-not-bound} condition will be raised if there is
+no binding for @var{name}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:set-binding! name object
+Creates an association between the string @var{name} and 
+@var{object}, which must be a managed record, replacing any
+previous binding that may exist for @var{name}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:remove-binding! name
+Removes the binding for the string @var{name}. A 
+@code{&gzochi:name-not-bound} condition will be raised if there is
+no binding for @var{name}. Note that this procedure only removes
+the association between @var{name} and a managed record; to remove
+the record itself, you must call @code{gzochi:remove-record!}.
+@end deffn
+
+@node gzochi io
+@section gzochi io
+
+The @code{(gzochi io)} library exports structures and procedures
+useful for building serializations, which are used by the data 
+management features of the gzochid container for storing and 
+retrieving application data. The serializations described below may
+be used directly as field serializations for a managed record-type
+descriptor or composed to form serializations for more complex
+types.
+
+A serialization is an R6RS record with fields for a serialization
+procedure and a deserialization procedure. Serialization procedures
+should take two arguments, an output port and the value to be 
+serialized, and should write the serialized form of the value to the
+port as a sequence of bytes; deserialization procedures will be 
+passed an input port and should read the bytes necessary to return a
+value of the required type.
+
+No type or length information---or delimiters---other than what the 
+serializers themselves add to the output will be persisted. In 
+particular, deserializer procedures should take care not to read 
+more bytes than necessary from the port, as doing so will disrupt 
+the operation of subsequent deserializers.
+
+@defvar {Record Type} gzochi:serialization
+@end defvar
+@deffn {Scheme Procedure} gzochi:make-serialization serializer deserializer
+@deffnx {Scheme Procedure} gzochi:serialization? obj
+@deffnx {Scheme Procedure} gzochi:serialization-serializer serialization
+@deffnx {Scheme Procedure} gzochi:serialization-deserializer serialization
+The base serialization record-type, constructor, predicate, and
+field accessors.
+@end deffn
+
+@defvar {Scheme Variable} gzochi:integer-serialization
+@end defvar
+@deffn {Scheme Procedure} gzochi:write-integer port int
+@deffnx {Scheme Procedure} gzochi:read-integer port
+A serialization that uses an efficient, variable-length 
+encoding format to read and write integer values of arbitrary 
+size.
+@end deffn
+
+@defvar {Scheme Variable} gzochi:boolean-serialization
+@end defvar
+@deffn {Scheme Procedure} gzochi:write-boolean port bool
+@deffnx {Scheme Procedure} gzochi:read-boolean port
+A serialization that encodes boolean values as integers, with 
+@code{1} representing @code{true} and @code{0} representing false. 
+Note that the deserializer procedure will treat any non-zero value 
+as encoding @code{true}.
+@end deffn
+
+@defvar {Scheme Variable} gzochi:string-serialization
+@end defvar
+@deffn {Scheme Procedure} gzochi:write-string port str
+@deffnx {Scheme Procedure} gzochi:read-string port
+A serialization that reads and writes text strings using the UTF-8
+encoding, with an integer prefix giving the number of characters in
+the original string.
+@end deffn
+
+@deffn {Scheme Variable} gzochi:symbol-serialization
+@deffnx {Scheme Procedure} gzochi:write-symbol port sym
+@deffnx {Scheme Procedure} gzochi:read-symbol port
+A serialization that reads and writes symbols by converting them to
+and from strings and delegating to the procedures in 
+@code{gzochi:string-serialization}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-uniform-list-serialization ser
+Returns a new @code{gzochi:serialization} record that can be used as
+a serialization for a list of arbitrary length in which every 
+@var{car} of the list has its serialization performed by the 
+serialization @var{ser}.
+@end deffn
+
+@node gzochi log
+@section gzochi log
+
+The @code{(gzochi log)} library provides procedures for 
+performing application-level message logging, at various levels
+of priority. All of the procedures in this library do their
+writes transactionally, which means that the messages will only
+be persisted (to the console and/or a file on disk, depending
+on configuration) if the current transaction commits.
+
+These procedures interpret their ``rest'' arguments as values 
+with which to replace escapes in the message string. Formatting
+and replacement is done according to the rules of Guile's 
+@code{simple-format} procedure.
+
+@deffn {Scheme Procedure} gzochi:log priority msg . args
+Writes a transactional message at the priority level @var{priority},
+a symbol that must be one of @code{err}, @code{warning}, 
+@code{notice}, @code{info}, and @code{debug}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:log-err msg . args
+@deffnx {Scheme Procedure} gzochi:log-warning msg . args
+@deffnx {Scheme Procedure} gzochi:log-notice msg . args
+@deffnx {Scheme Procedure} gzochi:log-info msg . args
+@deffnx {Scheme Procedure} gzochi:log-debug msg . args
+Each of these convenience procedures delegates to @code{gzochi:log},
+passing a respective priority value.
+@end deffn
+
+@node gzochi task
+@section gzochi task
+
+The @code{(gzochi task)} library provides procedures for 
+creating and scheduling transactional tasks. Tasks are 
+@code{gzochi:callback} records, and represent blocks of code to be
+executed on behalf of a game application. All tasks are executed in
+a fully transactional context, meaning that their side effects enjoy
+guarantees of atomicity.
+
+@deffn {Scheme Procedure} gzochi:schedule-task callback [delay]
+Transactionally schedules the @code{gzochi:callback} @var{callback} 
+for future execution. If @var{delay} is specified, it must be a
+positive integer giving the number of milliseconsd by which the
+execution of @var{callback} should be delayed. If @var{delay} is
+omitted, the behavior of this procedure is as if @var{delay} were
+zero: @var{callback} will be eligible for exeuction immediately
+upon the successful commit of the current transaction. 
+
+Note that the execution delay of a scheduled task is ``best 
+effort.'' The task will not be eligible for execution until at least
+the specified number of milliseconds have elapsed, but may be 
+delayed further depending on the current state of the server.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:schedule-periodic-task callback period [delay]
+Transactionally schedules the @code{gzochi:callback} @var{callback}
+for periodic execution. @var{period} is the number of milliseconds
+that must elapse between executions of @var{callback}, and must be a
+positive integer. If @var{delay} is given, it must also be a 
+positive integer, and specifies the desired delay before the 
+@emph{first} execution of the task.
+
+This procedure returns a ``perodic task handle,'' an opaque managed
+record that can be used to control the scheduling behavior of the
+resulting periodic task.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:periodic-task-handle? obj
+Returns @code{#t} if @var{obj} is a periodic task handle, @code{#f}
+otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:cancel-periodic-task handle
+Cancels the periodic task associated with the periodic task handle
+@var{handle}. Note that depending on the state of the container's
+task execution schedule, the task may still be eligible for 
+execution for a short period of time following its cancellation.
+
+After this procedure returns, @var{handle} will be removed from the
+data store.
+@end deffn
+
+@node gzochi
+@section gzochi
+
+The @code{(gzochi)} library is a composite of all of the other
+public gzochi libraries---it imports and re-exports all of their
+exported procedures and syntactic forms.
+
+@node An example application
+@chapter An example application
+
+The following sample code is a complete gzochid application that
+implements a simple ``Hello, world!'' behavior. Authenticated 
+clients receive a simple greeting and may send a single message to
+the server before being disconnected.
+
+@example
+#!r6rs
+
+(library (gzochi example hello-world)
+  (export initialize-hello-world 
+          hello-client 
+
+          client-message
+          client-disconnected)
+
+  (import (gzochi) (rnrs))
+
+  (define (initialize-hello-world properties)
+    (gzochi:notice "Hello, world!"))
+
+  (define (hello-client session)
+    (gzochi:client-session-send session 
+     (string->utf8 
+      (string-append "Hello, " (gzochi:client-session-name session) "!")))
+    (gzochi:make-client-session-listener
+     (gzochi:make-callback 'client-message '(gzochi example hello-world))
+     (gzochi:make-callback 'client-disconnected 
+                           '(gzochi example hello-world))))
+
+  (define (client-message session msg)
+    (let ((name (gzochi:client-session-name session)))
+      (gzochi:notice "~a: ~a" name (utf8->string msg))
+      (gzochi:client-session-send session
+        (string->utf8 (simple-format "Goodbye, ~a!" name))))
+    (gzochi:disconnect session))
+
+  (define (client-disconnected session) (if #f #f))
+)
+@end example
+
+To launch this application, copy and paste the code above into a 
+file named ``hello-world.scm'' and copy it to a sub-directory named
+``hello-world/gzochi/example'' below your gzochid application 
+deployment root directory. For example, the default deployment root
+is ``/var/gzochid/deploy,'' so the full path in the default case 
+would be 
+``/var/gzochid/deploy/hello-world/gzochi/example/hello-world.scm.''
+You'll also need to copy and paste the following game descriptor XML
+to a file named ``game.xml'' in the top-level ``hello-world''
+directory.
+
+@example
+<?xml version="1.0"?>
+<game name="hello-world">
+  <description>Hello, world!</description>
+  <load-paths />
+
+  <initialized>
+    <callback module="gzochi example hello-world" 
+              procedure="initialize-hello-world" />
+  </initialized>
+
+  <logged-in>
+    <callback module="gzochi example hello-world" 
+              procedure="hello-client" />
+  </logged-in>
+</game>
+@end example
+
+The descriptor begins by giving the application's short name and a
+description. The @code{load-paths} element is a list of additional
+locations the system should look for Scheme modules when module
+dependencies are being resolved. The application's deployment
+directory is implicitly on the load path, so this element is empty
+in the descriptor for ``hello-world.'' 
+
+Next there are declarations for the two primary callbacks,
+initialization and client connection. This game descriptor file sets
+the initialization callback to the @code{initialize-hello-world} 
+procedure in the module @code{(gzochi example hello-world)} and sets
+the connection callback to the procedure @code{hello-client} in that
+same module.
+
+The Scheme implementation of @code{initialize-hello-world} gets 
+passed a hash table with the game properties (which will be empty in
+this case) and doesn't do anything except log a message. The 
+@code{hello-client} callback is a bit more interesting---it sends a
+greeting to the newly-connected session and then constructs and
+returns a new client session listener, which includes two additional
+callbacks that will be used to handle events related specifically to
+the new session. The first listener callback will be called when a
+message is received from a client session; in this case, the 
+@code{client-message} procedure is used. The other callback 
+(@code{client-disconneted} in the example above) will be called when
+the session disconnects. 
+
+@include fdl.texi
+
+@node Concept index
+@unnumbered Concept index
+
+@node Procedure index
+@unnumbered Procedure index
+
+@printindex fn
+
+@bye

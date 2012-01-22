@@ -44,8 +44,8 @@ AC_SUBST(GZOCHI_COMMON)
 AC_SERVEEZ
 
 AC_CONFIG_FILES([Makefile
+		 doc/Makefile
                  src/Makefile
-		 src/api/Makefile
-		 src/tests/Makefile])
+		 src/api/Makefile])
 
 AC_OUTPUT

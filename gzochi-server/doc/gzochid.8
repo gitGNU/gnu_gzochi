@@ -1,0 +1,39 @@
+.TH GZOCHID 8 "January 15, 2012"
+.SH NAME
+.Nm gzochid - the gzochi server
+.SH SYNOPSIS
+\fBgzochid [\fR\fB\fIoptions\fR\fB]\fR
+.SH DESCRIPTION
+\fBgzochid\fR, the server for the gzochi massively multiplayer 
+online game development framework, is the main program that does the
+work of hosting deployed games and exposing endpoints for client
+connections.
+.P
+When gzochid starts, it launches the games it finds in its 
+deployment directory, storing their data in its data directory; it
+begins listening for client connections and routing them to game
+application endpoints; and optionally starts a web server that 
+reports information about the state of the game server and any
+active games.
+.P
+The \fBgzochid\fR program has many options that can be specified at
+startup. For a complete list of options, run this command:
+.IP
+shell> \fBgzochid \-\-help\fR
+.SH COPYRIGHT
+Copyright \(co 2012 Julian Graham. License GPLv3+: GNU GPL version 3
+or later <http://gnu.org/licenses/gpl.html>.
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+.SH SEE ALSO
+.P
+The full documentation for \fBgzochid\fR is maintained as a Texinfo
+manual. If the \fBinfo\fR and \fBgzochid\fR programs are properly 
+installed at your site, the command
+.IP
+.B info gzochid
+.P
+should give you access to the complete manual.
+.SH AUTHOR
+Julian Graham (julian@member.fsf.org)
