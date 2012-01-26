@@ -1,0 +1,18 @@
+<!-- DTD for game.xml, the gzochi game application descriptor -->
+
+<!ELEMENT game (description, load-paths, initialized, logged-in)>
+<!ATTLIST game name CDATA #REQUIRED>
+
+<!ELEMENT description (#PCDATA)>
+
+<!ELEMENT load-paths (load-path*)>
+
+<!ELEMENT load-path (#PCDATA)>
+
+<!ELEMENT initialized (callback)>
+
+<!ELEMENT logged-in (callback)>
+
+<!ELEMENT callback EMPTY> 
+<!ATTLIST callback procedure CDATA #REQUIRED>
+<!ATTLIST callback module CDATA #REQUIRED>
