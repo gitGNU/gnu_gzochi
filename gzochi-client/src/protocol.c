@@ -1,5 +1,5 @@
 /* protocol.c: Client-side protocol I/O routines for libgzochi
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include "channel.h"
 #include "protocol.h"
 #include "session.h"
 #include "sys/socket.h"
@@ -79,8 +78,7 @@ int gzochi_protocol_send_login_request
 int gzochi_protocol_send_disconnect (gzochi_client_session *session)
 {
   return send_protocol_message 
-    (session->socket, GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECT_REQUEST, NULL, 
-     0);
+    (session->socket, GZOCHI_COMMON_PROTOCOL_LOGOUT_REQUEST, NULL, 0);
 }
 
 int gzochi_protocol_send_session_message 
@@ -89,104 +87,6 @@ int gzochi_protocol_send_session_message
   return send_protocol_message
     (session->socket, GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE, 
      (unsigned char *) msg, len);
-}
-
-int gzochi_protocol_send_channel_message
-(gzochi_client_session *session, char *channel, unsigned char *msg, short len)
-{
-  int ret = 0;
-  int channel_len = strlen (channel) + 1;
-  int buffer_len = channel_len + len;
-  unsigned char *buffer = malloc (sizeof (char) * buffer_len);
-
-  memcpy (buffer, channel, channel_len);
-  memcpy (buffer + channel_len, msg, len);
-
-  ret = send_protocol_message 
-    (session->socket, GZOCHI_COMMON_PROTOCOL_CHANNEL_MESSAGE, buffer, 
-     buffer_len);
-  
-  free (buffer);
-  return ret;
-}
-
-static void dispatch_channel_join 
-(gzochi_client_session *session, char *name, unsigned char *id, short id_len)
-{
-  int i;
-  gzochi_client_channel *channel = gzochi_client_channel_new 
-    (session, name, id, id_len);
-
-  channel->connected = TRUE;
-
-  for (i = 0; i < session->channels_length; i++)
-    {
-      if (session->channels[i] == NULL)
-	{
-	  session->channels[i] = channel;
-	  break;
-	}
-    }
-  
-  if (i == session->channels_length)
-    {
-      gzochi_client_channel **new_channels = 
-	calloc (session->channels_length * 2, sizeof (gzochi_client_channel *));
-
-      memcpy (new_channels, session->channels, 
-	      sizeof (gzochi_client_channel *) * session->channels_length);
-      free (session->channels);
-      session->channels = new_channels;
-      session->channels_length *= 2;
-
-      session->channels[i] = channel;
-    }
-  
-  if (session->joined_channel_callback != NULL)
-    session->joined_channel_callback (channel);
-}
-
-static void dispatch_channel_disconnected 
-(gzochi_client_session *session, unsigned char *id, short id_len)
-{
-  int i;
-  gzochi_client_channel *channel = NULL;
-  for (i = 0; i < session->channels_length; i++)
-    if (session->channels[i] != NULL 
-	&& memcmp (session->channels[i]->id, id, id_len) == 0)
-      {
-	channel = session->channels[i];
-	session->channels[i] = NULL;
-	break;
-      }
-  
-  if (channel != NULL)
-    {
-      channel->connected = FALSE;
-      if (channel->disconnected_callback != NULL)
-	channel->disconnected_callback (channel);
-      gzochi_client_channel_free (channel);
-    }
-}
-
-static void dispatch_channel_message
-(gzochi_client_session *session, unsigned char *id, short id_len, 
- unsigned char *message, short message_len)
-{
-  int i;
-  gzochi_client_channel *channel = NULL;
-
-  for (i = 0; i < session->channels_length; i++)
-    if (session->channels[i] != NULL 
-	&& memcmp (session->channels[i]->id, id, id_len) == 0)
-      {
-	channel = session->channels[i];
-	break;
-      }
-
-  if (channel != NULL)
-    if (channel->received_message_callback != NULL)
-      channel->received_message_callback (channel, message, message_len);
 }
 
 static void dispatch_session_message 
@@ -205,50 +105,12 @@ static void dispatch_session_disconnected (gzochi_client_session *session)
 static void dispatch 
 (gzochi_client_session *session, int opcode, unsigned char *payload, short len)
 {
-  unsigned short channel_name_len;
-  char *channel_name;
-
-  unsigned short channel_id_len;
-  unsigned short channel_message_len;
-
   switch (opcode)
     {
     case GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE:
       dispatch_session_message (session, payload, len); break;
     case GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECTED:
       dispatch_session_disconnected (session); break;
-
-    case GZOCHI_COMMON_PROTOCOL_CHANNEL_JOIN:
-      channel_name_len = gzochi_common_io_read_short (payload, 0);
-      channel_name = calloc (channel_name_len + 1, sizeof (char));
-      channel_name = memcpy (channel_name, payload + 2, channel_name_len);
-      
-      channel_id_len = gzochi_common_io_read_short 
-	(payload, channel_name_len + 2);
-      
-      dispatch_channel_join 
-	(session, channel_name, payload + channel_name_len + 4, channel_id_len);
-      
-      free (channel_name);
-
-      break;
-
-    case GZOCHI_COMMON_PROTOCOL_CHANNEL_DISCONNECTED:
-
-      channel_id_len = gzochi_common_io_read_short (payload, 0);
-      dispatch_channel_disconnected (session, payload + 2, channel_id_len); 
-
-      break;
-    
-    case GZOCHI_COMMON_PROTOCOL_CHANNEL_MESSAGE:
-      channel_id_len = gzochi_common_io_read_short (payload, 0);
-      channel_message_len = gzochi_common_io_read_short
-	(payload, channel_id_len + 2);
-
-      dispatch_channel_message 
-	(session, 
-	 payload + 2, channel_id_len, 
-	 payload + channel_id_len + 4, channel_message_len);
 
     default:
       break;

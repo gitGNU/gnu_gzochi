@@ -1,5 +1,5 @@
 /* libgzochi.h: Public prototypes and declarations for libgzochi
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,19 +19,11 @@
 #define LIBGZOCHI_H
 
 typedef struct _gzochi_client_session gzochi_client_session;
-typedef struct _gzochi_client_channel gzochi_client_channel;
 
 typedef void (*gzochi_client_session_disconnected_callback) 
 (gzochi_client_session *);
 typedef void (*gzochi_client_session_received_message_callback)
 (gzochi_client_session *, unsigned char *, short);
-typedef void (*gzochi_client_session_joined_channel_callback) 
-(gzochi_client_channel *);
-
-typedef void (*gzochi_client_channel_disconnected_callback) 
-(gzochi_client_channel *);
-typedef void (*gzochi_client_channel_received_message_callback)
-(gzochi_client_channel *, unsigned char *, short);
 
 gzochi_client_session *gzochi_client_connect 
 (char *, int, char *, unsigned char *, int);
@@ -45,19 +37,7 @@ int gzochi_client_session_port (gzochi_client_session *);
 
 void gzochi_client_session_set_disconnected_callback
 (gzochi_client_session *, gzochi_client_session_disconnected_callback);
-void gzochi_client_session_set_joined_channel_callback
-(gzochi_client_session *, gzochi_client_session_joined_channel_callback);
 void gzochi_client_session_set_received_message_callback
 (gzochi_client_session *, gzochi_client_session_received_message_callback);
-
-gzochi_client_session *gzochi_client_channel_session (gzochi_client_channel *);
-char *gzochi_client_channel_name (gzochi_client_channel *);
-void gzochi_client_channel_send 
-(gzochi_client_channel *, unsigned char *, short);
-
-void gzochi_client_channel_set_disconnected_callback 
-(gzochi_client_channel *, gzochi_client_channel_disconnected_callback);
-void gzochi_client_channel_set_received_message_callback 
-(gzochi_client_channel *, gzochi_client_channel_received_message_callback);
 
 #endif /* LIBGZOCHI_H */

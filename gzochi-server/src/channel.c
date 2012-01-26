@@ -1,5 +1,5 @@
 /* channel.c: Channel management routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -152,22 +152,12 @@ static void commit_channel_side_effect_message
 
   switch (message->type)
     {
-    case GZOCHID_CHANNEL_MESSAGE_JOIN:
-      gzochid_protocol_client_joined_channel 
-	(message->client, channel->name, channel->id, channel->id_len);
-      break;
-
-    case GZOCHID_CHANNEL_MESSAGE_LEAVE:
-      gzochid_protocol_client_left_channel 
-	(message->client, channel->id, channel->id_len);
-      break;
-
     case GZOCHID_CHANNEL_MESSAGE_SEND:
       payload_message = (gzochid_channel_payload_message *) message;
-      gzochid_protocol_client_channel_send
-	(message->client, channel->id, channel->id_len, payload_message->msg,
-	 payload_message->len);
-      break;
+      gzochid_protocol_client_send
+	(message->client, payload_message->msg, payload_message->len);
+      
+    default:  break;
     }
 }
 

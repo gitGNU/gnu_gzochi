@@ -25,13 +25,12 @@ AM_CFLAGS = @CFLAGS@ $(GZOCHI_COMMON_CFLAGS) -Wall -pedantic
 
 lib_LTLIBRARIES = libgzochi.la
 
-libgzochi_la_SOURCES = channel.c client.c protocol.c session.c
+libgzochi_la_SOURCES = client.c protocol.c session.c
 libgzochi_la_LIBADD = $(GZOCHI_COMMON_LIBS)
 
 includedir = $(prefix)/include
 dist_include_HEADERS = libgzochi.h
 
-channel.c: channel.h
 client.c:
 protocol.c: protocol.h
 session.c: session.h

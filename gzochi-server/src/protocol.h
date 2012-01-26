@@ -1,5 +1,5 @@
 /* protocol.h: Prototypes and declarations for protocol.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -48,11 +48,5 @@ void gzochid_protocol_client_login_success (gzochid_protocol_client *);
 void gzochid_protocol_client_login_failure (gzochid_protocol_client *);
 void gzochid_protocol_client_send 
 (gzochid_protocol_client *, unsigned char *, short);
-void gzochid_protocol_client_joined_channel 
-(gzochid_protocol_client *, char *, unsigned char *, short);
-void gzochid_protocol_client_left_channel 
-(gzochid_protocol_client *, unsigned char *, short);
-void gzochid_protocol_client_channel_send 
-(gzochid_protocol_client *, unsigned char *, short, unsigned char *, short);
 
 #endif /* GZOCHID_PROTOCOL_H */

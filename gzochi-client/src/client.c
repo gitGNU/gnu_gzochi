@@ -1,5 +1,5 @@
 /* client.c: Main client API routines for libgzochi
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include "channel.h"
 #include "io.h"
 #include "protocol.h"
 #include "session.h"

@@ -1,5 +1,5 @@
 /* protocol.h: Preprocessor definitions for shared client-server protocol
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -25,12 +25,7 @@
 #define GZOCHI_COMMON_PROTOCOL_LOGOUT_REQUEST 0x20
 #define GZOCHI_COMMON_PROTOCOL_LOGOUT_SUCCESS 0x21
 
-#define GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECT_REQUEST 0x30
-#define GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECTED 0x31
-#define GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE 0x32
-
-#define GZOCHI_COMMON_PROTOCOL_CHANNEL_JOIN 0x40
-#define GZOCHI_COMMON_PROTOCOL_CHANNEL_DISCONNECTED 0x41
-#define GZOCHI_COMMON_PROTOCOL_CHANNEL_MESSAGE 0x42
+#define GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECTED 0x30
+#define GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE 0x31
 
 #endif /* GZOCHI_COMMON_PROTOCOL_H */

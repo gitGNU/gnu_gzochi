@@ -1,5 +1,5 @@
 /* protocol.c: Application communication protocol routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -92,17 +92,6 @@ static void dispatch_session_message
 	 (client->context, client, msg, len);
 }
 
-static void dispatch_channel_message
-(gzochid_protocol_client *client, char *channel, unsigned char *msg, short len)
-{
-  if (client->identity == NULL)
-    gzochid_warning 
-      ("Received channel message from unauthenticated client at %s",
-       client->connection_description);
-  gzochid_application_channel_message_received 
-    (client->context, client, channel, msg, len);
-}
-
 void gzochid_protocol_client_disconnected (gzochid_protocol_client *client)
 {
   if (client->identity != NULL && !client->disconnected)
@@ -162,16 +151,7 @@ void gzochid_protocol_client_dispatch
       dispatch_logout_request (client); break;
     case GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE:
       dispatch_session_message (client, (unsigned char *) payload, len); break;
-    case GZOCHI_COMMON_PROTOCOL_CHANNEL_MESSAGE:
 
-      pfx = strndup ((char *) payload, len);
-      pfx_len = strlen (pfx) + 1;
-      sfx = payload + pfx_len;
-      sfx_len = len - pfx_len;
-
-      dispatch_channel_message (client, pfx, sfx, sfx_len);
-
-      break;
     default:
       gzochid_warning ("Unexpected opcode %d received from client", opcode);
     }
@@ -210,63 +190,4 @@ void gzochid_protocol_client_send
 
   svz_sock_write (client->sock, (char *) len_str, 3);
   svz_sock_write (client->sock, (char *) msg, len);
-}
-
-void gzochid_protocol_client_joined_channel 
-(gzochid_protocol_client *client, char *name, unsigned char *id, short id_len)
-{
-  short name_len = strlen (name);
-
-  unsigned char name_len_str[2];
-  unsigned char id_len_str[2];
-  unsigned char len_str[3];
-  
-  gzochi_common_io_write_short (name_len + id_len + 4, len_str, 0);
-  len_str[2] = GZOCHI_COMMON_PROTOCOL_CHANNEL_JOIN;
-
-  gzochi_common_io_write_short (name_len, name_len_str, 0);
-  gzochi_common_io_write_short (id_len, id_len_str, 0);
-
-  svz_sock_write (client->sock, (char *) len_str, 3);
-  svz_sock_write (client->sock, (char *) name_len_str, 2);
-  svz_sock_write (client->sock, name, name_len);
-  svz_sock_write (client->sock, (char *) id_len_str, 2);
-  svz_sock_write (client->sock, (char *) id, id_len);
-}
-
-void gzochid_protocol_client_left_channel 
-(gzochid_protocol_client *client, unsigned char *id, short id_len)
-{
-  unsigned char id_len_str[2];
-  unsigned char len_str[3];
-
-  gzochi_common_io_write_short (id_len + 2, len_str, 0);
-  gzochi_common_io_write_short (id_len, id_len_str, 0);
-
-  len_str[2] = GZOCHI_COMMON_PROTOCOL_CHANNEL_DISCONNECTED;
-
-  svz_sock_write (client->sock, (char *) len_str, 3);
-  svz_sock_write (client->sock, (char *) id_len_str, 2);
-  svz_sock_write (client->sock, (char *) id, id_len);
-}
-
-void gzochid_protocol_client_channel_send 
-(gzochid_protocol_client *client, unsigned char *id, short id_len, 
- unsigned char *msg, short msg_len)
-{
-  unsigned char id_len_str[2];
-  unsigned char msg_len_str[2];
-  unsigned char len_str[3];
-  
-  gzochi_common_io_write_short (id_len + msg_len + 4, len_str, 0);
-  gzochi_common_io_write_short (id_len, id_len_str, 0);
-  gzochi_common_io_write_short (msg_len, msg_len_str, 0);
-
-  len_str[2] = GZOCHI_COMMON_PROTOCOL_CHANNEL_MESSAGE;
-
-  svz_sock_write (client->sock, (char *) len_str, 3);
-  svz_sock_write (client->sock, (char *) id_len_str, 2);
-  svz_sock_write (client->sock, (char *) id, id_len);
-  svz_sock_write (client->sock, (char *) msg_len_str, 2);
-  svz_sock_write (client->sock, (char *) msg, msg_len);
 }
