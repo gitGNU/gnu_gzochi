@@ -32,6 +32,13 @@
 
 #define _(String) gettext (String)
 
+#define Q(x) #x
+#define QUOTE(x) Q(x)
+
+#ifndef GZOCHI_CONF_LOCATION
+#define GZOCHI_CONF_LOCATION "/etc/gzochid.conf"
+#endif /* GZOCHI_CONF_LOCATION */
+
 static const struct option longopts[] =
   {
     { "help", no_argument, NULL, 'h' },
@@ -52,7 +59,7 @@ static void initialize_async (gpointer data, gpointer user_data)
   server_context->game_context = gzochid_game_context_new ();
 
   g_key_file_load_from_file 
-    (key_file, "/etc/gzochid/server.conf", G_KEY_FILE_NONE, NULL);
+    (key_file, QUOTE(GZOCHID_CONF_LOCATION), G_KEY_FILE_NONE, NULL);
 
   admin_config = gzochid_config_keyfile_extract_config (key_file, "admin");
   game_config = gzochid_config_keyfile_extract_config (key_file, "game");

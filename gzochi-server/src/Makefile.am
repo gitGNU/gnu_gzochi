@@ -18,17 +18,19 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = api tests
+SUBDIRS = api
 
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
-AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ \
-	@MICROHTTPD_CFLAGS@ @ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ \
+AM_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
+	@GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @MICROHTTPD_CFLAGS@ \
+	@ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ \
 	$(GZOCHI_COMMON_CFLAGS) \
 	-Wall -pedantic
 
 bin_PROGRAMS = gzochid
+sysconf_DATA = conf/gzochid.conf
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	fsm.c game.c guile.c gzochid.c httpd.c log.c protocol.c schedule.c \
