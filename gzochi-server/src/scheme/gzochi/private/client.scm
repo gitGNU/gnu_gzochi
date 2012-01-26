@@ -1,5 +1,5 @@
 ;; gzochi/private/client.scm: Private infrastructure for gzochi client API 
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2012 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -22,7 +22,8 @@
 	  gzochi:client-session-name
 	  gzochi:client-session-oid
 
-	  gzochi:send-message)
+	  gzochi:send-message
+	  gzochi:disconnect)
 
   (import (gzochi data)
 	  (gzochi io)
@@ -32,6 +33,7 @@
 	  (rnrs exceptions))
 
   (define primitive-send-message #f)
+  (define primitive-disconnect #f)
 
   (gzochi:define-managed-record-type 
    (gzochi:client-session gzochi:make-client-session gzochi:client-session?)
@@ -50,4 +52,11 @@
 			  (make-irritants-condition msg))))
     
     (primitive-send-message session msg))
+
+  (define (gzochi:disconnect session)
+    (or (gzochi:client-session? session)
+	(raise (condition (make-assertion-violation)
+			  (make-irritants-condition session))))
+
+    (primitive-disconnect session))
 )

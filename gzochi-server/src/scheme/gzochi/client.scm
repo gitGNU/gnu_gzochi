@@ -26,7 +26,8 @@
 	  gzochi:client-session-listener-received-message
 	  gzochi:client-session-listener-disconnected
 
-	  gzochi:send-message)
+	  gzochi:send-message
+	  gzochi:disconnect)
 
   (import (rnrs)
 	  (gzochi app)
