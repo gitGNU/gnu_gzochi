@@ -1,1 +1,1 @@
-SUBDIRS = meta src
+SUBDIRS = doc meta src
