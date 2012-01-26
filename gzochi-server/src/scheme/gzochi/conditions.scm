@@ -19,11 +19,17 @@
 (library (gzochi conditions)
   (export &gzochi:name-exists
 	  gzochi:make-name-exists-condition
+	  gzochi:name-exists-condition-name
 	  gzochi:name-exists-condition?
 
           &gzochi:name-not-bound
 	  gzochi:make-name-not-bound-condition
-	  gzochi:name-not-bound-condition?)
+	  gzochi:name-not-bound-condition-name
+	  gzochi:name-not-bound-condition?
+
+	  &gzochi:object-removed
+	  gzochi:make-object-removed-condition
+	  gzochi:object-removed-condition?)
 	  
   (import (rnrs base)
 	  (rnrs conditions)
@@ -39,5 +45,10 @@
 		       gzochi:make-name-not-bound-condition
 		       gzochi:name-not-bound-condition?)
     (fields name)
+    (parent &condition))
+
+  (define-record-type (&gzochi:object-removed
+		       gzochi:make-object-removed-condition
+		       gzochi:object-removed-condition?)
     (parent &condition))
 )
