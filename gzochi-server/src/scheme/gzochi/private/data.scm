@@ -1,5 +1,5 @@
 ;; gzochi/private/data.scm: Private infrastructure for gzochi data API
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2012 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -38,6 +38,7 @@
 
 	  gzochi:get-binding
 	  gzochi:set-binding!
+	  gzochi:remove-binding!
 
 	  gzochi:make-managed-reference
 	  gzochi:managed-reference?
@@ -547,11 +548,11 @@
 	    data))))
 
   (define (gzochi:get-binding name)
-    (or (string? name) (raise (condition (make-assertion-violation))))
+    (or (string? name) (raise (make-assertion-violation)))
     (primitive-get-binding name))
   
   (define (gzochi:set-binding! name obj)
-    (or (string? name) (raise (condition (make-assertion-violation))))
+    (or (string? name) (raise (make-assertion-violation)))
     (or (gzochi:managed-record? obj)
 	(raise (condition 
 		(make-assertion-violation)
@@ -560,6 +561,10 @@
 
     (primitive-set-binding! name obj))
 
+  (define (gzochi:remove-binding! name)
+    (or (string? name) (raise (make-assertion-violation)))
+    (primitive-remove-binding! name))
+
   (define primitive-mark-for-write! #f)
 
   (define primitive-create-reference #f)
@@ -567,4 +572,5 @@
 
   (define primitive-get-binding #f)
   (define primitive-set-binding! #f)
+  (define primitive-removing-binding! #f)
 )

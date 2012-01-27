@@ -88,6 +88,20 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
   return SCM_UNSPECIFIED;
 }
 
+SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
+	    (SCM name), "Remove the binding for a name.")
+{
+  gzochid_application_context *context =
+    gzochid_scheme_current_application_context ();
+  char *cname = scm_to_locale_string (name);
+  
+  gzochid_data_remove_binding (context, cname);
+
+  free (cname);
+  
+  return SCM_UNSPECIFIED;
+}
+
 SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
 	    (SCM obj), "Mark a managed record that has been modified.")
 {
