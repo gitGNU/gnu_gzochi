@@ -60,10 +60,6 @@ SCM gzochid_scheme_callback_data (SCM);
 SCM gzochid_scheme_handler_received_message (SCM);
 SCM gzochid_scheme_handler_disconnected (SCM);
 
-char *gzochid_scheme_task_procedure (SCM);
-GList *gzochid_scheme_task_module (SCM);
-SCM gzochid_scheme_task_data (SCM);
-
 SCM gzochid_scheme_create_bytevector (unsigned char *, size_t);
 SCM gzochid_scheme_create_client_session (gzochid_client_session *, mpz_t);
 SCM gzochid_scheme_create_managed_hashtable (GHashTable *);

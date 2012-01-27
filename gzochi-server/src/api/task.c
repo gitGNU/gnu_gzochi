@@ -1,5 +1,5 @@
 /* task.c: Primitive functions for user-facing gzochi task management API
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -25,18 +25,18 @@
 #include "task.h"
 
 SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 2, 0, 0, 
-	    (SCM task, SCM delay), "Schedule a durable task to run.")
+	    (SCM callback, SCM delay), "Schedule a durable task to run.")
 {
   gzochid_application_context *context = 
     gzochid_scheme_current_application_context (); 
   gzochid_auth_identity *identity = gzochid_scheme_current_identity ();
 
-  gzochid_task *scheme_task = gzochid_scheme_task_new 
+  gzochid_application_task *scheme_task = gzochid_scheme_task_new 
     (context, 
      identity,
-     gzochid_scheme_task_procedure (task),
-     gzochid_scheme_task_module (task), 
-     gzochid_scheme_task_data (task));
+     gzochid_scheme_callback_procedure (callback),
+     gzochid_scheme_callback_module (callback), 
+     gzochid_scheme_callback_data (callback));
   
   unsigned long d = scm_to_ulong (delay);
   gzochid_schedule_delayed_durable_task 

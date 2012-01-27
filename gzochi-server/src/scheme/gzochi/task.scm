@@ -1,5 +1,5 @@
 ;; gzochi/task.scm: Public exports for gzochi task scheduling API
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2012 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -18,19 +18,6 @@
 
 (library (gzochi task)	 
 
-  (export gzochi:make-task
-	  gzochi:task?
-	  gzochi:task-module
-	  gzochi:task-procedure
-	  gzochi:task-data
-
-	  gzochi:schedule-task)
-
-  (import (gzochi private data)
-	  (rename (gzochi private task)
-		  (gzochi:task-data private-task-data))
-	  (rnrs base))
-
-  (define (gzochi:task-data task)
-    (map gzochi:dereference (private-task-data task)))
+  (export gzochi:schedule-task)
+  (import (gzochi private task))
 )

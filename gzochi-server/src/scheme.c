@@ -1,5 +1,5 @@
 /* scheme.c: Supplementary Scheme routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -67,10 +67,6 @@ static SCM scm_client_session_oid;
 static SCM scm_make_channel;
 static SCM scm_channel_oid;
 
-static SCM scm_make_task;
-static SCM scm_task_procedure;
-static SCM scm_task_module;
-static SCM scm_task_data;
 static SCM scm_run_task;
 
 static void *with_application_context 
@@ -359,7 +355,7 @@ void *init_scheme_task (gpointer ptr)
 {
   SCM lst = (SCM) ptr;
   
-  return scm_apply_2 (scm_make_task, 
+  return scm_apply_2 (scm_make_callback, 
 		      scm_list_ref (lst, SCM_INUM0),
 		      scm_list_ref (lst, SCM_INUM1),
 		      scm_list_ref (lst, scm_from_short (2)));
@@ -372,8 +368,8 @@ gzochid_application_task *gzochid_scheme_task_new
   SCM scm_data = gzochid_scheme_invoke 
     (context,
      NULL,
-     "gzochi:make-task", 
-     g_list_append (g_list_append (NULL, "gzochi"), "task"), 
+     "gzochi:make-callback",
+     g_list_append (g_list_append (NULL, "gzochi"), "app"), 
      scm_cons 
      (scm_from_locale_symbol (procedure),
       scm_cons (gzochid_scheme_glist_to_list 
@@ -391,24 +387,6 @@ gzochid_application_task *gzochid_scheme_task_new
 static gpointer scm_symbol_to_locale_string (SCM sym)
 {
   return scm_to_locale_string (scm_symbol_to_string (sym));
-}
-
-char *gzochid_scheme_task_procedure (SCM task)
-{
-  return (char *) scm_symbol_to_locale_string 
-    (scm_call_1 (scm_task_procedure, task));
-}
-
-GList *gzochid_scheme_task_module (SCM task)
-{
-  return gzochid_scheme_list_to_glist 
-    (scm_call_1 (scm_task_module, task), 
-     (gpointer (*) (SCM)) scm_symbol_to_locale_string);
-}
-
-SCM gzochid_scheme_task_data (SCM task)
-{
-  return scm_call_1 (scm_task_data, task);
 }
 
 SCM gzochid_scheme_glist_to_list (GList *lst, SCM (*transformer) (gpointer))
@@ -617,7 +595,6 @@ static void *initialize_bindings (void *ptr)
   SCM gzochi_channel = scm_c_resolve_module ("gzochi channel");
   SCM gzochi_client = scm_c_resolve_module ("gzochi client");
   SCM gzochi_data = scm_c_resolve_module ("gzochi data");
-  SCM gzochi_task = scm_c_resolve_module ("gzochi task");
 
   SCM gzochi_private_client = scm_c_resolve_module ("gzochi private client");
   SCM gzochi_private_data = scm_c_resolve_module ("gzochi private data");
@@ -658,8 +635,6 @@ static void *initialize_bindings (void *ptr)
   initialize_binding 
     (gzochi_data, &scm_managed_record_p, "gzochi:managed-record?");
 
-  initialize_binding (gzochi_task, &scm_task_data, "gzochi:task-data");
-
   initialize_binding 
     (gzochi_private_data, &scm_managed_record_serialize, 
      "gzochi:serialize-managed-record");
@@ -681,11 +656,6 @@ static void *initialize_bindings (void *ptr)
     (gzochi_private_data, &scm_make_managed_reference, 
      "gzochi:make-managed-reference");
  
-  initialize_binding (gzochi_private_task, &scm_make_task, "gzochi:make-task");
-  initialize_binding 
-    (gzochi_private_task, &scm_task_procedure, "gzochi:task-procedure");
-  initialize_binding 
-    (gzochi_private_task, &scm_task_module, "gzochi:task-module");
   initialize_binding (gzochi_private_task, &scm_run_task, "gzochi:run-task");
  
   gzochid_api_channel_init ();

@@ -1,5 +1,5 @@
 ;; gzochi/private/task.scm: Private infrastructure for gzochi task API
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2012 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -17,19 +17,11 @@
 #!r6rs
 
 (library (gzochi private task)
-  (export gzochi:make-task
-	  gzochi:task?
-	  gzochi:task-module
-	  gzochi:task-procedure
-	  gzochi:task-data
-
-          gzochi:run-task
+  (export gzochi:run-task
 	  gzochi:schedule-task)
 
   (import (guile)
-	  (gzochi data)
-	  (gzochi io)
-	  (gzochi private data)
+	  (gzochi app)
 	  (gzochi private reflect)
 	  (rnrs base)
 	  (rnrs conditions)
@@ -37,42 +29,24 @@
 
   (define primitive-schedule-task #f)
   
-  (define (gzochi:run-task task)
+  (define (gzochi:run-task callback)
     (let ((procedure (gzochi:resolve-procedure 
-		      (gzochi:task-procedure task)
-		      (gzochi:task-module task))))
-      (apply procedure (map gzochi:dereference (gzochi:task-data task)))))
+		      (gzochi:callback-procedure callback)
+		      (gzochi:callback-module callback))))
+      (procedure (gzochi:callback-data callback))))
 
-  (define (gzochi:schedule-task task . args)
-    (or (gzochi:task? task)
+  (define (gzochi:schedule-task callback . args)
+    (or (gzochi:callback? callback)
 	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition task))))
+			  (make-irritants-condition callback))))
 
     (if (null? args)
-	(primitive-schedule-task task 0)
+	(primitive-schedule-task callback 0)
 	(or (and (eqv? (length args) 1)
 		 (let ((x (car args))) 
 		   (and (integer? x) 
 			(>= x 0) 
-			(primitive-schedule-task task x))))
+			(primitive-schedule-task callback x))))
 	    (raise (condition (make-assertion-violation)
 			      (make-irritants-condition args))))))
-
-  (gzochi:define-managed-record-type 
-    (gzochi:task gzochi:make-task gzochi:task?)
-
-    (fields (immutable procedure (serialization gzochi:symbol-serialization))
-	    (immutable module (serialization
-			       (gzochi:make-uniform-list-serialization
-				gzochi:symbol-serialization)))
-	    (immutable data (serialization
-			     (gzochi:make-uniform-list-serialization
-			      gzochi:managed-reference-serialization))))
-    (nongenerative gzochi:task)
-    (protocol (lambda (n)
-		(lambda (procedure module . args)
-		  (let ((p (n))) 
-		    (p procedure module 
-		       (map gzochi:create-reference args))))))
-    (sealed #t))
 )
