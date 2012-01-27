@@ -148,7 +148,6 @@ static void commit_channel_side_effect_message
 {
   gzochid_channel_message *message = (gzochid_channel_message *) data;
   gzochid_channel_payload_message *payload_message = NULL;
-  gzochid_channel *channel = (gzochid_channel *) user_data;
 
   switch (message->type)
     {
