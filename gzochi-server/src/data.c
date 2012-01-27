@@ -514,6 +514,29 @@ void gzochid_data_remove_binding
   free (oid_str);
 }
 
+int gzochid_data_binding_exists
+(gzochid_application_context *context, char *name)
+{
+  mpz_t oid;
+  char *oid_str = NULL;
+  int ret = TRUE;
+
+  gzochid_data_transaction_context *tx_context = NULL;
+
+  mpz_init (oid);
+
+  join_transaction (context);
+  tx_context = gzochid_transaction_context (&data_participant);
+
+  get_binding (tx_context, name, oid);
+  
+  if (mpz_cmp_si (oid, -1) == 0)
+    ret = FALSE;
+
+  mpz_clear (oid);
+  return ret;
+}
+
 gzochid_data_managed_reference *gzochid_data_create_reference
 (gzochid_application_context *context, 
  gzochid_io_serialization *serialization, void *ptr)
