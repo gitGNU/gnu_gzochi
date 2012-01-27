@@ -1,5 +1,5 @@
 /* data.c: Primitive functions for user-facing gzochi data management API
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -53,7 +53,10 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
     (context, &gzochid_scheme_data_serialization, oid);
   gzochid_data_dereference (reference);
 
-  return reference->obj;
+  if (reference->obj == NULL)
+    return gzochid_scheme_r6rs_raise 
+      (gzochid_scheme_make_object_removed_condition ());
+  else return reference->obj;
 }
 
 SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),

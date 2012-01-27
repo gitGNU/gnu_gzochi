@@ -1,5 +1,5 @@
 /* data.c: Application data management routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -392,7 +392,11 @@ void dereference
   data = gzochid_storage_transaction_get 
     (context->oids_transaction, oid_str, strlen (oid_str) + 1, &data_len);
 
-  assert (data != NULL);
+  if (data == NULL)
+    {
+      gzochid_info ("No data found for reference '%s'.", oid_str);
+      return NULL;
+    }
   
   in = g_string_new_len (data, data_len);
   reference->obj = reference->serialization->deserializer 
