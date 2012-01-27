@@ -69,6 +69,10 @@ static SCM scm_channel_oid;
 
 static SCM scm_run_task;
 
+static SCM scm_r6rs_raise;
+
+static SCM scm_make_object_removed_condition;
+
 static void *with_application_context 
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  void *(*worker) (gpointer), gpointer data)
@@ -513,6 +517,16 @@ SCM gzochid_scheme_create_managed_hashtable (GHashTable *properties)
   return ht;
 }
 
+SCM gzochid_scheme_r6rs_raise (SCM cond)
+{
+  return scm_call_1 (scm_r6rs_raise, cond);
+}
+
+SCM gzochid_scheme_make_object_removed_condition ()
+{
+  return scm_call_0 (scm_make_object_removed_condition);
+}
+
 SCM gzochid_scheme_handler_received_message (SCM handler)
 {
   return scm_call_1 (scm_handler_received_message, handler);
@@ -589,11 +603,13 @@ static void initialize_binding (SCM module, SCM *binding, char *name)
 
 static void *initialize_bindings (void *ptr)
 {
+  SCM rnrs_exceptions = scm_c_resolve_module ("rnrs exceptions");
   SCM rnrs_hashtables = scm_c_resolve_module ("rnrs hashtables");
 
   SCM gzochi_app = scm_c_resolve_module ("gzochi app");
   SCM gzochi_channel = scm_c_resolve_module ("gzochi channel");
   SCM gzochi_client = scm_c_resolve_module ("gzochi client");
+  SCM gzochi_conditions = scm_c_resolve_module ("gzochi conditions");
   SCM gzochi_data = scm_c_resolve_module ("gzochi data");
 
   SCM gzochi_private_client = scm_c_resolve_module ("gzochi private client");
@@ -604,6 +620,8 @@ static void *initialize_bindings (void *ptr)
     scm_c_resolve_module ("gzochi private app");
   scm_gc_protect_object (gzochid_scheme_scm_module_gzochi_private_app);
   
+  initialize_binding (rnrs_exceptions, &scm_r6rs_raise, "raise");
+
   initialize_binding 
     (rnrs_hashtables, &gzochid_scheme_string_hash, "string-hash");
   initialize_binding (rnrs_hashtables, &gzochid_scheme_string_equiv, "equal?");
@@ -629,6 +647,10 @@ static void *initialize_bindings (void *ptr)
   initialize_binding
     (gzochi_client, &scm_handler_disconnected,
      "gzochi:client-session-listener-disconnected");
+
+  initialize_binding
+    (gzochi_conditions, &scm_make_object_removed_condition,
+     "gzochi:make-object-removed-condition");
 
   initialize_binding
     (gzochi_data, &scm_make_managed_hashtable, "gzochi:make-managed-hashtable");

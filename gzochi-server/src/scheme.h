@@ -57,6 +57,9 @@ char *gzochid_scheme_callback_procedure (SCM);
 GList *gzochid_scheme_callback_module (SCM);
 SCM gzochid_scheme_callback_data (SCM);
 
+SCM gzochid_scheme_r6rs_raise (SCM);
+SCM gzochid_scheme_make_object_removed_condition (void);
+
 SCM gzochid_scheme_handler_received_message (SCM);
 SCM gzochid_scheme_handler_disconnected (SCM);
 
