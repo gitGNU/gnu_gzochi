@@ -65,12 +65,24 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
   gzochid_application_context *context =
     gzochid_scheme_current_application_context ();
   char *cname = scm_to_locale_string (name);
-  SCM obj = (SCM) gzochid_data_get_binding 
-    (context, cname, &gzochid_scheme_data_serialization);
 
-  free (cname);
+  if (!gzochid_data_binding_exists (context, cname))
+    {
+      SCM cond = gzochid_scheme_make_name_not_bound_condition (cname);
 
-  return obj;
+      free (cname);
+
+      return gzochid_scheme_r6rs_raise (cond);
+    }
+  else 
+    {
+      SCM obj = (SCM) gzochid_data_get_binding 
+	(context, cname, &gzochid_scheme_data_serialization);
+
+      free (cname);
+
+      return obj;
+    }
 }
 
 SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
@@ -80,12 +92,23 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
     gzochid_scheme_current_application_context ();
   char *cname = scm_to_locale_string (name);
   
-  gzochid_data_set_binding 
-    (context, cname, &gzochid_scheme_data_serialization, obj);
+  if (gzochid_data_binding_exists (context, cname))
+    {
+      SCM cond = gzochid_scheme_make_name_exists_condition (cname);
 
-  free (cname);
-  
-  return SCM_UNSPECIFIED;
+      free (cname);
+
+      return gzochid_scheme_r6rs_raise (cond);
+    }
+  else
+    {
+      gzochid_data_set_binding 
+	(context, cname, &gzochid_scheme_data_serialization, obj);
+      
+      free (cname);
+      
+      return SCM_UNSPECIFIED;
+    }
 }
 
 SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
@@ -95,11 +118,22 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
     gzochid_scheme_current_application_context ();
   char *cname = scm_to_locale_string (name);
   
-  gzochid_data_remove_binding (context, cname);
+  if (!gzochid_data_binding_exists (context, cname))
+    {
+      SCM cond = gzochid_scheme_make_name_not_bound_condition (cname);
 
-  free (cname);
+      free (cname);
+
+      return gzochid_scheme_r6rs_raise (cond);
+    }
+  else
+    {
+      gzochid_data_remove_binding (context, cname);
+
+      free (cname);
   
-  return SCM_UNSPECIFIED;
+      return SCM_UNSPECIFIED;
+    }
 }
 
 SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
