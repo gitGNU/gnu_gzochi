@@ -395,18 +395,21 @@ void dereference
   if (data == NULL)
     {
       gzochid_info ("No data found for reference '%s'.", oid_str);
-      return NULL;
+      free (oid_str);
     }
-  
-  in = g_string_new_len (data, data_len);
-  reference->obj = reference->serialization->deserializer 
-    (context->context, in);
-  reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED;
+  else 
+    {
+      in = g_string_new_len (data, data_len);
+      reference->obj = reference->serialization->deserializer 
+	(context->context, in);
+      reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED;
+      
+      g_hash_table_insert (context->oids_to_references, oid_str, reference);
+      g_hash_table_insert 
+	(context->ptrs_to_references, reference->obj, reference);
 
-  g_hash_table_insert (context->oids_to_references, oid_str, reference);
-  g_hash_table_insert (context->ptrs_to_references, reference->obj, reference);
-
-  g_string_free (in, TRUE);
+      g_string_free (in, TRUE);
+    }
 }
 
 static void join_transaction (gzochid_application_context *context)
@@ -518,7 +521,6 @@ int gzochid_data_binding_exists
 (gzochid_application_context *context, char *name)
 {
   mpz_t oid;
-  char *oid_str = NULL;
   int ret = TRUE;
 
   gzochid_data_transaction_context *tx_context = NULL;
