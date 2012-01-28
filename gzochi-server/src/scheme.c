@@ -72,6 +72,8 @@ static SCM scm_run_task;
 static SCM scm_r6rs_raise;
 
 static SCM scm_make_object_removed_condition;
+static SCM scm_make_name_exists_condition;
+static SCM scm_make_name_not_bound_condition;
 
 static void *with_application_context 
 (gzochid_application_context *context, gzochid_auth_identity *identity,
@@ -527,6 +529,18 @@ SCM gzochid_scheme_make_object_removed_condition ()
   return scm_call_0 (scm_make_object_removed_condition);
 }
 
+SCM gzochid_scheme_make_name_exists_condition (char *name)
+{
+  return scm_call_1 
+    (scm_make_name_exists_condition, scm_from_locale_string (name));
+}
+
+SCM gzochid_scheme_make_name_not_bound_condition (char *name)
+{
+  return scm_call_1
+    (scm_make_name_not_bound_condition, scm_from_locale_string (name));
+}
+
 SCM gzochid_scheme_handler_received_message (SCM handler)
 {
   return scm_call_1 (scm_handler_received_message, handler);
@@ -648,6 +662,12 @@ static void *initialize_bindings (void *ptr)
     (gzochi_client, &scm_handler_disconnected,
      "gzochi:client-session-listener-disconnected");
 
+  initialize_binding
+    (gzochi_conditions, &scm_make_name_exists_condition,
+     "gzochi:make-name-exists-condition");
+  initialize_binding
+    (gzochi_conditions, &scm_make_name_not_bound_condition,
+     "gzochi:make-name-not-bound-condition");
   initialize_binding
     (gzochi_conditions, &scm_make_object_removed_condition,
      "gzochi:make-object-removed-condition");

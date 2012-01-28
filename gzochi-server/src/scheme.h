@@ -1,5 +1,5 @@
 /* protocol.h: Prototypes and declarations for protocol.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -58,6 +58,8 @@ GList *gzochid_scheme_callback_module (SCM);
 SCM gzochid_scheme_callback_data (SCM);
 
 SCM gzochid_scheme_r6rs_raise (SCM);
+SCM gzochid_scheme_make_name_exists_condition (char *);
+SCM gzochid_scheme_make_name_not_bound_condition (char *);
 SCM gzochid_scheme_make_object_removed_condition (void);
 
 SCM gzochid_scheme_handler_received_message (SCM);
