@@ -1,5 +1,5 @@
 /* session.c: Client session management routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -61,6 +61,10 @@ typedef struct _gzochid_client_session_pending_message_operation
 typedef struct _gzochid_client_session_transaction_context
 {
   gzochid_application_context *context;
+  
+  gboolean login_failed;
+  gzochid_client_session_pending_operation *login_operation;
+
   GList *operations;
 } gzochid_client_session_transaction_context;
 
@@ -143,12 +147,11 @@ static void cleanup_transaction
   free (tx_context);
 }
 
-static void session_commit_operation (gpointer data, gpointer user_data)
+static void session_commit_operation
+(gzochid_client_session_transaction_context *tx_context, 
+ gzochid_client_session_pending_operation *op)
 {
-  gzochid_application_context *context = 
-    (gzochid_application_context *) user_data;
-  gzochid_client_session_pending_operation *op = 
-    (gzochid_client_session_pending_operation *) data;
+  gzochid_application_context *context = tx_context->context;
   gzochid_client_session_pending_message_operation *msg_op = NULL;
 
   char *oid_str = mpz_get_str (NULL, 16, op->target_session);
@@ -179,8 +182,14 @@ static void session_commit_operation (gpointer data, gpointer user_data)
       gzochid_protocol_client_login_failure (client); break;
     case GZOCHID_CLIENT_SESSION_OP_MESSAGE:
 
-      msg_op = (gzochid_client_session_pending_message_operation *) op;
-      gzochid_protocol_client_send (client, msg_op->message, msg_op->len);
+      if (!tx_context->login_failed 
+	  || mpz_cmp (op->target_session, 
+		      tx_context->login_operation->target_session) != 0)
+	{
+	  msg_op = (gzochid_client_session_pending_message_operation *) op;
+	  gzochid_protocol_client_send (client, msg_op->message, msg_op->len);
+	}
+
       break;
 
     default:
@@ -190,13 +199,27 @@ static void session_commit_operation (gpointer data, gpointer user_data)
   g_mutex_unlock (context->client_mapping_lock);
 }
 
+static void session_commit_operation_visitor (gpointer data, gpointer user_data)
+{
+  gzochid_client_session_transaction_context *tx_context =
+    (gzochid_client_session_transaction_context *) user_data;
+  gzochid_client_session_pending_operation *op = 
+    (gzochid_client_session_pending_operation *) data;
+
+  session_commit_operation (tx_context, op);
+}
+
 static void session_commit (gpointer data)
 {
   gzochid_client_session_transaction_context *tx_context = 
     (gzochid_client_session_transaction_context *) data;
 
+  if (tx_context->login_operation != NULL)
+    session_commit_operation (tx_context, tx_context->login_operation);
+
   g_list_foreach 
-    (tx_context->operations, session_commit_operation, tx_context->context);
+    (tx_context->operations, session_commit_operation_visitor, tx_context);
+
   cleanup_transaction (tx_context);
 }
 
@@ -341,9 +364,10 @@ void gzochid_client_session_send_login_success
     (context, &gzochid_client_session_serialization, session);
 
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
-
-  tx_context->operations = g_list_append 
-    (tx_context->operations, create_login_success_operation (reference->oid));
+  assert (tx_context->login_operation == NULL);
+  
+  tx_context->login_operation = create_login_success_operation 
+    (reference->oid);
 }
 
 void gzochid_client_session_send_login_failure
@@ -358,9 +382,10 @@ void gzochid_client_session_send_login_failure
     (context, &gzochid_client_session_serialization, session);
 
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
+  assert (tx_context->login_operation == NULL);
 
-  tx_context->operations = g_list_append
-    (tx_context->operations, create_login_failure_operation (reference->oid));
+  tx_context->login_operation = create_login_failure_operation (reference->oid);
+  tx_context->login_failed = TRUE;
 }
 
 void gzochid_client_session_send_message 
