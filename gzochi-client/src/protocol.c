@@ -111,7 +111,7 @@ static void dispatch
       dispatch_session_message (session, payload, len); break;
     case GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECTED:
       dispatch_session_disconnected (session); break;
-
+ 
     default:
       break;
     }
@@ -130,9 +130,9 @@ static int attempt_dispatch (gzochi_client_session *session, int limit)
 
       if (session->buffer_length - offset < 3)
 	break;
-      
+
       message_len = gzochi_common_io_read_short (session->buffer, offset);
-      if (session->buffer_length - offset < message_len + 3)
+      if (session->buffer_length - offset < message_len + 3) 
 	break;
 
       opcode = session->buffer[offset + 2];
@@ -158,23 +158,16 @@ static int read (gzochi_client_session *session)
 {
   char chunk[CHUNK_SIZE];
   int available_buffer = GZOCHI_CLIENT_MAX_BUFFER_SIZE - session->buffer_length;
+  int bytes_requested = MIN(CHUNK_SIZE, available_buffer);
+  int bytes_read = recv (session->socket, chunk, bytes_requested, 0);
 
-  while (available_buffer > 0)
-    {
-      int bytes_requested = MIN(CHUNK_SIZE, available_buffer);
-      int bytes_read = recv (session->socket, chunk, bytes_requested, 0);
-
-      if (bytes_read < 0)
-	return -1;
+  if (bytes_read < 0)
+    return -1;
       
-      memcpy (session->buffer + session->buffer_length, chunk, bytes_read);
-      session->buffer_length += bytes_read;
-      available_buffer -= bytes_read;
-
-      if (bytes_read < bytes_requested)
-	break;
-    }
-
+  memcpy (session->buffer + session->buffer_length, chunk, bytes_read);
+  session->buffer_length += bytes_read;
+  available_buffer -= bytes_read;
+  
   return 0;
 }
 
