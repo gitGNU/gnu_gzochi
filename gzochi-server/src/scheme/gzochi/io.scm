@@ -1,5 +1,5 @@
 ;; gzochi/io.scm: Public exports for common I/O and serialization procedures
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2012 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -21,17 +21,20 @@
 	  gzochi:read-boolean
 	  gzochi:read-string
 	  gzochi:read-symbol
+	  gzochi:read-bytevector
 
 	  gzochi:write-integer
 	  gzochi:write-boolean
 	  gzochi:write-string
 	  gzochi:write-symbol
+	  gzochi:write-bytevector
 
 	  gzochi:integer-serialization
 	  gzochi:boolean-serialization
 	  gzochi:string-serialization
 	  gzochi:symbol-serialization
-	  
+	  gzochi:bytevector-serialization
+
 	  gzochi:make-uniform-list-serialization
 
 	  gzochi:serialization
@@ -89,6 +92,14 @@
     (gzochi:write-string port (symbol->string sym)))
   (define gzochi:symbol-serialization
     (gzochi:make-serialization gzochi:write-symbol gzochi:read-symbol))
+
+  (define (gzochi:read-bytevector port)
+    (get-bytevector-n port (read-varint port)))
+  (define (gzochi:write-bytevector port bv)
+    (write-varint port (bytevector-length bv))
+    (put-bytevector port bv))
+  (define gzochi:bytevector-serialization
+    (gzochi:make-serialization gzochi:write-bytevector gzochi:read-bytevector))
 
   (define (gzochi:make-uniform-list-serialization serialization)
     (define serializer (gzochi:serialization-serializer serialization))

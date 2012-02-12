@@ -55,11 +55,13 @@
           ;; (gzochi io)
 
 	  gzochi:read-integer gzochi:read-boolean gzochi:read-string
-	  gzochi:read-symbol gzochi:write-integer gzochi:write-boolean
-	  gzochi:write-string gzochi:write-symbol gzochi:integer-serialization
+	  gzochi:read-symbol gzochi:read-bytevector gzochi:write-integer 
+	  gzochi:write-boolean gzochi:write-string gzochi:write-symbol 
+	  gzochi:write-bytevector gzochi:integer-serialization
 	  gzochi:boolean-serialization gzochi:string-serialization
-	  gzochi:symbol-serialization gzochi:make-uniform-list-serialization
-	  gzochi:serialization gzochi:serialization? gzochi:make-serialization
+	  gzochi:symbol-serialization gzochi:bytevector-serialization 
+	  gzochi:make-uniform-list-serialization gzochi:serialization 
+	  gzochi:serialization? gzochi:make-serialization
 	  gzochi:serialization-deserializer gzochi:serialization-serializer
 
           ;; (gzochi log)

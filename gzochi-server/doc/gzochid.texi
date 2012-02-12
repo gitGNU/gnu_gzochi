@@ -1363,6 +1363,14 @@ and from strings and delegating to the procedures in
 @code{gzochi:string-serialization}.
 @end deffn
 
+@deffn {Scheme Variable} gzochi:bytevector-serialization
+@deffnx {Scheme Procedure} gzochi:write-bytevector port bv
+@deffnx {Scheme Procedure} gzochi:read-bytevector port
+A serialization that reads and writes R6RS bytevectors as sequences
+of bytes with encoded integer prefixes giving the lengths of the 
+original vectors.
+@end deffn
+
 @deffn {Scheme Procedure} gzochi:make-uniform-list-serialization ser
 Returns a new @code{gzochi:serialization} record that can be used as
 a serialization for a list of arbitrary length in which every 
