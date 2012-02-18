@@ -141,6 +141,7 @@
   (define (gzochi:make-managed-record-constructor-descriptor 
 	   rtd parent-constructor-descriptor protocol)
 
+    (define prtd (record-type-parent rtd))
     (define (default-inherited-protocol n)
       (lambda args
 	(receive 
@@ -152,21 +153,23 @@
 
     (define (create-reference arg)
       (if (gzochi:managed-record? arg) (gzochi:create-reference arg) arg))
-      
+
     (make-record-constructor-descriptor 
-     rtd 
-     (or parent-constructor-descriptor 
-	 (make-record-constructor-descriptor gzochi:managed-record #f #f))
+     rtd
+     (or parent-constructor-descriptor
+	 (and prtd
+	      (not (eq? prtd gzochi:managed-record)) 
+	      (gzochi:make-managed-record-constructor-descriptor prtd #f #f)))
 
      (lambda (parent-constructor)
        (let ((wrapped-parent-constructor
-	      (lambda args
-		(let ((field-binder (apply parent-constructor args)))
-		  (lambda args
-		    (apply field-binder (map create-reference args)))))))
+	      (lambda args		
+		(let ((field-binder 
+		       (apply parent-constructor (map create-reference args))))
+		  (lambda args (apply field-binder args))))))
 
-       ((or protocol default-inherited-protocol) 
-	wrapped-parent-constructor)))))
+	 ((or protocol default-inherited-protocol) 
+	  wrapped-parent-constructor)))))
  
   (define managed-record-type-registry (make-eq-hashtable))
 
@@ -334,15 +337,16 @@
 		       (sequence (length processed-fields))))
                      (parent-cd
 		      (cond ((not (unspecified? _parent))
-			     #`(record-constructor-descriptor
+			     #`(gzochi:managed-record-constructor-descriptor
 				#,_parent))
 			    ((not (unspecified? _parent-rtd))
 			     (cadr _parent-rtd))
-			    (else #`(record-constructor-descriptor 
-				     gzochi:managed-record))))
+			    (else  #`(record-constructor-descriptor 
+				      gzochi:managed-record))))
                      (parent-rtd
 		      (cond ((not (unspecified? _parent))
-			     #`(record-type-descriptor #,_parent))
+			     #`(gzochi:managed-record-type-descriptor 
+				#,_parent))
 			    ((not (unspecified? _parent-rtd))
 			     (car _parent-rtd))
 			    (else #`(record-type-descriptor 
