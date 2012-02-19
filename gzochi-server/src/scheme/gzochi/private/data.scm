@@ -166,7 +166,8 @@
 	      (lambda args		
 		(let ((field-binder 
 		       (apply parent-constructor (map create-reference args))))
-		  (lambda args (apply field-binder args))))))
+		  (lambda args 
+		    (apply field-binder (map create-reference args)))))))
 
 	 ((or protocol default-inherited-protocol) 
 	  wrapped-parent-constructor)))))
