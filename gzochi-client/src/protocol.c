@@ -147,7 +147,8 @@ static int attempt_dispatch (gzochi_client_session *session, int limit)
 
   if (offset > 0)
     {
-      memmove (session->buffer, session->buffer + offset, offset);
+      memmove (session->buffer, session->buffer + offset, 
+	       session->buffer_length - offset);
       session->buffer_length -= offset;
     }
 
