@@ -93,13 +93,14 @@ static void dispatch_session_message
 (gzochi_client_session *session, unsigned char *message, short len)
 {
   if (session->received_message_callback != NULL)
-    session->received_message_callback (session, message, len);
+    session->received_message_callback 
+      (session, message, len, session->received_message_user_data);
 }
 
 static void dispatch_session_disconnected (gzochi_client_session *session)
 {
   if (session->disconnected_callback != NULL)
-    session->disconnected_callback (session);
+    session->disconnected_callback (session, session->disconnected_user_data);
 }
 
 static void dispatch 

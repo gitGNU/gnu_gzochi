@@ -51,18 +51,20 @@ routines
 \fB#include <libgzochi.h>\fR
 .P
 \fBtypedef void (*gzochi_client_session_disconnected_callback) \fR
-      \fB(gzochi_client_session *);\fR
+      \fB(gzochi_client_session *, void *);\fR
 .br
 \fBtypedef void (*gzochi_client_session_received_message_callback) \fR
-      \fB(gzochi_client_session *, unsigned char *, short);\fR
+      \fB(gzochi_client_session *, unsigned char *, short, void *);\fR
 .P
 \fBvoid gzochi_client_session_set_disconnected_callback \fR
       \fB(gzochi_client_session *session, \fR
-       \fBgzochi_client_session_disconnected_callback callback);\fR
+       \fBgzochi_client_session_disconnected_callback callback, \fR
+       \fBvoid *user_data);\fR
 .br
 \fBvoid gzochi_client_session_set_received_callback \fR
       \fB(gzochi_client_session *session, \fR
-       \fBgzochi_client_session_received_message_callback callback);\fR
+       \fBgzochi_client_session_received_message_callback callback, \fR
+       \fBvoid *user_data);\fR
 .P
 \fBchar *gzochi_client_session_endpoint (gzochi_client_session *session);\fR
 .br
@@ -95,6 +97,9 @@ memory region containing the message, and an indication of the message's
 length. This message pointer addresses an internal buffer whose contents may
 change once the callback returns. The bytes it contains should be copied if
 they are to be used outside the scope of the callback.
+.P
+Each callback will be passed the generic pointer \fBuser_data\fR, which may
+be specified (optionally as \fBNULL\fR) when the callbacks are registered.
 .P
 Since the gzochi client runs in a single thread, these callbacks will be called
 synchronously from the thread executing \fBgzochi_client_run\fR(3GZOCHI).

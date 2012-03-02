@@ -21,9 +21,9 @@
 typedef struct _gzochi_client_session gzochi_client_session;
 
 typedef void (*gzochi_client_session_disconnected_callback) 
-(gzochi_client_session *);
+(gzochi_client_session *, void *);
 typedef void (*gzochi_client_session_received_message_callback)
-(gzochi_client_session *, unsigned char *, short);
+(gzochi_client_session *, unsigned char *, short, void *);
 
 gzochi_client_session *gzochi_client_connect 
 (char *, int, char *, unsigned char *, int);
@@ -36,8 +36,9 @@ char *gzochi_client_session_hostname (gzochi_client_session *);
 int gzochi_client_session_port (gzochi_client_session *);
 
 void gzochi_client_session_set_disconnected_callback
-(gzochi_client_session *, gzochi_client_session_disconnected_callback);
+(gzochi_client_session *, gzochi_client_session_disconnected_callback, void *);
 void gzochi_client_session_set_received_message_callback
-(gzochi_client_session *, gzochi_client_session_received_message_callback);
+(gzochi_client_session *, gzochi_client_session_received_message_callback, 
+ void *);
 
 #endif /* LIBGZOCHI_H */

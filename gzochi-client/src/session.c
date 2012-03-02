@@ -1,5 +1,5 @@
 /* session.c: Session management routines for libgzochi
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -36,31 +36,25 @@ int gzochi_client_session_port (gzochi_client_session *session)
 }
 
 void gzochi_client_session_set_disconnected_callback
-(gzochi_client_session *session, void (*callback) (gzochi_client_session *))
+(gzochi_client_session *session, 
+ void (*callback) (gzochi_client_session *, void *), void *user_data)
 {
   session->disconnected_callback = callback;
-}
-
-void gzochi_client_session_set_joined_channel_callback
-(gzochi_client_session *session, void (*callback) (gzochi_client_channel *))
-{
-  session->joined_channel_callback = callback;
+  session->disconnected_user_data = user_data;
 }
 
 void gzochi_client_session_set_received_message_callback
-(gzochi_client_session *session, 
- void (*callback) (gzochi_client_session *, unsigned char *, short))
+(gzochi_client_session *session,
+ void (*callback) (gzochi_client_session *, unsigned char *, short, void *), 
+ void *user_data)
 {
   session->received_message_callback = callback;
+  session->received_message_user_data = user_data;
 }
 
 gzochi_client_session *gzochi_client_session_new (void)
 {
   gzochi_client_session *session = calloc (1, sizeof (gzochi_client_session));
-
-  session->channels_length = 10;
-  session->channels = 
-    calloc (session->channels_length, sizeof (gzochi_client_channel *));
 
   return session;
 }
@@ -72,17 +66,8 @@ void gzochi_client_session_free (gzochi_client_session *session)
 
 void gzochi_client_session_disconnect (gzochi_client_session *session)
 {
-  int i = 0;
-
   session->connected = FALSE;
 
-  for (; i < session->channels_length; i++)
-    {
-      gzochi_client_channel *channel = session->channels[i];
-      if (channel != NULL && channel->disconnected_callback != NULL)
-	channel->disconnected_callback (channel);
-    }
-
   if (session->disconnected_callback != NULL)
-    session->disconnected_callback (session);
+    session->disconnected_callback (session, session->disconnected_user_data);
 }

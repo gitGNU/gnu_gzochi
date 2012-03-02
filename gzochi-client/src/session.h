@@ -1,5 +1,5 @@
 /* session.h: Prototypes and declarations for session.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -32,9 +32,11 @@ typedef struct _gzochi_client_session
   unsigned char buffer[GZOCHI_CLIENT_MAX_BUFFER_SIZE];
   int buffer_length;
   
-  void (*disconnected_callback) (struct _gzochi_client_session *);
+  void (*disconnected_callback) (struct _gzochi_client_session *, void *);
+  void *disconnected_user_data;
   void (*received_message_callback)
-  (struct _gzochi_client_session *, unsigned char *, short);
+  (struct _gzochi_client_session *, unsigned char *, short, void *);
+  void *received_message_user_data;
 } gzochi_client_session;
 
 gzochi_client_session *gzochi_client_session_new (void);
