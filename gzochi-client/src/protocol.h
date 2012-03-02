@@ -25,8 +25,6 @@ int gzochi_protocol_send_login_request
 int gzochi_protocol_send_disconnect (gzochi_client_session *);
 int gzochi_protocol_send_session_message 
 (gzochi_client_session *, unsigned char *, short);
-int gzochi_protocol_send_channel_message
-(gzochi_client_session *, char *, unsigned char *, short);
 
 void gzochi_protocol_run (gzochi_client_session *);
 void gzochi_protocol_run_once (gzochi_client_session *);

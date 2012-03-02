@@ -20,22 +20,6 @@
 
 #define GZOCHI_CLIENT_MAX_BUFFER_SIZE 65538
 
-typedef struct _gzochi_client_channel 
-{
-  char *name;
-
-  unsigned char *id;
-  int id_len;
-
-  struct _gzochi_client_session *session;
-
-  int connected;
-  
-  void (*disconnected_callback) (struct _gzochi_client_channel *);
-  void (*received_message_callback)
-  (struct _gzochi_client_channel *, unsigned char *, short);
-} gzochi_client_channel;
-
 typedef struct _gzochi_client_session
 {
   char *hostname;
@@ -48,13 +32,9 @@ typedef struct _gzochi_client_session
   unsigned char buffer[GZOCHI_CLIENT_MAX_BUFFER_SIZE];
   int buffer_length;
   
-  gzochi_client_channel **channels;
-  int channels_length;
-
   void (*disconnected_callback) (struct _gzochi_client_session *);
   void (*received_message_callback)
   (struct _gzochi_client_session *, unsigned char *, short);
-  void (*joined_channel_callback) (struct _gzochi_client_channel *);
 } gzochi_client_session;
 
 gzochi_client_session *gzochi_client_session_new (void);
