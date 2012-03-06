@@ -71,7 +71,7 @@ static int check_request (svz_socket_t *sock)
 	  short len = gzochi_common_io_read_short 
 	    ((unsigned char *) sock->recv_buffer, offset);
 	  
-	  if (++len > remaining)
+	  if (++len > remaining - 2)
 	    break;
 	  
 	  offset += 2;
