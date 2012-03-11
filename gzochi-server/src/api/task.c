@@ -31,12 +31,8 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 2, 0, 0,
     gzochid_scheme_current_application_context (); 
   gzochid_auth_identity *identity = gzochid_scheme_current_identity ();
 
-  gzochid_application_task *scheme_task = gzochid_scheme_task_new 
-    (context, 
-     identity,
-     gzochid_scheme_callback_procedure (callback),
-     gzochid_scheme_callback_module (callback), 
-     gzochid_scheme_callback_data (callback));
+  gzochid_application_task *scheme_task = gzochid_application_task_new 
+    (context, identity, gzochid_scheme_application_worker, callback);
   
   unsigned long d = scm_to_ulong (delay);
   gzochid_schedule_delayed_durable_task 

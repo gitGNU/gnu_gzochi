@@ -194,9 +194,9 @@ SCM gzochid_scheme_invoke
   return ret;
 }
 
-static void scheme_worker 
+void gzochid_scheme_application_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
- void *task)
+ gpointer task)
 {
   gzochid_scheme_invoke 
     (context, 
@@ -218,7 +218,7 @@ static void scheme_worker_serializer
 static gzochid_application_worker scheme_worker_deserializer
 (gzochid_application_context *context, GString *in)
 {
-  return scheme_worker;
+  return gzochid_scheme_application_worker;
 }
 
 gboolean is_managed_record (SCM obj)
@@ -384,7 +384,7 @@ gzochid_application_task *gzochid_scheme_task_new
      SCM_BOOL_F);
 
   gzochid_application_task *task = gzochid_application_task_new
-    (context, identity, scheme_worker, scm_data);
+    (context, identity, gzochid_scheme_application_worker, scm_data);
   
   scm_gc_protect_object (task->data);
   return task;
