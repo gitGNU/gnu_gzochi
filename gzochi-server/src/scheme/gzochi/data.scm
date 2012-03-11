@@ -34,11 +34,17 @@
 	  gzochi:cdr
 	  gzochi:make-managed-pair
 	  gzochi:managed-pair?
+	  gzochi:cons
+
+	  gzochi:managed-list
+	  gzochi:managed-list->list
+	  gzochi:list->managed-list
 	  
 	  gzochi:make-managed-vector
 	  gzochi:managed-vector?
 	  gzochi:managed-vector-ref
 	  gzochi:managed-vector-set!
+	  gzochi:managed-vector-length
 	  gzochi:managed-vector->list
 
 	  gzochi:make-managed-hashtable
@@ -62,17 +68,6 @@
 	  (only (srfi :1) split-at)
 	  (srfi :8))
 
-  (define (gzochi:car pair) (gzochi:managed-pair-car pair))
-  (define (gzochi:cdr pair) (or (gzochi:managed-pair-cdr pair) '()))
-  (define (gzochi:cons x y)
-    (or (and (gzochi:managed-record? x)
-	     (or (gzochi:managed-record? y) (null? y)))
-	(gzochi:make-managed-pair x (if (null? y) #f y))))
-
-  (define (gzochi:managed-list head . rest)
-    (gzochi:cons 
-     head (if (null? rest) rest (gzochi:managed-list (car rest) (cdr rest)))))
-
   (gzochi:define-managed-record-type 
     (gzochi:managed-pair gzochi:make-managed-pair gzochi:managed-pair?)
 
@@ -81,6 +76,24 @@
     (nongenerative gzochi:managed-pair)
     (sealed #t))
 
+  (define gzochi:car gzochi:managed-pair-car)
+  (define gzochi:cdr gzochi:managed-pair-cdr)
+  (define (gzochi:cons x y)
+    (or (and (or (gzochi:managed-record? x) (not x))
+	     (or (gzochi:managed-record? y) (not y) (null? y)))
+	(raise (make-assertion-violation)))
+    (gzochi:make-managed-pair x (if (null? y) #f y)))
+
+  (define (gzochi:managed-list h . t)
+    (gzochi:cons h (if (null? t) t (gzochi:managed-list (car t) (cdr t)))))
+
+  (define (gzochi:managed-list->list l)
+    (if l (cons (gzochi:car l) (gzochi:managed-list->list (gzochi:cdr l))) '()))
+  
+  (define (gzochi:list->managed-list l)
+    (and (not (null? l))
+	 (gzochi:cons (car l) (gzochi:list->managed-list (cdr l)))))
+  
   (define (serialize-managed-vector port vec)
     (gzochi:write-integer port (vector-length vec))
     (vector-for-each
@@ -94,6 +107,9 @@
 	    (loop (- i 1) 
 		  (cons (gzochi:deserialize-managed-reference port) refs))))))
   
+  (define (gzochi:managed-vector-length vec)
+    (vector-length (gzochi:managed-vector-vector vec)))
+
   (define (gzochi:managed-vector-ref vec i)
     (gzochi:dereference (vector-ref (gzochi:managed-vector-vector vec) i)))
 
