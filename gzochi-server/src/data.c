@@ -102,9 +102,19 @@ static void flush_reference (gpointer data, gpointer user_data)
 
   switch (reference->state)
     {
-    case GZOCHID_MANAGED_REFERENCE_STATE_EMPTY:
+    case GZOCHID_MANAGED_REFERENCE_STATE_EMPTY: break;
+
+    case GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED:
     case GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY:
+
+      oid_str = mpz_get_str (NULL, 16, reference->oid);
+
+      gzochid_debug ("Removing reference '%s'.", oid_str);      
+      gzochid_storage_transaction_delete
+	(context->oids_transaction, oid_str, strlen (oid_str) + 1);
+
       break;
+      
     case GZOCHID_MANAGED_REFERENCE_STATE_NEW:
     case GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED:
       
@@ -412,6 +422,15 @@ void dereference
     }
 }
 
+static void remove_object 
+(gzochid_data_transaction_context *context, 
+ gzochid_data_managed_reference *reference)
+{
+  if (reference->state == GZOCHID_MANAGED_REFERENCE_STATE_EMPTY)
+    reference->state = GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY;
+  else reference->state = GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED;
+}
+
 static void join_transaction (gzochid_application_context *context)
 {
   if (!gzochid_transaction_active ()
@@ -631,6 +650,12 @@ void gzochid_data_dereference (gzochid_data_managed_reference *reference)
 {
   join_transaction (reference->context);
   dereference (gzochid_transaction_context (&data_participant), reference);
+}
+
+void gzochid_data_remove_object (gzochid_data_managed_reference *reference)
+{
+  join_transaction (reference->context);
+  remove_object (gzochid_transaction_context (&data_participant), reference);
 }
 
 void gzochid_data_mark 

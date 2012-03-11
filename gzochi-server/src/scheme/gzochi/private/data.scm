@@ -39,6 +39,7 @@
 	  gzochi:get-binding
 	  gzochi:set-binding!
 	  gzochi:remove-binding!
+	  gzochi:remove-object!
 
 	  gzochi:make-managed-reference
 	  gzochi:managed-reference?
@@ -570,6 +571,12 @@
     (or (string? name) (raise (make-assertion-violation)))
     (primitive-remove-binding! name))
 
+  (define (gzochi:remove-object! obj)
+    (or (gzochi:managed-record? obj)
+	(raise (condition (make-message-condition "Not a managed record.") 
+			  (make-assertion-violation))))
+    (primitive-remove-object! obj))
+
   (define primitive-mark-for-write! #f)
 
   (define primitive-create-reference #f)
@@ -577,5 +584,6 @@
 
   (define primitive-get-binding #f)
   (define primitive-set-binding! #f)
-  (define primitive-removing-binding! #f)
+  (define primitive-remove-binding! #f)
+  (define primitive-remove-object! #f)
 )

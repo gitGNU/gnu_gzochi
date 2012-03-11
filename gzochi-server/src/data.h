@@ -106,6 +106,7 @@ gzochid_data_managed_reference *gzochid_data_create_reference_sync
 gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
 (gzochid_application_context *, gzochid_io_serialization *, mpz_t);
 void gzochid_data_dereference (gzochid_data_managed_reference *reference);
+void gzochid_data_remove_object (gzochid_data_managed_reference *reference);
 
 void gzochid_data_mark 
 (gzochid_application_context *, gzochid_io_serialization *, void *);

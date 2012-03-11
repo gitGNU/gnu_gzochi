@@ -1,5 +1,5 @@
 ;; gzochi/data.scm: Public exports for gzochi data API
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2012 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@
 	  gzochi:cdr
 	  gzochi:make-managed-pair
 	  gzochi:managed-pair?
-
+	  
 	  gzochi:make-managed-vector
 	  gzochi:managed-vector?
 	  gzochi:managed-vector-ref
@@ -53,7 +53,8 @@
 	  gzochi:dereference
 	  gzochi:get-binding
 	  gzochi:set-binding!
-	  gzochi:remove-binding!)
+	  gzochi:remove-binding!
+	  gzochi:remove-object!)
 
   (import (gzochi io)
 	  (gzochi private data)

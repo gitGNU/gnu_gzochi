@@ -136,6 +136,19 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
     }
 }
 
+SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
+	    (SCM obj), "Remove a managed record from the data store.")
+{
+  gzochid_application_context *context =
+    gzochid_scheme_current_application_context ();
+  gzochid_data_managed_reference *reference = gzochid_data_create_reference 
+    (context, &gzochid_scheme_data_serialization, obj);
+
+  gzochid_data_remove_object (reference);
+
+  return SCM_UNSPECIFIED;
+}
+
 SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
 	    (SCM obj), "Mark a managed record that has been modified.")
 {
