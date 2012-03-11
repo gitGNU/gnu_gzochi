@@ -1,0 +1,14 @@
+<?xml version="1.0" ?>
+<game name="mazewar">
+  <description>Maze War</description>
+  <load-paths />
+
+  <initialized>
+    <callback module="gzochi example mazewar" procedure="initialized" />
+  </initialized>
+  
+  <logged-in>
+    <callback module="gzochi example mazewar" procedure="logged-in" />
+  </logged-in>
+
+</game>
