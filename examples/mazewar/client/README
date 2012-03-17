@@ -1,0 +1,60 @@
+This is the client portion of the mazewar example game for the gzochi game
+development framework. Like the server component 
+
+Please send bug reports to gzochi-devel@nongnu.org.
+
+Additional INSTALL instructions ============================================
+
+Generic instructions for configuring and compiling the mazewar client can be 
+found in the INSTALL file. More specific information and configure options
+can be found below.
+
+The gzochi mazewar example client depends on the following external libraries.
+- libg
+- libgzochi
+- libSDL
+
+You can use the `--with-SDL-prefix' option when invoking ./configure, if you
+have libSDL installed to a location other than the standard place (/usr or
+/usr/local).
+
+The dependencies on libg and libgzochi are configured using `pkg-config'.
+
+
+Required External Packages =================================================
+
+The mazewar client requires the following external packages:
+
+  - GNU GLib, at least version 2.28
+
+    GLib is used in several places in the client for its general-purpose 
+    utility functions and data structures. It is available from 
+    http://www.gtk.org/ .
+
+  - Simple DirectMedia Layer (libSDL), at least version 1.2.14
+
+    SDL is used for managing the client's display and for accepting input from
+    the user. It is available from http://www.libsdl.org/ .
+
+  - pkg-config
+
+    The client's ./configure script uses pkg-config to discover the correct 
+    compile and link options for a number of the libraries above.
+
+
+About This Distribution ====================================================
+
+Interesting files include:
+
+- COPYING, which contains the terms of the GNU General Public License.
+- INSTALL, which contains general instructions for building/installing the 
+  example client.
+- NEWS, which describes user-visible changes since the last release of the 
+  example client.
+
+Files are usually installed according to the prefix specified to configure,
+/usr/local by default. Building and installing gives you:
+
+Executables, in ${prefix}/bin:
+
+ mazewar --- the client for the gzochi mazewar example game

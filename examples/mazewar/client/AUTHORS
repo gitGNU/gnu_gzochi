@@ -1,0 +1,13 @@
+Julian Graham:
+wrote the majority of this client implementation for the gzochi mazewar example
+game.
+
+Andreas Schiffler:
+gave permission for the 8x13 bitmap font from the SDL_gfx library 
+(http://www.ferkopp.net/Software/SDL_gfx-2.0/) to be included in this source 
+distribution.
+
+Christopher A. Kent, et al.:
+wrote the HP-UX port of Mazewar that inspired this implementation. See
+http://hpux.connect.org.uk/hppd/hpux/Games/Networking/mazewar-1.13/ for
+source code and binaries.
