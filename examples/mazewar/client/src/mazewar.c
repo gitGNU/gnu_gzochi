@@ -453,7 +453,11 @@ int main (int argc, char *argv[])
   char *hostname = NULL, *player = NULL; /* The hostname and player name. */
   int port = 0; /* The port number. */
 
-  assert (argc == 4);
+  if (argc != 4)
+    {
+      printf ("Usage: %s [hostname] [port] [player name]\n", argv[0]);
+      exit (1);
+    }
 
   hostname = argv[1];
   port = atoi (argv[2]); /* Parse the port number. */
