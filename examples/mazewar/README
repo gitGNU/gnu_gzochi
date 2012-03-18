@@ -1,0 +1,31 @@
+gzochi mazewar is a clone of the classic MazeWar game developed at NASA and MIT
+in the mid-1970s. MazeWar was one of the first games --- possibly the first 
+game --- to feature multiplayer interaction over a network. With the aid of a 
+first-person 3-D perspective view and an overhead map, players chase each other
+through a maze and shoot each other with missiles to earn points.
+
+This implementation differs somewhat from the original MazeWar variants: 
+Whereas the first versions of MazeWar passed network messages across a
+peer-to-distinguished-peer host topology, gzochi mazewar operates in a strict
+client-server fashion. Some variants of MazeWar include the ability to peek
+around corners or enter an "omniscient" mode where all players become visible
+regardless of position. gzochi mazewar is distinctly no-frills in this respect,
+and only allows players to turn to the left or right, step forward, and shoot
+missiles. Users are encouraged to modify this software to add any desired
+features that may be missing!
+
+The source code for the both the server and client components of gzochi mazewar
+has been heavily annotated to help explicate the workings of the game logic and
+the interactions between the client and server. It is hoped that the code 
+comments and other documentation will be useful for developers attempting to 
+write their own games for the gzochi framework. Please send any questions or 
+comments to the gzochi development mailing list: gzochi-devel@nongnu.org.
+
+For more information on the history and evolution of MazeWar, including source
+distributions for various hardware and software platforms, please visit the 
+following web sites:
+
+* http://en.wikipedia.org/wiki/Maze_War
+* http://www.digibarn.com/history/04-VCF7-MazeWar/
+* http://hpux.connect.org.uk/hppd/hpux/Games/Networking/mazewar-1.13/
+* http://mazewarssvg.sourceforge.net/
