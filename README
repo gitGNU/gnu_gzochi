@@ -1,0 +1,21 @@
+This is version 0.1 of the gzochi game development framework.
+
+gzochi is a framework for developing massively multiplayer online games. A
+server container provides services to deployed games, which are written in 
+Guile Scheme, that abstract and simplify some of the most challenging and
+error-prone aspects of online game development: Concurrency, data persistence, 
+and network communications. A very thin client library can be embedded to 
+provide connectivity for client applications written in any language.
+
+This is the top level of the gzochi distribution. To build and begin developing
+with gzochi, visit the following sub-directories, each of which correponds to a
+component of the distribution:
+
+* gzochi-common/ - the static utility library shared between the server and 
+  client modules
+* gzochi-server/ - gzochid, the server for the gzochi framework
+* gzochi-client/ - libgzochi, the reference client library implementation
+* debug-client/ - mictlan, a low-level socket client implementation
+* examples/ - some example games with client and server component 
+  implementations intended to help new developers understand the gzochi
+  framework
