@@ -1,3 +1,3 @@
-SUBDIRS = src
+SUBDIRS = src doc
 
 AM_LDFLAGS = @GUILE_LIBS@ @GLIB_LIBS@
