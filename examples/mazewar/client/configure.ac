@@ -16,7 +16,7 @@ dnl You should have received a copy of the GNU General Public License
 dnl along with this package.  If not, see <http://www.gnu.org/licenses/>.
 dnl
 
-AC_INIT([mazewar], [0.0.1], [julian.graham@aya.yale.edu], [],
+AC_INIT([mazewar], [0.1], [joolean@undecidable.net], [],
         [http://www.nongnu.org/gzochi/])
 AC_CONFIG_SRCDIR([src/mazewar.c])
 AM_INIT_AUTOMAKE(1.6)

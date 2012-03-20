@@ -1,6 +1,6 @@
 dnl configure.ac --- food for -*-autoconf-*- et al
 dnl
-dnl Copyright (C) 2011 Julian Graham
+dnl Copyright (C) 2012 Julian Graham
 dnl
 dnl This is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@ dnl You should have received a copy of the GNU General Public License
 dnl along with this package.  If not, see <http://www.gnu.org/licenses/>.
 dnl
 
-AC_INIT([mictlan], [0.0.1], [julian.graham@aya.yale.edu], [],
+AC_INIT([mictlan], [0.1], [joolean@undecidable.net], [],
         [http://www.nongnu.org/gzochi/])
 AC_CONFIG_SRCDIR([src/mictlan.c])
 AM_INIT_AUTOMAKE(1.6)
