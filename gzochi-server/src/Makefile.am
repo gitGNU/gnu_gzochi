@@ -32,6 +32,15 @@ AM_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 bin_PROGRAMS = gzochid
 sysconf_DATA = conf/gzochid.conf
 
+nobase_dist_pkglib_DATA = scheme/gzochi.scm \
+	scheme/gzochi/app.scm scheme/gzochi/channel.scm \
+	scheme/gzochi/client.scm scheme/gzochi/conditions.scm \
+	scheme/gzochi/data.scm scheme/gzochi/io.scm scheme/gzochi/log.scm \
+	scheme/gzochi/task.scm \
+	scheme/gzochi/private/app.scm scheme/gzochi/private/channel.scm \
+	scheme/gzochi/private/client.scm scheme/gzochi/private/data.scm \
+	scheme/gzochi/private/log.scm scheme/gzochi/private/reflect.scm
+
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	fsm.c game.c guile.c gzochid.c httpd.c log.c protocol.c schedule.c \
 	scheme.c session.c socket.c storage.c task.c threads.c tx.c txlog.c \
