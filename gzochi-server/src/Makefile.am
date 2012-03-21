@@ -30,7 +30,8 @@ AM_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 	-Wall -pedantic
 
 bin_PROGRAMS = gzochid
-sysconf_DATA = conf/gzochid.conf
+dist_noinst_DATA = dtd/game.dtd
+dist_sysconf_DATA = conf/gzochid.conf
 
 nobase_dist_pkglib_DATA = scheme/gzochi.scm \
 	scheme/gzochi/app.scm scheme/gzochi/channel.scm \
