@@ -18,7 +18,13 @@ dnl
 
 AC_INIT([gzochi], [0.1], [joolean@undecidable.net], [], 
         [http://www.nongnu.org/gzochi/])
+
 AM_INIT_AUTOMAKE(1.6)
+
+dnl Include libtool here to satisfy auto*conf requirement that parent projects
+dnl aggregate their children's script dependencies.
+
+AC_PROG_LIBTOOL
 
 AC_CONFIG_FILES([Makefile])
 
