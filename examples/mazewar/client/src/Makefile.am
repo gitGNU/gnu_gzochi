@@ -24,6 +24,9 @@ AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@ @GZOCHI_LIBS@
 
 bin_PROGRAMS = mazewar
 
+noinst_HEADERS = display.h input.h mazewar.h message.h \
+	data/avatars.h data/font.h data/views.h
+
 mazewar_SOURCES = display.c display-sdl.c input-sdl.c mazewar.c message.c \
 	data/avatars.c data/font.c data/views.c
 

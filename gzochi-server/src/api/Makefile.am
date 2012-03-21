@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2011 Julian Graham
+# Copyright (C) 2012 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@ AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ \
 	-Wall -pedantic
 
 noinst_LIBRARIES = libgzochid-server-api.a
+noinst_HEADERS = channel.h data.h log.h session.h task.h
 
 libgzochid_server_api_a_SOURCES = channel.c data.c log.c session.c task.c
 

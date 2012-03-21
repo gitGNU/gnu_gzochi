@@ -41,6 +41,11 @@ nobase_dist_pkglib_DATA = scheme/gzochi.scm \
 	scheme/gzochi/private/client.scm scheme/gzochi/private/data.scm \
 	scheme/gzochi/private/log.scm scheme/gzochi/private/reflect.scm
 
+noinst_HEADERS = admin.h app.h auth.h channel.h config.h context.h data.h \
+	fsm.h game.h guile.h gzochid.h httpd.h io.h log.h protocol.h \
+	schedule.h scheme.h session.h socket.h storage.h task.h threads.h \
+	tx.h txlog.h util.h
+
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	fsm.c game.c guile.c gzochid.c httpd.c log.c protocol.c schedule.c \
 	scheme.c session.c socket.c storage.c task.c threads.c tx.c txlog.c \

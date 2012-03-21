@@ -30,6 +30,7 @@ libgzochi_la_LIBADD = $(GZOCHI_COMMON_LIBS)
 
 includedir = $(prefix)/include
 dist_include_HEADERS = libgzochi.h
+noinst_HEADERS = protocol.h session.h
 
 client.c:
 protocol.c: protocol.h
