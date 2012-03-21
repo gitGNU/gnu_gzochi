@@ -18,12 +18,16 @@ dnl
 
 AC_INIT([mictlan], [0.1], [joolean@undecidable.net], [],
         [http://www.nongnu.org/gzochi/])
+AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_SRCDIR([src/mictlan.c])
+
 AM_INIT_AUTOMAKE(1.6)
 
 AC_LANG(C)
 AC_PROG_CC
-AC_PROG_LIBTOOL
+
+LT_PREREQ([2.4])
+LT_INIT
 
 PKG_CHECK_MODULES([GZOCHI], [gzochi])
 

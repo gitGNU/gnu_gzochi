@@ -18,13 +18,14 @@ dnl
 
 AC_INIT([libgzochi-common], [0.1], [joolean@undecidable.net], [],
         [http://www.nongnu.org/])
+AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_SRCDIR([src/gzochi-common.h])
 AM_INIT_AUTOMAKE(1.6)
 
 AC_LANG(C)
 AC_PROG_CC
-AC_PROG_RANLIB
-AC_PROG_LIBTOOL
+LT_PREREQ([2.4])
+LT_INIT
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile

@@ -18,13 +18,16 @@ dnl
 
 AC_INIT([gzochid], [0.1], [joolean@undecidable.net], [],
         [http://www.nongnu.org/gzochi/])
+AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_SRCDIR([src/gzochid.c])
+
 AM_INIT_AUTOMAKE(1.6)
 
 AC_LANG(C)
 AC_PROG_CC
-AC_PROG_RANLIB
-AC_PROG_LIBTOOL
+
+LT_PREREQ([2.4])
+LT_INIT
 
 PKG_CHECK_MODULES([GUILE], [guile-2.0])
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
