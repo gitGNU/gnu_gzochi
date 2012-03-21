@@ -42,7 +42,7 @@ static void *reader_loop (void *arg)
 }
 
 static void received_message 
-(gzochi_client_session *session, unsigned char *msg, short len)
+(gzochi_client_session *session, unsigned char *msg, short len, void *user_data)
 {
   fprintf (stderr, "[Message] %.*s\n", len, (char *) msg);
 }
@@ -66,7 +66,7 @@ int main (int argc, char *argv[])
       pthread_t reader_thread;
 
       gzochi_client_session_set_received_message_callback 
-	(session, received_message);
+	(session, received_message, NULL);
 
       pthread_create (&reader_thread, NULL, reader_loop, session);
       gzochi_client_run (session);
