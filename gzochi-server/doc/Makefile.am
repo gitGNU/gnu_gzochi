@@ -22,3 +22,4 @@ info_TEXINFOS = gzochid.texi
 gzochid_TEXINFOS = fdl.texi
 man_MANS = gzochid.8
 
+EXTRA_DIST = ${man_MANS}
