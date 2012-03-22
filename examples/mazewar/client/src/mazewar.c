@@ -392,7 +392,7 @@ static void bootstrap_maze
 static void received_message
 (gzochi_client_session *session, unsigned char *msg, short len, void *user_data)
 {
-  mazewar_context *context = (mazewar_context *) msg;
+  mazewar_context *context = (mazewar_context *) user_data;
   mazewar_server_message *message = NULL;
 
   /* If the maze bitmap is NULL, this must be the first message received from
