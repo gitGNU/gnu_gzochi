@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2011 Julian Graham
+# Copyright (C) 2012 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = api
+SUBDIRS = api scheme
 
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
@@ -32,15 +32,6 @@ AM_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 bin_PROGRAMS = gzochid
 dist_noinst_DATA = dtd/game.dtd
 dist_sysconf_DATA = conf/gzochid.conf
-
-nobase_dist_pkglib_DATA = scheme/gzochi.scm \
-	scheme/gzochi/app.scm scheme/gzochi/channel.scm \
-	scheme/gzochi/client.scm scheme/gzochi/conditions.scm \
-	scheme/gzochi/data.scm scheme/gzochi/io.scm scheme/gzochi/log.scm \
-	scheme/gzochi/task.scm \
-	scheme/gzochi/private/app.scm scheme/gzochi/private/channel.scm \
-	scheme/gzochi/private/client.scm scheme/gzochi/private/data.scm \
-	scheme/gzochi/private/log.scm scheme/gzochi/private/reflect.scm
 
 noinst_HEADERS = admin.h app.h auth.h channel.h config.h context.h data.h \
 	fsm.h game.h guile.h gzochid.h httpd.h io.h log.h protocol.h \

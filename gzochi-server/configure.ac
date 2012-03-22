@@ -35,6 +35,8 @@ PKG_CHECK_MODULES([GTHREAD], [gthread-2.0])
 PKG_CHECK_MODULES([MICROHTTPD], [libmicrohttpd])
 PKG_CHECK_MODULES([ZLIB], [zlib])
 
+GUILE_SITE_DIR
+
 AC_SEARCH_LIBS([gdbm_open], [gdbm])
 AC_CHECK_HEADER([gdbm.h])
 
@@ -49,6 +51,7 @@ AC_SERVEEZ
 AC_CONFIG_FILES([Makefile
 		 doc/Makefile
                  src/Makefile
-		 src/api/Makefile])
+		 src/api/Makefile
+		 src/scheme/Makefile])
 
 AC_OUTPUT
