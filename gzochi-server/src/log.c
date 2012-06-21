@@ -1,5 +1,5 @@
 /* log.c: Log-writing routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <glib.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/time.h>
@@ -22,6 +23,8 @@
 #include <time.h>
 
 #include "log.h"
+
+static GStaticMutex log_mutex = G_STATIC_MUTEX_INIT;
 
 void gzochid_vlog (int priority, char *msg, va_list ap)
 {
@@ -44,12 +47,14 @@ void gzochid_vlog (int priority, char *msg, va_list ap)
 
   vsyslog (priority, msg, ap);
 
+  g_static_mutex_lock (&log_mutex);
   fprintf (stderr, "%d-%.2d-%.2dT%.2d:%.2d,%dZ ", 1900 + ltm.tm_year, 
 	   ltm.tm_mon + 1, ltm.tm_mday, ltm.tm_hour, ltm.tm_min, 
 	   (int) (tv.tv_usec / 1000));
   fprintf (stderr, "%s ", severity);
   vfprintf (stderr, msg, ap);
   fprintf (stderr, "\n");
+  g_static_mutex_unlock (&log_mutex);
 }
 
 void gzochid_log (int priority, char *msg, ...)
