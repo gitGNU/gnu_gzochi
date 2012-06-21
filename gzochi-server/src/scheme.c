@@ -38,9 +38,6 @@
 #include "api/session.h"
 #include "api/task.h"
 
-static GStaticPrivate thread_application_context_key = G_STATIC_PRIVATE_INIT;
-static GStaticPrivate thread_identity_key = G_STATIC_PRIVATE_INIT;
-
 static SCM scm_make_callback;
 static SCM scm_callback_module;
 static SCM scm_callback_procedure;
@@ -75,31 +72,6 @@ static SCM scm_r6rs_raise;
 static SCM scm_make_object_removed_condition;
 static SCM scm_make_name_exists_condition;
 static SCM scm_make_name_not_bound_condition;
-
-static void *with_application_context 
-(gzochid_application_context *context, gzochid_auth_identity *identity,
- void *(*worker) (gpointer), gpointer data)
-{
-  gpointer ret = NULL;
-  gboolean private_needs_context = 
-    g_static_private_get (&thread_application_context_key) == NULL;
-
-  if (private_needs_context)
-    {
-      g_static_private_set (&thread_application_context_key, context, NULL);
-      g_static_private_set (&thread_identity_key, identity, NULL);
-    }
-  
-  ret = worker (data);
-
-  if (private_needs_context)
-    {
-      g_static_private_set (&thread_application_context_key, NULL, NULL);
-      g_static_private_set (&thread_identity_key, NULL, NULL);
-    }
-
-  return ret;
-}
 
 static SCM resolve_procedure (char *procedure, GList *module)
 {
@@ -147,7 +119,7 @@ SCM gzochid_scheme_invoke
   data[1] = args;
   data[2] = exception;
 
-  ret = (SCM) with_application_context 
+  ret = (SCM) gzochid_with_application_context 
     (context, identity, scheme_invoke_inner, data);
   scm_variable_set_x (load_path, backup_load_path);
 
@@ -694,20 +666,4 @@ void gzochid_scheme_channel_oid (SCM channel, mpz_t oid)
 void gzochid_scheme_initialize_bindings (void)
 {
   scm_with_guile (initialize_bindings, NULL);
-}
-
-gzochid_application_context *gzochid_scheme_current_application_context (void)
-{
-  gzochid_application_context *context = (gzochid_application_context *)
-    g_static_private_get (&thread_application_context_key);
-  assert (context != NULL);
-  return context;
-}
-
-gzochid_auth_identity *gzochid_scheme_current_identity (void)
-{
-  gzochid_auth_identity *identity = (gzochid_auth_identity *)
-    g_static_private_get (&thread_identity_key);
-  assert (identity != NULL);
-  return identity;
 }

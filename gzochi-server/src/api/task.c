@@ -28,8 +28,8 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 2, 0, 0,
 	    (SCM callback, SCM delay), "Schedule a durable task to run.")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context (); 
-  gzochid_auth_identity *identity = gzochid_scheme_current_identity ();
+    gzochid_get_current_application_context (); 
+  gzochid_auth_identity *identity = gzochid_get_current_identity ();
 
   gzochid_application_task *scheme_task = gzochid_application_task_new 
     (context, identity, gzochid_scheme_application_worker, callback);

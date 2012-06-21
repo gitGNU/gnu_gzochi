@@ -79,7 +79,4 @@ void gzochid_scheme_channel_oid (SCM, mpz_t);
 
 void gzochid_scheme_initialize_bindings (void);
 
-gzochid_application_context *gzochid_scheme_current_application_context (void);
-gzochid_auth_identity *gzochid_scheme_current_identity (void);
-
 #endif /* GZOCHID_SCHEME_H */

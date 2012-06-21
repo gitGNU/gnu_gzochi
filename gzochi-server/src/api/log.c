@@ -29,7 +29,7 @@ SCM_DEFINE (primitive_log, "primitive-log", 2, 0, 0, (SCM priority, SCM msg),
 	    "Log a message for the current application")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   char *cpriority = scm_to_locale_string (scm_symbol_to_string (priority));
   char *cmsg = scm_to_locale_string (msg);
 

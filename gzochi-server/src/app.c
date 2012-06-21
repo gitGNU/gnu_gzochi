@@ -1,5 +1,5 @@
 /* app.c: Application context routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -33,6 +33,9 @@
 #include "threads.h"
 #include "tx.h"
 #include "util.h"
+
+static GStaticPrivate thread_application_context_key = G_STATIC_PRIVATE_INIT;
+static GStaticPrivate thread_identity_key = G_STATIC_PRIVATE_INIT;
 
 static void initialize_async (gpointer data, gpointer user_data)
 {
@@ -649,4 +652,40 @@ void gzochid_application_channel_message_received
 (gzochid_application_context *context, gzochid_protocol_client *client, 
  char *channel, unsigned char *msg, short len)
 {
+}
+
+void *gzochid_with_application_context 
+(gzochid_application_context *context, gzochid_auth_identity *identity,
+ void *(*worker) (gpointer), gpointer data)
+{
+  gpointer ret = NULL;
+  gboolean private_needs_context = 
+    g_static_private_get (&thread_application_context_key) == NULL;
+
+  if (private_needs_context)
+    {
+      g_static_private_set (&thread_application_context_key, context, NULL);
+      g_static_private_set (&thread_identity_key, identity, NULL);
+    }
+  
+  ret = worker (data);
+
+  if (private_needs_context)
+    {
+      g_static_private_set (&thread_application_context_key, NULL, NULL);
+      g_static_private_set (&thread_identity_key, NULL, NULL);
+    }
+
+  return ret;
+}
+
+gzochid_application_context *gzochid_get_current_application_context (void)
+{
+  return (gzochid_application_context *) 
+    g_static_private_get (&thread_application_context_key);
+}
+
+gzochid_auth_identity *gzochid_get_current_identity (void)
+{
+  return (gzochid_auth_identity *) g_static_private_get (&thread_identity_key);
 }

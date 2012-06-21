@@ -1,5 +1,5 @@
 /* channel.c: Primitive functions for user-facing gzochid channel API
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ SCM_DEFINE (primitive_create_channel, "primitive-create-channel", 1, 0, 0,
 	    (SCM name), "Create a new channel with the specified name.")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   char *cname = scm_to_locale_string (name);
   gzochid_channel *channel = gzochid_channel_create (context, cname);
   gzochid_data_managed_reference *scm_reference = 
@@ -45,7 +45,7 @@ SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
 	    (SCM name), "Retrieves the channel with the specified name.")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   char *cname = scm_to_locale_string (name);
   gzochid_channel *channel = gzochid_channel_get (context, cname);
 
@@ -66,7 +66,7 @@ SCM_DEFINE (primitive_join_channel, "primitive-join-channel", 2, 0, 0,
 	    (SCM channel, SCM session), "Add client session to a channel.")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   gzochid_data_managed_reference *channel_reference = NULL;
   gzochid_data_managed_reference *session_reference = NULL;
   mpz_t channel_oid, session_oid;
@@ -97,7 +97,7 @@ SCM_DEFINE (primitive_leave_channel, "primitive-leave-channel", 2, 0, 0,
 	    "Remove a client session from a channel.")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   gzochid_data_managed_reference *channel_reference = NULL;
   gzochid_data_managed_reference *session_reference = NULL;
   mpz_t channel_oid, session_oid;
@@ -127,7 +127,7 @@ SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message",
 	    "Send a message to the sessions that belong to a channel.")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
 
   short len = (short) SCM_BYTEVECTOR_LENGTH (bv);
   unsigned char *msg = (unsigned char *) SCM_BYTEVECTOR_CONTENTS (bv);
@@ -152,7 +152,7 @@ SCM_DEFINE (primitive_close_channel, "primitive-close-channel", 1, 0, 0,
 	    (SCM channel, SCM msg), "Shut down a channel.")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   gzochid_data_managed_reference *channel_reference = NULL;
   mpz_t channel_oid;
 

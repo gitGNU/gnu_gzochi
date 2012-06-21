@@ -28,7 +28,7 @@ SCM_DEFINE (primitive_create_reference, "primitive-create-reference", 1, 0, 0,
 	    (SCM obj), "Create a managed reference.")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
     (context, &gzochid_scheme_data_serialization, obj);
   
@@ -41,7 +41,7 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
 	    "Dereference a managed reference.")
 {
   gzochid_application_context *context = 
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   gzochid_data_managed_reference *reference = NULL;
   mpz_t oid;
   
@@ -63,7 +63,7 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
 	    "Retrieve a managed record bound to a name.")
 {
   gzochid_application_context *context =
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   char *cname = scm_to_locale_string (name);
 
   if (!gzochid_data_binding_exists (context, cname))
@@ -89,7 +89,7 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
 	    (SCM name, SCM obj), "Bind a managed record to a name.")
 {
   gzochid_application_context *context =
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   char *cname = scm_to_locale_string (name);
   
   if (gzochid_data_binding_exists (context, cname))
@@ -115,7 +115,7 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
 	    (SCM name), "Remove the binding for a name.")
 {
   gzochid_application_context *context =
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   char *cname = scm_to_locale_string (name);
   
   if (!gzochid_data_binding_exists (context, cname))
@@ -140,7 +140,7 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
 	    (SCM obj), "Remove a managed record from the data store.")
 {
   gzochid_application_context *context =
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
     (context, &gzochid_scheme_data_serialization, obj);
 
@@ -152,9 +152,8 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
 SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
 	    (SCM obj), "Mark a managed record that has been modified.")
 {
-  gzochid_data_mark 
-    (gzochid_scheme_current_application_context (), 
-     &gzochid_scheme_data_serialization, obj);
+  gzochid_data_mark (gzochid_get_current_application_context (), 
+		     &gzochid_scheme_data_serialization, obj);
   return SCM_UNSPECIFIED;
 }
 

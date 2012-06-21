@@ -154,4 +154,10 @@ void gzochid_application_channel_message_received
 (gzochid_application_context *, struct _gzochid_protocol_client *, 
  char *, unsigned char *, short);
 
+void *gzochid_with_application_context 
+(gzochid_application_context *, gzochid_auth_identity *, void *(*) (gpointer), 
+ gpointer);
+gzochid_application_context *gzochid_get_current_application_context (void);
+gzochid_auth_identity *gzochid_get_current_identity (void);
+
 #endif /* GZOCHID_APP_H */

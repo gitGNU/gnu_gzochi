@@ -1,5 +1,5 @@
 /* session.c: Primitive functions for user-facing gzochid client session API
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ SCM_DEFINE (primitive_send_message, "primitive-send-message", 2, 0, 0,
 	    (SCM session, SCM msg), "Send a message to a client session.")
 {
   gzochid_application_context *context =
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   gzochid_data_managed_reference *reference = NULL;
   
   short len = (short) SCM_BYTEVECTOR_LENGTH (msg);
@@ -52,7 +52,7 @@ SCM_DEFINE (primitive_disconnect, "primitive-disconnect", 1, 0, 0,
 	    (SCM session), "Disconnect a client session.")
 {
   gzochid_application_context *context =
-    gzochid_scheme_current_application_context ();
+    gzochid_get_current_application_context ();
   gzochid_data_managed_reference *reference = NULL;  
   mpz_t c_oid;
 
