@@ -26,6 +26,7 @@
 #include "app.h"
 #include "auth.h"
 #include "data.h"
+#include "guile.h"
 #include "io.h"
 #include "scheme.h"
 #include "session.h"
@@ -100,64 +101,23 @@ static void *with_application_context
   return ret;
 }
 
-static SCM scheme_catch_body (void *data)
-{
-  void **ptr = (void **) data;
-
-  SCM procedure = (SCM) ptr[0];
-  SCM args = (SCM) ptr[1];
-  
-  return scm_apply_0 (procedure, args);
-}
-
-static SCM scheme_catch_handler (void *data, SCM tag, SCM throw_args)
-{
-  SCM exception_variable = (SCM) data;
-
-  if (scm_variable_p (exception_variable) == SCM_BOOL_T)
-    scm_variable_set_x (exception_variable, throw_args);
-
-  return SCM_BOOL_F;
-}
-
-static SCM scheme_pre_unwind_handler (void *data, SCM tag, SCM throw_args)
-{
-  scm_display_backtrace 
-    (scm_make_stack (SCM_BOOL_T, SCM_EOL),
-     scm_current_output_port (), 
-     SCM_BOOL_F, 
-     SCM_BOOL_F);
-
-  scm_print_exception (scm_current_output_port (), SCM_BOOL_F, tag, throw_args);
-
-  return SCM_BOOL_F;
-}
-
-static gpointer scheme_invoke_inner (gpointer data)
-{
-  void **ptr = (void **) data;
-  void *sub_data[2];
-
-  SCM procedure = (SCM) ptr[0];
-  SCM args = (SCM) ptr[1];
-  SCM exception = (SCM) ptr[2];
-
-  sub_data[0] = procedure;
-  sub_data[1] = args;
-
-  return scm_c_catch 
-    (SCM_BOOL_T,
-     scheme_catch_body, sub_data, 
-     scheme_catch_handler, exception, 
-     scheme_pre_unwind_handler, NULL);
-}
-
 static SCM resolve_procedure (char *procedure, GList *module)
 {
   SCM scm_procedure = scm_from_locale_symbol (procedure);
   SCM scm_module = gzochid_scheme_glist_to_list 
     (module, (SCM (*) (gpointer)) scm_from_locale_symbol);
   return scm_public_ref (scm_module, scm_procedure);
+}
+
+static gpointer scheme_invoke_inner (gpointer data)
+{
+  void **ptr = (void **) data;
+
+  SCM procedure = (SCM) ptr[0];
+  SCM args = (SCM) ptr[1];
+  SCM exception = (SCM) ptr[2];
+
+  return gzochid_guile_invoke (procedure, args, exception);
 }
 
 SCM gzochid_scheme_invoke

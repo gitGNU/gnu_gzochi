@@ -1,5 +1,5 @@
 /* guile.c: GNU Guile interface routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -29,8 +29,52 @@ typedef struct _gzochid_guile_thread_work
   gpointer user_data;
 } gzochid_guile_thread_work;
 
-static GStaticMutex resolve_module_mutex = G_STATIC_MUTEX_INIT;
-static GHashTable *module_cache;
+static SCM guile_catch_body (void *data)
+{
+  void **ptr = (void **) data;
+
+  SCM procedure = (SCM) ptr[0];
+  SCM args = (SCM) ptr[1];
+  
+  return scm_apply_0 (procedure, args);
+}
+
+static SCM guile_catch_handler (void *data, SCM tag, SCM throw_args)
+{
+  SCM exception_variable = (SCM) data;
+
+  if (scm_variable_p (exception_variable) == SCM_BOOL_T)
+    scm_variable_set_x (exception_variable, throw_args);
+
+  return SCM_BOOL_F;
+}
+
+static SCM guile_pre_unwind_handler (void *data, SCM tag, SCM throw_args)
+{
+  scm_display_backtrace 
+    (scm_make_stack (SCM_BOOL_T, SCM_EOL),
+     scm_current_output_port (), 
+     SCM_BOOL_F, 
+     SCM_BOOL_F);
+
+  scm_print_exception (scm_current_output_port (), SCM_BOOL_F, tag, throw_args);
+
+  return SCM_BOOL_F;
+}
+
+SCM gzochid_guile_invoke (SCM procedure, SCM args, SCM exception)
+{
+  void *sub_data[2];
+
+  sub_data[0] = procedure;
+  sub_data[1] = args;
+
+  return scm_c_catch 
+    (SCM_BOOL_T,
+     guile_catch_body, sub_data, 
+     guile_catch_handler, exception, 
+     guile_pre_unwind_handler, NULL);
+}
 
 static void *guile_unwrapper (gpointer data)
 {
@@ -46,63 +90,6 @@ static void guile_dispatch (gpointer data, gpointer user_data)
   gzochid_guile_thread_work *work = (gzochid_guile_thread_work *) data;
   work->user_data = user_data;
   scm_with_guile (guile_unwrapper, work);
-}
-
-static SCM resolve_module 
-(gzochid_application_context *context, char *module_name)
-{
-  SCM module = SCM_BOOL_F;
-  SCM load_path = SCM_EOL, new_load_path = SCM_EOL, backup_load_path = SCM_EOL;
-  GList *path_ptr = context->descriptor->load_paths;
-
-  load_path = scm_module_variable 
-    (scm_c_resolve_module ("guile"), scm_from_locale_symbol ("%load-path"));
-  backup_load_path = scm_variable_ref (load_path);
-  new_load_path = backup_load_path;
-
-  while (path_ptr != NULL)
-    {
-      new_load_path = scm_cons 
-	(scm_from_locale_string ((char *) path_ptr->data), new_load_path);      
-      path_ptr = path_ptr->prev;
-    }
-  
-  scm_variable_set_x (load_path, new_load_path);
-  module = scm_c_resolve_module (module_name);
-  scm_gc_protect_object (module);
-  scm_variable_set_x (load_path, backup_load_path);
-
-  return module;
-}
-
-SCM gzochid_guile_resolve_module 
-(gzochid_application_context *context, char *module_name)
-{
-  SCM module = SCM_BOOL_F;
-  GHashTable *application_module_cache;
-
-  g_static_mutex_lock (&resolve_module_mutex);
-
-  if (module_cache == NULL)
-    module_cache = g_hash_table_new (g_direct_hash, g_direct_equal);
-
-  application_module_cache = g_hash_table_lookup (module_cache, context);
-  if (application_module_cache == NULL)
-    {
-      application_module_cache = g_hash_table_new (g_str_hash, g_str_equal);
-      g_hash_table_insert (module_cache, context, application_module_cache);
-    }
-
-  module = g_hash_table_lookup (application_module_cache, module_name);
-  if (module == NULL)
-    {
-      module = resolve_module (context, module_name);
-      g_hash_table_insert (application_module_cache, module_name, module);
-    }
-
-  g_static_mutex_unlock (&resolve_module_mutex);
-
-  return module;
 }
 
 void gzochid_guile_run (gzochid_thread_worker worker, gpointer data)
