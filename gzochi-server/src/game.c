@@ -1,5 +1,5 @@
 /* game.c: Game context management routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -217,4 +217,9 @@ gzochid_application_context *gzochid_game_context_lookup_application
 (gzochid_game_context *context, char *name)
 {
   return g_hash_table_lookup (context->applications, name);
+}
+
+GList *gzochid_game_context_get_applications (gzochid_game_context *context)
+{
+  return g_hash_table_get_values (context->applications);
 }

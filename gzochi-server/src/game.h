@@ -58,5 +58,6 @@ void gzochid_game_context_unregister_application
 (gzochid_game_context *, char *);
 gzochid_application_context *gzochid_game_context_lookup_application
 (gzochid_game_context *, char *);
+GList *gzochid_game_context_get_applications (gzochid_game_context *);
 
 #endif /* GZOCHID_GAME_H */
