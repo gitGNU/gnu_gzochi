@@ -19,25 +19,29 @@
 #
 
 AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ \
-	-Wall -pedantic
+	@SERVEEZ_CFLAGS@ -Wall -pedantic
 
 noinst_LIBRARIES = libgzochid-server-api.a
-noinst_HEADERS = channel.h data.h log.h session.h task.h
+noinst_HEADERS = admin.h channel.h data.h log.h session.h task.h
 
-libgzochid_server_api_a_SOURCES = channel.c data.c log.c session.c task.c
+libgzochid_server_api_a_SOURCES = admin.c channel.c data.c log.c session.c \
+	task.c
 
 SUFFIXES = .x
 .c.x:
-	guile-snarf -o $@ $< @DEFS@ @CFLAGS@ @GLIB_CFLAGS@ @GUILE_CFLAGS@
+	guile-snarf -o $@ $< @DEFS@ @CFLAGS@ @GLIB_CFLAGS@ @GUILE_CFLAGS@ \
+		@SERVEEZ_CFLAGS@
 
-BUILT_SOURCES = channel.x data.x log.x session.x task.x
+BUILT_SOURCES = admin.x channel.x data.x log.x session.x task.x
 
+admin.c: admin.h
 channel.c: channel.h
 data.c: data.h
 log.c: log.h
 session.c: session.h
 task.c: task.h
 
+admin.x: admin.c
 channel.x: channel.c
 data.x: data.c
 log.x: log.c

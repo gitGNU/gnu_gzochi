@@ -21,7 +21,7 @@
 pkgguile_sitedir = ${GUILE_SITE}/${PACKAGENAME}
 
 nobase_dist_pkgguile_site_DATA = gzochi.scm \
-	gzochi/app.scm gzochi/channel.scm gzochi/client.scm \
+	gzochi/admin.scm gzochi/app.scm gzochi/channel.scm gzochi/client.scm \
 	gzochi/conditions.scm gzochi/data.scm gzochi/io.scm gzochi/log.scm \
 	gzochi/task.scm \
 	gzochi/private/app.scm gzochi/private/channel.scm \

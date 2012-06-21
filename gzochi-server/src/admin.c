@@ -22,14 +22,27 @@
 #include "admin.h"
 #include "config.h"
 #include "context.h"
+#include "guile.h"
 #include "gzochid.h"
 #include "httpd.h"
 #include "threads.h"
+
+#include "api/admin.h"
 
 static void initialize_async (gpointer data, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
   gzochid_fsm_to_state (context->fsm, GZOCHID_ADMIN_STATE_RUNNING);
+}
+
+static void initialize_guile (gpointer data, gpointer user_data)
+{
+  gzochid_context *context = (gzochid_context *) data;
+  gzochid_server_context *server_context = 
+    (gzochid_server_context *) context->parent;
+
+  gzochid_api_admin_init 
+    ((gzochid_game_context *) server_context->game_context);  
 }
 
 static void initialize (int from_state, int to_state, gpointer user_data)
@@ -48,6 +61,7 @@ static void initialize (int from_state, int to_state, gpointer user_data)
     }
     }
 
+  gzochid_guile_run (initialize_guile, context);
   gzochid_thread_pool_push (admin_context->pool, initialize_async, NULL, NULL);
 }
 
