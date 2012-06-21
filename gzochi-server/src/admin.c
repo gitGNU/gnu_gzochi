@@ -1,4 +1,5 @@
 /* Administrative context routines for gzochid
+ * Copyright (C) 2012 Julian Graham
  * Copyright (C) 2011 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -21,6 +22,7 @@
 #include "admin.h"
 #include "config.h"
 #include "context.h"
+#include "gzochid.h"
 #include "httpd.h"
 #include "threads.h"
 
@@ -32,19 +34,21 @@ static void initialize_async (gpointer data, gpointer user_data)
 
 static void initialize (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_admin_context *context = (gzochid_admin_context *) user_data;
+  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_admin_context *admin_context = (gzochid_admin_context *) context;
 
   if (gzochid_config_to_boolean 
-      (g_hash_table_lookup (context->config, "module.httpd.enabled"), FALSE))
+      (g_hash_table_lookup 
+       (admin_context->config, "module.httpd.enabled"), FALSE))
     {
       int port = gzochid_config_to_int 
-	(g_hash_table_lookup (context->config, "module.httpd.port"), 0);
+	(g_hash_table_lookup (admin_context->config, "module.httpd.port"), 0);
       gzochid_httpd_context *httpd_context = gzochid_httpd_context_new ();
-      gzochid_httpd_context_init 
-	(httpd_context, (gzochid_context *) context, port);
+      gzochid_httpd_context_init (httpd_context, context, port);
+    }
     }
 
-  gzochid_thread_pool_push (context->pool, initialize_async, NULL, NULL);
+  gzochid_thread_pool_push (admin_context->pool, initialize_async, NULL, NULL);
 }
 
 gzochid_admin_context *gzochid_admin_context_new (void)

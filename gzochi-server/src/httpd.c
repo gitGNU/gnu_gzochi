@@ -350,8 +350,10 @@ static int dispatch (void *cls, struct MHD_Connection *connection,
 	(gzochid_admin_context *) ((gzochid_context *) context)->parent;
       gzochid_server_context *server_context =
 	(gzochid_server_context *) ((gzochid_context *) admin_context)->parent; 
+      gzochid_game_context *game_context = (gzochid_game_context *)
+	server_context->game_context;
 
-      return dispatch_app (connection, url, server_context->game_context);
+      return dispatch_app (connection, url, game_context);
     }
   else 
     {
