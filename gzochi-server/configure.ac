@@ -37,8 +37,20 @@ PKG_CHECK_MODULES([ZLIB], [zlib])
 
 GUILE_SITE_DIR
 
-AC_SEARCH_LIBS([gdbm_open], [gdbm])
-AC_CHECK_HEADER([gdbm.h])
+AC_ARG_WITH([storage-engine],
+  [AS_HELP_STRING([--with-storage-engine=ENGINE],
+    [storage engine ENGINE [bdb, gdbm]])],
+  [GZOCHI_STORAGE_ENGINE="$withval"],
+  [GZOCHI_STORAGE_ENGINE="gdbm"])
+
+AS_CASE([$GZOCHI_STORAGE_ENGINE],
+  [bdb], [AC_SEARCH_LIBS([db_create], [db]) AC_CHECK_HEADER([db.h])],
+  [gdbm], [AC_SEARCH_LIBS([gdbm_open], [gdbm]) AC_CHECK_HEADER([gdbm.h])],
+  [AC_MSG_ERROR([Invalid storage engine $STORAGE_ENGINE.])])
+
+AC_SUBST(GZOCHI_STORAGE_ENGINE)
+AM_CONDITIONAL([STORAGE_ENGINE_BDB], [test x$GZOCHI_STORAGE_ENGINE = xbdb])
+AM_CONDITIONAL([STORAGE_ENGINE_GDBM], [test x$GZOCHI_STORAGE_ENGINE = xgdbm])
 
 AC_SEARCH_LIBS([__gmpz_init], [gmp])
 AC_CHECK_HEADER([gmp.h])

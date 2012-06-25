@@ -40,11 +40,19 @@ noinst_HEADERS = admin.h app.h auth.h channel.h config.h context.h data.h \
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	debug.c fsm.c game.c guile.c gzochid.c httpd.c log.c protocol.c \
-	schedule.c scheme.c session.c socket.c storage.c task.c threads.c \
-	tx.c txlog.c util.c
+	schedule.c scheme.c session.c socket.c task.c threads.c tx.c txlog.c \
+	util.c
 gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
 	@GLIB_LIBS@ @GTHREAD_LIBS@ @MICROHTTPD_LIBS@ @ZLIB_LIBS@ \
 	@SERVEEZ_LDFLAGS@
+
+if STORAGE_ENGINE_BDB
+gzochid_SOURCES += storage-bdb.c
+endif
+
+if STORAGE_ENGINE_GDBM
+gzochid_SOURCES += storage-gdbm.c
+endif
 
 admin.c: admin.h
 app.c: app.h
@@ -65,7 +73,8 @@ schedule.c: schedule.h
 scheme.c: scheme.h
 session.c: session.h
 socket.c: socket.h
-storage.c: storage.h
+storage-bdb.c: storage.h
+storage-gdbm.c: storage.h
 task.c: task.h
 threads.c: threads.h
 tx.c: tx.h
