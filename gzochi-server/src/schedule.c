@@ -1,5 +1,5 @@
 /* schedule.c: Task execution and task queue management routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -142,4 +142,9 @@ void gzochid_schedule_run_task
     g_cond_wait (pending_task->cond, pending_task->mutex);
   g_mutex_unlock (pending_task->mutex);
   free (pending_task);
+}
+
+void gzochid_schedule_execute_task (gzochid_task *task)
+{
+  task->worker (task->data, NULL);
 }
