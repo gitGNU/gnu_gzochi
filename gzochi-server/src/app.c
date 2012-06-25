@@ -172,26 +172,19 @@ static void run_async_transactional (gpointer data)
 
   if (persisted_callback == NULL)
     {
-      gzochid_game_context *game_context = 
-	(gzochid_game_context *) ((gzochid_context *) context)->parent;
-
-      gzochid_transactional_application_task transactional_task;
       gzochid_application_task application_task;
       gzochid_task task;
 
-      transactional_task.worker = initialized_worker;
-      transactional_task.data = context->descriptor->properties;
-      
-      application_task.worker = gzochid_application_transactional_task_worker;
+      application_task.worker = initialized_worker;
       application_task.context = context;
       application_task.identity = system_identity;
-      application_task.data = &transactional_task;
+      application_task.data = context->descriptor->properties;
 
       task.worker = gzochid_application_task_thread_worker;
       task.data = &application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
-      gzochid_schedule_run_task (game_context->task_queue, &task);
+      gzochid_schedule_execute_task (&task);
     }
   else 
     {
