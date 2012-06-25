@@ -52,9 +52,9 @@ static void initialize_data (int from_state, int to_state, gpointer user_data)
 
   char *data_dir = g_strconcat 
     (game_context->work_dir, "/", app_context->descriptor->name, NULL);
-  char *meta_db = g_strconcat (data_dir, "/meta.db", NULL);
-  char *oids_db = g_strconcat (data_dir, "/oids.db", NULL);
-  char *names_db = g_strconcat (data_dir, "/names.db", NULL);
+  char *meta_db = g_strconcat (data_dir, "/meta", NULL);
+  char *oids_db = g_strconcat (data_dir, "/oids", NULL);
+  char *names_db = g_strconcat (data_dir, "/names", NULL);
 
   if (!g_file_test (data_dir, G_FILE_TEST_EXISTS))
     {

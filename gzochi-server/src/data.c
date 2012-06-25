@@ -198,7 +198,7 @@ static gzochid_data_oid_block *create_oid_block
 {
   char next_oid_key[] = { NEXT_OID_KEY };
   char *next_oid_value = NULL;
-  int next_oid_value_len = 0;
+  size_t next_oid_value_len = 0;
 
   gzochid_data_oid_block *block = calloc (1, sizeof (gzochid_data_oid_block));
 
@@ -388,7 +388,7 @@ void dereference
 (gzochid_data_transaction_context *context, 
  gzochid_data_managed_reference *reference)
 {
-  int data_len = 0;
+  size_t data_len = 0;
   char *oid_str = NULL; 
   char *data = NULL; 
   GString *in = NULL;

@@ -1,5 +1,5 @@
 /* storage.h: Prototypes and declarations for storage.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -37,51 +37,28 @@ enum gzochid_storage_lock_type
 typedef struct _gzochid_storage_store
 {
   GMutex *mutex;
-
-  GMutex *lock_table_mutex;
-  GHashTable *lock_table;
-
-  GDBM_FILE database;
+  gpointer database;
 } gzochid_storage_store;
 
 typedef struct _gzochid_storage_transaction
 {
   gzochid_storage_store *store;
-  GHashTable *cache;
-  GList *operations;
+  gpointer txn;
   gboolean rollback;
 } gzochid_storage_transaction;
-
-typedef struct _gzochid_storage_data_lock
-{
-  enum gzochid_storage_lock_type type;
-  gzochid_storage_transaction *transaction;
-} gzochid_storage_data_lock;
-
-typedef struct _gzochid_storage_operation
-{
-  char *key;
-  int key_len;
-  enum gzochid_storage_operation_type type;
-} gzochid_storage_operation;
-
-typedef struct _gzochid_storage_operation_put
-{
-  gzochid_storage_operation base;
-  char *value;
-  int value_len;
-} gzochid_storage_operation_put;
 
 gzochid_storage_store *gzochid_storage_open (char *);
 void gzochid_storage_close (gzochid_storage_store *);
 void gzochid_storage_lock (gzochid_storage_store *);
 void gzochid_storage_unlock (gzochid_storage_store *);
 
-char *gzochid_storage_get (gzochid_storage_store *, char *, int, int *);
-void gzochid_storage_put (gzochid_storage_store *, char *, int, char *, int);
-void gzochid_storage_delete (gzochid_storage_store *, char *, int);
-char *gzochid_storage_first_key (gzochid_storage_store *, int *);
-char *gzochid_storage_next_key (gzochid_storage_store *, char *, int, int *);
+char *gzochid_storage_get (gzochid_storage_store *, char *, size_t, size_t *);
+void gzochid_storage_put 
+(gzochid_storage_store *, char *, size_t, char *, size_t);
+void gzochid_storage_delete (gzochid_storage_store *, char *, size_t);
+char *gzochid_storage_first_key (gzochid_storage_store *, size_t *);
+char *gzochid_storage_next_key 
+(gzochid_storage_store *, char *, size_t, size_t *);
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin
 (gzochid_storage_store *);
@@ -89,14 +66,14 @@ void gzochid_storage_transaction_commit (gzochid_storage_transaction *);
 void gzochid_storage_transaction_rollback (gzochid_storage_transaction *);
 void gzochid_storage_transaction_check (gzochid_storage_transaction *);
 char *gzochid_storage_transaction_get 
-(gzochid_storage_transaction *, char *, int, int *);
+(gzochid_storage_transaction *, char *, size_t, size_t *);
 void gzochid_storage_transaction_put 
-(gzochid_storage_transaction *, char *, int, char *, int);
+(gzochid_storage_transaction *, char *, size_t, char *, size_t);
 void gzochid_storage_transaction_delete 
-(gzochid_storage_transaction *, char *, int);
+(gzochid_storage_transaction *, char *, size_t);
 char *gzochid_storage_transaction_first_key 
-(gzochid_storage_transaction *, int *);
+(gzochid_storage_transaction *, size_t *);
 char *gzochid_storage_transaction_next_key 
-(gzochid_storage_transaction *, char *, int, int *);
+(gzochid_storage_transaction *, char *, size_t, size_t *);
 
 #endif /* GZOCHID_STORAGE_H */

@@ -173,7 +173,7 @@ static void free_data_state (void *ptr)
 static int dispatch_oid (struct MHD_Connection *connection, 
 			 gzochid_application_context *context, mpz_t oid)
 {
-  int data_length = 0;
+  size_t data_length = 0;
   char *oid_str = mpz_get_str (NULL, 16, oid);
   char *data = gzochid_storage_get 
     (context->oids, oid_str, strlen (oid_str) + 1, &data_length);
@@ -224,7 +224,7 @@ static int dispatch_oids
       GString *response_str = g_string_new (NULL);
       struct MHD_Response *response = NULL;
       
-      int klen = 0;
+      size_t klen = 0;
       char *k = gzochid_storage_first_key (context->oids, &klen);
       
       g_string_append (response_str, "<html>\n");
@@ -264,7 +264,7 @@ static int dispatch_names (struct MHD_Connection *connection,
   GString *response_str = g_string_new (NULL);
   struct MHD_Response *response = NULL;
   
-  int klen = 0;
+  size_t klen = 0;
   char *k = gzochid_storage_first_key (context->names, &klen);
 
   g_string_append (response_str, "<html>\n");

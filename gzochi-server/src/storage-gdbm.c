@@ -1,5 +1,5 @@
-/* storage.c: Database storage routines for gzochid
- * Copyright (C) 2011 Julian Graham
+/* storage.c: Database storage routines for gzochid (GDBM)
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,6 +24,40 @@
 #include "storage.h"
 
 #define DEFAULT_BLOCK_SIZE 512
+
+typedef struct _gdbm_context 
+{
+  GDBM_FILE dbf;
+  
+  GMutex *lock_table_mutex;
+  GHashTable *lock_table;
+} gdbm_context;
+
+typedef struct _gdbm_transaction_context
+{
+  GHashTable *cache;
+  GList *operations;
+} gdbm_transaction_context;
+
+typedef struct _gzochid_storage_data_lock
+{
+  enum gzochid_storage_lock_type type;
+  gzochid_storage_transaction *transaction;
+} gzochid_storage_data_lock;
+
+typedef struct _gzochid_storage_operation
+{
+  char *key;
+  int key_len;
+  enum gzochid_storage_operation_type type;
+} gzochid_storage_operation;
+
+typedef struct _gzochid_storage_operation_put
+{
+  gzochid_storage_operation base;
+  char *value;
+  int value_len;
+} gzochid_storage_operation_put;
 
 typedef struct _extended_datum
 {
@@ -51,25 +85,40 @@ gboolean g_datum_equal (gconstpointer v1, gconstpointer v2)
   return d1->dsize == d2->dsize && memcmp (d1->dptr, d2->dptr, d1->dsize) == 0;
 }
 
-gzochid_storage_store *gzochid_storage_open (char *filename)
+gzochid_storage_store *gzochid_storage_open (char *basename)
 {
+  int basename_len = strlen (basename);
   gzochid_storage_store *store = calloc (1, sizeof (gzochid_storage_store));
+  gdbm_context *context = malloc (sizeof (gdbm_context));
+
+  char *filename = malloc (sizeof (strlen (basename) + 4));
+  
+  filename = strncpy (filename, basename, basename_len + 1);
+  filename = strncat (filename, ".db", 3);
+
+  context->lock_table_mutex = g_mutex_new ();
+  context->lock_table = g_hash_table_new (g_datum_hash, g_datum_equal);
+  context->dbf = gdbm_open 
+    (filename, DEFAULT_BLOCK_SIZE, GDBM_WRCREAT, 420, NULL);
 
   store->mutex = g_mutex_new ();
-  store->lock_table_mutex = g_mutex_new ();
-  store->lock_table = g_hash_table_new (g_datum_hash, g_datum_equal);
-  store->database = gdbm_open 
-    (filename, DEFAULT_BLOCK_SIZE, GDBM_WRCREAT, 420, NULL);
+  store->database = context;
+
+  free (filename);
 
   return store;
 }
 
 void gzochid_storage_close (gzochid_storage_store *store)
 {
+  gdbm_context *context = (gdbm_context *) store->database;
+  
+  g_mutex_free (context->lock_table_mutex);
+  g_hash_table_destroy (context->lock_table);
+  gdbm_close (context->dbf);
+
   g_mutex_free (store->mutex);
-  g_mutex_free (store->lock_table_mutex);
-  g_hash_table_destroy (store->lock_table);
-  gdbm_close (store->database);
+  free (store->database);
   free (store);
 }
 
@@ -84,14 +133,15 @@ void gzochid_storage_unlock (gzochid_storage_store *store)
 }
 
 char *gzochid_storage_get 
-(gzochid_storage_store *store, char *key, int key_len, int *len)
+(gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
 {
+  gdbm_context *context = (gdbm_context *) store->database;
   datum dkey, dvalue;
 
   dkey.dptr = key;
   dkey.dsize = key_len;
 
-  dvalue = gdbm_fetch (store->database, dkey);
+  dvalue = gdbm_fetch (context->dbf, dkey);
 
   if (len != NULL)
     *len = dvalue.dsize;
@@ -100,8 +150,10 @@ char *gzochid_storage_get
 }
 
 void gzochid_storage_put 
-(gzochid_storage_store *store, char *key, int key_len, char *data, int data_len)
+(gzochid_storage_store *store, char *key, size_t key_len, char *data, 
+ size_t data_len)
 {
+  gdbm_context *context = (gdbm_context *) store->database;
   datum dkey, ddata;
 
   dkey.dptr = key;
@@ -110,33 +162,35 @@ void gzochid_storage_put
   ddata.dptr = data;
   ddata.dsize = data_len;
 
-  assert (gdbm_store (store->database, dkey, ddata, GDBM_REPLACE) == 0);
-  gdbm_sync (store->database);
+  assert (gdbm_store (context->dbf, dkey, ddata, GDBM_REPLACE) == 0);
+  gdbm_sync (context->dbf);
 }
 
 void gzochid_storage_delete 
-(gzochid_storage_store *store, char *key, int key_len)
+(gzochid_storage_store *store, char *key, size_t key_len)
 {
+  gdbm_context *context = (gdbm_context *) store->database;
   datum dkey;
 
   dkey.dptr = key;
   dkey.dsize = key_len;
 
-  assert (gdbm_delete (store->database, dkey) == 0);
+  assert (gdbm_delete (context->dbf, dkey) == 0);
 }
 
-char *gzochid_storage_first_key (gzochid_storage_store *store, int *len)
+char *gzochid_storage_first_key (gzochid_storage_store *store, size_t *len)
 {
   char z = '\0';
   return gzochid_storage_next_key (store, &z, 1, len);
 }
 
 char *gzochid_storage_next_key 
-(gzochid_storage_store *store, char *key, int key_len, int *len)
+(gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
 {
+  gdbm_context *context = (gdbm_context *) store->database;
   datum next, best_match = { NULL, 0 };
 
-  next = gdbm_firstkey (store->database);
+  next = gdbm_firstkey (context->dbf);
   while (next.dptr != NULL)
     {
       if (strncmp (key, next.dptr, MIN (key_len, next.dsize)) < 0)
@@ -151,7 +205,7 @@ char *gzochid_storage_next_key
 	    }
 	}
 
-      next = gdbm_nextkey (store->database, next);
+      next = gdbm_nextkey (context->dbf, next);
     }
   
   if (best_match.dptr == NULL)
@@ -168,17 +222,25 @@ gzochid_storage_transaction *gzochid_storage_transaction_begin
 {
   gzochid_storage_transaction *transaction = 
     calloc (1, sizeof (gzochid_storage_transaction));
+  gdbm_transaction_context *txn = 
+    calloc (sizeof (gdbm_transaction_context), 1);
+
+  txn->cache = g_hash_table_new (g_datum_hash, g_datum_equal);
 
   transaction->store = store;
-  transaction->cache = g_hash_table_new (g_datum_hash, g_datum_equal);
+  transaction->txn = txn;
 
   return transaction;
 }
 
 static void cleanup_transaction (gzochid_storage_transaction *tx)
 {
-  g_hash_table_destroy (tx->cache);
-  g_list_free_full (tx->operations, free);
+  gdbm_transaction_context *txn = (gdbm_transaction_context *) tx->txn;
+
+  g_hash_table_destroy (txn->cache);
+  g_list_free_full (txn->operations, free);
+
+  free (txn);
   free (tx);
 }
 
@@ -188,6 +250,7 @@ static void commit_operation (gpointer data, gpointer user_data)
   gzochid_storage_operation *op = (gzochid_storage_operation *) data;
   gzochid_storage_operation_put *put = NULL;
   gzochid_storage_transaction *tx = (gzochid_storage_transaction *) user_data;
+  gdbm_context *context = (gdbm_context *) tx->store->database;
 
   key.dptr = op->key;
   key.dsize = op->key_len;
@@ -199,19 +262,22 @@ static void commit_operation (gpointer data, gpointer user_data)
       put = (gzochid_storage_operation_put *) op;
       value.dptr = put->value;
       value.dsize = put->value_len;
-      assert (gdbm_store (tx->store->database, key, value, GDBM_REPLACE) == 0);
+      assert (gdbm_store (context->dbf, key, value, GDBM_REPLACE) == 0);
       
       break;		  
     case GZOCHID_STORAGE_OPERATION_DELETE: 
-      gdbm_delete (tx->store->database, key);
+      gdbm_delete (context->dbf, key);
     default: break;
     }
 }
 
 void gzochid_storage_transaction_commit (gzochid_storage_transaction *tx)
 {
-  g_list_foreach (tx->operations, commit_operation, tx);
-  gdbm_sync (tx->store->database);
+  gdbm_transaction_context *txn = (gdbm_transaction_context *) tx->txn;
+  gdbm_context *context = (gdbm_context *) tx->store->database;
+
+  g_list_foreach (txn->operations, commit_operation, tx);
+  gdbm_sync (context->dbf);
   cleanup_transaction (tx);
 }
 
@@ -226,17 +292,21 @@ void gzochid_storage_transaction_check (gzochid_storage_transaction *tx)
 
 static void set_read_lock (gzochid_storage_transaction *tx, datum *key)
 {
-  g_mutex_lock (tx->store->lock_table_mutex);
-  g_mutex_unlock (tx->store->lock_table_mutex);
+  gdbm_context *context = (gdbm_context *) tx->store->database;
+
+  g_mutex_lock (context->lock_table_mutex);
+  g_mutex_unlock (context->lock_table_mutex);
 }
 
 static void set_write_lock (gzochid_storage_transaction *tx, datum *key)
 {
-  g_mutex_lock (tx->store->lock_table_mutex);
-  g_mutex_unlock (tx->store->lock_table_mutex);
+  gdbm_context *context = (gdbm_context *) tx->store->database;
+
+  g_mutex_lock (context->lock_table_mutex);
+  g_mutex_unlock (context->lock_table_mutex);
 }
 
-static datum *make_key (char *key, int key_len)
+static datum *make_key (char *key, size_t key_len)
 {
   datum *d = malloc (sizeof (datum));
 
@@ -247,7 +317,7 @@ static datum *make_key (char *key, int key_len)
   return d;
 }
 
-static extended_datum *make_extended_key (char *key, int key_len)
+static extended_datum *make_extended_key (char *key, size_t key_len)
 {
   extended_datum *ed = malloc (sizeof (extended_datum));
   datum *d = (datum *) ed;
@@ -299,26 +369,29 @@ static gzochid_storage_operation *make_put (datum *key, datum *value)
 }
 
 char *gzochid_storage_transaction_get 
-(gzochid_storage_transaction *tx, char *key, int key_len, int *len)
+(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
 {
+  gdbm_transaction_context *txn = (gdbm_transaction_context *) tx->txn;
+  gdbm_context *context = (gdbm_context *) tx->store->database;
+
   datum *value = NULL;
   datum *k = make_key (key, key_len);
   char *ret = NULL;
 
   set_read_lock (tx, k);
-  value = g_hash_table_lookup (tx->cache, k);
+  value = g_hash_table_lookup (txn->cache, k);
 
   if (value == NULL)
     { 
-      datum db_value = gdbm_fetch (tx->store->database, *k);
+      datum db_value = gdbm_fetch (context->dbf, *k);
 
       if (db_value.dptr != NULL)
 	{ 
 	  value = (datum *) make_extended_key (db_value.dptr, db_value.dsize);
-	  g_hash_table_insert (tx->cache, k, value);
+	  g_hash_table_insert (txn->cache, k, value);
 	  free (db_value.dptr);
 	}
-      else g_hash_table_insert (tx->cache, k, make_extended_key (NULL, 0));
+      else g_hash_table_insert (txn->cache, k, make_extended_key (NULL, 0));
     }
   else
     {
@@ -342,47 +415,51 @@ char *gzochid_storage_transaction_get
 }
 
 void gzochid_storage_transaction_put
-(gzochid_storage_transaction *tx, char *key, int key_len, char *data, 
- int data_len)
+(gzochid_storage_transaction *tx, char *key, size_t key_len, char *data, 
+ size_t data_len)
 {
+  gdbm_transaction_context *txn = (gdbm_transaction_context *) tx->txn;
   datum *k = make_key (key, key_len);
   datum *v = (datum *) make_extended_key (data, data_len);
   
   set_write_lock (tx, k);
-  g_hash_table_insert (tx->cache, k, v);  
-  tx->operations = g_list_append (tx->operations, make_put (k, v));
+  g_hash_table_insert (txn->cache, k, v);  
+  txn->operations = g_list_append (txn->operations, make_put (k, v));
 }
 
 void gzochid_storage_transaction_delete
-(gzochid_storage_transaction *tx, char *key, int key_len)
+(gzochid_storage_transaction *tx, char *key, size_t key_len)
 {
+  gdbm_transaction_context *txn = (gdbm_transaction_context *) tx->txn;
   datum *k = make_key (key, key_len);
   datum *v = (datum *) make_extended_key (NULL, 0);
   
   set_write_lock (tx, k);
-  g_hash_table_insert (tx->cache, k, v);
-  tx->operations = g_list_append (tx->operations, make_delete (k));
+  g_hash_table_insert (txn->cache, k, v);
+  txn->operations = g_list_append (txn->operations, make_delete (k));
 }
 
 char *gzochid_storage_transaction_first_key 
-(gzochid_storage_transaction *tx, int *len)
+(gzochid_storage_transaction *tx, size_t *len)
 {
   char z = '\0';
   return gzochid_storage_transaction_next_key (tx, &z, 1, len);
 }
 
 char *gzochid_storage_transaction_next_key 
-(gzochid_storage_transaction *tx, char *key, int key_len, int *len)
+(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
 {
+  gdbm_transaction_context *txn = (gdbm_transaction_context *) tx->txn;
+  gdbm_context *context = (gdbm_context *) tx->store->database;
   datum next, best_match = { NULL, 0 };
 
-  next = gdbm_firstkey (tx->store->database);
+  next = gdbm_firstkey (context->dbf);
   while (next.dptr != NULL)
     {      
-      extended_datum *value = g_hash_table_lookup (tx->cache, &next);
+      extended_datum *value = g_hash_table_lookup (txn->cache, &next);
       if (value != NULL && value->null)
 	{
-	  datum next_next = gdbm_nextkey (tx->store->database, next);
+	  datum next_next = gdbm_nextkey (context->dbf, next);
 	  free (next.dptr);
 	  next = next_next;
 	  continue;
@@ -400,7 +477,7 @@ char *gzochid_storage_transaction_next_key
 	    }
 	}
 
-      next = gdbm_nextkey (tx->store->database, next);
+      next = gdbm_nextkey (context->dbf, next);
     }
   
   if (best_match.dptr == NULL)
