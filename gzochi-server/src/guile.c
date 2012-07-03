@@ -64,16 +64,22 @@ static SCM guile_pre_unwind_handler (void *data, SCM tag, SCM throw_args)
 
 SCM gzochid_guile_invoke (SCM procedure, SCM args, SCM exception)
 {
+  SCM ret = SCM_BOOL_F;
   void *sub_data[2];
 
   sub_data[0] = procedure;
   sub_data[1] = args;
 
-  return scm_c_catch 
+  ret = scm_c_catch 
     (SCM_BOOL_T,
      guile_catch_body, sub_data, 
      guile_catch_handler, exception, 
      guile_pre_unwind_handler, NULL);
+
+  scm_remember_upto_here_1 (procedure);
+  scm_remember_upto_here_1 (args);
+
+  return ret;
 }
 
 static void *guile_unwrapper (gpointer data)

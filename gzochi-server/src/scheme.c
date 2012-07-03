@@ -123,6 +123,9 @@ SCM gzochid_scheme_invoke
     (context, identity, scheme_invoke_inner, data);
   scm_variable_set_x (load_path, backup_load_path);
 
+  scm_remember_upto_here_1 (args);
+  scm_remember_upto_here_1 (exception);
+
   return ret;
 }
 
