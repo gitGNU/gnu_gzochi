@@ -35,13 +35,13 @@ dist_sysconf_DATA = conf/gzochid.conf
 
 noinst_HEADERS = admin.h app.h auth.h channel.h config.h context.h data.h \
 	debug.h fsm.h game.h guile.h gzochid.h httpd.h io.h log.h protocol.h \
-	schedule.h scheme.h session.h socket.h storage.h task.h threads.h \
-	tx.h txlog.h util.h
+	reloc.h schedule.h scheme.h session.h socket.h storage.h task.h \
+	threads.h tx.h txlog.h util.h
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	debug.c fsm.c game.c guile.c gzochid.c httpd.c log.c protocol.c \
-	schedule.c scheme.c session.c socket.c task.c threads.c tx.c txlog.c \
-	util.c
+	reloc.c schedule.c scheme.c session.c socket.c task.c threads.c tx.c \
+	txlog.c util.c
 gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
 	@GLIB_LIBS@ @GTHREAD_LIBS@ @MICROHTTPD_LIBS@ @ZLIB_LIBS@ \
 	@SERVEEZ_LDFLAGS@
@@ -69,6 +69,7 @@ gzochid.c: gzochid.h
 httpd.c: httpd.h
 log.c: log.h
 protocol.c: protocol.h
+reloc.c: reloc.h
 schedule.c: schedule.h
 scheme.c: scheme.h
 session.c: session.h
