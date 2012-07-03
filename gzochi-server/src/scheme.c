@@ -28,6 +28,7 @@
 #include "data.h"
 #include "guile.h"
 #include "io.h"
+#include "reloc.h"
 #include "scheme.h"
 #include "session.h"
 #include "task.h"
@@ -519,8 +520,14 @@ SCM gzochid_scheme_create_managed_reference
 
   SCM scm_oid = scm_string_to_number 
     (scm_from_locale_string (oid_str), scm_from_short (16));
-  SCM data = reference->obj == NULL ? SCM_BOOL_F : (SCM) reference->obj;
-  SCM ret = scm_call_2 (scm_make_managed_reference, scm_oid, data);
+  SCM data = SCM_BOOL_F;
+  SCM ret = SCM_BOOL_F;
+
+  if (reference->obj != NULL)
+    data = gzochid_scm_location_resolve 
+      (reference->context, (gzochid_scm_location_info *) reference->obj);
+  
+  ret = scm_call_2 (scm_make_managed_reference, scm_oid, data);
 
   free (oid_str);
   scm_gc_protect_object (ret);

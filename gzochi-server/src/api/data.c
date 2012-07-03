@@ -20,6 +20,7 @@
 
 #include "../app.h"
 #include "../data.h"
+#include "../reloc.h"
 #include "../scheme.h"
 
 #include "data.h"
@@ -29,9 +30,10 @@ SCM_DEFINE (primitive_create_reference, "primitive-create-reference", 1, 0, 0,
 {
   gzochid_application_context *context = 
     gzochid_get_current_application_context ();
+  gzochid_scm_location_info *obj_loc = gzochid_scm_location_get (context, obj);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, obj);
-  
+    (context, &gzochid_scm_location_aware_serialization, obj_loc);
+
   scm_gc_protect_object (obj);
 
   return gzochid_scheme_create_managed_reference (reference);
@@ -50,14 +52,20 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
   gzochid_scheme_managed_reference_oid (ref, oid);
 
   reference = gzochid_data_create_reference_to_oid 
-    (context, &gzochid_scheme_data_serialization, oid);
+    (context, &gzochid_scm_location_aware_serialization, oid);
   gzochid_data_dereference (reference);
 
   if (reference->obj == NULL)
     return gzochid_scheme_r6rs_raise 
       (gzochid_scheme_make_object_removed_condition ());
-  else return reference->obj;
+  else 
+    {
+      gzochid_scm_location_info *location = 
+	(gzochid_scm_location_info *) reference->obj;
+      return gzochid_scm_location_resolve (context, location);
+    }
 }
+
 
 SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
 	    "Retrieve a managed record bound to a name.")
@@ -76,8 +84,10 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
     }
   else 
     {
-      SCM obj = (SCM) gzochid_data_get_binding 
-	(context, cname, &gzochid_scheme_data_serialization);
+      gzochid_scm_location_info *location = 
+	(gzochid_scm_location_info *) gzochid_data_get_binding 
+	(context, cname, &gzochid_scm_location_aware_serialization);
+      SCM obj = gzochid_scm_location_resolve (context, location);
 
       free (cname);
 
@@ -102,8 +112,11 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
     }
   else
     {
+      gzochid_scm_location_info *obj_loc = 
+	gzochid_scm_location_get (context, obj);
+
       gzochid_data_set_binding 
-	(context, cname, &gzochid_scheme_data_serialization, obj);
+	(context, cname, &gzochid_scm_location_aware_serialization, obj_loc);
       
       free (cname);
       
@@ -141,8 +154,9 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
 {
   gzochid_application_context *context =
     gzochid_get_current_application_context ();
+  gzochid_scm_location_info *obj_loc = gzochid_scm_location_get (context, obj);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, obj);
+    (context, &gzochid_scm_location_aware_serialization, obj_loc);
 
   gzochid_data_remove_object (reference);
 
@@ -152,8 +166,13 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
 SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
 	    (SCM obj), "Mark a managed record that has been modified.")
 {
+  gzochid_application_context *context =
+    gzochid_get_current_application_context ();
+  gzochid_scm_location_info *obj_loc = gzochid_scm_location_get (context, obj);
+
   gzochid_data_mark (gzochid_get_current_application_context (), 
-		     &gzochid_scheme_data_serialization, obj);
+		     &gzochid_scm_location_aware_serialization, obj_loc);
+
   return SCM_UNSPECIFIED;
 }
 
