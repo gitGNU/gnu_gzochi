@@ -186,6 +186,13 @@ static void initialize (int from_state, int to_state, gpointer user_data)
   
   svz_portcfg_t *portcfg = NULL;
   svz_server_t *server = NULL;
+  int i = 0;
+
+  /* Disable Serveez's coserver system; it's not necessary and, frankly, it 
+     gets in the way. */
+  
+  for (; i < MAX_COSERVER_TYPES; i++)
+    svz_coservertypes[i].instances = 0;
 
   svz_boot ();
 
