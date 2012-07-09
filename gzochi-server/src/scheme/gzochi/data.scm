@@ -42,6 +42,7 @@
 	  gzochi:list->managed-list
 	  
 	  gzochi:make-managed-vector
+	  gzochi:managed-vector
 	  gzochi:managed-vector?
 	  gzochi:managed-vector-ref
 	  gzochi:managed-vector-set!
@@ -108,6 +109,19 @@
 	    (loop (- i 1) 
 		  (cons (gzochi:deserialize-managed-reference port) refs))))))
   
+  (gzochi:define-managed-record-type
+   (managed-vector gzochi:make-managed-vector gzochi:managed-vector?)
+
+   (fields (immutable vector
+		      gzochi:managed-vector-vector
+		      (serialization (gzochi:make-serialization 
+				      serialize-managed-vector
+				      deserialize-managed-vector))))
+   
+   (nongenerative gzochi:managed-vector)
+   (protocol (lambda (n) (lambda (l) (let ((p (n))) (p (make-vector l #f))))))
+   (sealed #t))
+
   (define (gzochi:managed-vector-length vec)
     (vector-length (gzochi:managed-vector-vector vec)))
 
@@ -121,21 +135,14 @@
     (vector-set! (gzochi:managed-vector-vector vec) i 
 		 (gzochi:create-reference obj)))
 
-  (gzochi:define-managed-record-type
-   (gzochi:managed-vector gzochi:make-managed-vector gzochi:managed-vector?)
+  (define (gzochi:managed-vector . l)
+    (define constructor
+      (gzochi:managed-record-constructor
+       (gzochi:make-managed-record-constructor-descriptor
+	managed-vector #f 
+	(lambda (n) (lambda (vec) (let ((p (n))) (p vec)))))))
 
-    (fields (immutable vector 
-		       (serialization (gzochi:make-serialization 
-				       serialize-managed-vector
-				       deserialize-managed-vector))))
-
-    (nongenerative gzochi:managed-vector)
-    (protocol (lambda (n)
-		(lambda args
-		  (let ((p (n)))
-		    (p (apply vector (map gzochi:create-reference args)))))))
-    (sealed #t))
-
+    (constructor (list->vector (map gzochi:create-reference l))))      
   (define (gzochi:managed-hashtable-set! ht key value) (if #f #f))
 
   (define (gzochi:managed-hashtable-ref ht key) (if #f #f))
