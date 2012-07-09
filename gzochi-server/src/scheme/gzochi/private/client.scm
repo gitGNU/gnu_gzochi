@@ -22,11 +22,17 @@
 	  gzochi:client-session-name
 	  gzochi:client-session-oid
 
+	  gzochi:client-session-listener
+	  gzochi:make-client-session-listener
+	  gzochi:client-session-listener?
+	  gzochi:client-session-listener-received-message
+	  gzochi:client-session-listener-disconnected
+
 	  gzochi:send-message
 	  gzochi:disconnect)
 
-  (import (gzochi data)
-	  (gzochi io)
+  (import (gzochi io)
+	  (gzochi private data)
 	  (rnrs base)
 	  (rnrs bytevectors)
 	  (rnrs conditions)
@@ -41,6 +47,15 @@
    (fields (immutable name (serialization gzochi:string-serialization))
 	   (immutable oid (serialization gzochi:integer-serialization)))
    (nongenerative gzochi:client-session))
+
+  (gzochi:define-managed-record-type 
+   (gzochi:client-session-listener
+    gzochi:make-client-session-listener
+    gzochi:client-session-listener?)
+    
+   (fields received-message disconnected)
+   (nongenerative gzochi:client-session-listener)
+   (sealed #t))
 
   (define (gzochi:send-message session msg)
     (or (gzochi:client-session? session)

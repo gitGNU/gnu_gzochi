@@ -29,18 +29,5 @@
 	  gzochi:send-message
 	  gzochi:disconnect)
 
-  (import (rnrs)
-	  (gzochi app)
-	  (gzochi data)
-	  (gzochi private client)
-	  (gzochi private data))
-  
-  (gzochi:define-managed-record-type 
-   (gzochi:client-session-listener
-    gzochi:make-client-session-listener
-    gzochi:client-session-listener?)
-    
-   (fields received-message disconnected)
-   (nongenerative gzochi:client-session-listener)
-   (sealed #t))
+  (import (gzochi private client))
 )
