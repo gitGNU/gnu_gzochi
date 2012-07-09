@@ -18,6 +18,7 @@
 
 (library (gzochi private data)
   (export gzochi:make-managed-record-type-descriptor
+	  gzochi:make-managed-record-constructor-descriptor
 	  gzochi:managed-record-accessor
 	  gzochi:managed-record-mutator
 	  gzochi:managed-record-constructor
