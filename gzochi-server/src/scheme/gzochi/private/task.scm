@@ -21,7 +21,7 @@
 	  gzochi:schedule-task)
 
   (import (guile)
-	  (gzochi app)
+	  (gzochi private app)
 	  (gzochi private reflect)
 	  (rnrs base)
 	  (rnrs conditions)
