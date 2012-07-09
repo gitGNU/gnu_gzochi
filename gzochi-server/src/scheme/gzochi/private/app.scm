@@ -20,13 +20,45 @@
   (export gzochi:execute-disconnected
 	  gzochi:execute-initialized
 	  gzochi:execute-logged-in
-	  gzochi:execute-received-message)
+	  gzochi:execute-received-message
+	  
+	  gzochi:make-callback
+	  gzochi:callback?
+	  gzochi:callback-module
+	  gzochi:callback-procedure
+	  gzochi:callback-data)
 
   (import (rnrs)
-	  (gzochi app)
-	  (gzochi client)
-	  (gzochi task)
+	  (gzochi io)
+	  (gzochi private client)
+	  (gzochi private data)
 	  (gzochi private reflect))
+
+  (gzochi:define-managed-record-type 
+    (gzochi:callback gzochi:make-callback gzochi:callback?)
+    
+    (fields (immutable procedure (serialization gzochi:symbol-serialization))
+	    (immutable module (serialization
+			       (gzochi:make-uniform-list-serialization 
+				gzochi:symbol-serialization)))
+	    (immutable data))
+    (nongenerative gzochi:callback)
+    (protocol 
+     (lambda (n)
+       (lambda (procedure module . args)
+	 (let ((p (n))) 
+	   (if (null? args)
+	       (p procedure module #f)
+	       (let ((arg (car args)))
+		 (or (and (gzochi:managed-record? arg) (null? (cdr args)))
+		     (raise
+		      (condition
+		       (make-assertion-violation)
+		       (make-message-condition
+			"Callback data must be a single managed record or #f."
+			))))
+		 (p procedure module arg)))))))
+    (sealed #t))
 
   (define (gzochi:execute-initialized callback properties)
     (or (gzochi:callback? callback)

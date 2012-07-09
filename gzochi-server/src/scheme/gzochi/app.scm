@@ -1,5 +1,5 @@
 ;; gzochi/app.scm: Public exports for general gzochi application support 
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2012 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -23,33 +23,5 @@
 	  gzochi:callback-procedure
 	  gzochi:callback-data)
 
-  (import (rnrs)
-	  (gzochi data)
-	  (gzochi io))
-  
-  (gzochi:define-managed-record-type 
-    (gzochi:callback gzochi:make-callback gzochi:callback?)
-    
-    (fields (immutable procedure (serialization gzochi:symbol-serialization))
-	    (immutable module (serialization
-			       (gzochi:make-uniform-list-serialization 
-				gzochi:symbol-serialization)))
-	    (immutable data))
-    (nongenerative gzochi:callback)
-    (protocol 
-     (lambda (n)
-       (lambda (procedure module . args)
-	 (let ((p (n))) 
-	   (if (null? args)
-	       (p procedure module #f)
-	       (let ((arg (car args)))
-		 (or (and (gzochi:managed-record? arg) (null? (cdr args)))
-		     (raise
-		      (condition
-		       (make-assertion-violation)
-		       (make-message-condition
-			"Callback data must be a single managed record or #f."
-			))))
-		 (p procedure module arg)))))))
-    (sealed #t))
+  (import (gzochi private app))
 )
