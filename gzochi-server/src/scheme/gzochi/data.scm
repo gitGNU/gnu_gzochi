@@ -40,6 +40,11 @@
 	  gzochi:managed-list
 	  gzochi:managed-list->list
 	  gzochi:list->managed-list
+
+	  gzochi:make-managed-serializable
+	  gzochi:managed-serializable?
+	  gzochi:managed-serializable-value
+	  gzochi:managed-serializable-value-set!
 	  
 	  gzochi:make-managed-vector
 	  gzochi:managed-vector
@@ -96,6 +101,64 @@
     (and (not (null? l))
 	 (gzochi:cons (car l) (gzochi:list->managed-list (cdr l)))))
   
+  (define (serialize-serialization-with-value port pair)
+    (let* ((serializer-callback (car pair))
+	   (deserializer-callback (cadr pair))
+	   (serializer-callback-procedure
+	    (gzochi:resolve-procedure 
+	     (gzochi:callback-procedure serializer-callback) 
+	     (gzochi:callback-module serializer-callback))))
+      (gzochi:serialize-managed-record port serializer-callback)
+      (gzochi:serialize-managed-record port deserializer-callback)
+      (serializer-callback-procedure port (caddr pair))))
+
+  (define (deserialize-serialization-with-value port)
+    (let* ((serializer-callback (gzochi:deserialize-managed-record port))
+	   (deserializer-callback (gzochi:deserialize-managed-record port))
+	   (deserializer-callback-procedure
+	    (gzochi:resolve-procedure
+	     (gzochi:callback-procedure deserializer-callback) 
+	     (gzochi:callback-module deserializer-callback))))
+      (list serializer-callback 
+	    deserializer-callback 
+	    (deserializer-callback-procedure port))))
+
+  (define serialization-with-value-serialization
+    (gzochi:make-serialization 
+     serialize-serialization-with-value deserialize-serialization-with-value))
+
+  (gzochi:define-managed-record-type 
+   (gzochi:managed-serializable 
+    gzochi:make-managed-serializable 
+    gzochi:managed-serializable?)
+   (fields (mutable callback-with-value 
+		    (serialization serialization-with-value-serialization)))
+   (nongenerative gzochi:managed-serializable)
+   (protocol (lambda (n)
+	       (lambda (value serializer-callback deserializer-callback)
+		 (or (gzochi:callback? serializer-callback)
+		     (raise (condition 
+			     (make-assertion-violation)
+			     (make-irritants-condition serializer-callback))))
+		 (or (gzochi:callback? deserializer-callback)
+		     (raise (condition 
+			     (make-assertion-violation)
+			     (make-irritants-condition deserializer-callback))))
+
+		 (let ((p (n)))
+		   (p (list serializer-callback 
+			    deserializer-callback 
+			    value)))))))
+ 
+  (define (gzochi:managed-serializable-value obj)
+    (caddr (gzochi:managed-serializable-callback-with-value obj)))
+  
+  (define (gzochi:managed-serializable-value-set! obj val)
+    (let ((l (gzochi:managed-serializable-callback-with-value obj)))
+      (gzochi:managed-serializable-callback-with-value-set!
+       obj (list (car l) (cadr l) val))
+      (if #f #f)))
+
   (define (serialize-managed-vector port vec)
     (gzochi:write-integer port (vector-length vec))
     (vector-for-each
