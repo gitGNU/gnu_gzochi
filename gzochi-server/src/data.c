@@ -662,8 +662,10 @@ void gzochid_data_mark
 (gzochid_application_context *context, gzochid_io_serialization *serialization,
  void *ptr)
 {
-  gzochid_data_managed_reference *reference =
-    get_reference_by_ptr (context, ptr, serialization);
+  gzochid_data_managed_reference *reference = NULL;
+  join_transaction (context);
+
+  reference = get_reference_by_ptr (context, ptr, serialization);
 
   if (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW)
     reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
