@@ -29,7 +29,11 @@
 
 	  &gzochi:object-removed
 	  gzochi:make-object-removed-condition
-	  gzochi:object-removed-condition?)
+	  gzochi:object-removed-condition?
+	  
+	  &gzochi:no-current-application
+	  gzochi:make-no-current-application-condition
+	  gzochi:no-current-application-condition?)
 	  
   (import (rnrs base)
 	  (rnrs conditions)
@@ -50,5 +54,10 @@
   (define-record-type (&gzochi:object-removed
 		       gzochi:make-object-removed-condition
 		       gzochi:object-removed-condition?)
+    (parent &condition))
+
+  (define-record-type (&gzochi:no-current-application
+		       gzochi:make-no-current-application-condition
+		       gzochi:no-current-application-condition?)
     (parent &condition))
 )
