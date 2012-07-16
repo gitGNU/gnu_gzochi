@@ -38,6 +38,7 @@
 #include "api/log.h"
 #include "api/session.h"
 #include "api/task.h"
+#include "api/util.h"
 
 static SCM scm_make_callback;
 static SCM scm_callback_module;
@@ -647,6 +648,7 @@ static void *initialize_bindings (void *ptr)
   gzochid_api_log_init ();
   gzochid_api_session_init ();
   gzochid_api_task_init ();
+  gzochid_api_util_init ();
   
   return NULL;
 }

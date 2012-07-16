@@ -1,5 +1,5 @@
 /* log.c: Primitive functions for user-facing gzochid transactional log API
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,12 +24,13 @@
 #include "../txlog.h"
 
 #include "log.h"
+#include "util.h"
 
 SCM_DEFINE (primitive_log, "primitive-log", 2, 0, 0, (SCM priority, SCM msg), 
 	    "Log a message for the current application")
 {
   gzochid_application_context *context = 
-    gzochid_get_current_application_context ();
+    gzochid_api_ensure_current_application_context ();
   char *cpriority = scm_to_locale_string (scm_symbol_to_string (priority));
   char *cmsg = scm_to_locale_string (msg);
 
