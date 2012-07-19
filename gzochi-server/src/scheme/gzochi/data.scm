@@ -70,8 +70,12 @@
 	  gzochi:remove-object!)
 
   (import (gzochi io)
+	  (gzochi private app)
 	  (gzochi private data)
+	  (gzochi private reflect)
+	  (ice-9 optargs)
 	  (rnrs)
+	  (only (guile) keyword? modulo)
 	  (only (srfi :1) split-at)
 	  (srfi :8))
 
@@ -171,7 +175,65 @@
 	    (list->vector (reverse refs))
 	    (loop (- i 1) 
 		  (cons (gzochi:deserialize-managed-reference port) refs))))))
-  
+
+  (gzochi:define-managed-record-type managed-vector-entry
+   (fields (mutable value-internal)
+	   (mutable wrapped-value?
+		    managed-vector-entry-wrapped-value?
+		    managed-vector-entry-wrapped-value-set!
+		    (serialization gzochi:boolean-serialization)))
+
+   (nongenerative gzochi:managed-vector-entry)
+
+   (protocol 
+    (lambda (n)
+      (lambda (value value-serializer value-deserializer)
+	(or (gzochi:managed-record? value)
+	    (and (gzochi:callback? value-serializer)
+		 (gzochi:callback? value-deserializer))
+	    (raise (condition
+		    (make-assertion-violation)
+		    (make-message-condition 
+		     "Serialization must be specified for unmanaged values."))))
+
+	(let* ((p (n))
+	       (wrapped-value (not (gzochi:managed-record? value)))
+	       (value (if wrapped-value
+			  (gzochi:make-managed-serializable
+			   value value-serializer value-deserializer)
+			  value)))
+
+	  (p value wrapped-value)))))
+
+   (sealed #f))
+
+  (define (managed-vector-entry-value entry)
+    (let ((value (managed-vector-entry-value-internal entry)))
+      (if (managed-vector-entry-wrapped-value? entry)
+	  (gzochi:managed-serializable-value value)
+	  value)))
+
+  (define (managed-vector-entry-value-set! 
+	   entry value value-serializer value-deserializer)
+    (if (managed-vector-entry-wrapped-value? entry)
+	(gzochi:remove-object! (managed-vector-entry-value-internal entry)))
+    (if (gzochi:managed-record? value)
+	(begin
+	  (managed-vector-entry-value-internal-set! entry value)
+	  (managed-vector-entry-wrapped-value-set! entry #f))
+	(begin
+	  (or (and (gzochi:callback? value-serializer)
+		   (gzochi:callback? value-deserializer))
+	      (raise 
+	       (condition 
+		(make-assertion-violation)
+		(make-message-condition 
+		 "Serialization must be specified for unmanaged values."))))
+	  (managed-vector-entry-value-internal-set!
+	   entry (gzochi:make-managed-serializable 
+		  value value-serializer value-deserializer))
+	  (managed-vector-entry-wrapped-value-set! entry #t))))
+     
   (gzochi:define-managed-record-type
    (managed-vector gzochi:make-managed-vector gzochi:managed-vector?)
 
@@ -189,23 +251,53 @@
     (vector-length (gzochi:managed-vector-vector vec)))
 
   (define (gzochi:managed-vector-ref vec i)
-    (gzochi:dereference (vector-ref (gzochi:managed-vector-vector vec) i)))
+    (let ((obj (vector-ref (gzochi:managed-vector-vector vec) i)))
+      (and obj (managed-vector-entry-value (gzochi:dereference obj)))))
 
   (define (gzochi:managed-vector->list vec)
-    (map gzochi:dereference (vector->list (gzochi:managed-vector-vector vec))))
+    (map (lambda (obj) 
+	   (and obj (managed-vector-entry-value (gzochi:dereference obj))))
+	 (vector->list (gzochi:managed-vector-vector vec))))
 
-  (define (gzochi:managed-vector-set! vec i obj)
-    (vector-set! (gzochi:managed-vector-vector vec) i 
-		 (gzochi:create-reference obj)))
+  (define* (gzochi:managed-vector-set! vec i obj #:key serializer deserializer)
+    (let* ((unmanaged-vec (gzochi:managed-vector-vector vec))
+	   (ref (vector-ref unmanaged-vec i))
+	   (entry (and ref (gzochi:dereference ref))))
 
-  (define (gzochi:managed-vector . l)
+      (if entry
+	  (begin
+	    (managed-vector-entry-value-set! entry obj serializer deserializer)
+	    (if (not obj) (gzochi:remove-object! entry)))
+
+	  (if obj
+	      (vector-set! 
+	       unmanaged-vec i 
+	       (gzochi:create-reference 
+		(make-managed-vector-entry obj serializer deserializer))))))
+
+    (gzochi:mark-for-write! vec))
+
+  (define* (gzochi:managed-vector #:key serializer deserializer #:rest l)
     (define constructor
       (gzochi:managed-record-constructor
        (gzochi:make-managed-record-constructor-descriptor
 	managed-vector #f 
 	(lambda (n) (lambda (vec) (let ((p (n))) (p vec)))))))
 
-    (constructor (list->vector (map gzochi:create-reference l))))      
+    (constructor 
+     (list->vector 
+      (map (lambda (obj) 
+	     (gzochi:create-reference 
+	      (make-managed-vector-entry obj serializer deserializer)))
+	   (let loop 
+	       ((l l) (filtered-l '()) (last-was-keyword? #f))
+	     (if (null? l)
+		 (reverse filtered-l)
+		 (let ((cl (car l)))
+		   (cond ((keyword? cl) (loop (cdr l) filtered-l #t))
+			 (last-was-keyword? (loop (cdr l) filtered-l #f))
+			 (else (loop (cdr l) (cons cl filtered-l) #f))))))))))
+
   (define (gzochi:managed-hashtable-set! ht key value) (if #f #f))
 
   (define (gzochi:managed-hashtable-ref ht key) (if #f #f))
