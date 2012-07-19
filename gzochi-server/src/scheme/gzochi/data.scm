@@ -154,6 +154,12 @@
 			    deserializer-callback 
 			    value)))))))
  
+  (define (gzochi:managed-serializable-serializer obj)
+    (car (gzochi:managed-serializable-callback-with-value obj)))
+  
+  (define (gzochi:managed-serializable-deserializer obj)
+    (cadr (gzochi:managed-serializable-callback-with-value obj)))
+
   (define (gzochi:managed-serializable-value obj)
     (caddr (gzochi:managed-serializable-callback-with-value obj)))
   
