@@ -32,7 +32,7 @@
 
   (import (gzochi client)
 	  (gzochi conditions)
-	  (gzochi data)
+	  (gzochi private data)
 	  (gzochi io)
 	  (rnrs))
 
