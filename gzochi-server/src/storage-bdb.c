@@ -285,7 +285,7 @@ gzochid_storage_transaction *gzochid_storage_transaction_begin
     calloc (1, sizeof (gzochid_storage_transaction));
   DB_TXN *txn;
 
-  context->db_env->txn_begin (context->db_env, NULL, &txn, 0);
+  context->db_env->txn_begin (context->db_env, NULL, &txn, DB_TXN_NOWAIT);
 
   transaction->store = store;
   transaction->txn = txn;
