@@ -142,6 +142,7 @@ char *gzochid_storage_get
 {
   bdb_context *context = (bdb_context *) store->database;
   DBT db_key, db_data;
+  int ret = 0;
 
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_data, 0, sizeof (DBT));
@@ -150,12 +151,18 @@ char *gzochid_storage_get
   db_key.size = key_len;
 
   db_data.flags = DB_DBT_MALLOC;
-  context->db->get (context->db, NULL, &db_key, &db_data, 0);
-
-  if (db_data.data != NULL && len != NULL)
-    *len = db_data.size;
-
-  return db_data.data;
+  ret = context->db->get (context->db, NULL, &db_key, &db_data, 0);
+  if (ret == 0)
+    {
+      if (db_data.data != NULL && len != NULL)
+	*len = db_data.size;
+      return db_data.data;
+    }
+  else 
+    {
+      gzochid_err ("Failed to retrieve key %s: %s", key, db_strerror (ret));
+      return NULL;
+    }
 }
 
 void gzochid_storage_put 
@@ -164,6 +171,7 @@ void gzochid_storage_put
 {
   bdb_context *context = (bdb_context *) store->database;
   DBT db_key, db_data;
+  int ret = 0;
 
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_data, 0, sizeof (DBT));
@@ -174,7 +182,10 @@ void gzochid_storage_put
   db_data.data = data;
   db_data.size = data_len;
 
-  context->db->put (context->db, NULL, &db_key, &db_data, 0);
+  ret = context->db->put (context->db, NULL, &db_key, &db_data, 0);
+
+  if (ret != 0)
+    gzochid_err ("Failed to store key %s: %s", key, db_strerror (ret));
 }
 
 void gzochid_storage_delete 
@@ -182,12 +193,16 @@ void gzochid_storage_delete
 {
   bdb_context *context = (bdb_context *) store->database;
   DBT db_key;
+  int ret = 0;
 
   memset (&db_key, 0, sizeof (DBT));
   db_key.data = key;
   db_key.size = key_len;
 
-  context->db->del (context->db, NULL, &db_key, 0);
+  ret = context->db->del (context->db, NULL, &db_key, 0);
+
+  if (ret != 0)
+    gzochid_err ("Failed to delete key %s: %s", key, db_strerror (ret));
 }
 
 char *gzochid_storage_first_key (gzochid_storage_store *store, size_t *len)
@@ -195,13 +210,21 @@ char *gzochid_storage_first_key (gzochid_storage_store *store, size_t *len)
   bdb_context *context = (bdb_context *) store->database;
   DBC *cursor = NULL;
   DBT db_key, db_value;
+  int ret = 0;
 
   context->db->cursor (context->db, NULL, &cursor, 0);
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_value, 0, sizeof (DBT));
 
   db_key.flags = DB_DBT_MALLOC;
-  cursor->get (cursor, &db_key, &db_value, DB_FIRST);
+  ret = cursor->get (cursor, &db_key, &db_value, DB_FIRST);
+  if (ret != 0)
+    {
+      gzochid_err ("Failed to seek to first key: %s", db_strerror (ret));
+      cursor->close (cursor);
+      return NULL;
+    }
+
   cursor->close (cursor);
 
   if (db_key.data != NULL && len != NULL)
@@ -227,8 +250,11 @@ char *gzochid_storage_next_key
   db_key.size = key_len;
 
   ret = cursor->get (cursor, &db_key, &db_value, DB_SET);
-  if (ret == DB_NOTFOUND)
+  if (ret != 0)
     {
+      if (ret != DB_NOTFOUND)
+	gzochid_err ("Failed to seek to key %s: %s", key, db_strerror (ret));
+      
       cursor->close (cursor);
       return NULL;
     }
@@ -291,6 +317,7 @@ char *gzochid_storage_transaction_get
   bdb_context *context = (bdb_context *) tx->store->database;
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBT db_key, db_data;
+  int ret = 0;
 
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_data, 0, sizeof (DBT));
@@ -299,12 +326,22 @@ char *gzochid_storage_transaction_get
   db_key.size = key_len;
 
   db_data.flags = DB_DBT_MALLOC;
-  context->db->get (context->db, txn, &db_key, &db_data, 0);
+  ret = context->db->get (context->db, txn, &db_key, &db_data, 0);
+  if (ret == 0)
+    {
+      if (db_data.data != NULL && len != NULL)
+	*len = db_data.size;
 
-  if (db_data.data != NULL && len != NULL)
-    *len = db_data.size;
-
-  return db_data.data;
+      return db_data.data;
+    }
+  else 
+    {
+      gzochid_warning 
+	("Failed to retrieve key %s in transaction: %s", 
+	 key, db_strerror (ret)); 
+      tx->rollback = TRUE;
+      return NULL;
+    }
 }
 
 void gzochid_storage_transaction_put
@@ -314,6 +351,7 @@ void gzochid_storage_transaction_put
   bdb_context *context = (bdb_context *) tx->store->database;
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBT db_key, db_data;
+  int ret = 0;
 
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_data, 0, sizeof (DBT));
@@ -324,7 +362,14 @@ void gzochid_storage_transaction_put
   db_data.data = data;
   db_data.size = data_len;
 
-  context->db->put (context->db, txn, &db_key, &db_data, 0);
+  ret = context->db->put (context->db, txn, &db_key, &db_data, 0);
+
+  if (ret != 0)
+    {
+      gzochid_warning 
+	("Failed to store key %s in transaction: %s", key, db_strerror (ret)); 
+      tx->rollback = TRUE;
+    }
 }
 
 void gzochid_storage_transaction_delete
@@ -333,12 +378,20 @@ void gzochid_storage_transaction_delete
   bdb_context *context = (bdb_context *) tx->store->database;
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBT db_key;
+  int ret = 0;
 
   memset (&db_key, 0, sizeof (DBT));
   db_key.data = key;
   db_key.size = key_len;
 
-  context->db->del (context->db, txn, &db_key, 0);
+  ret = context->db->del (context->db, txn, &db_key, 0);
+
+  if (ret != 0)
+    {
+      gzochid_warning
+	("Failed to delete key %s in transaction: %s", key, db_strerror (ret)); 
+      tx->rollback = TRUE;
+    }
 }
 
 char *gzochid_storage_transaction_first_key 
@@ -348,14 +401,23 @@ char *gzochid_storage_transaction_first_key
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBC *cursor = NULL;
   DBT db_key, db_value;
+  int ret = 0;
 
   context->db->cursor (context->db, txn, &cursor, 0);
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_value, 0, sizeof (DBT));
 
   db_key.flags = DB_DBT_MALLOC;
-  cursor->get (cursor, &db_key, &db_value, DB_FIRST);
+  ret = cursor->get (cursor, &db_key, &db_value, DB_FIRST);
   cursor->close (cursor);
+
+  if (ret != 0)
+    {
+      gzochid_warning
+	("Failed to seek to first key in transaction: %s", db_strerror (ret));
+      tx->rollback = TRUE;
+      return NULL;
+    }
 
   if (db_key.data != NULL && len != NULL)
     *len = db_key.size;
@@ -382,8 +444,15 @@ char *gzochid_storage_transaction_next_key
 
   ret = cursor->get (cursor, &db_key, &db_value, DB_SET);
 
-  if (ret == DB_NOTFOUND)
+  if (ret != 0)
     {
+      if (ret != DB_NOTFOUND)
+	{
+	  gzochid_warning
+	    ("Failed to seek to key %s in transaction: %s", 
+	     key, db_strerror (ret));
+	  tx->rollback = TRUE;
+	}
       cursor->close (cursor);
       return NULL;
     }
@@ -401,7 +470,11 @@ char *gzochid_storage_transaction_next_key
   else 
     {
       if (ret != DB_NOTFOUND)
-	gzochid_err ("Failed to advance cursor: %s", db_strerror (ret));
+	{
+	  gzochid_warning
+	    ("Failed to advance cursor in transaction: %s", db_strerror (ret));
+	  tx->rollback = TRUE;
+	}
       return NULL;
     }
 }
