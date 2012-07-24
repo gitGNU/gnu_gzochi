@@ -74,8 +74,9 @@ static void thunk_worker (gpointer data, gpointer user_data)
 
   SCM thunk = (SCM) args[0];
   SCM *out = (SCM *) args[1];
+  SCM exception_var = (SCM) args[2];
 
-  *out = scm_call_0 ((SCM) thunk);
+  *out = gzochid_guile_invoke (thunk, SCM_EOL, exception_var);
 }
 
 static void *thunk_guile_worker (gpointer data)
@@ -107,13 +108,16 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
   gzochid_application_task application_task;
 
   SCM ret = SCM_UNDEFINED;
-  void *args[2];
+  SCM exception_var = scm_make_variable (SCM_BOOL_F);
+  SCM exception = SCM_UNDEFINED;
+  void *args[3];
 
   debug_identity->name = "[DEBUG]";
 
   args[0] = thunk;
   args[1] = &ret;
-
+  args[2] = exception_var;
+  
   transactional_task.worker = thunk_application_worker;
   transactional_task.data = args;
 
@@ -125,6 +129,10 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
   gzochid_application_task_worker (&application_task);
 
   free (name);
+
+  exception = scm_variable_ref (exception_var);
+  if (exception != SCM_BOOL_F)
+    scm_throw (SCM_CAR (exception), SCM_CDR (exception));
 
   return ret;
 }
