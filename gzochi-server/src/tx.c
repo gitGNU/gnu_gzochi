@@ -1,5 +1,5 @@
 /* tx.c: Application-level transactions implementation for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -240,7 +240,7 @@ int gzochid_transaction_execute (void (*func) (gpointer), gpointer data)
   return TRUE;
 }
 
-int gzochid_transaction_active ()
+gboolean gzochid_transaction_active ()
 {
   gzochid_transaction *transaction = (gzochid_transaction *) 
     g_static_private_get (&thread_transaction_key);
