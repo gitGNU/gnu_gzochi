@@ -252,25 +252,24 @@ void gzochid_transaction_mark_for_rollback
 int gzochid_transaction_execute (void (*func) (gpointer), gpointer data)
 {
   gzochid_transaction *transaction = NULL;
-
+  gboolean success = TRUE;
+  
   func (data);
 
   transaction = g_static_private_get (&thread_transaction_key);
   if (transaction == NULL)
     return TRUE;
 
-  if (!prepare (transaction))
+  if (rollback_only (transaction) || !prepare (transaction))
     {
       rollback (transaction);
-      transaction_free (transaction);
-      return FALSE;
+      success = FALSE;
     }
-  
-  commit (transaction);
+  else commit (transaction);
   g_static_private_set (&thread_transaction_key, NULL, NULL);
 
   transaction_free (transaction);
-  return TRUE;
+  return success;
 }
 
 gboolean gzochid_transaction_active ()
