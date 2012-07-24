@@ -79,7 +79,9 @@ static void transaction_free (gzochid_transaction *transaction)
 typedef struct _gzochid_transaction_participant_registration
 {
   gzochid_transaction_participant *participant;
+
   gpointer data;
+  gboolean rollback;
 } gzochid_transaction_participant_registration;
 
 gzochid_transaction_participant *gzochid_transaction_participant_new 
@@ -195,6 +197,23 @@ static void commit (gzochid_transaction *transaction)
   g_list_free (participants);
 }
 
+static gboolean rollback_only (gzochid_transaction *transaction)
+{
+  GHashTableIter iter;
+  gpointer key, value;
+  
+  g_hash_table_iter_init (&iter, transaction->participants);
+  while (g_hash_table_iter_next (&iter, &key, &value))
+    {
+      gzochid_transaction_participant_registration *participant = 
+	(gzochid_transaction_participant_registration *) value;
+      if (participant->rollback)
+	return TRUE;
+    }
+
+  return FALSE;
+}
+
 static void rollback (gzochid_transaction *transaction)
 {
   GList *participants = g_hash_table_get_values (transaction->participants);
@@ -214,6 +233,20 @@ static void rollback (gzochid_transaction *transaction)
   gzochid_debug ("Rolled back transaction '%s'.", transaction->name);
 
   g_list_free (participants);
+}
+
+void gzochid_transaction_mark_for_rollback 
+(gzochid_transaction_participant *participant)
+{
+  gzochid_transaction *transaction = (gzochid_transaction *) 
+    g_static_private_get (&thread_transaction_key);  
+
+  gzochid_transaction_participant_registration *registration =
+    (gzochid_transaction_participant_registration *) 
+    g_hash_table_lookup (transaction->participants, participant->name);
+
+  assert (registration != NULL);
+  registration->rollback = TRUE;
 }
 
 int gzochid_transaction_execute (void (*func) (gpointer), gpointer data)
@@ -246,4 +279,14 @@ gboolean gzochid_transaction_active ()
     g_static_private_get (&thread_transaction_key);
   return transaction != NULL 
     && transaction->state == GZOCHID_TRANSACTION_STATE_ACTIVE;
+}
+
+gboolean gzochid_transaction_rollback_only ()
+{
+  gzochid_transaction *transaction = (gzochid_transaction *) 
+    g_static_private_get (&thread_transaction_key);
+
+  assert (transaction != NULL);
+
+  return rollback_only (transaction);
 }

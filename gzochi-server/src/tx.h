@@ -42,5 +42,7 @@ void gzochid_transaction_join (gzochid_transaction_participant *, gpointer);
 gpointer gzochid_transaction_context (gzochid_transaction_participant *);
 int gzochid_transaction_execute (void (*) (gpointer), gpointer);
 gboolean gzochid_transaction_active ();
+gboolean gzochid_transaction_rollback_only ();
+void gzochid_transaction_mark_for_rollback (gzochid_transaction_participant *);
 
 #endif /* GZOCHID_TX_H */
