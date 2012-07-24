@@ -311,12 +311,14 @@ void gzochid_storage_transaction_check (gzochid_storage_transaction *tx)
 {
 }
 
-char *gzochid_storage_transaction_get 
-(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+static char *transaction_get_internal
+(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len,
+ gboolean write_lock)
 {
   bdb_context *context = (bdb_context *) tx->store->database;
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBT db_key, db_data;
+  u_int32_t flags = write_lock ? DB_RMW : 0;
   int ret = 0;
 
   memset (&db_key, 0, sizeof (DBT));
@@ -326,7 +328,7 @@ char *gzochid_storage_transaction_get
   db_key.size = key_len;
 
   db_data.flags = DB_DBT_MALLOC;
-  ret = context->db->get (context->db, txn, &db_key, &db_data, 0);
+  ret = context->db->get (context->db, txn, &db_key, &db_data, flags);
   if (ret == 0)
     {
       if (db_data.data != NULL && len != NULL)
@@ -342,6 +344,18 @@ char *gzochid_storage_transaction_get
       tx->rollback = TRUE;
       return NULL;
     }
+}
+
+char *gzochid_storage_transaction_get 
+(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+{
+  return transaction_get_internal (tx, key, key_len, len, FALSE);
+}
+
+char *gzochid_storage_transaction_get_for_update
+(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+{
+  return transaction_get_internal (tx, key, key_len, len, TRUE);
 }
 
 void gzochid_storage_transaction_put

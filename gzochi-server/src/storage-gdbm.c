@@ -368,8 +368,9 @@ static gzochid_storage_operation *make_put (datum *key, datum *value)
   return op;
 }
 
-char *gzochid_storage_transaction_get 
-(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+static char *transaction_get_internal
+(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len, 
+ gboolean write_lock)
 {
   gdbm_transaction_context *txn = (gdbm_transaction_context *) tx->txn;
   gdbm_context *context = (gdbm_context *) tx->store->database;
@@ -378,7 +379,10 @@ char *gzochid_storage_transaction_get
   datum *k = make_key (key, key_len);
   char *ret = NULL;
 
-  set_read_lock (tx, k);
+  if (write_lock)
+    set_write_lock (tx, k);
+  else set_read_lock (tx, k);
+
   value = g_hash_table_lookup (txn->cache, k);
 
   if (value == NULL)
@@ -412,6 +416,18 @@ char *gzochid_storage_transaction_get
   ret = memcpy (ret, value->dptr, value->dsize);
 
   return ret;
+}
+
+char *gzochid_storage_transaction_get 
+(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+{
+  return transaction_get_internal (tx, key, key_len, len, FALSE);
+}
+
+char *gzochid_storage_transaction_get_for_update
+(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+{
+  return transaction_get_internal (tx, key, key_len, len, TRUE);
 }
 
 void gzochid_storage_transaction_put

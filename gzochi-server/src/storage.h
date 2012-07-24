@@ -67,6 +67,8 @@ void gzochid_storage_transaction_rollback (gzochid_storage_transaction *);
 void gzochid_storage_transaction_check (gzochid_storage_transaction *);
 char *gzochid_storage_transaction_get 
 (gzochid_storage_transaction *, char *, size_t, size_t *);
+char *gzochid_storage_transaction_get_for_update 
+(gzochid_storage_transaction *, char *, size_t, size_t *);
 void gzochid_storage_transaction_put 
 (gzochid_storage_transaction *, char *, size_t, char *, size_t);
 void gzochid_storage_transaction_delete 
