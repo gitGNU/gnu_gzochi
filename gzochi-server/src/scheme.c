@@ -89,14 +89,14 @@ static gpointer scheme_invoke_inner (gpointer data)
 
   SCM procedure = (SCM) ptr[0];
   SCM args = (SCM) ptr[1];
-  SCM exception = (SCM) ptr[2];
+  SCM exception_var = (SCM) ptr[2];
 
-  return gzochid_guile_invoke (procedure, args, exception);
+  return gzochid_guile_invoke (procedure, args, exception_var);
 }
 
 SCM gzochid_scheme_invoke
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
- char *procedure, GList *module, SCM args, SCM exception)
+ char *procedure, GList *module, SCM args, SCM exception_var)
 {
   void *data[3];
   SCM ret = SCM_EOL;
@@ -119,14 +119,14 @@ SCM gzochid_scheme_invoke
 
   data[0] = resolve_procedure (procedure, module);
   data[1] = args;
-  data[2] = exception;
+  data[2] = exception_var;
 
   ret = (SCM) gzochid_with_application_context 
     (context, identity, scheme_invoke_inner, data);
   scm_variable_set_x (load_path, backup_load_path);
 
   scm_remember_upto_here_1 (args);
-  scm_remember_upto_here_1 (exception);
+  scm_remember_upto_here_1 (exception_var);
 
   return ret;
 }

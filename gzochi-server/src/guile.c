@@ -44,7 +44,7 @@ static SCM guile_catch_handler (void *data, SCM tag, SCM throw_args)
   SCM exception_variable = (SCM) data;
 
   if (scm_variable_p (exception_variable) == SCM_BOOL_T)
-    scm_variable_set_x (exception_variable, throw_args);
+    scm_variable_set_x (exception_variable, scm_cons (tag, throw_args));
 
   return SCM_BOOL_F;
 }
@@ -62,7 +62,7 @@ static SCM guile_pre_unwind_handler (void *data, SCM tag, SCM throw_args)
   return SCM_BOOL_F;
 }
 
-SCM gzochid_guile_invoke (SCM procedure, SCM args, SCM exception)
+SCM gzochid_guile_invoke (SCM procedure, SCM args, SCM exception_var)
 {
   SCM ret = SCM_BOOL_F;
   void *sub_data[2];
@@ -73,7 +73,7 @@ SCM gzochid_guile_invoke (SCM procedure, SCM args, SCM exception)
   ret = scm_c_catch 
     (SCM_BOOL_T,
      guile_catch_body, sub_data, 
-     guile_catch_handler, exception, 
+     guile_catch_handler, exception_var, 
      guile_pre_unwind_handler, NULL);
 
   scm_remember_upto_here_1 (procedure);
