@@ -1,5 +1,5 @@
 ;; gzochi/conditions.scm: Public exports for gzochi condition types 
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2012 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -33,7 +33,11 @@
 	  
 	  &gzochi:no-current-application
 	  gzochi:make-no-current-application-condition
-	  gzochi:no-current-application-condition?)
+	  gzochi:no-current-application-condition?
+
+	  &gzochi:transaction-aborted
+	  gzochi:make-transaction-aborted-condition
+	  gzochi:transaction-aborted-condition?)
 	  
   (import (rnrs base)
 	  (rnrs conditions)
@@ -59,5 +63,10 @@
   (define-record-type (&gzochi:no-current-application
 		       gzochi:make-no-current-application-condition
 		       gzochi:no-current-application-condition?)
+    (parent &condition))
+
+  (define-record-type (&gzochi:transaction-aborted
+		       gzochi:make-transaction-aborted-condition
+		       gzochi:transaction-aborted-condition?)
     (parent &condition))
 )
