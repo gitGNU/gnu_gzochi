@@ -668,7 +668,20 @@ void gzochid_data_mark
   reference = get_reference_by_ptr (context, ptr, serialization);
 
   if (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW)
-    reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
+    {
+      char *data = NULL;
+      char *oid_str = mpz_get_str (NULL, 16, reference->oid); 
+      gzochid_data_transaction_context *tx_context = 
+	gzochid_transaction_context (&data_participant);
+
+      reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
+      gzochid_debug ("Marking reference '%s' for update.", oid_str);
+
+      data = gzochid_storage_transaction_get_for_update
+	(tx_context->oids_transaction, oid_str, strlen (oid_str) + 1, NULL);
+      free (oid_str);
+      free (data);
+    }
 }
 
 typedef struct _gzochid_persistence_task_data
