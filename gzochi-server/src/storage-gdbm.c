@@ -91,7 +91,7 @@ gzochid_storage_store *gzochid_storage_open (char *basename)
   gzochid_storage_store *store = calloc (1, sizeof (gzochid_storage_store));
   gdbm_context *context = malloc (sizeof (gdbm_context));
 
-  char *filename = malloc (sizeof (strlen (basename) + 4));
+  char *filename = malloc (sizeof (char) * (basename_len + 4));
   
   filename = strncpy (filename, basename, basename_len + 1);
   filename = strncat (filename, ".db", 3);
