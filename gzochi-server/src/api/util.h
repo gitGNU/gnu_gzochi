@@ -23,6 +23,8 @@
 gzochid_application_context *gzochid_api_ensure_current_application_context 
 (void);
 
+void gzochid_api_check_rollback (void);
+
 void gzochid_api_util_init (void);
 
 #endif /* GZOCHID_API_UTIL_H */

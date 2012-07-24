@@ -19,10 +19,12 @@
 
 #include "../app.h"
 #include "../scheme.h"
+#include "../tx.h"
 
 #include "util.h"
 
 static SCM scm_make_no_current_application_condition;
+static SCM scm_make_transaction_aborted_condition;
 
 gzochid_application_context *gzochid_api_ensure_current_application_context ()
 {
@@ -35,6 +37,13 @@ gzochid_application_context *gzochid_api_ensure_current_application_context ()
   return context;
 }
 
+void gzochid_api_check_rollback ()
+{
+  if (gzochid_transaction_rollback_only ())
+    gzochid_scheme_r6rs_raise 
+      (scm_call_0 (scm_make_transaction_aborted_condition));
+}
+
 void gzochid_api_util_init ()
 {
   SCM gzochi_conditions = scm_c_resolve_module ("gzochi conditions");
@@ -43,4 +52,9 @@ void gzochid_api_util_init ()
   
   scm_make_no_current_application_condition = scm_variable_ref (var);
   scm_gc_protect_object (scm_make_no_current_application_condition);
+
+  var = scm_c_module_lookup 
+    (gzochi_conditions, "gzochi:make-transaction-aborted-condition");
+  scm_make_transaction_aborted_condition = scm_variable_ref (var);
+  scm_gc_protect_object (scm_make_transaction_aborted_condition);
 }
