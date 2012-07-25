@@ -46,6 +46,9 @@ SCM_DEFINE (primitive_send_message, "primitive-send-message", 2, 0, 0,
     (context, (gzochid_client_session *) reference->obj, payload, len);
 
   mpz_clear (c_oid);
+
+  gzochid_api_check_rollback ();
+
   return SCM_UNSPECIFIED;
 }
 
@@ -67,6 +70,9 @@ SCM_DEFINE (primitive_disconnect, "primitive-disconnect", 1, 0, 0,
     (context, (gzochid_client_session *) reference->obj);
 
   mpz_clear (c_oid);
+
+  gzochid_api_check_rollback ();
+
   return SCM_UNSPECIFIED;
 }
 

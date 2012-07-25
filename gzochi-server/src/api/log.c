@@ -47,6 +47,8 @@ SCM_DEFINE (primitive_log, "primitive-log", 2, 0, 0, (SCM priority, SCM msg),
 
   free (cpriority);
   free (cmsg);
+
+  gzochid_api_check_rollback ();
   
   return SCM_UNSPECIFIED;
 }

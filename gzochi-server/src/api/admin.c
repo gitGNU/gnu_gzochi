@@ -25,6 +25,7 @@
 #include "../guile.h"
 
 #include "task.h"
+#include "util.h"
 
 static gzochid_game_context *game_context;
 
@@ -77,6 +78,7 @@ static void thunk_worker (gpointer data, gpointer user_data)
   SCM exception_var = (SCM) args[2];
 
   *out = gzochid_guile_invoke (thunk, SCM_EOL, exception_var);
+  gzochid_api_check_rollback ();
 }
 
 static void *thunk_guile_worker (gpointer data)

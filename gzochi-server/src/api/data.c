@@ -34,10 +34,15 @@ SCM_DEFINE (primitive_create_reference, "primitive-create-reference", 1, 0, 0,
   gzochid_scm_location_info *obj_loc = gzochid_scm_location_get (context, obj);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
     (context, &gzochid_scm_location_aware_serialization, obj_loc);
+  SCM ret = SCM_BOOL_F;
 
   scm_gc_protect_object (obj);
 
-  return gzochid_scheme_create_managed_reference (reference);
+  ret = gzochid_scheme_create_managed_reference (reference);
+  
+  gzochid_api_check_rollback ();
+
+  return ret;
 }
 
 SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
@@ -46,6 +51,7 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
   gzochid_data_managed_reference *reference = NULL;
+  SCM ret = SCM_BOOL_F;
   mpz_t oid;
   
   mpz_init (oid);
@@ -57,14 +63,18 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
   gzochid_data_dereference (reference);
 
   if (reference->obj == NULL)
-    return gzochid_scheme_r6rs_raise 
+    gzochid_scheme_r6rs_raise 
       (gzochid_scheme_make_object_removed_condition ());
   else 
     {
       gzochid_scm_location_info *location = 
 	(gzochid_scm_location_info *) reference->obj;
-      return gzochid_scm_location_resolve (context, location);
+      ret = gzochid_scm_location_resolve (context, location);
     }
+
+  gzochid_api_check_rollback ();
+
+  return ret;
 }
 
 
@@ -74,6 +84,7 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
+  SCM ret = SCM_BOOL_F;
 
   if (!gzochid_data_binding_exists (context, cname))
     {
@@ -81,19 +92,20 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
 
       free (cname);
 
-      return gzochid_scheme_r6rs_raise (cond);
+      gzochid_scheme_r6rs_raise (cond);
     }
   else 
     {
       gzochid_scm_location_info *location = 
 	(gzochid_scm_location_info *) gzochid_data_get_binding 
 	(context, cname, &gzochid_scm_location_aware_serialization);
-      SCM obj = gzochid_scm_location_resolve (context, location);
+      ret = gzochid_scm_location_resolve (context, location);
 
       free (cname);
-
-      return obj;
     }
+
+  gzochid_api_check_rollback ();
+  return ret;
 }
 
 SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
@@ -102,14 +114,15 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
+  SCM ret = SCM_BOOL_F;
   
   if (gzochid_data_binding_exists (context, cname))
     {
       SCM cond = gzochid_scheme_make_name_exists_condition (cname);
 
       free (cname);
-
-      return gzochid_scheme_r6rs_raise (cond);
+      
+      gzochid_scheme_r6rs_raise (cond);
     }
   else
     {
@@ -120,9 +133,10 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
 	(context, cname, &gzochid_scm_location_aware_serialization, obj_loc);
       
       free (cname);
-      
-      return SCM_UNSPECIFIED;
     }
+
+  gzochid_api_check_rollback ();
+  return SCM_UNSPECIFIED;
 }
 
 SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
@@ -138,16 +152,17 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
 
       free (cname);
 
-      return gzochid_scheme_r6rs_raise (cond);
+      gzochid_scheme_r6rs_raise (cond);
     }
   else
     {
       gzochid_data_remove_binding (context, cname);
 
       free (cname);
-  
-      return SCM_UNSPECIFIED;
     }
+
+  gzochid_api_check_rollback ();
+  return SCM_UNSPECIFIED;
 }
 
 SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
@@ -160,6 +175,7 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
     (context, &gzochid_scm_location_aware_serialization, obj_loc);
 
   gzochid_data_remove_object (reference);
+  gzochid_api_check_rollback ();
 
   return SCM_UNSPECIFIED;
 }
@@ -173,6 +189,7 @@ SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
 
   gzochid_data_mark 
     (context, &gzochid_scm_location_aware_serialization, obj_loc);
+  gzochid_api_check_rollback ();
 
   return SCM_UNSPECIFIED;
 }
