@@ -50,6 +50,13 @@ static void initialize (int from_state, int to_state, gpointer user_data)
   gzochid_context *context = (gzochid_context *) user_data;
   gzochid_admin_context *admin_context = (gzochid_admin_context *) context;
 
+  admin_context->pool = 
+    gzochid_thread_pool_new 
+    (context, gzochid_config_to_int 
+     (g_hash_table_lookup 
+      (admin_context->config, "thread_pool.max_threads"), 4), 
+     TRUE, NULL);
+
   if (gzochid_config_to_boolean 
       (g_hash_table_lookup 
        (admin_context->config, "module.httpd.enabled"), FALSE))
@@ -68,7 +75,7 @@ static void initialize (int from_state, int to_state, gpointer user_data)
       gzochid_debug_context *debug_context = gzochid_debug_context_new ();
       gzochid_debug_context_init (debug_context, context, port);
     }
-
+  
   gzochid_guile_run (initialize_guile, context);
   gzochid_thread_pool_push (admin_context->pool, initialize_async, NULL, NULL);
 }
@@ -93,7 +100,6 @@ void gzochid_admin_context_init
   gzochid_fsm_add_state (fsm, GZOCHID_ADMIN_STATE_RUNNING, "RUNNING");
   gzochid_fsm_add_state (fsm, GZOCHID_ADMIN_STATE_STOPPED, "STOPPED");
 
-  context->pool = gzochid_thread_pool_new (context, -1, FALSE, NULL);
   context->config = config;
 
   gzochid_fsm_add_transition 
