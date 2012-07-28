@@ -1,5 +1,5 @@
 /* config.c: Configuration management routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -203,6 +203,23 @@ static void descriptor_start_element (GMarkupParseContext *context,
 		  "Invalid position for 'callback' element.");
 	}
       else;
+    }
+  else if (strcmp (element_name, "property") == 0)
+    {
+      if (parent == NULL || strcmp (parent, "game") != 0)
+	*error = g_error_new 
+	  (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
+	   "Invalid position for 'property' element.");
+      else
+	{
+	  const gchar *name = find_attribute_value 
+	    ("name", attribute_names, attribute_values);
+	  const gchar *value = find_attribute_value 
+	    ("value", attribute_names, attribute_values);
+	  
+	  g_hash_table_insert 
+	    (descriptor->properties, strdup (name), strdup (value));
+	}
     }
   else *error = g_error_new
 	 (G_MARKUP_ERROR, G_MARKUP_ERROR_UNKNOWN_ELEMENT, 
