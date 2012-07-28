@@ -1,5 +1,5 @@
 ;; gzochi.scm: The gzochi composite library
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2012 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -34,7 +34,8 @@
 	  gzochi:client-session? gzochi:client-session-name 
 	  gzochi:client-session-listener gzochi:make-client-session-listener
 	  gzochi:client-session-listener-received-message
-	  gzochi:client-session-listener-disconnected
+	  gzochi:client-session-listener-disconnected gzochi:send-message
+	  gzochi:disconnect
 
           ;; (gzochi conditions)
 
