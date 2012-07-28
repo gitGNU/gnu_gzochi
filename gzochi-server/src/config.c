@@ -308,14 +308,16 @@ gzochid_application_descriptor *gzochid_config_parse_application_descriptor
   int bytes_read = 0;
   int xml_fd = open (filename, O_RDONLY);
   char *filename_copy = strdup (filename);
+  char *deployment_root = dirname (filename_copy);
 
   if (xml_fd < 0)
     return NULL;
 
   descriptor = calloc (1, sizeof (gzochid_application_descriptor));
   descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);
-  descriptor->load_paths = g_list_append 
-    (NULL, strdup (dirname (filename_copy)));
+  descriptor->deployment_root = strdup (deployment_root);
+  descriptor->load_paths = g_list_append (NULL, strdup (deployment_root));
+
   free (filename_copy);
 
   context = g_markup_parse_context_new 

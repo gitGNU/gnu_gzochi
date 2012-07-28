@@ -46,6 +46,7 @@ typedef struct _gzochid_application_descriptor
 {
   char *name;
   char *description;
+  char *deployment_root;
 
   GList *load_paths;
  
