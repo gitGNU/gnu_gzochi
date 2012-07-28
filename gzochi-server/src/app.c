@@ -654,11 +654,19 @@ void *gzochid_with_application_context
   gpointer ret = NULL;
   gboolean private_needs_context = 
     g_static_private_get (&thread_application_context_key) == NULL;
+  SCM application_root_fluid = 
+    scm_variable_ref
+    (scm_c_module_lookup 
+     (scm_c_resolve_module("gzochi app"), "%gzochi:application-root"));
 
   if (private_needs_context)
     {
       g_static_private_set (&thread_application_context_key, context, NULL);
       g_static_private_set (&thread_identity_key, identity, NULL);
+      
+      scm_fluid_set_x
+	(application_root_fluid, 
+	 scm_from_locale_string (context->descriptor->deployment_root));
     }
   
   ret = worker (data);
@@ -667,6 +675,8 @@ void *gzochid_with_application_context
     {
       g_static_private_set (&thread_application_context_key, NULL, NULL);
       g_static_private_set (&thread_identity_key, NULL, NULL);
+
+      scm_fluid_set_x (application_root_fluid, SCM_UNSPECIFIED);
     }
 
   return ret;
