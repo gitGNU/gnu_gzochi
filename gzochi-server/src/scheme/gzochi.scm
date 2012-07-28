@@ -20,7 +20,8 @@
   (export ;; (gzochi app)
 
           gzochi:make-callback gzochi:callback? gzochi:callback-module
-	  gzochi:callback-procedure gzochi:callback-data
+	  gzochi:callback-procedure gzochi:callback-data 
+	  %gzochi:application-root
    
           ;; (gzochi channel)
 

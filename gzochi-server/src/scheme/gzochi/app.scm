@@ -21,7 +21,13 @@
 	  gzochi:callback?
 	  gzochi:callback-module
 	  gzochi:callback-procedure
-	  gzochi:callback-data)
+	  gzochi:callback-data
 
-  (import (gzochi private app))
+	  %gzochi:application-root)
+
+  (import (only (guile) make-fluid)
+	  (gzochi private app)
+	  (rnrs base))
+
+  (define %gzochi:application-root (make-fluid))
 )
