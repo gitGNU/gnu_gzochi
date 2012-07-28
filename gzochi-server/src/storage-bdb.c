@@ -160,7 +160,8 @@ char *gzochid_storage_get
     }
   else 
     {
-      gzochid_err ("Failed to retrieve key %s: %s", key, db_strerror (ret));
+      if (ret != DB_NOTFOUND)
+	gzochid_err ("Failed to retrieve key %s: %s", key, db_strerror (ret));
       return NULL;
     }
 }
@@ -220,7 +221,9 @@ char *gzochid_storage_first_key (gzochid_storage_store *store, size_t *len)
   ret = cursor->get (cursor, &db_key, &db_value, DB_FIRST);
   if (ret != 0)
     {
-      gzochid_err ("Failed to seek to first key: %s", db_strerror (ret));
+      if (ret != DB_NOTFOUND)
+	gzochid_err
+	  ("Failed to seek to first key: %s", db_strerror (ret));
       cursor->close (cursor);
       return NULL;
     }
@@ -338,10 +341,13 @@ static char *transaction_get_internal
     }
   else 
     {
-      gzochid_warning 
-	("Failed to retrieve key %s in transaction: %s", 
-	 key, db_strerror (ret)); 
-      tx->rollback = TRUE;
+      if (ret != DB_NOTFOUND)
+	{
+	  gzochid_warning 
+	    ("Failed to retrieve key %s in transaction: %s", 
+	     key, db_strerror (ret)); 
+	  tx->rollback = TRUE;
+	}
       return NULL;
     }
 }
