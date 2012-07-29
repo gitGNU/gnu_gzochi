@@ -17,6 +17,7 @@
 
 #include <libguile.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "../app.h"
 #include "../data.h"
@@ -77,20 +78,34 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
   return ret;
 }
 
+static char *prefix_name (char *name)
+{
+  int name_len = strlen (name);
+  char *prefixed_name = malloc (sizeof (char) * (name_len + 3));
+  
+  prefixed_name = strncpy (prefixed_name, "o.", 3);
+  prefixed_name = strncat (prefixed_name, name, name_len);
+
+  return prefixed_name;
+}
 
 SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
 	    "Retrieve a managed record bound to a name.")
 {
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
+  
   char *cname = scm_to_locale_string (name);
+  char *prefixed_name = prefix_name (cname);
+  
   SCM ret = SCM_BOOL_F;
 
-  if (!gzochid_data_binding_exists (context, cname))
+  if (!gzochid_data_binding_exists (context, prefixed_name))
     {
       SCM cond = gzochid_scheme_make_name_not_bound_condition (cname);
 
       free (cname);
+      free (prefixed_name);
 
       gzochid_scheme_r6rs_raise (cond);
     }
@@ -98,10 +113,11 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
     {
       gzochid_scm_location_info *location = 
 	(gzochid_scm_location_info *) gzochid_data_get_binding 
-	(context, cname, &gzochid_scm_location_aware_serialization);
+	(context, prefixed_name, &gzochid_scm_location_aware_serialization);
       ret = gzochid_scm_location_resolve (context, location);
 
       free (cname);
+      free (prefixed_name);
     }
 
   gzochid_api_check_rollback ();
@@ -114,14 +130,15 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
-  SCM ret = SCM_BOOL_F;
+  char *prefixed_name = prefix_name (cname);
   
-  if (gzochid_data_binding_exists (context, cname))
+  if (gzochid_data_binding_exists (context, prefixed_name))
     {
       SCM cond = gzochid_scheme_make_name_exists_condition (cname);
 
       free (cname);
-      
+      free (prefixed_name);
+
       gzochid_scheme_r6rs_raise (cond);
     }
   else
@@ -130,9 +147,11 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
 	gzochid_scm_location_get (context, obj);
 
       gzochid_data_set_binding 
-	(context, cname, &gzochid_scm_location_aware_serialization, obj_loc);
+	(context, prefixed_name, &gzochid_scm_location_aware_serialization, 
+	 obj_loc);
       
       free (cname);
+      free (prefixed_name);
     }
 
   gzochid_api_check_rollback ();
@@ -145,20 +164,23 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
+  char *prefixed_name = prefix_name (cname);
   
-  if (!gzochid_data_binding_exists (context, cname))
+  if (!gzochid_data_binding_exists (context, prefixed_name))
     {
       SCM cond = gzochid_scheme_make_name_not_bound_condition (cname);
 
       free (cname);
+      free (prefixed_name);
 
       gzochid_scheme_r6rs_raise (cond);
     }
   else
     {
-      gzochid_data_remove_binding (context, cname);
+      gzochid_data_remove_binding (context, prefixed_name);
 
       free (cname);
+      free (prefixed_name);
     }
 
   gzochid_api_check_rollback ();
