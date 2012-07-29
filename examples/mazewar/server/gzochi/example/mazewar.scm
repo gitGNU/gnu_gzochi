@@ -338,7 +338,7 @@
 	      (apply append (vector->list (vector-map vector->list maze))))
 	     (tiles (list-sort positional-less tiles)))
 
-	(mazewar:make-maze (apply gzochi:make-managed-vector 
+	(mazewar:make-maze (apply gzochi:managed-vector 
 				  (filter mazewar:space? tiles))
 			   (maze->bytes tiles)
 			   #f)))
