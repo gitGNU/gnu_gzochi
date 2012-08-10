@@ -54,6 +54,23 @@
 	  gzochi:managed-record-constructor-descriptor gzochi:get-binding 
 	  gzochi:set-binding! gzochi:remove-binding!
 
+	  gzochi:make-managed-serializable gzochi:managed-serializable?
+	  gzochi:managed-serializable-value
+	  gzochi:managed-serializable-value-set!
+
+	  gzochi:make-managed-vector gzochi:managed-vector?
+	  gzochi:managed-vector-ref gzochi:managed-vector-set!
+          gzochi:managed-vector-length gzochi:managed-vector->list
+
+          gzochi:make-managed-hashtable gzochi:managed-hashtable?
+          gzochi:managed-hashtable-size gzochi:managed-hashtable-ref
+          gzochi:managed-hashtable-set! gzochi:managed-hashtable-delete!
+          gzochi:managed-hashtable-contains? gzochi:managed-hashtable-update!
+          gzochi:managed-hashtable-clear! gzochi:managed-hashtable-keys
+          gzochi:managed-hashtable-entries
+	  gzochi:managed-hashtable-hash-function
+          gzochi:managed-hashtable-equivalence-function
+
           ;; (gzochi io)
 
 	  gzochi:read-integer gzochi:read-boolean gzochi:read-string
