@@ -32,7 +32,15 @@
 
 SCM gzochid_scheme_scm_module_gzochi_private_app;
 
-void gzochid_scheme_application_worker 
+void gzochid_scheme_application_worker
+(gzochid_application_context *, gzochid_auth_identity *, gpointer);
+void gzochid_scheme_application_initialized_worker
+(gzochid_application_context *, gzochid_auth_identity *, gpointer);
+void gzochid_scheme_application_logged_in_worker
+(gzochid_application_context *, gzochid_auth_identity *, gpointer);
+void gzochid_scheme_application_received_message_worker
+(gzochid_application_context *, gzochid_auth_identity *, gpointer);
+void gzochid_scheme_application_disconnected_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 gzochid_io_serialization gzochid_scheme_data_serialization;
 gzochid_application_task_serialization gzochid_scheme_task_serialization;

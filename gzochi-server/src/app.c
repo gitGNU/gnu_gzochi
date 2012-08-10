@@ -91,38 +91,6 @@ static void initialize_complete
     (game_context->pool, initialize_async, user_data, NULL);
 }
 
-static void initialized_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
-{
-  GHashTable *properties = (GHashTable *) data;
-  gzochid_data_managed_reference *callback_reference = NULL;
-  SCM callback = gzochid_scheme_create_callback 
-    (context->descriptor->initialized, NULL);
-
-  callback_reference = gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, callback);
-
-  gzochid_scheme_invoke 
-    (context,
-     identity,
-     "gzochi:execute-initialized",
-     g_list_append
-     (g_list_append
-      (g_list_append (NULL, "gzochi"), "private"), "app"),
-     scm_list_2 (callback,
-		 gzochid_scheme_ghashtable_to_hashtable 
-		 (properties, 
-		  gzochid_scheme_string_hash,
-		  gzochid_scheme_string_equiv,
-		  (SCM (*) (gpointer)) scm_from_locale_string,
-		  (SCM (*) (gpointer)) scm_from_locale_string)),
-     SCM_BOOL_F);
-
-  gzochid_data_set_binding_to_oid 
-    (context, "s.initializer", callback_reference->oid);
-}
-
 static void transactional_task_worker (gpointer data)
 {
   void **args = (void **) data;
@@ -175,7 +143,7 @@ static void run_async_transactional (gpointer data)
       gzochid_application_task application_task;
       gzochid_task task;
 
-      application_task.worker = initialized_worker;
+      application_task.worker = gzochid_scheme_application_initialized_worker;
       application_task.context = context;
       application_task.identity = system_identity;
       application_task.data = context->descriptor->properties;
@@ -340,92 +308,6 @@ void gzochid_application_context_init
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
 }
 
-static gzochid_application_callback *scm_to_callback 
-(gzochid_application_context *context, SCM scm_callback)
-{
-  GList *module = gzochid_scheme_callback_module (scm_callback);
-  char *procedure = gzochid_scheme_callback_procedure (scm_callback);
-  gzochid_data_managed_reference *reference = 
-    gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, scm_callback);
-
-  mpz_t oid;
-  
-  mpz_init (oid);
-  mpz_set (oid, reference->oid);      
-    
-  return gzochid_application_callback_new (procedure, module, oid);
-}
-
-static void client_logged_in_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
-{
-  mpz_t session_oid;
-  char *session_oid_str = (char *) data;
-  gzochid_client_session *session = NULL;
-  gzochid_data_managed_reference *session_reference = NULL;
-
-  SCM scm_session = SCM_BOOL_F;
-  gzochid_data_managed_reference *session_scm_reference = NULL;
-
-  SCM cb = SCM_BOOL_F;
-  gzochid_data_managed_reference *callback_reference = NULL;
-
-  SCM handler = SCM_BOOL_F;
-
-  mpz_init (session_oid);
-  mpz_set_str (session_oid, session_oid_str, 16);
-  session_reference = gzochid_data_create_reference_to_oid
-    (context, &gzochid_client_session_serialization, session_oid);
-  mpz_clear (session_oid);
-
-  gzochid_data_dereference (session_reference);
-  session = (gzochid_client_session *) session_reference->obj;
-
-  scm_session = gzochid_scheme_create_client_session 
-    (session, session_reference->oid);
-  session_scm_reference = 
-    gzochid_data_create_reference
-    (context, &gzochid_scheme_data_serialization, scm_session);
-
-  cb = gzochid_scheme_create_callback (context->descriptor->logged_in, NULL);
-  callback_reference = gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, cb);
-
-  handler = gzochid_scheme_invoke 
-    (context,
-     identity,
-     "gzochi:execute-logged-in",
-     g_list_append
-     (g_list_append
-      (g_list_append (NULL, "gzochi"), "private"), "app"),
-     scm_list_2 ((SCM) callback_reference->obj, 
-		 (SCM) session_scm_reference->obj), 
-     SCM_BOOL_F);
-  
-  if (scm_is_false (handler))
-    gzochid_client_session_send_login_failure (context, session);
-  else
-    {
-      gzochid_client_session_handler *session_handler = 
-	malloc (sizeof (gzochid_client_session_handler));
-
-      session_handler->received_message = 
-	scm_to_callback
-	(context, gzochid_scheme_handler_received_message (handler));
-      session_handler->disconnected =
-	scm_to_callback 
-	(context, gzochid_scheme_handler_disconnected (handler));
-
-      session->handler = session_handler;
-
-      gzochid_data_mark 
-	(context, &gzochid_client_session_serialization, session);
-      gzochid_client_session_send_login_success (context, session);
-    }
-}
-
 void gzochid_application_client_logged_in
 (gzochid_application_context *context, gzochid_protocol_client *client)
 {
@@ -448,7 +330,7 @@ void gzochid_application_client_logged_in
   g_hash_table_insert (context->oids_to_clients, session_oid_str, client);
   g_hash_table_insert (context->clients_to_oids, client, session_oid_str);
 
-  transactional_task.worker = client_logged_in_worker;
+  transactional_task.worker = gzochid_scheme_application_logged_in_worker;
   transactional_task.data = session_oid_str;
 
   application_task.worker = gzochid_application_transactional_task_worker;
@@ -461,42 +343,6 @@ void gzochid_application_client_logged_in
   gettimeofday (&task.target_execution_time, NULL);
 
   gzochid_schedule_run_task (game_context->task_queue, &task);
-}
-
-static void client_disconnected_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer ptr)
-{
-  gzochid_client_session *session = NULL;
-  gzochid_data_managed_reference *session_reference = NULL;
-  gzochid_data_managed_reference *callback_reference = NULL;
-
-  GList *gpa = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
-
-  mpz_t session_oid;
-  mpz_init (session_oid);
-  mpz_set_str (session_oid, (char *) ptr, 16);
-
-  session_reference = gzochid_data_create_reference_to_oid 
-    (context, &gzochid_client_session_serialization, session_oid);
-  gzochid_data_dereference (session_reference);
-  session = (gzochid_client_session *) session_reference->obj;
-
-  callback_reference =
-    gzochid_data_create_reference_to_oid
-    (context, &gzochid_scheme_data_serialization, 
-     session->handler->disconnected->scm_oid);
-  gzochid_data_dereference (callback_reference);
-      
-  gzochid_scheme_invoke
-    (context, 
-     identity,
-     "gzochi:execute-disconnected", gpa,
-     scm_list_1 ((SCM) callback_reference->obj),
-     SCM_BOOL_F);
-
-  g_list_free (gpa);
 }
 
 void gzochid_application_client_disconnected
@@ -518,7 +364,7 @@ void gzochid_application_client_disconnected
     {
       gzochid_transactional_application_task *transactional_task =
 	gzochid_transactional_application_task_new
-	(client_disconnected_worker, session_oid_str);
+	(gzochid_scheme_application_disconnected_worker, session_oid_str);
 
       gzochid_application_task *application_task =
 	gzochid_application_task_new
@@ -538,51 +384,6 @@ void gzochid_application_client_disconnected
       gzochid_schedule_submit_task (game_context->task_queue, task);
       g_mutex_unlock (context->client_mapping_lock);
     }
-}
-
-static void client_received_message_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer ptr)
-{
-  gzochid_client_session *session = NULL;
-  gzochid_data_managed_reference *session_reference = NULL;
-  gzochid_data_managed_reference *callback_reference = NULL;
-
-  SCM bv = SCM_BOOL_F;
-  GList *gpa = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
-
-  unsigned char *message = NULL;
-  short *message_len_ptr = NULL;
-  void **data = (void **) ptr;
-
-  mpz_t session_oid;
-  mpz_init (session_oid);
-  mpz_set_str (session_oid, (char *) data[0], 16);
-
-  message = (unsigned char *) data[1];
-  message_len_ptr = (short *) data[2];
-
-  session_reference = gzochid_data_create_reference_to_oid 
-    (context, &gzochid_client_session_serialization, session_oid);
-  gzochid_data_dereference (session_reference);
-  session = (gzochid_client_session *) session_reference->obj;
-
-  bv = gzochid_scheme_create_bytevector (message, *message_len_ptr);
-  callback_reference =
-    gzochid_data_create_reference_to_oid
-    (context, &gzochid_scheme_data_serialization, 
-     session->handler->received_message->scm_oid);
-  gzochid_data_dereference (callback_reference);
-      
-  gzochid_scheme_invoke
-    (context, 
-     identity,
-     "gzochi:execute-received-message", gpa,
-     scm_list_2 ((SCM) callback_reference->obj, bv),
-     SCM_BOOL_F);
-
-  g_list_free (gpa);
 }
 
 gzochid_application_worker_serialization received_message_worker_serialization =
@@ -625,7 +426,8 @@ void gzochid_application_session_received_message
       data[1] = msg;
       data[2] = &len;
       
-      transactional_task.worker = client_received_message_worker;
+      transactional_task.worker = 
+	gzochid_scheme_application_received_message_worker;
       transactional_task.data = data;
       
       application_task.worker = gzochid_application_transactional_task_worker;
