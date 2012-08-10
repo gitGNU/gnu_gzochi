@@ -49,7 +49,9 @@
 	  gzochi:make-managed-record-type-descriptor
 	  gzochi:managed-record-accessor gzochi:managed-record-mutator
 	  gzochi:managed-record-constructor gzochi:managed-record-predicate
-	  gzochi:managed-record? gzochi:define-managed-record-type
+	  gzochi:managed-record? gzochi:managed-record-rtd 
+	  gzochi:managed-record-type-name gzochi:managed-record-type-parent 
+	  gzochi:managed-record-type-uid gzochi:define-managed-record-type 
 	  gzochi:managed-record-type-descriptor 
 	  gzochi:managed-record-constructor-descriptor gzochi:get-binding 
 	  gzochi:set-binding! gzochi:remove-binding!

@@ -24,15 +24,17 @@
 	  gzochi:managed-record-constructor
 	  gzochi:managed-record-predicate
 
-	  gzochi:managed-record?
-
           gzochi:define-managed-record-type
 	  gzochi:managed-record-type-descriptor
 	  gzochi:managed-record-constructor-descriptor
 
-	  gzochi:managed-record
 	  gzochi:make-managed-record
+
 	  gzochi:managed-record?
+	  gzochi:managed-record-rtd 
+	  gzochi:managed-record-type-name
+	  gzochi:managed-record-type-parent 
+	  gzochi:managed-record-type-uid
 
 	  gzochi:create-reference
 	  gzochi:dereference
@@ -101,6 +103,11 @@
   (define gzochi:managed-record-reference-mutator record-mutator)
   (define gzochi:managed-record-constructor record-constructor)
   (define gzochi:managed-record-predicate record-predicate)
+
+  (define gzochi:managed-record-rtd record-rtd)
+  (define gzochi:managed-record-type-name record-type-name)
+  (define gzochi:managed-record-type-parent record-type-parent)
+  (define gzochi:managed-record-type-uid record-type-uid)
 
   (define (managed-record-subtype? rtd)
     (or (eq? rtd gzochi:managed-record)
