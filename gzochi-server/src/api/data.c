@@ -63,7 +63,8 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
     (context, &gzochid_scm_location_aware_serialization, oid);
   gzochid_data_dereference (reference);
 
-  if (reference->obj == NULL)
+  if (reference->obj == NULL
+      || reference->state == GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED)
     gzochid_scheme_r6rs_raise 
       (gzochid_scheme_make_object_removed_condition ());
   else 
