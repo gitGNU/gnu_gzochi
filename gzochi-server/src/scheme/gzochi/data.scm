@@ -317,8 +317,6 @@
 			 (last-was-keyword? (loop (cdr l) filtered-l #f))
 			 (else (loop (cdr l) (cons cl filtered-l) #f))))))))))
 
-  (define (gzochi:managed-hashtable-set! ht key value) (if #f #f))
-
   (gzochi:define-managed-record-type managed-hashtable-entry
    (fields (immutable hash (serialization gzochi:integer-serialization))
 	   (immutable key managed-hashtable-entry-key-internal)
@@ -723,7 +721,7 @@
 			   (equiv-function
 			    (managed-hashtable-entry-key entry) key))
 		      entry)
-		     ((< entry-hash hash) #f)
+		     ((< hash entry-hash) #f)
 		     (else (loop (managed-hashtable-entry-next entry)))))))))
 
   (define (gzochi:managed-hashtable-contains? ht key)
