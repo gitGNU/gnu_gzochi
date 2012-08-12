@@ -390,7 +390,8 @@ void dereference
   char *data = NULL; 
   GString *in = NULL;
 
-  if (reference->obj != NULL)
+  if (reference->obj != NULL 
+      || reference->state == GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY)
     return;
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
