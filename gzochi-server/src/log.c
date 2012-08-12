@@ -26,11 +26,16 @@
 
 static GStaticMutex log_mutex = G_STATIC_MUTEX_INIT;
 
+static int max_priority = LOG_INFO;
+
 void gzochid_vlog (int priority, char *msg, va_list ap)
 {
   char *severity = NULL;
   struct timeval tv;
   struct tm ltm;
+
+  if (priority > max_priority)
+    return;
 
   gettimeofday (&tv, NULL);
   localtime_r (&tv.tv_sec, &ltm);
@@ -103,4 +108,9 @@ void gzochid_debug (char *msg, ...)
   va_start (args, msg);
   gzochid_vlog (LOG_DEBUG, msg, args);
   va_end (args);
+}
+
+void gzochid_set_log_threshold (int priority)
+{
+  max_priority = priority;
 }

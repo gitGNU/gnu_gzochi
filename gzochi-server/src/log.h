@@ -1,5 +1,5 @@
 /* log.h: Prototypes and declarations for log.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -27,5 +27,7 @@ void gzochid_warning (char *, ...);
 void gzochid_notice (char *, ...);
 void gzochid_info (char *, ...);
 void gzochid_debug (char *, ...);
+
+void gzochid_set_log_threshold (int);
 
 #endif /* GZOCHID_LOG_H */
