@@ -536,10 +536,7 @@
   (define-record-type (gzochi:managed-reference 
 		       gzochi:make-managed-reference 
 		       gzochi:managed-reference?)
-    (fields oid 
-	    (mutable record 
-		     gzochi:managed-reference-record 
-		     gzochi:managed-reference-set-record!)))
+    (fields oid))
 
   (define (gzochi:create-reference obj)
     (or (gzochi:managed-record? obj)
@@ -555,11 +552,7 @@
 	(raise (condition (make-assertion-violation)
 			  (make-message-condition
 			   "Only managed references can be dereferenced."))))
-    (let ((record (gzochi:managed-reference-record reference)))
-      (or record
-	  (let ((data (primitive-dereference reference)))
-	    (gzochi:managed-reference-set-record! reference data)
-	    data))))
+    (primitive-dereference reference))
 
   (define (gzochi:get-binding name)
     (or (string? name) (raise (make-assertion-violation)))
