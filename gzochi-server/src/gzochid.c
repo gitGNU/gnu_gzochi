@@ -17,6 +17,7 @@
 
 #include <config.h>
 #include <getopt.h>
+#include <glib.h>
 #include <locale.h>
 #include <libintl.h>
 #include <stdio.h>
@@ -28,7 +29,13 @@
 #include "fsm.h"
 #include "game.h"
 #include "gzochid.h"
+#include "log.h"
 #include "threads.h"
+
+/* Need to move #include for syslog down here because we have other depedencies
+   like Serveez that attempt to redefine some of its `LOG_' #defines. */
+
+#include <syslog.h>
 
 #define _(String) gettext (String)
 
@@ -54,7 +61,8 @@ static void initialize_async (gpointer data, gpointer user_data)
   GKeyFile *key_file = g_key_file_new ();
   GHashTable *admin_config = NULL;
   GHashTable *game_config = NULL;  
-  
+  GHashTable *log_config = NULL;
+
   server_context->admin_context = 
     (gzochid_context *) gzochid_admin_context_new ();
   server_context->game_context = 
@@ -65,6 +73,30 @@ static void initialize_async (gpointer data, gpointer user_data)
 
   admin_config = gzochid_config_keyfile_extract_config (key_file, "admin");
   game_config = gzochid_config_keyfile_extract_config (key_file, "game");
+  log_config = gzochid_config_keyfile_extract_config (key_file, "log");
+
+  if (g_hash_table_contains (log_config, "priority.threshold")) 
+    {
+      char *threshold = g_hash_table_lookup (log_config, "priority.threshold");
+
+      if (g_ascii_strncasecmp (threshold, "EMERG", 5) == 0)
+	gzochid_set_log_threshold (LOG_EMERG);
+      else if (g_ascii_strncasecmp (threshold, "ALERT", 5) == 0)
+	gzochid_set_log_threshold (LOG_ALERT);
+      else if (g_ascii_strncasecmp (threshold, "CRIT", 4) == 0)
+	gzochid_set_log_threshold (LOG_CRIT);
+      else if (g_ascii_strncasecmp (threshold, "ERR", 3) == 0)
+	gzochid_set_log_threshold (LOG_ERR);
+      else if (g_ascii_strncasecmp (threshold, "WARNING", 7) == 0)
+	gzochid_set_log_threshold (LOG_WARNING);
+      else if (g_ascii_strncasecmp (threshold, "NOTICE", 6) == 0)
+	gzochid_set_log_threshold (LOG_NOTICE);
+      else if (g_ascii_strncasecmp (threshold, "INFO", 4) == 0)
+	gzochid_set_log_threshold (LOG_INFO);
+      else if (g_ascii_strncasecmp (threshold, "DEBUG", 5) == 0)
+	gzochid_set_log_threshold (LOG_DEBUG);
+    }
+  else gzochid_set_log_threshold (LOG_INFO);
 
   gzochid_admin_context_init 
     ((gzochid_admin_context *) server_context->admin_context, context, 
