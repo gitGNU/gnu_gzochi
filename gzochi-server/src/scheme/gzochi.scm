@@ -54,7 +54,7 @@
 	  gzochi:managed-record-type-uid gzochi:define-managed-record-type 
 	  gzochi:managed-record-type-descriptor 
 	  gzochi:managed-record-constructor-descriptor gzochi:get-binding 
-	  gzochi:set-binding! gzochi:remove-binding!
+	  gzochi:set-binding! gzochi:remove-binding! gzochi:remove-object!
 
 	  gzochi:make-managed-serializable gzochi:managed-serializable?
 	  gzochi:managed-serializable-value
