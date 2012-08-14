@@ -217,6 +217,22 @@ void gzochid_scheme_application_initialized_worker
 	 (context, "s.initializer", callback_reference->oid);
 }
 
+static gpointer unpack_handler (gpointer data)
+{
+  SCM handler = (SCM) data;
+  gzochid_application_context *context = 
+    gzochid_get_current_application_context ();
+  gzochid_client_session_handler *session_handler = 
+    malloc (sizeof (gzochid_client_session_handler));
+
+  session_handler->received_message = scm_to_callback 
+    (context, gzochid_scheme_handler_received_message (handler));
+  session_handler->disconnected = scm_to_callback 
+    (context, gzochid_scheme_handler_disconnected (handler));
+
+  return session_handler;
+}
+
 void gzochid_scheme_application_logged_in_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer data)
@@ -274,17 +290,9 @@ void gzochid_scheme_application_logged_in_worker
     gzochid_client_session_send_login_failure (context, session);
   else
     {
-      gzochid_client_session_handler *session_handler = 
-	malloc (sizeof (gzochid_client_session_handler));
-
-      session_handler->received_message = 
-	scm_to_callback
-	(context, gzochid_scheme_handler_received_message (handler));
-      session_handler->disconnected =
-	scm_to_callback 
-	(context, gzochid_scheme_handler_disconnected (handler));
-
-      session->handler = session_handler;
+      session->handler = (gzochid_client_session_handler *) 
+	gzochid_with_application_context 
+	(context, identity, unpack_handler, handler);
 
       gzochid_data_mark 
 	(context, &gzochid_client_session_serialization, session);
