@@ -440,12 +440,15 @@
       (if (< num-bits bit-length)
 	  (bitwise-arithmetic-shift-right n (- bit-length num-bits))
 	  n)))
+  (define max-dir-bits 5)
+  (define (node-dir-bits depth) (min (- 32 depth) max-dir-bits))
 
   (define (managed-hashtable-node-add-leaves! node prefix left-leaf right-leaf)
     (let* ((prefix (bitwise-arithmetic-shift-left 
 		    prefix (managed-hashtable-node-depth node)))
 	   (depth (managed-hashtable-node-depth node))
-	   (dir-bits (min (- 32 depth) 6))
+    (let* ((depth (managed-hashtable-node-depth node))
+	   (dir-bits (node-dir-bits depth))
 	   (directory (managed-hashtable-node-directory node))  
 	   (index (high-bits prefix dir-bits))
 	   (leaf (gzochi:managed-vector-ref directory index)))
@@ -530,7 +533,7 @@
 	    (managed-hashtable-node-parent-set! right-child node)
 	    (managed-hashtable-node-parent-set! left-child node)
 	    (let* ((directory-length 
-		    (bitwise-arithmetic-shift-left 1 (min (- 32 depth) 6)))
+		    (bitwise-arithmetic-shift-left 1 (node-dir-bits depth)))
 		   (directory (gzochi:make-managed-vector directory-length)))
 	      (managed-hashtable-node-directory-set! node directory)
 	      (let ((first-right (/ directory-length 2)))
@@ -551,11 +554,11 @@
     (let ((depth (managed-hashtable-node-depth node))) 
       (or (>= depth min-depth)
 	  (let* ((directory-length
-		  (bitwise-arithmetic-shift-left 1 (min (- 32 depth) 6)))
+		  (bitwise-arithmetic-shift-left 1 (node-dir-bits depth)))
 		 (directory (gzochi:make-managed-vector directory-length)))
 	    (managed-hashtable-node-entries-set! node #f)
 	    (managed-hashtable-node-directory-set! node directory)
-	    (let* ((leaf-bits (min (- min-depth depth) 6))
+	    (let* ((leaf-bits (min (- min-depth depth) max-dir-bits))
 		   (num-leaves (bitwise-arithmetic-shift-left 1 leaf-bits))
 		   (leaves (gzochi:make-managed-vector num-leaves)))
 	      (let loop ((i 0))
@@ -645,8 +648,7 @@
 		 (directory (managed-hashtable-node-directory node))
 		 (index (high-bits
 			 (bitwise-arithmetic-shift-left prefix depth)
-			 (min (- 32 depth) 6))))
-
+			 (node-dir-bits depth))))
 	    (loop (gzochi:managed-vector-ref directory index)))
 	  node)))
 
