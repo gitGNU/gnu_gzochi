@@ -436,18 +436,15 @@
     (sealed #t))
 
   (define (high-bits n num-bits)
-    (let ((bit-length (bitwise-length n)))
-      (if (< num-bits bit-length)
-	  (bitwise-arithmetic-shift-right n (- bit-length num-bits))
-	  n)))
+    (bitwise-arithmetic-shift-right n (- 32 num-bits)))
   (define max-dir-bits 5)
   (define (node-dir-bits depth) (min (- 32 depth) max-dir-bits))
 
   (define (managed-hashtable-node-add-leaves! node prefix left-leaf right-leaf)
-    (let* ((prefix (bitwise-arithmetic-shift-left 
-		    prefix (managed-hashtable-node-depth node)))
-	   (depth (managed-hashtable-node-depth node))
     (let* ((depth (managed-hashtable-node-depth node))
+	   (prefix (bitwise-and 
+		    (bitwise-arithmetic-shift-left prefix depth)
+		    (- (bitwise-arithmetic-shift-left 1 32) 1)))
 	   (dir-bits (node-dir-bits depth))
 	   (directory (managed-hashtable-node-directory node))  
 	   (index (high-bits prefix dir-bits))
@@ -495,17 +492,20 @@
 	   (prefix
 	    (let loop ((i 0) (prefix 0))
 	      (let* ((child (if (< i first-right) left-child right-child))
-		     (entry (gzochi:managed-vector-ref entries i))
+		     (entry (and (< i num-entries) 
+				 (gzochi:managed-vector-ref entries i)))
 		     (next-prefix
-		      (let loop ((entry entry) (prev #f) (prev-index 0))
-			(let* ((hash (managed-hashtable-entry-hash entry))
-			       (index (managed-hashtable-leaf-index child hash))
-			       (next-entry
-				(managed-hashtable-entry-next entry)))
-			  (managed-hashtable-node-add-entry!
-			   child entry (and (not (eqv? index prev-index)) prev))
-			  (if next-entry (loop next-entry entry index) hash)))))
-		(loop (+ i 1) next-prefix)))))
+		      (and entry
+			   (let loop ((entry entry) (prev #f) (prev-index 0))
+			     (let* ((h (managed-hashtable-entry-hash entry))
+				    (x (managed-hashtable-leaf-index child h))
+				    (ne (managed-hashtable-entry-next entry)))
+			       (managed-hashtable-node-add-entry!
+				child entry (and (eqv? x prev-index) prev))
+			       (if ne (loop ne entry x) h))))))
+		(if (< i num-entries) 
+		    (loop (+ i 1) (or next-prefix prefix)) 
+		    prefix)))))
 
       (managed-hashtable-node-entries-set! node #f)
       (managed-hashtable-node-size-set! node 0)
@@ -527,7 +527,7 @@
       (managed-hashtable-node-left-leaf-set! right-child left-child)
 
       (if (or (not (managed-hashtable-node-parent node))
-	      (eqv? (modulo depth 6) 0)
+	      (eqv? (modulo depth max-dir-bits) 0)
 	      (eqv? depth 6))
 	  (begin
 	    (managed-hashtable-node-parent-set! right-child node)
@@ -647,7 +647,9 @@
 	  (let* ((depth (managed-hashtable-node-depth node))
 		 (directory (managed-hashtable-node-directory node))
 		 (index (high-bits
-			 (bitwise-arithmetic-shift-left prefix depth)
+			 (bitwise-and
+			  (bitwise-arithmetic-shift-left prefix depth)
+			  (- (bitwise-arithmetic-shift-left 1 32) 1))
 			 (node-dir-bits depth))))
 	    (loop (gzochi:managed-vector-ref directory index)))
 	  node)))
@@ -694,10 +696,8 @@
 	     prev)))))
 
   (define (managed-hashtable-leaf-index node hash)
-    (let* ((leaf-capacity 256)
-	   (leaf-bits (bitwise-length leaf-capacity))
-	   (left-offset (+ (managed-hashtable-node-depth node) leaf-bits)))
-      (bitwise-and (high-bits hash left-offset) (- leaf-capacity 1))))
+    (let* ((left-offset (min 32 (+ (managed-hashtable-node-depth node) 8))))
+      (bitwise-and (high-bits hash left-offset) 255)))
 
   (define (managed-hashtable-get-entry ht key)
     (let* ((hash-function (gzochi:managed-hashtable-hash-function ht))
