@@ -453,14 +453,9 @@ static void leave_channel
   free (session_oid_str);
 }
 
-static void commit_channel_operation (gpointer data, gpointer user_data)
+static gzochid_task *create_channel_operation_task
+(gzochid_channel_pending_operation *op, gzochid_application_context *context)
 {
-  gzochid_channel_pending_operation *op = 
-    (gzochid_channel_pending_operation *) data;
-  gzochid_application_context *context = 
-    (gzochid_application_context *) user_data;
-  gzochid_game_context *game_context = 
-    (gzochid_game_context *) ((gzochid_context *) context)->parent;
   gzochid_task *task = NULL;
 
   struct timeval now;
@@ -498,7 +493,7 @@ static void commit_channel_operation (gpointer data, gpointer user_data)
       break;
     }
 
-  gzochid_schedule_submit_task (game_context->task_queue, task);
+  return task;
 }
 
 typedef struct _gzochid_channel_transaction_context 
@@ -598,9 +593,25 @@ static void channel_commit (gpointer data)
 {
   gzochid_channel_transaction_context *tx_context =
     (gzochid_channel_transaction_context *) data;
+  gzochid_application_context *app_context = tx_context->context;
+  gzochid_game_context *game_context =
+    (gzochid_game_context *) ((gzochid_context *) app_context)->parent;
 
-  g_list_foreach 
-    (tx_context->operations, commit_channel_operation, tx_context->context);
+  GList *task_chain = NULL;
+  GList *operation_ptr = tx_context->operations;
+
+  while (operation_ptr != NULL)
+    {
+      task_chain = g_list_append 
+	(task_chain, 
+	 create_channel_operation_task 
+	 ((gzochid_channel_pending_operation *) operation_ptr->data,
+	  app_context));
+      operation_ptr = operation_ptr->next;
+    }
+
+  gzochid_schedule_submit_task_chain (game_context->task_queue, task_chain);
+  g_list_free (task_chain);
 
   cleanup_transaction (tx_context);
 }
