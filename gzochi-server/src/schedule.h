@@ -1,5 +1,5 @@
 /* schedule.h: Prototypes and declarations for schedule.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -57,6 +57,9 @@ void gzochid_schedule_task_queue_start (gzochid_task_queue *);
 
 gzochid_pending_task *gzochid_schedule_submit_task 
 (gzochid_task_queue *, gzochid_task *);
+gzochid_pending_task *gzochid_schedule_submit_task_chain 
+(gzochid_task_queue *, GList *);
+
 void gzochid_schedule_run_task (gzochid_task_queue *, gzochid_task *);
 void gzochid_schedule_execute_task (gzochid_task *);
 

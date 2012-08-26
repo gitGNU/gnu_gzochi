@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 
 #include "guile.h"
@@ -115,6 +116,36 @@ gint pending_task_compare (gconstpointer a, gconstpointer b, gpointer user_data)
     return 1;
   else return pending_task_a->scheduled_execution_time.tv_usec 
 	 - pending_task_b->scheduled_execution_time.tv_usec;
+}
+
+static void task_chain_worker (gpointer data, gpointer user_data)
+{
+  GList *tasks = (GList *) data;
+  GList *task_ptr = tasks;
+
+  while (task_ptr != NULL)
+    {
+      gzochid_schedule_execute_task ((gzochid_task *) task_ptr->data);
+      task_ptr = task_ptr->next;
+    }
+
+  g_list_free (tasks);
+}
+
+gzochid_pending_task *gzochid_schedule_submit_task_chain
+(gzochid_task_queue *task_queue, GList *tasks)
+{
+  GList *tasks_copy = g_list_copy (tasks);
+  gzochid_task *task = malloc (sizeof (gzochid_task));
+
+  assert (g_list_length (tasks) > 0);
+
+  task->worker = task_chain_worker;
+  task->data = tasks_copy;
+  task->target_execution_time = 
+    ((gzochid_task *) tasks_copy->data)->target_execution_time;
+
+  return gzochid_schedule_submit_task (task_queue, task);
 }
 
 gzochid_pending_task *gzochid_schedule_submit_task
