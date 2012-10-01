@@ -1,0 +1,17 @@
+<?xml version="1.0" ?>
+<game name="abermud">
+  <description>AberMUD</description>
+  <load-paths />
+
+  <initialized>
+    <callback module="gzochi example abermud" procedure="initialized" />
+  </initialized>
+  
+  <logged-in>
+    <callback module="gzochi example abermud" procedure="logged-in" />
+  </logged-in>
+
+  <property name="universe_path" value="new.uni" />  
+  <property name="motd_path" value="motd" />
+  <property name="help_path" value="help" />
+</game>

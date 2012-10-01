@@ -1,0 +1,15 @@
+The Land Of Four Winds is a multi-player interactive adventure game.
+
+You control your presence in The Land Of The Four Winds by typing commands to 
+an English language parser. As with all computer games the commands that the 
+computer understands are limited. Basic commands consist of either a verb or a
+verb with one or more adjectives and nouns. For instance to get this message
+you typed 'help'. Other useful commands include 'look' to review where you are 
+currently. To pick up items, use the command 'take'. To drop items use the
+command 'drop'. You can review what you are carrying by typing 'inventory'.
+You can move around by using typing in directions. The 'exits' command will 
+list any obvious exits and where they appear to lead.
+
+This is a multi-player game, and there are therefore commands to talk and to
+interact with other players. The first of these you might use is 'say'. E.g.
+'say what on earth is going on here ?'.
