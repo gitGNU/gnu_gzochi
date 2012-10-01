@@ -1,0 +1,8 @@
+Julian Graham:
+wrote the majority of this client implementation for the gzochi abermud example
+game.
+
+Alan Cox, et al.:
+wrote the original version of AberMUD that inspired this implementation. See
+http://ftp.linux.org.uk/pub/linux/alan/Software/Games/AberMUD5/ for source 
+code.
