@@ -1,0 +1,34 @@
+gzochi abermud is a clone of the classic AberMUD game developed by Alan Cox 
+(and others) at the University of Wales, Aberystwyth in the late 1980s. This 
+implementation is based on the source code of AberMUD 5.30, which was released 
+under the GNU General Public License in 1992. AberMUD was not the first 
+text-based, multi-player virtual world -- Multi-User Dungeon was developed at 
+the University of Essex by Roy Trubshaw in 1978 -- but it was one of the most
+widely-distributed and one of the first to be written in C.
+
+The real AberMUD has a huge array of features that this example implementation
+cannot hope to match: A large vocabulary, an in-game world editor, complex 
+object relationships and magic spell effects, and vector graphics for certain
+locations all contributed to AberMUD's popularity. gzochi abermud offers a
+handful of the commands supported by the real AberMUD, as well as a parser
+sufficiently advanced to provide a few extension points for supporting more
+complex commands. Additionally, in place of AberMUD's explicit load and save 
+operations, which synchronize the game state with a local disk, gzochi abermud
+uses gzochi's powerful automatic persistence features to seamlessly persist 
+aspects of the game state whenever they change. In order to bootstrap its game
+world, however, gzochi abermud includes a parser for the AberMUD 5.21 universe
+file format, and the "abernew" universe file is included in the distribution.
+
+The source code for the both the server and client components of gzochi abermud
+has been heavily annotated to help explicate the workings of the game logic and
+the interactions between the client and server. It is hoped that the code 
+comments and other documentation will be useful for developers attempting to 
+write their own games for the gzochi framework. Please send any questions or 
+comments to the gzochi development mailing list: gzochi-devel@nongnu.org.
+
+For more information on the history and evolution of AberMUD, including source
+distributions, please visit the following web sites:
+
+* http://en.wikipedia.org/wiki/AberMUD
+* ftp://ftp.linux.org.uk/pub/linux/alan/Software/Games/AberMUD5/
+* http://www.abermud.info/mudlist/
