@@ -391,6 +391,7 @@ void gzochid_scheme_application_disconnected_worker
       gzochid_transaction_join (&scheme_participant, NULL);
       gzochid_transaction_mark_for_rollback (&scheme_participant);
     }
+  else gzochid_data_remove_object (session_reference);
 
   g_list_free (gpa);
 }
