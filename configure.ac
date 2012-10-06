@@ -27,6 +27,7 @@ AC_CONFIG_SUBDIRS([gzochi-common])
 AC_CONFIG_SUBDIRS([gzochi-server])
 AC_CONFIG_SUBDIRS([gzochi-client])
 AC_CONFIG_SUBDIRS([debug-client])
+AC_CONFIG_SUBDIRS([examples/abermud])
 AC_CONFIG_SUBDIRS([examples/mazewar])
 
 AC_OUTPUT
