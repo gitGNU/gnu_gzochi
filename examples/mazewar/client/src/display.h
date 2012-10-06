@@ -18,6 +18,8 @@
 #ifndef MAZEWAR_DISPLAY_H
 #define MAZEWAR_DISPLAY_H
 
+#include <glib.h>
+
 #include "mazewar.h"
 
 #define	VIEW_X_DIM 200
