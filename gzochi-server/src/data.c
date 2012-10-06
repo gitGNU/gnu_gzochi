@@ -560,13 +560,6 @@ void gzochid_data_remove_binding
     (tx_context->names_transaction, name, strlen (name) + 1);
   if (tx_context->names_transaction->rollback)
     gzochid_transaction_mark_for_rollback (&data_participant);
-  else
-    {
-      gzochid_storage_transaction_delete
-	(tx_context->oids_transaction, oid_str, strlen (oid_str) + 1);
-      if (tx_context->oids_transaction->rollback)
-	gzochid_transaction_mark_for_rollback (&data_participant);
-    }
 
   free (oid_str);
 }
