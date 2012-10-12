@@ -24,7 +24,7 @@ AM_LDFLAGS = @LDFLAGS@ @GZOCHI_LIBS@
 
 bin_PROGRAMS = abermud
 
-noinst_HEADERS = console.h
+noinst_HEADERS = abermud.h console.h
 
 abermud_SOURCES = abermud.c console-curses.c
 

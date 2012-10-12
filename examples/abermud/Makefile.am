@@ -21,4 +21,12 @@
 SUBDIRS = client
 
 dist_noinst_DATA = server/game.xml \
-	server/gzochi/example/abermud.scm
+	server/gzochi/example/abermud.scm \
+	server/gzochi/example/abermud/command.scm \
+	server/gzochi/example/abermud/data.scm \
+	server/gzochi/example/abermud/load.scm \
+	server/gzochi/example/abermud/session.scm \
+	server/gzochi/example/abermud/util.scm \
+	server/help \
+	server/motd \
+	server/new.uni
