@@ -860,8 +860,9 @@ indexed by the internal object identifiers the container uses to
 track them.
 
 Future plans for the monitoring web server include per-game 
-statistical reporting on data such as transactional throughput,
-client session volume, and 
+statistical reporting on data such as transactional throughput and
+client session volume.
+
 @node Remote debugging
 @chapter Remote debugging
 
@@ -1175,7 +1176,7 @@ to client sessions. A listener is returned from the callback for the
 listener must in turn be configured with two @code{gzochi:callback} 
 objects, one to be invoked when a new message is received from the
 spcified session, the other to be invoked when the session 
-disconnects from the sevrver.
+disconnects from the server.
 
 @deffn {Managed Record Type} gzochi:client-session-listener
 The record type, for introspection or use as a base type. 
