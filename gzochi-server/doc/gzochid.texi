@@ -1424,9 +1424,16 @@ descriptor @var{mrcd}. This procedure returns the same value as the
 @end deffn
 
 @deffn {Scheme Procedure} gzochi:managed-record-predicate mrtd
-Returns the record predicate procedure for the managed record-type
-descriptor @var{mrtd}. This procedure returns the same value as the
-@code{record-predicate} procedure in the 
+@deffnx {Scheme Procedure} gzochi:managed-record-type-name mrtd
+@deffnx {Scheme Procedure} gzochi:managed-record-type-parent mrtd
+@deffnx {Scheme Procedure} gzochi:managed-record-type-uid mrtd
+These procedures return the same values as their counterparts in the
+@code{(rnrs records procedural)} library.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-record-rtd mr
+Returns the record-type descriptor for @var{mr}. This procedure
+returns the same value as the @code{record-rtd} procedure in the
 @code{(rnrs records procedural)} library.
 @end deffn
 
