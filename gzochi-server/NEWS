@@ -1,0 +1,121 @@
+gzochid NEWS -- history of user-visible changes
+Copyright (C) 2012 Julian Graham
+See the end of copying conditions.
+
+Send comments, questions, and bug reports to gzochi-devel@nongnu.org
+
+
+Changes in 0.2 (since 0.1):
+
+* Notable changes
+
+** Remote debugging for game applications
+
+The gzochid container now offers a remote debugging interface. Using a telnet
+client, a debugging user can connect to a running gzochid server instance and 
+evaluate arbitrary Scheme expressions in the context of a specified game
+application. See "Debugging" in the manual for more information.
+
+** Support for alternative storage engines
+
+The storage layer has been refactored in order to allow storage engines besides
+GNU DBM to be selected at build time. The first new storage engine to be 
+supported is BerkeleyDB. To use BerkeleyDB, pass the 
+`--with-storage-engine=bdb' argument to `configure'. See "Installation" in the
+manual for details about using a different storage engines.
+
+** Transaction rollback detection
+
+When a transaction on the `names' or `oids' store of a gzochi game application
+is rolled back, the outer, application-level transaction is now correctly
+marked for rollback as well. When an application invokes a function from the
+gzochi API in a transaction that has been marked for rollback, a 
+non-continuable condition is now raised.
+
+** Logging enhancements
+
+Log messages are now written to the server log in a synchronous way, such that
+messages from different threads will no longer be interleaved on a single line.
+A log priority threshold can also be set (via gzochid.conf) so that finer-
+grained messages are excluded from the logs. See "Logging" in the manual for 
+more information.
+
+* New interfaces
+
+** Administrative API
+
+A new administrative API, primarily for use during debugging, is available from
+the `(gzochi admin)' library. This release exports the 
+`gzochi:application-context' type, and the functions `gzochi:applications', 
+`gzochi:current-application', and `gzochi:with-application'. See "gzochi admin"
+in the manual for more informaton.
+
+** %gzochi:application-root
+
+This new fluid stores the root deployment directory of the current application,
+for the purposes of locating non-Scheme resources. See "Application deployment"
+in the manual.
+
+** Managed vectors
+
+The `gzochi:managed-vector' type and its associated functions, which extend 
+gzochi's transactional guarantees to operations over vectors of managed 
+records, were present in the `(gzochi data)' library in version 0.1 but not 
+documented and not exported from the `(gzochi)' aggregation library. A more 
+flexible and more efficient implementation of this API has been provided in 
+this release.
+
+** Managed hashtables
+
+A complete implementation has likewise been provided for 
+`gzochi:managed-hashtable', based on the Java ScalableHashMap implementation in
+RedDwarf Server. This type and its accompanying functions are exported from
+`(gzochi data)' and from the `(gzochi)' aggregation library. See "Scalable data
+structures" in the manual for more information about `gzochi:managed-hashtable'
+and `gzochi:managed-vector'.
+
+** Serialization for generic objects
+
+A Scheme datum that is not a managd record can now be wrapped in an instance of
+the new `gzochi:managed-serializable' type, which allows it to be serialized 
+and persisted to a game's data store and to be included in a managed object
+graph. `gzochi:managed-serializable' and its accompanying functions are 
+exported from `(gzochi data)' and from the `(gzochi)' aggregation library.
+
+** Extended API for managed records
+
+The following functions are now available (as pass-thrus to their R6RS record
+API counterparts) from the `(gzochi data)' and `(gzochi)' libraries:
+`gzochi:managed-record-rtd', `gzochi:managed-record-type-name', 
+`gzochi:managed-record-type-parent', `gzochi:managed-record-type-uid'.
+
+* Bug fixes
+
+** Deadlocks while processing channel operations
+** `gzochi:remove-binding!' should not remove bound object.
+** Transactions should roll back on a non-local exit from application code
+** Extraneous forked processes are launched
+** Sporadic data corruption during initialization
+** Sporadic segmentation fault during initialized callback
+** Userland bindings should be prefixed with "o."
+
+
+Copyright information:
+
+Copyright (C) 2012 Julian Graham
+
+   Permission is granted to anyone to make or distribute verbatim copies
+   of this document as received, in any medium, provided that the
+   copyright notice and this permission notice are preserved,
+   thus giving the recipient permission to redistribute in turn.
+
+   Permission is granted to distribute modified versions
+   of this document, or of portions of it,
+   under the above conditions, provided also that they
+   carry prominent notices stating who last changed them.
+
+
+Local variables:
+mode: outline
+paragraph-separate: "[ 	]*$"
+end:
