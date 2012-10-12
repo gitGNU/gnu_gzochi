@@ -69,6 +69,7 @@ The gzochid container
 * Communication protocol::
 * User authentication::
 * Monitoring::
+* Remote debugging::
 
 Writing applications for gzochid
 
@@ -433,6 +434,14 @@ about the state of a running gzochid server and its hosted games.
 Disabling this feature (by setting this key to @code{false}) will
 net a small improvement in process memory consumption and CPU
 performance.
+
+@item module.debug.enabled
+Set to @code{true} to enable the debugging server. Has no effect if
+@samp{context.enabled} is not @code{true}.
+
+@item module.debug.port
+The local port on which the debugging server should listen for
+incoming telnet connections.
 
 @item module.httpd.enabled
 Set to @code{true} to enable the monitoring web server. Has no
@@ -853,6 +862,50 @@ track them.
 Future plans for the monitoring web server include per-game 
 statistical reporting on data such as transactional throughput,
 client session volume, and 
+@node Remote debugging
+@chapter Remote debugging
+
+Application code deployed to gzochid executes in a context with
+fairly unique characteristics. Even when unit tests---which should
+be the primary means of detecting and preventing bugs---have been
+written, situations present themselves in which inspecting the state
+of a running application is the most effective way to troubleshoot
+an error or incorrect behavior. To this end, gzochid offers a remote
+debugging interface that allows a developer to connect to a running
+gzochid instance using a telnet client and to evaluate Scheme code 
+within the context of an application hosted by that instance.
+
+The debugging server listens on the port specified by the 
+@code{module.debug.port} setting in the server configuration file.
+When a client connects to the debug port, a new Scheme REPL (Read 
+Evaluate Print Loop) is launched and associated with a fresh
+``sandbox'' environment in which the @code{(guile)}, 
+@code{(gzochi)}, and @code{(gzochi admin)} modules have been
+pre-loaded. A user can interact with the debugger using the full
+complement of Scheme syntax and Guile REPL commands
+(e.g., @code{,pretty-print}). A typical debugging session might have
+the form:
+
+@example
+julian@@navigator:~$ telnet localhost 37146
+Trying ::1...
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+GNU Guile 2.0.6.31-2446f
+Copyright (C) 1995-2012 Free Software Foundation, Inc.
+
+Guile comes with ABSOLUTELY NO WARRANTY; for details type `,show w'.
+This program is free software, and you are welcome to redistribute it
+under certain conditions; type `,show c' for details.
+
+Enter `,help' for help.
+scheme@@(#@{ g109@}#)> (gzochi:applications)
+$1 = (#<r6rs:record:gzochi:application-context>)
+scheme@@(#@{ g109@}#)> (gzochi:with-application (car $1) 
+  (lambda () (gzochi:get-binding "scoreboard")))
+$2 = #<r6rs:record:my-game:scoreboard>
+@end example
 
 @node Application design with gzochid
 @chapter Application design with gzochid
