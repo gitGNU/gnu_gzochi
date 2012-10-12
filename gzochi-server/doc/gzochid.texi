@@ -1079,6 +1079,12 @@ Returns the managed record that encapsulates the data for the
 was created without any.
 @end deffn
 
+@defvr {Scheme Variable} %gzochi:application-root
+The value of this fluid is set to the root deployment directory of 
+the application to which the currently executing code belongs. (By
+default, this is ``/var/gzochid/deploy/[application name]''.)
+@end defvr
+
 @node gzochi channel
 @section gzochi channel
 
