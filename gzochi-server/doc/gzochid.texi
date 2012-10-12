@@ -1455,6 +1455,174 @@ the association between @var{name} and a managed record; to remove
 the record itself, you must call @code{gzochi:remove-record!}.
 @end deffn
 
+Many of the operations provided by @code{(gzochi data)} are 
+supported only for managed records. For example, you cannot use
+@code{gzochi:set-binding!} to store a primitive value; you must 
+first ``wrap'' that value as a field in a managed record type that
+includes information about how it should be serialized. In lieu of 
+creating distinct managed record types to wrap every unmanaged type
+that needs to be stored, the procedures below are provided to
+support the use of the generic @code{gzochi:managed-serializable}
+type that encapsulates the serialization information for unmanaged
+types.
+
+@deffn {Scheme Procedure} gzochi:make-managed-serializable value serializer-callback deserializer-callback
+Constructs a new @code{gzochi:managed-serializable} object with the 
+specified value. The @var{serializer-callback} and 
+@var{deserializer-callback} arguments must be @code{gzochi:callback}
+instances specifying procedures to be used or serialization and
+deserialization, respectively. 
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-serializable? obj
+Returns @code{#t} if @var{obj} is a managed serializable record, 
+@code{#f} otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-serializable-value ms
+Returns the value wrapped by the managed serializable record 
+@var{ms}.
+@end deffn
+
+Compound data types such as vectors and hash tables are necessary
+components of any non-trivial application, but designing structures
+that support highly concurrent access to and modification of their 
+contents is challenging. The following API describes ``managed''
+implementations of R6RS vectors and hash tables, which partition
+their elements such that conflicts between transactions accessing
+different elements of the same container are minimized.
+
+@deffn {Scheme Procedure} gzochi:make-managed-vector len
+Returns a newly allocated managed vector of @var{len} elements. The
+initial contents of each position is set to @code{#f}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-vector #:key serializer deserializer #:rest arg ...
+Returns a newly allocated managed vector composed of the given 
+arguments. If any vector element is not a managed record, the 
+keyword arguments @var{#:serializer} and @var{#:deserializer} must 
+be given (in the form of @code{gzochi:callback} records), and
+managed serializable wrappers will be generated to hold any 
+unmanaged elements.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-vector?
+Returns @code{#t} if @var{obj} is a managed vector, @code{#f} 
+otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-vector-ref vec k
+Returns the contents of position @var{k} of @var{vec}. @var{k} must
+be a valid index of @var{vec}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-vector-set! vec k obj #:key serializer deserializer
+Stores @var{obj} at position @var{k} of @var{vec}. @var{k} must be a
+valid index of @var{vec}. The value returned by 
+@code{gzochi:managed-vector-set!} is unspecified. If @var{obj} is
+not a managed record, the keyword arguments @var{#:serializer} and 
+@var{#:deserializer} must be given (in the form of 
+@code{gzochi:callback} records), and a managed serializable wrapper
+will be generated to hold @var{obj}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-vector-length vector
+Returns the number of elements in @var{vector} as an exact integer.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-vector->list v
+Return a newly allocated list composed of the contents of @var{v}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-managed-hashtable hash-callback equiv-callback
+Constructs a new hash table that uses the procedure specified by the
+@code{gzochi:callback} arguments @var{equiv-callback} to compare keys
+and @var{hash-callback} as a hash function. @var{equiv-callback} must
+specify a procedure that accepts two arguments and returns a true
+value if the are equivalent, @code{#f} otherwise, @var{hash-callback}
+a procedure that accepts one argument and returns a non-negative
+integer.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable?
+Returns @code{#t} if @var{obj} is a managed hash table, @code{#f} 
+otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-size hashtable
+Returns the number of keys currently in the managed hash table
+@var{hashtable}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-ref hashtable key default
+Returns the value associated with @var{key} in the the managed hash 
+table @var{hashtable} or @var{default} if none is found.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-set! hashtable key obj #:key key-serializer key-deserializer value-serializer value-deserializer
+Associates the key @var{key} wth the value @var{obj} in the managed
+hash table @var{hashtable}, and returns an unspecified value.
+
+If @var{key} is not a managed record, the keyword arguments 
+@var{#:key-serializer} and @var{#:key-deserializer} must be given 
+(in the form of @code{gzochi:callback} records), and a managed 
+serializable wrapper will be generated to hold @var{key}. Likewise,
+if @var{obj} is not a managed record, @var{#:value-serializer} and
+@var{#:value-deserializer} must be provided.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-delete! hashtable key
+Removes any association found for the key @var{key} in the hash
+table @var{hashtable}, and returns an unspecified value.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-contains? hashtable key
+Returns @code{#t} if the managed hash table @var{hashtable} contains
+an association for the key @var{key}, @code{#f} otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-update! hashtable key proc default #:key key-serializer key-deserializer value-serializer value-deserializer
+Associates with @var{key} in the managed hash table @var{hashtable}
+the result of calling @var{proc}, which must be a procedure that 
+takes one argument, on the value currently associated with @var{key}
+in @var{hashtable}---or on @var{default} if no such association 
+exists.
+
+If @var{key} is not a managed record, the keyword arguments 
+@var{#:key-serializer} and @var{#:key-deserializer} must be given. 
+If @var{proc} returns something that is not a managed record---or if
+@var{default} becomes the value of the association---then 
+@var{#:value-serializer} and @var{#:value-deserializer} must be
+provided.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-clear! hashtable
+Removes all of the associations from the managed hash table 
+@var{hashtable}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-keys hashtable
+Returns a managed vector of the keys with associations in the 
+managed hash table @var{hashtable}, in an unspecified order.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-entries hashtable
+Returns two values---a managed vector of the keys with associations
+in the managed hash table @var{hashtable}, and a managed vector of 
+the values to which these keys are mapped, in corresponding but 
+unspecified order.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-hash-function hashtable
+Returns a @code{gzochi:callback} record that represents the
+equivalence predicate used by @var{hashtable}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-hashtable-equivalence-function hashtable
+Returns a @code{gzochi:callback} record that represents the hash
+function used by @var{hashtable}
+@end deffn
+
 @node gzochi io
 @section gzochi io
 
