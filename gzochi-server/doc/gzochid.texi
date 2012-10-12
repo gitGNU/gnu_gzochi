@@ -978,6 +978,7 @@ that can be imported independently or all together via the
 @code{(gzochi)} composite library.
 
 @menu
+* gzochi admin::
 * gzochi app::
 * gzochi channel::
 * gzochi client::
@@ -989,6 +990,52 @@ that can be imported independently or all together via the
 
 * gzochi::
 @end menu
+
+@node gzochi admin
+@section gzochi admin
+
+The @code{(gzochi admin)} module exports procedures and data types
+that enable introspection of game application state and the 
+execution of Scheme code within the context of a running game
+application.
+
+These functions are intended for use with the remote debugging
+interface provided by the gzochid container. Because their use cases
+as part of deployed application code are not well defined, they are
+not exported from the @code{(gzochi)} composite library.
+
+@deffn {Scheme Procedure} gzochi:applications
+Returns a list of application context objects representing the
+set of applications running in the container.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:current-application
+Returns an application context representing the ``current''
+application, e.g. as set by @code{gzochi:with-application}, or
+@code{#f} if the current application has not been set.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:application-context? obj
+Returns @code{#t} if @var{obj} is an application context object
+(as returned by @code{gzochi:applications} or 
+@code{gzochi:current-application}, @code{#f} otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:application-context-name context
+Returns the name of the application represented by the application
+context object @var{context}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:with-application context thunk
+Calls the zero-argument procedure @var{thunk} with the current
+application set temporarily to the application represented by the 
+application context object @var{context}. The value yielded by
+@code{thunk} is returned.
+
+The application that was current before calling 
+@code{gzochi:with-application} (or @code{#f} if there was none) will
+be restored when @var{thunk} exits locally or non-locally.
+@end deffn
 
 @node gzochi app
 @section gzochi app
@@ -1518,8 +1565,9 @@ data store.
 @section gzochi
 
 The @code{(gzochi)} library is a composite of all of the other
-public gzochi libraries---it imports and re-exports all of their
-exported procedures and syntactic forms.
+public gzochi libraries, with the exception of `(gzochi admin)'. It 
+imports and re-exports all of their exported procedures and syntactic 
+forms.
 
 @node An example application
 @chapter An example application
