@@ -1282,6 +1282,63 @@ Returns @code{#t} of @var{obj} is a @code{&gzochi:object-removed}
 condition, @code{#f} otherwise.
 @end deffn
 
+A @code{&gzochi:no-current-application} condition is raised when an
+operation requiring an application context is attempted and none is
+present. This happens most frequently because of user error in an
+interactive remote debugging session---for example, a call to a
+transaction-aware API function that is not wrapped in an 
+invocation of @code{gzochi:with-application}.
+
+@deffn {Condition Type} &gzochi:no-current-application
+The condition type, for introspection or use as a base type for 
+other conditions.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-no-current-application-condition
+Contructs a new @code{&gzochi:no-current-application} condition.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:no-current-application-condition?
+Returns @code{#t} of @var{obj} is a @code{&gzochi:no-current-application}
+condition, @code{#f} otherwise.
+@end deffn
+
+A @code{&gzochi:transaction-aborted} condition is raised when a 
+transactional operation is in attempted and the transaction bound to
+the current thread has been found to be in an inconsistent 
+state---that is to say, it has been rolled back or marked for 
+rollback.
+
+Although this condition will almost aways be raised in a 
+non-continuable way, aborted transactions are an expected part of
+the control flow of a gzochi game application. A transaction may be
+aborted for a number of reasons; the code executing as part of the
+transaction may have accessed data in a way that brought it into
+conflict with code executing as part of another transaction, or its
+execution time may have exceeded a configured threshold and the 
+scheduler has pre-emptively aborted its transaction to prevent it
+from interfering with other transactions.
+
+A @code{&gzochi:transaction-aborted} condition does not typically
+require explicit handling. Rather, it is best to allow the code that 
+triggered the condition to exit non-locally; gzochid's task 
+scheduler will observe the state of the transaction upon exit and
+reschedule the task or callback accordingly.
+
+@deffn {Condition Type} &gzochi:transaction-aborted
+The condition type, for introspection or use as a base type for 
+other conditions.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-transaction-aborted-condition
+Contructs a new @code{&gzochi:transaction-aborted} condition.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:transaction-aborted-condition?
+Returns @code{#t} of @var{obj} is a @code{&gzochi:transaction-aborted}
+condition, @code{#f} otherwise.
+@end deffn
+
 @node gzochi data
 @section gzochi data
 
