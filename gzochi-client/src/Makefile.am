@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2011 Julian Graham
+# Copyright (C) 2012 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,20 +18,16 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
-GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
+GZOCHI_CLIENT_COMMON_CFLAGS = -I@GZOCHI_CLIENT_COMMON@/src
+GZOCHI_CLIENT_COMMON_LIBS = \
+	@GZOCHI_CLIENT_COMMON@/src/libgzochi-client-common.la
 
-AM_CFLAGS = @CFLAGS@ $(GZOCHI_COMMON_CFLAGS) -Wall -pedantic
+AM_CFLAGS = @CFLAGS@ $(GZOCHI_CLIENT_COMMON_CFLAGS) -Wall -pedantic
 
 lib_LTLIBRARIES = libgzochi.la
 
-libgzochi_la_SOURCES = client.c protocol.c session.c
-libgzochi_la_LIBADD = $(GZOCHI_COMMON_LIBS)
+libgzochi_la_SOURCES = client.c 
+libgzochi_la_LIBADD = $(GZOCHI_CLIENT_COMMON_LIBS)
 
 includedir = $(prefix)/include
 dist_include_HEADERS = libgzochi.h
-noinst_HEADERS = protocol.h session.h
-
-client.c:
-protocol.c: protocol.h
-session.c: session.h

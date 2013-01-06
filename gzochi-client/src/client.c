@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <gzochi-common.h>
+#include <gzochi-client-common.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -23,13 +23,51 @@
 #include <string.h>
 #include <sys/socket.h>
 
-#include "io.h"
-#include "protocol.h"
-#include "session.h"
+#ifndef TRUE
+#define TRUE 1
+#endif /* TRUE */
+
+#ifndef FALSE
+#define FALSE 0
+#endif /* FALSE */
+
+typedef gzochi_client_common_session gzochi_client_session;
+
+typedef gzochi_client_common_session_disconnected_callback
+gzochi_client_session_disconnected_callback;
+
+typedef gzochi_client_common_session_received_message_callback
+gzochi_client_session_received_message_callback;
+
+static int read_and_dispatch (gzochi_client_session *session, int connecting)
+{
+  int dispatched = connecting 
+    ? gzochi_client_protocol_dispatch (session)
+    : gzochi_client_protocol_dispatch_all (session);
+
+  while (TRUE)
+    {
+      if (connecting && dispatched)
+	break;
+  
+      if (gzochi_client_protocol_read (session) < 0)
+	{
+	  if (session->disconnected_callback != NULL)
+	    session->disconnected_callback 
+	      (session, session->disconnected_user_data);
+
+	  return -1;
+	}
+
+      dispatched = gzochi_client_protocol_dispatch_all (session);
+    }
+
+  return 0;
+}
 
 void gzochi_client_run (gzochi_client_session *session)
 {
-  gzochi_protocol_run (session);
+  read_and_dispatch (session, FALSE);
 }
 
 gzochi_client_session *gzochi_client_connect 
@@ -58,13 +96,15 @@ gzochi_client_session *gzochi_client_connect
 	       sizeof (struct sockaddr_in)) < 0)
     return NULL;
 
-  session = gzochi_client_session_new ();
+  session = gzochi_client_common_session_new ();
   session->connected = TRUE;
   session->socket = sock;
 
-  gzochi_protocol_send_login_request 
+  gzochi_client_protocol_send_login_request 
     (session, endpoint, credentials, credentials_length);
-  gzochi_protocol_run_once (session);
+
+  read_and_dispatch (session, TRUE);
+
   if (session->connected)
     return session;
   else
@@ -76,11 +116,42 @@ gzochi_client_session *gzochi_client_connect
 
 void gzochi_client_disconnect (gzochi_client_session *session)
 {
-  gzochi_client_session_disconnect (session);
+  gzochi_client_common_session_disconnect (session);
 }
 
 void gzochi_client_send 
 (gzochi_client_session *session, unsigned char *msg, short len)
 {
-  gzochi_protocol_send_session_message (session, msg, len);
+  gzochi_client_protocol_send_session_message (session, msg, len);
+}
+
+char *gzochi_client_session_endpoint (gzochi_client_session *session)
+{
+  return gzochi_client_common_session_endpoint (session);
+}
+
+char *gzochi_client_session_hostname (gzochi_client_session *session)
+{
+  return gzochi_client_common_session_hostname (session);
+}
+
+int gzochi_client_session_port (gzochi_client_session *session)
+{
+  return gzochi_client_common_session_port (session);
+}
+
+void gzochi_client_session_set_disconnected_callback
+(gzochi_client_session *session, 
+ gzochi_client_session_disconnected_callback callback, void *user_data)
+{
+  gzochi_client_common_session_set_disconnected_callback 
+    (session, callback, user_data);
+}
+
+void gzochi_client_session_set_received_message_callback
+(gzochi_client_session *session, 
+ gzochi_client_session_received_message_callback callback, void *user_data)
+{
+  gzochi_client_common_session_set_received_message_callback 
+    (session, callback, user_data);
 }
