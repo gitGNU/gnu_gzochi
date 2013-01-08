@@ -1,5 +1,5 @@
 /* scheme.c: Supplementary Scheme routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -145,6 +145,8 @@ void gzochid_scheme_application_worker
 {
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
 
+  gzochid_transaction_join (&scheme_participant, NULL);
+
   gzochid_scheme_invoke 
     (context, 
      identity,
@@ -156,10 +158,7 @@ void gzochid_scheme_application_worker
      exception_var);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    {
-      gzochid_transaction_join (&scheme_participant, NULL);
-      gzochid_transaction_mark_for_rollback (&scheme_participant);
-    }
+    gzochid_transaction_mark_for_rollback (&scheme_participant);
 }
 
 static gzochid_application_callback *scm_to_callback 
@@ -192,6 +191,8 @@ void gzochid_scheme_application_initialized_worker
   callback_reference = gzochid_data_create_reference 
     (context, &gzochid_scheme_data_serialization, callback);
 
+  gzochid_transaction_join (&scheme_participant, NULL);
+
   gzochid_scheme_invoke 
     (context,
      identity,
@@ -209,10 +210,7 @@ void gzochid_scheme_application_initialized_worker
      exception_var);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    {
-      gzochid_transaction_join (&scheme_participant, NULL);
-      gzochid_transaction_mark_for_rollback (&scheme_participant);
-    }
+    gzochid_transaction_mark_for_rollback (&scheme_participant);
   else gzochid_data_set_binding_to_oid 
 	 (context, "s.initializer", callback_reference->oid);
 }
@@ -270,6 +268,8 @@ void gzochid_scheme_application_logged_in_worker
   callback_reference = gzochid_data_create_reference 
     (context, &gzochid_scheme_data_serialization, cb);
 
+  gzochid_transaction_join (&scheme_participant, NULL);
+
   handler = gzochid_scheme_invoke 
     (context,
      identity,
@@ -282,10 +282,7 @@ void gzochid_scheme_application_logged_in_worker
      exception_var);
   
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    {
-      gzochid_transaction_join (&scheme_participant, NULL);
-      gzochid_transaction_mark_for_rollback (&scheme_participant);
-    }
+    gzochid_transaction_mark_for_rollback (&scheme_participant);
   else if (scm_is_false (handler))
     gzochid_client_session_send_login_failure (context, session);
   else
@@ -434,6 +431,7 @@ static void scheme_managed_record_serializer
   GList *gpd = g_list_append 
     (g_list_append (g_list_append (NULL, "gzochi"), "private"), "data");
   SCM vec = SCM_EOL, port = SCM_EOL, proc = SCM_EOL;
+  SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
   SCM port_and_proc = 
     scm_struct_ref (scm_open_bytevector_output_port (SCM_BOOL_F), SCM_INUM0);
   int vec_len = 0;
@@ -446,7 +444,17 @@ static void scheme_managed_record_serializer
      NULL,
      "gzochi:serialize-managed-record", gpd,
      scm_list_2 (port, arg), 
-     SCM_BOOL_F);
+     exception_var);
+
+  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
+    {
+      /* Don't join the transaction here as the serializer should only be
+	 called during the PREPARING phase, which is too late to join. */
+
+      gzochid_transaction_mark_for_rollback (&scheme_participant);      
+      g_list_free (gpd);
+      return;
+    }
 
   vec = scm_call_0 (proc);
 
@@ -465,6 +473,7 @@ static void *scheme_managed_record_deserializer
 {
   int vec_len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   SCM vec = SCM_EOL, port = SCM_EOL, record = SCM_EOL;
+  SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
   
   g_string_erase (in, 0, 4);
   vec = scm_take_u8vector ((unsigned char *) in->str, vec_len);
@@ -479,10 +488,16 @@ static void *scheme_managed_record_deserializer
      (g_list_append 
       (g_list_append (NULL, "gzochi"), "private"), "data"),
      scm_list_1 (port),
-     SCM_BOOL_F);
+     exception_var);
 
-  scm_gc_protect_object (record);
   g_string_erase (in, 0, vec_len);
+  
+  /* Don't join the transaction here as the serializer should only be
+     called during the PREPARING phase, which is too late to join. */
+  
+  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
+    gzochid_transaction_mark_for_rollback (&scheme_participant);      
+  else scm_gc_protect_object (record);
 
   return record;
 }
@@ -646,7 +661,6 @@ GHashTable *gzochid_scheme_hashtable_to_ghashtable
 
       key_list = SCM_CDR (key_list);
     }
-  
 
   return ret;
 }
