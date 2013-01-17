@@ -1,5 +1,5 @@
 /* protocol.h: Prototypes and declarations for protocol.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -33,6 +33,8 @@
 SCM gzochid_scheme_scm_module_gzochi_private_app;
 
 void gzochid_scheme_application_worker
+(gzochid_application_context *, gzochid_auth_identity *, gpointer);
+void gzochid_scheme_application_task_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 void gzochid_scheme_application_initialized_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);

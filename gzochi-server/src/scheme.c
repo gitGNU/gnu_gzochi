@@ -95,11 +95,31 @@ static gpointer scheme_invoke_inner (gpointer data)
   return gzochid_guile_invoke (procedure, args, exception_var);
 }
 
+static SCM scheme_invoke 
+(gzochid_application_context *context, gzochid_auth_identity *identity,
+ SCM proc, SCM args, SCM exception_var)
+{
+  void *data[3];
+  SCM ret = SCM_EOL;
+
+  data[0] = proc;
+  data[1] = args;
+  data[2] = exception_var;
+
+  ret = (SCM) gzochid_with_application_context 
+    (context, identity, scheme_invoke_inner, data);
+
+  scm_remember_upto_here_1 (proc);
+  scm_remember_upto_here_1 (args);
+  scm_remember_upto_here_1 (exception_var);
+
+  return ret;
+}
+
 SCM gzochid_scheme_invoke
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  char *procedure, GList *module, SCM args, SCM exception_var)
 {
-  void *data[3];
   SCM ret = SCM_EOL;
   SCM load_path = SCM_EOL, new_load_path = SCM_EOL, backup_load_path = SCM_EOL;
   GList *path_ptr = context->descriptor->load_paths;
@@ -118,17 +138,11 @@ SCM gzochid_scheme_invoke
   
   scm_variable_set_x (load_path, new_load_path);
 
-  data[0] = resolve_procedure (procedure, module);
-  data[1] = args;
-  data[2] = exception_var;
+  ret = scheme_invoke 
+    (context, identity, resolve_procedure (procedure, module), args, 
+     exception_var);
 
-  ret = (SCM) gzochid_with_application_context 
-    (context, identity, scheme_invoke_inner, data);
   scm_variable_set_x (load_path, backup_load_path);
-
-  scm_remember_upto_here_1 (args);
-  scm_remember_upto_here_1 (exception_var);
-
   return ret;
 }
 
@@ -141,6 +155,25 @@ static gzochid_transaction_participant scheme_participant =
 
 void gzochid_scheme_application_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gpointer ptr)
+{
+  void **data = (void **) ptr;
+
+  SCM proc = (SCM) data[0];
+  SCM args = (SCM) data[1];
+  SCM exception_var = (SCM) data[2];
+  SCM *ret = (SCM *) data[3];
+
+  gzochid_transaction_join (&scheme_participant, NULL);
+
+  *ret = scheme_invoke (context, identity, proc, args, exception_var);
+
+  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
+    gzochid_transaction_mark_for_rollback (&scheme_participant);
+}
+
+void gzochid_scheme_application_task_worker 
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer task)
 {
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
@@ -151,7 +184,7 @@ void gzochid_scheme_application_worker
     (context, 
      identity,
      "gzochi:run-task", 
-     g_list_append 
+     g_list_append
      (g_list_append 
       (g_list_append (NULL, "gzochi"), "private"), "task"), 
      scm_list_1 ((SCM) task), 
@@ -402,7 +435,7 @@ static void scheme_worker_serializer
 static gzochid_application_worker scheme_worker_deserializer
 (gzochid_application_context *context, GString *in)
 {
-  return gzochid_scheme_application_worker;
+  return gzochid_scheme_application_task_worker;
 }
 
 gboolean is_managed_record (SCM obj)
@@ -586,7 +619,7 @@ gzochid_application_task *gzochid_scheme_task_new
      SCM_BOOL_F);
 
   gzochid_application_task *task = gzochid_application_task_new
-    (context, identity, gzochid_scheme_application_worker, scm_data);
+    (context, identity, gzochid_scheme_application_task_worker, scm_data);
   
   scm_gc_protect_object (task->data);
   return task;
