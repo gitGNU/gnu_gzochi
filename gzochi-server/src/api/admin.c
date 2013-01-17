@@ -1,5 +1,5 @@
 /* admin.c: Primitive functions for gzochi admin API
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #include "../auth.h"
 #include "../game.h"
 #include "../guile.h"
+#include "../scheme.h"
 #include "../tx.h"
 
 #include "task.h"
@@ -70,34 +71,6 @@ SCM_DEFINE (primitive_current_application, "primitive-current-application",
 	  scm_from_locale_string (context->descriptor->name));
 }
 
-static void thunk_worker (gpointer data, gpointer user_data)
-{
-  void **args = (void **) data;
-
-  SCM thunk = (SCM) args[0];
-  SCM *out = (SCM *) args[1];
-  SCM exception_var = (SCM) args[2];
-
-  *out = gzochid_guile_invoke (thunk, SCM_EOL, exception_var);
-
-  if (gzochid_transaction_active ())
-    gzochid_api_check_rollback ();
-}
-
-static void *thunk_guile_worker (gpointer data)
-{
-  gzochid_guile_run (thunk_worker, data);
-  return NULL;
-}
-
-static void thunk_application_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
-{
-  gzochid_with_application_context 
-    (context, identity, thunk_guile_worker, data);
-}
-
 SCM_DEFINE (primitive_with_application, "primitive-with-application", 
 	    2, 0, 0, (SCM context, SCM thunk), 
 	    "Returns the current application or #f if not set.")
@@ -115,15 +88,16 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
   SCM ret = SCM_UNDEFINED;
   SCM exception_var = scm_make_variable (SCM_BOOL_F);
   SCM exception = SCM_UNDEFINED;
-  void *args[3];
+  void *args[4];
 
   debug_identity->name = "[DEBUG]";
 
   args[0] = thunk;
-  args[1] = &ret;
+  args[1] = SCM_EOL;
   args[2] = exception_var;
+  args[3] = &ret;
   
-  transactional_task.worker = thunk_application_worker;
+  transactional_task.worker = gzochid_scheme_application_worker;
   transactional_task.data = args;
 
   application_task.worker = gzochid_application_transactional_task_worker;
@@ -138,6 +112,8 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
   exception = scm_variable_ref (exception_var);
   if (exception != SCM_BOOL_F)
     scm_throw (SCM_CAR (exception), SCM_CDR (exception));
+  else if (gzochid_transaction_active ())
+    gzochid_api_check_rollback ();
 
   return ret;
 }
