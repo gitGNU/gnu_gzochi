@@ -67,6 +67,7 @@
     (or (not reference) 
 	(gzochi:managed-reference? reference)
 	(raise (condition (make-assertion-violation)
+			  (make-message-condition "Not a managed reference.")
 			  (make-irritants-condition reference))))
 
     (gzochi:write-boolean port reference)
