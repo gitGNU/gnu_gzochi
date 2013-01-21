@@ -1,5 +1,5 @@
 /* data.c: Application data management routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -90,13 +90,10 @@ static void transaction_context_free (gzochid_data_transaction_context *context)
   free (context);
 }
 
-static void flush_reference (gpointer data, gpointer user_data)
+static gboolean flush_reference 
+(gzochid_data_managed_reference *reference,
+ gzochid_data_transaction_context *context)
 {
-  gzochid_data_transaction_context *context = 
-    (gzochid_data_transaction_context *) user_data;
-  gzochid_data_managed_reference *reference = 
-    (gzochid_data_managed_reference *) data;
-
   char *oid_str = NULL;
   GString *out = NULL;
 
@@ -117,7 +114,14 @@ static void flush_reference (gpointer data, gpointer user_data)
 
       reference->serialization->serializer
 	(context->context, reference->obj, out);
-      gzochid_storage_transaction_put 
+
+      if (gzochid_transaction_rollback_only ())
+	{
+	  g_string_free (out, FALSE);	  
+	  return FALSE;
+	}
+
+      gzochid_storage_transaction_put
 	(context->oids_transaction, oid_str, strlen (oid_str) + 1, 
 	 out->str, out->len);
 
@@ -129,6 +133,8 @@ static void flush_reference (gpointer data, gpointer user_data)
     default:
       assert (1 == 0);
     }
+
+  return TRUE;
 }
 
 static int data_prepare (gpointer data)
@@ -136,12 +142,26 @@ static int data_prepare (gpointer data)
   gzochid_data_transaction_context *context = 
     (gzochid_data_transaction_context *) data;
   GList *references = g_hash_table_get_values (context->oids_to_references);
-
+  GList *reference_ptr = references;
+  gboolean flush_failed = FALSE;
+  
   gzochid_storage_lock (context->context->oids);
   gzochid_storage_lock (context->context->names);
 
-  g_list_foreach (references, flush_reference, context);
+  while (reference_ptr != NULL)
+    {
+      if (!flush_reference (reference_ptr->data, context))
+	{
+	  flush_failed = TRUE;
+	  break;
+	}
+
+      reference_ptr = reference_ptr->next;
+    }
   g_list_free (references);
+
+  if (flush_failed)
+    return FALSE;
 
   gzochid_storage_transaction_check (context->oids_transaction);
   if (context->oids_transaction->rollback)
