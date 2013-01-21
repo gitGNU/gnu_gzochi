@@ -146,8 +146,8 @@ SCM gzochid_scheme_invoke
   return ret;
 }
 
-static int scheme_prepare (gpointer data) { return FALSE; }
-static void scheme_commit (gpointer data) { assert (1 == 0); }
+static int scheme_prepare (gpointer data) { return TRUE; }
+static void scheme_commit (gpointer data) { }
 static void scheme_rollback (gpointer data) { }
 
 static gzochid_transaction_participant scheme_participant = 
