@@ -1,5 +1,5 @@
 /* channel.c: Channel management routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -293,6 +293,7 @@ static void send_channel_message
 
   gzochid_channel *channel = NULL;
   GSequenceIter *iter = NULL;
+  gboolean channel_modified = FALSE;
 
   gzochid_data_dereference (channel_reference);
   channel = (gzochid_channel *) channel_reference->obj;
@@ -313,12 +314,20 @@ static void send_channel_message
 	   gzochid_channel_payload_message_new 
 	   (GZOCHID_CHANNEL_MESSAGE_SEND, client, send_op->message, 
 	    send_op->len));
-      else gzochid_warning 
-	     ("Client not found for messaged channel session '%s'; skipping.", 
-	      session_oid_str);
+      else 
+	{
+	  gzochid_warning 
+	    ("Client not found for messaged channel session '%s'; removing.", 
+	     session_oid_str);
+	  g_sequence_remove (iter);
+	  channel_modified = TRUE;
+	}
 
       iter = g_sequence_iter_next (iter);
     }
+
+  if (channel_modified)
+    gzochid_data_mark (context, &gzochid_channel_serialization, channel);
   
   g_mutex_unlock (context->client_mapping_lock);
 }
