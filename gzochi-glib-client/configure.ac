@@ -1,6 +1,6 @@
 dnl configure.ac --- food for -*-autoconf-*- et al
 dnl
-dnl Copyright (C) 2012 Julian Graham
+dnl Copyright (C) 2013 Julian Graham
 dnl
 dnl This is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -38,6 +38,7 @@ GZOCHI_VERSION="$PACKAGE_VERSION"
 AC_CONFIG_FILES([meta/gzochi-glib.pc])
 
 AC_CONFIG_FILES([Makefile
+                 doc/Makefile
                  meta/Makefile
                  src/Makefile])
 
