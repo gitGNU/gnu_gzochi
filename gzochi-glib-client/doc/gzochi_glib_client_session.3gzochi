@@ -1,0 +1,133 @@
+'\" t
+.\"***************************************************************************
+.\" Copyright (c) 2013 Julian Graham                                         *
+.\"                                                                          *
+.\" Permission is hereby granted, free of charge, to any person obtaining a  *
+.\" copy of this software and associated documentation files (the            *
+.\" "Software"), to deal in the Software without restriction, including      *
+.\" without limitation the rights to use, copy, modify, merge, publish,      *
+.\" distribute, distribute with modifications, sublicense, and/or sell       *
+.\" copies of the Software, and to permit persons to whom the Software is    *
+.\" furnished to do so, subject to the following conditions:                 *
+.\"                                                                          *
+.\" The above copyright notice and this permission notice shall be included  *
+.\" in all copies or substantial portions of the Software.                   *
+.\"                                                                          *
+.\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS  *
+.\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF               *
+.\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.   *
+.\" IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
+.\" DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR    *
+.\" OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR    *
+.\" THE USE OR OTHER DEALINGS IN THE SOFTWARE.                               *
+.\"                                                                          *
+.\" Except as contained in this notice, the name(s) of the above copyright   *
+.\" holders shall not be used in advertising or otherwise to promote the     *
+.\" sale, use or other dealings in this Software without prior written       *
+.\" authorization.                                                           *
+.\"***************************************************************************
+.\"
+.TH GZOCHI_GLIB_CLIENT_SESSION 3GZOCHI "January 23, 2013"
+.na
+.hy 0
+.SH NAME
+\fBgzochi_glib_client_session_disconnected_callback\fR,
+.br
+\fBgzochi_glib_client_session_received_message_callback\fR,
+.br
+\fBgzochi_glib_client_session_set_disconnected_callback\fR,
+.br
+\fBgzochi_glib_client_session_set_received_message_callback\fR,
+.br
+\fBgzochi_glib_client_session_endpoint\fR,
+.br
+\fBgzochi_glib_client_session_hostname\fR,
+.br
+\fBgzochi_glib_client_session_port\fR \- \fBgzochi\fR GLib client session 
+management routines
+.ad
+.hy
+.SH SYNOPSIS
+\fB#include <libgzochi-glib.h>\fR
+.P
+\fBtypedef void (*gzochi_glib_client_session_disconnected_callback) \fR
+      \fB(gzochi_glib_client_session *, void *);\fR
+.br
+\fBtypedef void (*gzochi_glib_client_session_received_message_callback) \fR
+      \fB(gzochi_glib_client_session *, unsigned char *, short, void *);\fR
+.P
+\fBvoid gzochi_glib_client_session_set_disconnected_callback \fR
+      \fB(gzochi_glib_client_session *session, \fR
+       \fBgzochi_glib_client_session_disconnected_callback callback, \fR
+       \fBvoid *user_data);\fR
+.br
+\fBvoid gzochi_glib_client_session_set_received_callback \fR
+      \fB(gzochi_glib_client_session *session, \fR
+       \fBgzochi_glib_client_session_received_message_callback callback, \fR
+       \fBvoid *user_data);\fR
+.P
+\fBchar *gzochi_glib_client_session_endpoint (gzochi_glib_client_session *session);\fR
+.br
+\fBchar *gzochi_glib_client_session_hostname (gzochi_glib_client_session *session);\fR
+.br
+\fBint gzochi_glib_client_session_port (gzochi_glib_client_session *session);\fR
+.SH DESCRIPTION
+These routines provide information about \fBgzochi_glib_client_session\fR 
+structures and allow callback routines to be registered for various client 
+lifecycle events. A pointer to a session structure is returned by 
+\fBgzochi_glib_client_connect\fR(3GZOCHI) and is passed to the other functions 
+that make up the library. The memory region addressed by this pointer should be 
+treated as being opaque to the user; users should not modify or free this 
+memory except via the functions in this library.
+.P
+The \fBgzochi_glib_client_session_set_disconnected_callback\fR and
+\fBgzochi_glib_client_session_set_received_message_callback\fR allow callback
+functions that respond to lifecycle events to be registered on a per-session
+basis. Both routines expect a session pointer followed by a function pointer 
+for a function of the requisite type. The 
+\fBgzochi_glib_client_session_disconnected_callback\fR will be called when a 
+session is disconnected explicitly by the server or by a network error, and 
+will be passed a pointer to the session that was disconnected. Note that after 
+this callback returns, the session will be cleaned up and the memory addressed 
+by the session pointer will no longer be accessible.
+\fBgzochi_glib_client_session_received_message_callback\fR will be called when 
+a session has received a complete message from the server, and will be passed a
+pointer to the session that received the message, as well as a pointer to a
+memory region containing the message, and an indication of the message's 
+length. This message pointer addresses an internal buffer whose contents may
+change once the callback returns. The bytes it contains should be copied if
+they are to be used outside the scope of the callback.
+.P
+Each callback will be passed the generic pointer \fBuser_data\fR, which may
+be specified (optionally as \fBNULL\fR) when the callbacks are registered.
+.P
+Since the gzochi GLib client is attached as a GSource to a GLib main loop, 
+these callbacks will be called synchronously from the thread executing the main
+loop (i.e., the thread calling \fBg_main_loop_run\fR).
+
+Callback registration may be changed at any time via the 
+\fBgzochi_glib_client_sesson_set_\fR routines, but this operation is not 
+thread-safe, particularly in the case of setting a \fBNULL\fR callback, so it
+is recommended that changes to callback registration be performed from the
+thread executing the main loop.
+.P
+\fBgzochi_glib_client_session_endpoint\fR, 
+\fBgzochi_glib_client_session_hostname\fR, and 
+\fBgzochi_glib_client_session_port\fR facilitate some limited inpection of the
+state of a client session pointer. \fBgzochi_glib_client_session_endpoint\fR 
+returns the named endpoint to which the session is connected, 
+\fBgzochi_glib_client_session_hostname\fR returns the endpoint's host, and
+\fBgzochi_glib_client_session_port\fR returns the port number of the remote 
+side of the connection.
+.SH RETURN VALUE
+\fBgzochi_glib_client_session_endpoint\fR and 
+\fBgzochi_glib_client_session_hostname\fR return \fBNULL\fR-terminated strings 
+whose memory should \fBnot\fR be freed or modified by their caller. 
+\fBgzochi_glib_client_session_port\fR returns an 
+\fBint\fR. None of the other functions return a value.
+.SH COPYRIGHT
+Copyright \(co 2013 Julian Graham. License GPLv3+: GNU GPL version 3
+or later <http://gnu.org/licenses/gpl.html>.
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.

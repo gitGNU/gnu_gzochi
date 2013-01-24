@@ -1,0 +1,91 @@
+'\" t
+.\"***************************************************************************
+.\" Copyright (c) 2013 Julian Graham                                         *
+.\"                                                                          *
+.\" Permission is hereby granted, free of charge, to any person obtaining a  *
+.\" copy of this software and associated documentation files (the            *
+.\" "Software"), to deal in the Software without restriction, including      *
+.\" without limitation the rights to use, copy, modify, merge, publish,      *
+.\" distribute, distribute with modifications, sublicense, and/or sell       *
+.\" copies of the Software, and to permit persons to whom the Software is    *
+.\" furnished to do so, subject to the following conditions:                 *
+.\"                                                                          *
+.\" The above copyright notice and this permission notice shall be included  *
+.\" in all copies or substantial portions of the Software.                   *
+.\"                                                                          *
+.\" THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS  *
+.\" OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF               *
+.\" MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.   *
+.\" IN NO EVENT SHALL THE ABOVE COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,   *
+.\" DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR    *
+.\" OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR    *
+.\" THE USE OR OTHER DEALINGS IN THE SOFTWARE.                               *
+.\"                                                                          *
+.\" Except as contained in this notice, the name(s) of the above copyright   *
+.\" holders shall not be used in advertising or otherwise to promote the     *
+.\" sale, use or other dealings in this Software without prior written       *
+.\" authorization.                                                           *
+.\"***************************************************************************
+.\"
+.TH gzochi-glib 3GZOCHI "January 22, 2013"
+.SH NAME
+\fBgzochi-glib\fR \- GLib-compatible client for the gzochi game development 
+framework
+.SH SYNOPSIS
+\fB#include <libgzochi-glib.h>\fR
+.br
+.SH DESCRIPTION
+\fBlibgzochi-glib\fR is a reference client implementation for the gzochi game
+development framework that integrates easily with the GLib library's "main 
+loop" functionality. \fBlibgzochi-glib\fR can be used in place of 
+\fBlibgzochi\fR to enable a more asynchrous, event-driven client architecture. 
+Like \fBlibgzochi\fR, This library takes care of the socket-level communication
+tasks required for establishing a connection to a gzochi game application 
+endpoint and dispatching messages to and from the server.
+.P
+A program using the routines provided by this library must be linked with the
+\fB\-lgzochi-glib\fR option.
+.P
+Most game application clients built on top of \fBlibgzochi-glib\fR will use the 
+following sequence of invocations to connect to a game application endpoint and
+begin receiving messages:
+.P
+      \fBgzochi_glib_client_session *session = \fR
+        \fBgzochi_glib_client_connect (my_server, my_endpoint, my_port);\fR
+      \fBGzochiSource *gzochi_source = gzochi_source_new (session);\fR
+      \fBgzochi_glib_client_session_set_disconnected_callback\fR
+        \fB(session, my_disconnected_handler);\fR
+      \fBgzochi_glib_client_session_set_received_message_callback\fR
+        \fB(session, my_received_message_handler);\fR
+      \fBg_source_attach ((GSource *) gzochi_source, my_main_context);\fR
+.P
+.SS Routine Name Index
+The following table lists each \fBlibgzochi-glib\fR routine and the name of the
+manual page on which it is described.
+.PP
+.TS
+center tab(/);
+l l.
+\fBlibgzochi-glib\fR Routine Name/Manual Page Name
+=
+gzochi_glib_client_connect/\fBgzochi_glib_client_connect\fR(3GZOCHI)
+gzochi_glib_client_disconnect/\fBgzochi_glib_client_disconnect\fR(3GZOCHI)
+gzochi_glib_client_send/\fBgzochi_glib_client_send\fR(3GZOCHI)
+gzochi_source_new/\fBgzochi_source_new\fR(3GZOCHI)
+
+.T&
+l s.
+gzochi_glib_client_session_set_disconnected_callback,
+gzochi_glib_client_session_set_received_message_callback,
+gzochi_glib_client_session_endpoint,
+gzochi_glib_client_session_hostname,
+.T&
+l l.
+gzochi_glib_client_session_port/\fBgzochi_glib_client_session\fR(3GZOCHI)
+.TE
+.SH COPYRIGHT
+Copyright \(co 2013 Julian Graham. License GPLv3+: GNU GPL version 3
+or later <http://gnu.org/licenses/gpl.html>.
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
