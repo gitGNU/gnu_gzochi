@@ -1,5 +1,5 @@
 /* socket.c: Application socket server implementation for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2012 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -156,7 +156,7 @@ static int handle_request (svz_socket_t *sock, char *msg, int len)
 static struct svz_servertype servertype =
   {
     "gzochi game server",
-    "game",
+    "gzochi",
         
     global_init,     /* global_init */
     init,            /* init */
@@ -186,24 +186,16 @@ static void initialize (int from_state, int to_state, gpointer user_data)
   
   svz_portcfg_t *portcfg = NULL;
   svz_server_t *server = NULL;
-  int i = 0;
-
-  /* Disable Serveez's coserver system; it's not necessary and, frankly, it 
-     gets in the way. */
   
-  for (; i < MAX_COSERVER_TYPES; i++)
-    svz_coservertypes[i].instances = 0;
-
-  svz_boot ();
+  svz_boot ("gzochid");
 
   portcfg = svz_portcfg_create ();
   portcfg->name = "default";
-  portcfg->proto = PROTO_TCP;
-  portcfg->flags = PORTCFG_FLAG_ALL;
+  portcfg->proto = SVZ_PROTO_TCP;
+  portcfg->flags = 0x0002;
   portcfg->protocol.tcp.port = game_context->port;
   portcfg->protocol.tcp.ipaddr = "*";
 
-  svz_portcfg_prepare (portcfg);
   if (svz_portcfg_mkaddr (portcfg) != 0)
     gzochid_err ("Failed to set port configuration for %s, %d", "*", 
 		 game_context->port);
@@ -211,16 +203,19 @@ static void initialize (int from_state, int to_state, gpointer user_data)
     gzochid_err ("Failed to add port configuration for %s, %d", "*", 
 		 game_context->port);
 
-  server = svz_server_instantiate (&servertype, "game");
-  server->data = server_context;
-  if (svz_server_bind (server, portcfg) != 0)
-    gzochid_err ("Failed to bind server to port %d", game_context->port);
+  svz_servertype_add (&servertype);
+  svz_config_type_instantiate 
+    ("server", "gzochi", "game-default", NULL, NULL, 0, NULL);
 
-  svz_server_add (server);
-  if (svz_server_init_all () < 0)
+  server = svz_server_get ("game-default");
+  server->data = server_context;
+
+  svz_updn_all_coservers (-1);
+  if (svz_updn_all_servers (1) < 0)
     gzochid_err ("Server failed to initialize");
 
-  server_context->server = svz_server_create (portcfg);
+  if (svz_server_bind (server, portcfg) != 0)
+    gzochid_err ("Failed to bind server to port %d", game_context->port);
 
   gzochid_notice ("Game server listening on port %d", game_context->port);
 
@@ -244,7 +239,7 @@ static void run (int from_state, int to_state, gpointer user_data)
 
 static void stop (int from_state, int to_state, gpointer user_data)
 {
-  svz_server_finalize_all ();
+  svz_updn_all_servers (0);
   svz_halt ();
 }
 
