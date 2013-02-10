@@ -1,6 +1,6 @@
 dnl configure.ac --- food for -*-autoconf-*- et al
 dnl
-dnl Copyright (C) 2012 Julian Graham
+dnl Copyright (C) 2013 Julian Graham
 dnl
 dnl This is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -64,6 +64,7 @@ AC_CONFIG_FILES([Makefile
 		 doc/Makefile
                  src/Makefile
 		 src/api/Makefile
-		 src/scheme/Makefile])
+		 src/scheme/Makefile
+		 src/tests/Makefile])
 
 AC_OUTPUT
