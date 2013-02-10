@@ -1,5 +1,5 @@
 /* auth.h: Prototypes and declarations for auth.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,12 +19,10 @@
 #define GZOCHID_AUTH_H
 
 #include <glib.h>
-#include <libguile.h>
 
 typedef struct _gzochid_auth_identity
 {
   char *name;
-  SCM record;
 } gzochid_auth_identity;
 
 struct _gzochid_application_context;

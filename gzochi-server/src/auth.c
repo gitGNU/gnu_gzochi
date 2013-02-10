@@ -1,5 +1,5 @@
 /* auth.c: Authorization management routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,7 +16,9 @@
  */
 
 #include <glib.h>
+#include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "app.h"
 #include "auth.h"

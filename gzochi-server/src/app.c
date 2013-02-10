@@ -17,6 +17,7 @@
 
 #include <glib.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "app.h"
 #include "auth.h"

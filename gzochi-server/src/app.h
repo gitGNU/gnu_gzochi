@@ -20,7 +20,7 @@
 
 #include <glib.h>
 #include <gmp.h>
-#include <libguile.h>
+#include <sys/time.h>
 
 #include "auth.h"
 #include "context.h"

@@ -1,5 +1,5 @@
 /* config.c: Configuration management routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 #include <libgen.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <sys/types.h>
 #include <sys/stat.h>
