@@ -1,5 +1,5 @@
 /* task.c: Application task management routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -28,16 +28,12 @@
 #include "guile.h"
 #include "io.h"
 #include "schedule.h"
-#include "scheme.h"
 #include "task.h"
 #include "tx.h"
 #include "txlog.h"
 #include "util.h"
 
 #define PENDING_TASK_PREFIX "s.pendingTask."
-
-extern gzochid_application_task_serialization 
-gzochid_client_received_message_task_serialization;
 
 GHashTable *serialization_registry = NULL;
 
@@ -57,11 +53,6 @@ void gzochid_task_register_serialization
 void gzochid_task_initialize_serialization_registry (void)
 {
   serialization_registry = g_hash_table_new (g_str_hash, g_str_equal);
-
-  gzochid_task_register_serialization 
-    ("scheme", &gzochid_scheme_task_serialization);
-  gzochid_task_register_serialization
-    ("received-message", &gzochid_client_received_message_task_serialization);
 }
 
 static int task_prepare (gpointer data)

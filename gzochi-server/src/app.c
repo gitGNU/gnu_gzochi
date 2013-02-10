@@ -1,5 +1,5 @@
 /* app.c: Application context routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -493,4 +493,10 @@ gzochid_application_context *gzochid_get_current_application_context (void)
 gzochid_auth_identity *gzochid_get_current_identity (void)
 {
   return (gzochid_auth_identity *) g_static_private_get (&thread_identity_key);
+}
+
+void gzochid_register_client_received_message_task_serialization (void)
+{
+  gzochid_task_register_serialization 
+    ("received-message", &gzochid_client_received_message_task_serialization);
 }

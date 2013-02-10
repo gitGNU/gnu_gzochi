@@ -1,5 +1,5 @@
 /* app.h: Prototypes and declarations for app.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -141,6 +141,8 @@ void gzochid_application_context_free (gzochid_application_context *);
 void gzochid_application_context_init 
 (gzochid_application_context *, gzochid_context *, 
  gzochid_application_descriptor *);
+
+void gzochid_register_client_received_message_task_serialization (void);
 
 struct _gzochid_protocol_client;
 

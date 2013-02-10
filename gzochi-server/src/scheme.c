@@ -975,4 +975,7 @@ void gzochid_scheme_channel_oid (SCM channel, mpz_t oid)
 void gzochid_scheme_initialize_bindings (void)
 {
   scm_with_guile (initialize_bindings, NULL);
+
+  gzochid_task_register_serialization 
+    ("scheme", &gzochid_scheme_task_serialization);
 }
