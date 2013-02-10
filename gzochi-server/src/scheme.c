@@ -579,11 +579,23 @@ static void *scheme_deserializer
   return scm_with_guile (scheme_deserializer_inner, args);
 }
 
+static void *scheme_finalizer_inner (void *data)
+{
+  scm_gc_unprotect_object ((SCM) data);
+  return NULL;
+}
+
+static void scheme_finalizer 
+(gzochid_application_context *context, gpointer data)
+{
+  scm_with_guile (scheme_finalizer_inner, data);
+}
+
 static gzochid_application_worker_serialization scheme_worker_serialization =
   { scheme_worker_serializer, scheme_worker_deserializer };
 
 gzochid_io_serialization gzochid_scheme_data_serialization =
-  { scheme_serializer, scheme_deserializer };
+  { scheme_serializer, scheme_deserializer, scheme_finalizer };
 
 gzochid_application_task_serialization gzochid_scheme_task_serialization = 
   { 

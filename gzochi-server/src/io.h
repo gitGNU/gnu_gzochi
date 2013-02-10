@@ -1,5 +1,5 @@
 /* io.h: Prototypes and declarations for serialization routines
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@ typedef struct _gzochid_io_serialization
 {
   void (*serializer) (struct _gzochid_application_context *, void *, GString *);
   void *(*deserializer) (struct _gzochid_application_context *, GString *);
+  void (*finalizer) (struct _gzochid_application_context *, void *);
 } gzochid_io_serialization;
 
 #endif /* GZOCHID_IO_H */

@@ -223,8 +223,21 @@ static gpointer deserialize_callback
   return callback;
 }
 
+static void finalize_callback 
+(gzochid_application_context *context, gpointer data)
+{
+  gzochid_application_callback *callback = 
+    (gzochid_application_callback *) data;
+
+  free (callback->procedure);
+  free (callback->module);
+  mpz_clear (callback->scm_oid);
+
+  free (callback);
+}
+
 gzochid_io_serialization gzochid_application_callback_serialization = 
-  { serialize_callback, deserialize_callback };
+  { serialize_callback, deserialize_callback, finalize_callback };
 
 gzochid_application_callback *gzochid_application_callback_new
 (char *procedure, GList *module, mpz_t scm_oid)
@@ -391,7 +404,7 @@ gzochid_application_worker_serialization received_message_worker_serialization =
   { NULL, NULL };
 
 gzochid_io_serialization received_message_data_serialization = 
-  { NULL, NULL };
+  { NULL, NULL, NULL };
 
 gzochid_application_task_serialization 
 gzochid_client_received_message_task_serialization = 

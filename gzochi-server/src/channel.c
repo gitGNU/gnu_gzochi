@@ -669,8 +669,23 @@ static void serialize_channel
   gzochid_util_serialize_mpz (channel->scm_oid, out);
 }
 
+static void finalize_channel
+(gzochid_application_context *context, gpointer obj)
+{
+  gzochid_channel *channel = (gzochid_channel *) obj;
+  
+  free (channel->name);
+  free (channel->id);
+  g_sequence_free (channel->sessions);
+
+  mpz_clear (channel->oid);
+  mpz_clear (channel->scm_oid);
+
+  free (channel);
+}
+
 gzochid_io_serialization gzochid_channel_serialization =
-  { serialize_channel, deserialize_channel };
+  { serialize_channel, deserialize_channel, finalize_channel };
 
 gzochid_channel *gzochid_channel_new (char *name)
 {

@@ -1,5 +1,5 @@
 /* session.c: Client session management routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -293,11 +293,39 @@ static void serialize_client_session
   else gzochid_util_serialize_boolean (FALSE, out);
 }
 
+static void finalize_handler 
+(gzochid_application_context *context, gzochid_client_session_handler *handler)
+{
+  gzochid_application_callback_serialization.finalizer 
+    (context, handler->received_message);
+  gzochid_application_callback_serialization.finalizer 
+    (context, handler->disconnected);
+}
+
+static void finalize_client_session
+(gzochid_application_context *context, gpointer obj)
+{
+  gzochid_client_session *session = (gzochid_client_session *) obj;
+
+  gzochid_auth_identity_finalizer (context, session->identity);
+  g_sequence_free (session->channels);
+  mpz_clear (session->scm_oid);
+
+  if (session->handler != NULL)
+    finalize_handler (context, session->handler);
+
+  free (session);
+}
+
 static gzochid_transaction_participant session_participant =
   { "session", session_prepare, session_commit, session_rollback };
 
 gzochid_io_serialization gzochid_client_session_serialization = 
-  { serialize_client_session, deserialize_client_session };
+  { 
+    serialize_client_session, 
+    deserialize_client_session, 
+    finalize_client_session 
+  };
 
 gzochid_client_session *gzochid_client_session_new 
 (gzochid_auth_identity *identity)

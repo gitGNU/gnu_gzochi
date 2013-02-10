@@ -62,3 +62,13 @@ void *gzochid_auth_identity_deserializer
   g_string_erase (in, 0, strlen (name) + 1);
   return identity;
 }
+
+void gzochid_auth_identity_finalizer
+(gzochid_application_context *context, void *ptr)
+{
+  gzochid_auth_identity *identity = (gzochid_auth_identity *) ptr;
+
+  free (identity->name);
+
+  free (identity);
+}

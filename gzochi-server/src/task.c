@@ -220,13 +220,21 @@ void serialize_durable_task
 {
   gzochid_durable_application_task *task = 
     (gzochid_durable_application_task *) data;
+
   gzochid_util_serialize_string (task->serialization->name, out);  
   serialize_application_task (context, task->serialization, task->task, out);
   gzochid_util_serialize_timeval (task->target_execution_time, out);
 }
 
+void finalize_durable_task 
+(gzochid_application_context *context, gpointer data)
+{
+  gzochid_durable_application_task_free 
+    ((gzochid_durable_application_task *) data);
+}
+
 gzochid_io_serialization durable_task_serialization = 
-  { serialize_durable_task, deserialize_durable_task };
+  { serialize_durable_task, deserialize_durable_task, finalize_durable_task };
 
 gzochid_task *gzochid_task_new 
 (gzochid_thread_worker worker, gpointer data, 

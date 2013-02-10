@@ -36,5 +36,7 @@ void gzochid_auth_identity_serializer
 (struct _gzochid_application_context *, void *, GString *);
 void *gzochid_auth_identity_deserializer
 (struct _gzochid_application_context *, GString *);
+void gzochid_auth_identity_finalizer
+(struct _gzochid_application_context *, void *);
 
 #endif /* GZOCHID_AUTH_H */

@@ -174,6 +174,27 @@ static int data_prepare (gpointer data)
   return TRUE;
 }
 
+static void finalize_references (gzochid_data_transaction_context *context)
+{
+  GList *references = g_hash_table_get_values (context->oids_to_references);
+  GList *reference_ptr = references;
+
+  while (reference_ptr != NULL)
+    {
+      gzochid_data_managed_reference *reference =
+	(gzochid_data_managed_reference *) reference_ptr->data;
+
+      if (reference->obj != NULL)
+	{
+	  reference->serialization->finalizer 
+	    (context->context, reference->obj);
+	  reference->obj = NULL;
+	}
+      reference_ptr = reference_ptr->next;
+    }
+  g_list_free (references);
+}
+
 static void data_commit (gpointer data)
 {
   gzochid_data_transaction_context *context = 
@@ -181,6 +202,8 @@ static void data_commit (gpointer data)
 
   gzochid_storage_transaction_commit (context->oids_transaction);
   gzochid_storage_transaction_commit (context->names_transaction);
+
+  finalize_references (context);
 
   gzochid_storage_unlock (context->context->names);
   gzochid_storage_unlock (context->context->oids);
@@ -195,6 +218,8 @@ static void data_rollback (gpointer data)
 
   gzochid_storage_transaction_rollback (context->oids_transaction);
   gzochid_storage_transaction_rollback (context->names_transaction);
+
+  finalize_references (context);
 
   gzochid_storage_unlock (context->context->names);
   gzochid_storage_unlock (context->context->oids);
