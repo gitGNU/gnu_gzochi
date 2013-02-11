@@ -40,10 +40,16 @@ static void *location_aware_scheme_deserializer
   return gzochid_scm_location_get (context, obj);
 }
 
+static void free_bits (gpointer ptr)
+{
+  scm_t_bits *bits = (scm_t_bits *) ptr;
+  scm_gc_unprotect_object (SCM_PACK (*bits));
+  free (bits);
+}
+
 static void location_aware_scheme_finalizer
 (gzochid_application_context *context, void *ptr)
 {
-  gzochid_scheme_data_serialization.finalizer (context, ptr);
 }
 
 gzochid_io_serialization gzochid_scm_location_aware_serialization = 
@@ -76,7 +82,7 @@ static gzochid_scm_location_transaction_context *create_transaction_context
 
   tx_context->context = app_context;
   tx_context->bits_cache = g_hash_table_new_full 
-    (scm_bits_hash, scm_bits_equal, free, free);  
+    (scm_bits_hash, scm_bits_equal, free_bits, free);  
   
   return tx_context;
 }
@@ -126,7 +132,8 @@ gzochid_scm_location_info *gzochid_scm_location_get
   scm_t_bits bits = SCM_UNPACK (obj);
 
   join_transaction (context);
-  tx_context = gzochid_transaction_context (&scm_location_participant);
+  tx_context = (gzochid_scm_location_transaction_context *) 
+    gzochid_transaction_context (&scm_location_participant);
 
   if (g_hash_table_contains (tx_context->bits_cache, &bits))
     return g_hash_table_lookup (tx_context->bits_cache, &bits);
@@ -139,7 +146,6 @@ gzochid_scm_location_info *gzochid_scm_location_get
       *key = bits;
       value->bits = bits;
 
-      scm_gc_protect_object (obj);      
       g_hash_table_insert (tx_context->bits_cache, key, value);
 
       return value;

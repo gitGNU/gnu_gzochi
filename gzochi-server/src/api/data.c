@@ -147,6 +147,8 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
       gzochid_scm_location_info *obj_loc = 
 	gzochid_scm_location_get (context, obj);
 
+      scm_gc_protect_object (obj);
+      
       gzochid_data_set_binding 
 	(context, prefixed_name, &gzochid_scm_location_aware_serialization, 
 	 obj_loc);
@@ -197,6 +199,8 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
     (context, &gzochid_scm_location_aware_serialization, obj_loc);
 
+  scm_gc_protect_object (obj);    
+
   gzochid_data_remove_object (reference);
   gzochid_api_check_rollback ();
 
@@ -209,6 +213,8 @@ SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   gzochid_scm_location_info *obj_loc = gzochid_scm_location_get (context, obj);
+
+  scm_gc_protect_object (obj);    
 
   gzochid_data_mark 
     (context, &gzochid_scm_location_aware_serialization, obj_loc);
