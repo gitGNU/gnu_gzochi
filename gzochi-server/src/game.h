@@ -19,6 +19,7 @@
 #define GZOCHID_GAME_H
 
 #include <glib.h>
+#include <sys/time.h>
 
 #include "app.h"
 #include "context.h"
@@ -41,10 +42,11 @@ typedef struct _gzochid_game_context
   int port;
   char *apps_dir;
   char *work_dir;
+  struct timeval tx_timeout;
 
   GHashTable *applications;
   gzochid_socket_server_context *server;
-
+  
 } gzochid_game_context;
 
 gzochid_game_context *gzochid_game_context_new (void);

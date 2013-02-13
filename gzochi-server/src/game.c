@@ -38,6 +38,8 @@
 
 #define GAME_DESCRIPTOR_XML "game.xml"
 
+#define DEFAULT_TX_TIMEOUT_MS 100
+
 static void scan_app_dir (gzochid_game_context *context, char *dir)
 {
   char *descriptor_file = g_strconcat (dir, "/", GAME_DESCRIPTOR_XML, NULL);
@@ -169,6 +171,7 @@ gzochid_task_queue *gzochid_task_queue_new (GThreadPool *pool)
 void gzochid_game_context_init
 (gzochid_game_context *context, gzochid_context *parent, GHashTable *config)
 {
+  long tx_timeout_ms = 0;
   gzochid_fsm *fsm = gzochid_fsm_new 
     ("game", GZOCHID_GAME_STATE_INITIALIZING, "INITIALIZING");
 
@@ -188,6 +191,11 @@ void gzochid_game_context_init
     (g_hash_table_lookup (config, "server.port"), 0);
   context->apps_dir = g_hash_table_lookup (config, "server.fs.apps");
   context->work_dir = g_hash_table_lookup (config, "server.fs.data");
+
+  tx_timeout_ms = gzochid_config_to_long 
+    (g_hash_table_lookup (config, "tx.timeout"), DEFAULT_TX_TIMEOUT_MS);
+  context->tx_timeout.tv_sec = tx_timeout_ms / 1000;
+  context->tx_timeout.tv_usec = (tx_timeout_ms % 1000) * 1000;
 
   gzochid_fsm_add_transition 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, GZOCHID_GAME_STATE_RUNNING);
