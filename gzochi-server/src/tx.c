@@ -1,5 +1,5 @@
 /* tx.c: Application-level transactions implementation for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,12 +19,14 @@
 #include <glib.h>
 #include <gmp.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "log.h"
 #include "tx.h"
 
 static GStaticMutex transaction_mutex = G_STATIC_MUTEX_INIT;
 static GStaticPrivate thread_transaction_key = G_STATIC_PRIVATE_INIT;
+static GStaticPrivate thread_transaction_timing_key = G_STATIC_PRIVATE_INIT;
 static mpz_t transaction_counter;
 static gboolean transactions_initialized;
 
@@ -38,12 +40,20 @@ enum gzochid_transaction_state
     GZOCHID_TRANSACTION_STATE_ROLLED_BACK
   };
 
+typedef struct _gzochid_transaction_timing
+{
+  struct timeval start_time;
+  struct timeval *timeout;
+} gzochid_transaction_timing;
+
 typedef struct _gzochid_transaction 
 {
   mpz_t id;
   char *name;
   GHashTable *participants;
   enum gzochid_transaction_state state;
+
+  gzochid_transaction_timing *timing;
 } gzochid_transaction;
 
 static gzochid_transaction *transaction_new (void)
@@ -111,7 +121,9 @@ void gzochid_transaction_join
     g_static_private_get (&thread_transaction_key);
   if (transaction == NULL)
     {
-      transaction = transaction_new ();   
+      transaction = transaction_new ();
+      transaction->timing = g_static_private_get 
+	(&thread_transaction_timing_key);
       g_static_private_set (&thread_transaction_key, transaction, NULL);
     }
   else assert (transaction->state == GZOCHID_TRANSACTION_STATE_ACTIVE);
@@ -249,12 +261,28 @@ void gzochid_transaction_mark_for_rollback
   registration->rollback = TRUE;
 }
 
-int gzochid_transaction_execute (void (*func) (gpointer), gpointer data)
+static int transaction_execute
+(void (*func) (gpointer), gpointer data, struct timeval *timeout)
 {
   gzochid_transaction *transaction = NULL;
+  gzochid_transaction_timing timing;
   gboolean success = TRUE;
-  
+  struct timeval tx_finish;
+  int ms = 0;
+
+  /* Set up the transaction timing information here, even before any
+     participants have joined - the idea being that if a transaction does end
+     up getting created because a participant requiring transactional semantics
+     joins, then this we should consider it as having begun now. */
+
+  gettimeofday (&timing.start_time, NULL);
+  timing.timeout = timeout;
+
+  g_static_private_set (&thread_transaction_timing_key, &timing, NULL);
+
   func (data);
+
+  g_static_private_set (&thread_transaction_timing_key, NULL, NULL);
 
   transaction = g_static_private_get (&thread_transaction_key);
   if (transaction == NULL)
@@ -266,10 +294,27 @@ int gzochid_transaction_execute (void (*func) (gpointer), gpointer data)
       success = FALSE;
     }
   else commit (transaction);
+
+  gettimeofday (&tx_finish, NULL);
+  ms = ((tx_finish.tv_sec - timing.start_time.tv_sec) * 1000)
+    + ((tx_finish.tv_usec - timing.start_time.tv_usec) / 1000);
+  g_debug ("Transaction completed in %dms", ms);
+
   g_static_private_set (&thread_transaction_key, NULL, NULL);
 
   transaction_free (transaction);
   return success;
+}
+
+int gzochid_transaction_execute (void (*func) (gpointer), gpointer data)
+{
+  return transaction_execute (func, data, NULL);
+}
+
+int gzochid_transaction_execute_timed
+(void (*func) (gpointer), gpointer data, struct timeval timeout)
+{
+  return transaction_execute (func, data, &timeout);
 }
 
 gboolean gzochid_transaction_active ()

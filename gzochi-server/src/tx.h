@@ -1,5 +1,5 @@
 /* tx.h: Prototypes and declarations for tx.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 #define GZOCHID_TX_H
 
 #include <glib.h>
+#include <sys/time.h>
 
 typedef int (*gzochid_transaction_prepare) (gpointer);
 typedef void (*gzochid_transaction_commit) (gpointer);
@@ -41,6 +42,8 @@ void gzochid_transaction_participant_free (gzochid_transaction_participant *);
 void gzochid_transaction_join (gzochid_transaction_participant *, gpointer);
 gpointer gzochid_transaction_context (gzochid_transaction_participant *);
 int gzochid_transaction_execute (void (*) (gpointer), gpointer);
+int gzochid_transaction_execute_timed 
+(void (*) (gpointer), gpointer, struct timeval);
 gboolean gzochid_transaction_active ();
 gboolean gzochid_transaction_rollback_only ();
 void gzochid_transaction_mark_for_rollback (gzochid_transaction_participant *);
