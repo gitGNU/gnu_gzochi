@@ -30,7 +30,7 @@
 #include "config.h"
 #include "log.h"
 
-int gzochid_config_to_boolean (char *str, int def)
+gboolean gzochid_config_to_boolean (char *str, gboolean def)
 {
   if (str == NULL)
     return def;
@@ -47,6 +47,16 @@ int gzochid_config_to_int (char *str, int def)
   if (str == NULL)
     return def;
   if (sscanf (str, "%d", &ret) == 1)
+    return ret;
+  return def;
+}
+
+long gzochid_config_to_long (char *str, long def)
+{
+  long ret = 0;
+  if (str == NULL)
+    return def;
+  if (sscanf (str, "%ld", &ret) == 1)
     return ret;
   return def;
 }

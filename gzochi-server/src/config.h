@@ -1,5 +1,5 @@
 /* config.h: Prototypes and declarations for config.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,8 +22,9 @@
 
 #include "app.h"
 
-int gzochid_config_to_boolean (char *, int);
+gboolean gzochid_config_to_boolean (char *, gboolean);
 int gzochid_config_to_int (char *, int);
+long gzochid_config_to_long (char *, long);
 
 GHashTable *gzochid_config_keyfile_extract_config (GKeyFile *, char *);
 
