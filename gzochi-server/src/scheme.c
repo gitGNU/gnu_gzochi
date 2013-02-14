@@ -251,15 +251,20 @@ void gzochid_scheme_application_initialized_worker
 static gpointer unpack_handler (gpointer data)
 {
   SCM handler = (SCM) data;
+  SCM received_message = gzochid_scheme_handler_received_message (handler);
+  SCM disconnected = gzochid_scheme_handler_disconnected (handler);
+
   gzochid_application_context *context = 
     gzochid_get_current_application_context ();
   gzochid_client_session_handler *session_handler = 
     malloc (sizeof (gzochid_client_session_handler));
 
+  scm_gc_protect_object (received_message);
+  scm_gc_protect_object (disconnected);
+
   session_handler->received_message = scm_to_callback 
-    (context, gzochid_scheme_handler_received_message (handler));
-  session_handler->disconnected = scm_to_callback 
-    (context, gzochid_scheme_handler_disconnected (handler));
+    (context, received_message);
+  session_handler->disconnected = scm_to_callback (context, disconnected);
 
   return session_handler;
 }
@@ -440,8 +445,7 @@ static gzochid_application_worker scheme_worker_deserializer
 
 gboolean is_managed_record (SCM obj)
 {
-  SCM ret = scm_call_1 (scm_managed_record_p, obj);
-  return ret == SCM_BOOL_T ? TRUE : FALSE;
+  return scm_is_true (scm_call_1 (scm_managed_record_p, obj));
 }
 
 gboolean for_all (SCM lst, gboolean (*pred) (SCM))
@@ -604,16 +608,6 @@ gzochid_application_task_serialization gzochid_scheme_task_serialization =
     &gzochid_scheme_data_serialization 
   };
 
-void *init_scheme_task (gpointer ptr)
-{
-  SCM lst = (SCM) ptr;
-  
-  return scm_apply_2 (scm_make_callback, 
-		      scm_list_ref (lst, SCM_INUM0),
-		      scm_list_ref (lst, SCM_INUM1),
-		      scm_list_ref (lst, scm_from_short (2)));
-}
-
 gzochid_application_task *gzochid_scheme_task_new 
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  char *procedure, GList *module_name, SCM data)
@@ -630,10 +624,12 @@ gzochid_application_task *gzochid_scheme_task_new
 		data)), 
      SCM_BOOL_F);
 
-  gzochid_application_task *task = gzochid_application_task_new
+  gzochid_application_task *task = NULL; 
+
+  scm_gc_protect_object (scm_data);
+  task = gzochid_application_task_new
     (context, identity, gzochid_scheme_application_task_worker, scm_data);
   
-  scm_gc_protect_object (task->data);
   return task;
 }
 

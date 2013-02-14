@@ -234,7 +234,7 @@ static void finalize_callback
     (gzochid_application_callback *) data;
 
   free (callback->procedure);
-  free (callback->module);
+  g_list_free_full (callback->module, free);
   mpz_clear (callback->scm_oid);
 
   free (callback);
@@ -389,7 +389,7 @@ void gzochid_application_client_disconnected
 	gzochid_transactional_application_task_new
 	(gzochid_scheme_application_disconnected_worker, session_oid_str);
       gzochid_application_task *application_task = NULL;
-      gpointer application_task_data[2];
+      gpointer *application_task_data = malloc (sizeof (gpointer) * 2);
 
       gzochid_task *task = NULL;
       struct timeval now;
