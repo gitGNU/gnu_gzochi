@@ -1,5 +1,5 @@
 /* util.c: Shared utility procedures for Scheme->C API.
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -44,17 +44,22 @@ void gzochid_api_check_rollback ()
       (scm_call_0 (scm_make_transaction_aborted_condition));
 }
 
+static void bind_scm (char *module, SCM *binding, char *name)
+{
+  SCM var = scm_c_public_variable (module, name);
+
+  if (scm_is_false (var))
+    g_error ("Missing Scheme binding for `%s'. Aborting...", name);
+
+  *binding = scm_variable_ref (var);
+  scm_gc_protect_object (*binding);
+}
+
 void gzochid_api_util_init ()
 {
-  SCM gzochi_conditions = scm_c_resolve_module ("gzochi conditions");
-  SCM var = scm_c_module_lookup 
-    (gzochi_conditions, "gzochi:make-no-current-application-condition");
   
-  scm_make_no_current_application_condition = scm_variable_ref (var);
-  scm_gc_protect_object (scm_make_no_current_application_condition);
-
-  var = scm_c_module_lookup 
-    (gzochi_conditions, "gzochi:make-transaction-aborted-condition");
-  scm_make_transaction_aborted_condition = scm_variable_ref (var);
-  scm_gc_protect_object (scm_make_transaction_aborted_condition);
+  bind_scm ("gzochi conditions", &scm_make_no_current_application_condition,
+	    "gzochi:make-no-current-application-condition");
+  bind_scm ("gzochi conditions", &scm_make_transaction_aborted_condition,
+	    "gzochi:make-transaction-aborted-condition");
 }

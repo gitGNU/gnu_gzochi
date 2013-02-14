@@ -860,97 +860,74 @@ SCM gzochid_scheme_create_channel (gzochid_channel *channel, mpz_t oid)
   return ret;
 }
 
-static void initialize_binding (SCM module, SCM *binding, char *name)
+static void bind_scm (char *module, SCM *binding, char *name)
 {
-  SCM var = scm_c_module_lookup (module, name);
+  SCM var = scm_c_public_variable (module, name);
+
+  if (scm_is_false (var))
+    g_error ("Missing Scheme binding for `%s'. Aborting...", name);
+
   *binding = scm_variable_ref (var);
   scm_gc_protect_object (*binding);
 }
 
 static void *initialize_bindings (void *ptr)
 {
-  SCM rnrs_exceptions = scm_c_resolve_module ("rnrs exceptions");
-  SCM rnrs_hashtables = scm_c_resolve_module ("rnrs hashtables");
-
-  SCM gzochi_app = scm_c_resolve_module ("gzochi app");
-  SCM gzochi_channel = scm_c_resolve_module ("gzochi channel");
-  SCM gzochi_client = scm_c_resolve_module ("gzochi client");
-  SCM gzochi_conditions = scm_c_resolve_module ("gzochi conditions");
-  SCM gzochi_data = scm_c_resolve_module ("gzochi data");
-
-  SCM gzochi_private_client = scm_c_resolve_module ("gzochi private client");
-  SCM gzochi_private_data = scm_c_resolve_module ("gzochi private data");
-  SCM gzochi_private_task = scm_c_resolve_module ("gzochi private task");
-
   gzochid_scheme_scm_module_gzochi_private_app = 
     scm_c_resolve_module ("gzochi private app");
   scm_gc_protect_object (gzochid_scheme_scm_module_gzochi_private_app);
   
-  initialize_binding (rnrs_exceptions, &scm_r6rs_raise, "raise");
+  bind_scm ("rnrs exceptions", &scm_r6rs_raise, "raise");
 
-  initialize_binding 
-    (rnrs_hashtables, &gzochid_scheme_string_hash, "string-hash");
-  initialize_binding (rnrs_hashtables, &gzochid_scheme_string_equiv, "equal?");
+  bind_scm ("rnrs hashtables", &gzochid_scheme_string_hash, "string-hash");
+  bind_scm ("rnrs base", &gzochid_scheme_string_equiv, "equal?");
 
-  initialize_binding (rnrs_hashtables, &scm_hashtable_keys, "hashtable-keys");
-  initialize_binding (rnrs_hashtables, &scm_hashtable_ref, "hashtable-ref");
-  initialize_binding (rnrs_hashtables, &scm_hashtable_set_x, "hashtable-set!");
-  initialize_binding (rnrs_hashtables, &scm_make_hashtable, "make-hashtable");
+  bind_scm ("rnrs hashtables", &scm_hashtable_keys, "hashtable-keys");
+  bind_scm ("rnrs hashtables", &scm_hashtable_ref, "hashtable-ref");
+  bind_scm ("rnrs hashtables", &scm_hashtable_set_x, "hashtable-set!");
+  bind_scm ("rnrs hashtables", &scm_make_hashtable, "make-hashtable");
 
-  initialize_binding (gzochi_app, &scm_make_callback, "gzochi:make-callback");
-  initialize_binding 
-    (gzochi_app, &scm_callback_module, "gzochi:callback-module");
-  initialize_binding
-    (gzochi_app, &scm_callback_procedure, "gzochi:callback-procedure");
-  initialize_binding (gzochi_app, &scm_callback_data, "gzochi:callback-data");
+  bind_scm ("gzochi app", &scm_make_callback, "gzochi:make-callback");
+  bind_scm ("gzochi app", &scm_callback_module, "gzochi:callback-module");
+  bind_scm ("gzochi app", &scm_callback_procedure, "gzochi:callback-procedure");
+  bind_scm ("gzochi app", &scm_callback_data, "gzochi:callback-data");
 
-  initialize_binding (gzochi_channel, &scm_make_channel, "gzochi:make-channel");
-  initialize_binding (gzochi_channel, &scm_channel_oid, "gzochi:channel-oid");
+  bind_scm ("gzochi private channel", &scm_make_channel, 
+	    "gzochi:make-channel");
+  bind_scm ("gzochi private channel", &scm_channel_oid, "gzochi:channel-oid");
 
-  initialize_binding
-    (gzochi_client, &scm_handler_received_message,
-     "gzochi:client-session-listener-received-message");
-  initialize_binding
-    (gzochi_client, &scm_handler_disconnected,
-     "gzochi:client-session-listener-disconnected");
+  bind_scm ("gzochi client", &scm_handler_received_message,
+	    "gzochi:client-session-listener-received-message");
+  bind_scm ("gzochi client", &scm_handler_disconnected,
+	    "gzochi:client-session-listener-disconnected");
 
-  initialize_binding
-    (gzochi_conditions, &scm_make_name_exists_condition,
-     "gzochi:make-name-exists-condition");
-  initialize_binding
-    (gzochi_conditions, &scm_make_name_not_bound_condition,
-     "gzochi:make-name-not-bound-condition");
-  initialize_binding
-    (gzochi_conditions, &scm_make_object_removed_condition,
-     "gzochi:make-object-removed-condition");
+  bind_scm ("gzochi conditions", &scm_make_name_exists_condition,
+	    "gzochi:make-name-exists-condition");
+  bind_scm ("gzochi conditions", &scm_make_name_not_bound_condition,
+	    "gzochi:make-name-not-bound-condition");
+  bind_scm ("gzochi conditions", &scm_make_object_removed_condition,
+	    "gzochi:make-object-removed-condition");
 
-  initialize_binding
-    (gzochi_data, &scm_make_managed_hashtable, "gzochi:make-managed-hashtable");
-  initialize_binding 
-    (gzochi_data, &scm_managed_record_p, "gzochi:managed-record?");
+  bind_scm ("gzochi data", &scm_make_managed_hashtable, 
+	    "gzochi:make-managed-hashtable");
+  bind_scm ("gzochi data", &scm_managed_record_p, "gzochi:managed-record?");
 
-  initialize_binding 
-    (gzochi_private_data, &scm_managed_record_serialize, 
-     "gzochi:serialize-managed-record");
-  initialize_binding 
-    (gzochi_private_data, &scm_managed_record_deserialize,
-     "gzochi:deserialize-managed-record");
-  initialize_binding
-    (gzochi_private_data, &scm_managed_reference_oid, 
-     "gzochi:managed-reference-oid");
+  bind_scm ("gzochi private data", &scm_managed_record_serialize, 
+	    "gzochi:serialize-managed-record");
+  bind_scm ("gzochi private data", &scm_managed_record_deserialize,
+	    "gzochi:deserialize-managed-record");
+  bind_scm ("gzochi private data", &scm_managed_reference_oid, 
+	    "gzochi:managed-reference-oid");
 
-  initialize_binding
-    (gzochi_private_client, &scm_make_client_session, 
-     "gzochi:make-client-session");
-  initialize_binding
-    (gzochi_private_client, &scm_client_session_oid, 
-     "gzochi:client-session-oid");
+  bind_scm ("gzochi private client", &scm_make_client_session, 
+	    "gzochi:make-client-session");
+  bind_scm ("gzochi private client", &scm_client_session_oid, 
+	    "gzochi:client-session-oid");
 
-  initialize_binding 
-    (gzochi_private_data, &scm_make_managed_reference, 
-     "gzochi:make-managed-reference");
+  bind_scm ("gzochi private data", &scm_make_managed_reference, 
+	    "gzochi:make-managed-reference");
  
-  initialize_binding (gzochi_private_task, &scm_run_task, "gzochi:run-task");
+  bind_scm ("gzochi private task", &scm_run_task, "gzochi:run-task");
  
   gzochid_api_channel_init ();
   gzochid_api_data_init ();
