@@ -1,5 +1,5 @@
 /* util.h: Prototypes and declarations for util.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -53,5 +53,9 @@ GHashTable *gzochid_util_deserialize_hash_table
 struct timeval gzochid_util_deserialize_timeval (GString *);
 
 gint gzochid_util_string_data_compare (gconstpointer, gconstpointer, gpointer);
+
+int gzochid_util_timeval_subtract 
+(struct timeval *, struct timeval *, struct timeval *);
+gint gzochid_util_timeval_compare (gconstpointer, gconstpointer);
 
 #endif /* GZOCHID_UTIL_H */

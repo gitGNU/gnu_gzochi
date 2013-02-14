@@ -1,5 +1,5 @@
 /* util.c: Assorted utility routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -216,4 +216,45 @@ gint gzochid_util_string_data_compare
 (gconstpointer a, gconstpointer b, gpointer user_data)
 {
   return g_strcmp0 ((const char *) a, (const char *) b);
+}
+
+/* Inspired by code snippet from the `Elapsed Time' section of the GNU C 
+   Library Texinfo manual, Edition 0.13 */
+
+int gzochid_util_timeval_subtract 
+(struct timeval *result, struct timeval *x, struct timeval *y)
+{
+  struct timeval y2 = *y;
+  if (x->tv_usec < y2.tv_usec) 
+    {
+      int nsec = (y2.tv_usec - x->tv_usec) / 1000000 + 1;
+      y2.tv_usec -= 1000000 * nsec;
+      y2.tv_sec += nsec;
+    }
+  if (x->tv_usec - y2.tv_usec > 1000000) 
+    {
+      int nsec = (x->tv_usec - y2.tv_usec) / 1000000;
+      y2.tv_usec += 1000000 * nsec;
+      y2.tv_sec -= nsec;
+    }
+  
+  result->tv_sec = x->tv_sec - y2.tv_sec;
+  result->tv_usec = x->tv_usec - y2.tv_usec;
+  
+  return x->tv_sec < y2.tv_sec;
+}
+
+gint gzochid_util_timeval_compare (gconstpointer a, gconstpointer b)
+{
+  const struct timeval *t1 = (const struct timeval *) a;
+  const struct timeval *t2 = (const struct timeval *) b;
+
+  if (t1->tv_sec > t2->tv_sec) return 1;
+  else if (t1->tv_sec < t2->tv_sec) return -1;
+  else 
+    {
+      if (t1->tv_usec > t2->tv_usec) return 1;
+      else if (t1->tv_usec < t2->tv_usec) return -1;
+      else return 0;
+    }
 }
