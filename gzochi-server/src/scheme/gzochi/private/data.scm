@@ -46,6 +46,7 @@
 
 	  gzochi:make-managed-reference
 	  gzochi:managed-reference?
+	  gzochi:managed-reference-oid
 
 	  gzochi:managed-reference-serialization
 	  gzochi:serialize-managed-reference
