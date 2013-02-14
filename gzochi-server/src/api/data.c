@@ -1,5 +1,5 @@
 /* data.c: Primitive functions for user-facing gzochi data management API
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ SCM_DEFINE (primitive_create_reference, "primitive-create-reference", 1, 0, 0,
 
   ret = gzochid_scheme_create_managed_reference (reference);
   
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return ret;
 }
@@ -74,7 +74,7 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
       ret = gzochid_scm_location_resolve (context, location);
     }
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return ret;
 }
@@ -121,7 +121,7 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
       free (prefixed_name);
     }
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
   return ret;
 }
 
@@ -157,7 +157,7 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
       free (prefixed_name);
     }
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
   return SCM_UNSPECIFIED;
 }
 
@@ -186,7 +186,7 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
       free (prefixed_name);
     }
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
   return SCM_UNSPECIFIED;
 }
 
@@ -202,7 +202,7 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
   scm_gc_protect_object (obj);    
 
   gzochid_data_remove_object (reference);
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
 }
@@ -218,7 +218,7 @@ SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
 
   gzochid_data_mark 
     (context, &gzochid_scm_location_aware_serialization, obj_loc);
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
 }

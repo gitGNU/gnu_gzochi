@@ -37,7 +37,7 @@ gzochid_application_context *gzochid_api_ensure_current_application_context ()
   return context;
 }
 
-void gzochid_api_check_rollback ()
+void gzochid_api_check_transaction ()
 {
   if (gzochid_transaction_rollback_only ())
     gzochid_scheme_r6rs_raise 

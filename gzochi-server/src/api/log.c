@@ -1,5 +1,5 @@
 /* log.c: Primitive functions for user-facing gzochid transactional log API
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ SCM_DEFINE (primitive_log, "primitive-log", 2, 0, 0, (SCM priority, SCM msg),
   free (cpriority);
   free (cmsg);
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
   
   return SCM_UNSPECIFIED;
 }

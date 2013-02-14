@@ -1,5 +1,5 @@
 /* util.h: Prototypes and declarations for util.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 gzochid_application_context *gzochid_api_ensure_current_application_context 
 (void);
 
-void gzochid_api_check_rollback (void);
+void gzochid_api_check_transaction (void);
 
 void gzochid_api_util_init (void);
 

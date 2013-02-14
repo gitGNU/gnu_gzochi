@@ -113,7 +113,7 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
   if (exception != SCM_BOOL_F)
     scm_throw (SCM_CAR (exception), SCM_CDR (exception));
   else if (gzochid_transaction_active ())
-    gzochid_api_check_rollback ();
+    gzochid_api_check_transaction ();
 
   return ret;
 }

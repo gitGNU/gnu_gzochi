@@ -1,5 +1,5 @@
 /* session.c: Primitive functions for user-facing gzochid client session API
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ SCM_DEFINE (primitive_send_message, "primitive-send-message", 2, 0, 0,
 
   mpz_clear (c_oid);
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
 }
@@ -71,7 +71,7 @@ SCM_DEFINE (primitive_disconnect, "primitive-disconnect", 1, 0, 0,
 
   mpz_clear (c_oid);
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
 }

@@ -1,5 +1,5 @@
 /* channel.c: Primitive functions for user-facing gzochid channel API
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ SCM_DEFINE (primitive_create_channel, "primitive-create-channel", 1, 0, 0,
 
   gzochid_data_dereference (scm_reference);
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return (SCM) scm_reference->obj;
 }
@@ -63,7 +63,7 @@ SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
       ret = (SCM) scm_reference->obj;
     }
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return ret;
 }
@@ -95,7 +95,7 @@ SCM_DEFINE (primitive_join_channel, "primitive-join-channel", 2, 0, 0,
      (gzochid_channel *) channel_reference->obj, 
      (gzochid_client_session *) session_reference->obj);
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
 }
@@ -128,7 +128,7 @@ SCM_DEFINE (primitive_leave_channel, "primitive-leave-channel", 2, 0, 0,
      (gzochid_channel *) channel_reference->obj, 
      (gzochid_client_session *) session_reference->obj);
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
 }
@@ -157,7 +157,7 @@ SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message",
   gzochid_channel_send 
     (context, (gzochid_channel *) channel_reference->obj, msg, len);
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
 }
@@ -178,7 +178,7 @@ SCM_DEFINE (primitive_close_channel, "primitive-close-channel", 1, 0, 0,
 
   gzochid_channel_close (context, (gzochid_channel *) channel_reference->obj);
 
-  gzochid_api_check_rollback ();
+  gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
 }
