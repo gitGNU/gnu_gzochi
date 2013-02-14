@@ -18,11 +18,13 @@
 #include <assert.h>
 #include <glib.h>
 #include <gmp.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
 #include "log.h"
 #include "tx.h"
+#include "util.h"
 
 static GStaticMutex transaction_mutex = G_STATIC_MUTEX_INIT;
 static GStaticPrivate thread_transaction_key = G_STATIC_PRIVATE_INIT;
@@ -298,7 +300,7 @@ static int transaction_execute
   gettimeofday (&tx_finish, NULL);
   ms = ((tx_finish.tv_sec - timing.start_time.tv_sec) * 1000)
     + ((tx_finish.tv_usec - timing.start_time.tv_usec) / 1000);
-  g_debug ("Transaction completed in %dms", ms);
+  gzochid_debug ("Transaction completed in %dms", ms);
 
   g_static_private_set (&thread_transaction_key, NULL, NULL);
 
@@ -333,4 +335,24 @@ gboolean gzochid_transaction_rollback_only ()
   assert (transaction != NULL);
 
   return rollback_only (transaction);
+}
+
+gboolean gzochid_transaction_timed_out ()
+{
+  gzochid_transaction *transaction = (gzochid_transaction *) 
+    g_static_private_get (&thread_transaction_key);
+
+  assert (transaction != NULL);
+
+  if (transaction->timing->timeout != NULL)
+    {
+      struct timeval now, result;
+      gettimeofday (&now, NULL);
+
+      assert (gzochid_util_timeval_subtract
+	      (&result, &now, transaction->timing->timeout) == 0);
+      return gzochid_util_timeval_compare
+	(&result, &transaction->timing->start_time) <= 0;
+    }
+  else return FALSE;
 }

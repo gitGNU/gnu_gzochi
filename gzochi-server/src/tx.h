@@ -44,8 +44,9 @@ gpointer gzochid_transaction_context (gzochid_transaction_participant *);
 int gzochid_transaction_execute (void (*) (gpointer), gpointer);
 int gzochid_transaction_execute_timed 
 (void (*) (gpointer), gpointer, struct timeval);
-gboolean gzochid_transaction_active ();
-gboolean gzochid_transaction_rollback_only ();
-void gzochid_transaction_mark_for_rollback (gzochid_transaction_participant *);
+
+gboolean gzochid_transaction_active (void);
+gboolean gzochid_transaction_rollback_only (void);
+gboolean gzochid_transaction_timed_out (void);
 
 #endif /* GZOCHID_TX_H */
