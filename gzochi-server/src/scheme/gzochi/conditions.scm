@@ -1,5 +1,5 @@
 ;; gzochi/conditions.scm: Public exports for gzochi condition types 
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -37,36 +37,45 @@
 
 	  &gzochi:transaction-aborted
 	  gzochi:make-transaction-aborted-condition
-	  gzochi:transaction-aborted-condition?)
+	  gzochi:transaction-aborted-condition?
+
+	  &gzochi:transaction-timeout
+	  gzochi:make-transaction-timeout-condition
+	  gzochi:transaction-timeout-condition?)
 	  
   (import (rnrs base)
 	  (rnrs conditions)
 	  (rnrs records syntactic))
 
-  (define-record-type (&gzochi:name-exists 
-		       gzochi:make-name-exists-condition
-		       gzochi:name-exists-condition?)
-    (fields name)
-    (parent &condition))
-
-  (define-record-type (&gzochi:name-not-bound
-		       gzochi:make-name-not-bound-condition
-		       gzochi:name-not-bound-condition?)
-    (fields name)
-    (parent &condition))
-
-  (define-record-type (&gzochi:object-removed
-		       gzochi:make-object-removed-condition
-		       gzochi:object-removed-condition?)
-    (parent &condition))
-
-  (define-record-type (&gzochi:no-current-application
-		       gzochi:make-no-current-application-condition
-		       gzochi:no-current-application-condition?)
-    (parent &condition))
-
-  (define-record-type (&gzochi:transaction-aborted
-		       gzochi:make-transaction-aborted-condition
-		       gzochi:transaction-aborted-condition?)
-    (parent &condition))
+  (define-condition-type &gzochi:name-exists 
+                         &condition
+			 gzochi:make-name-exists-condition
+			 gzochi:name-exists-condition?
+    (name gzochi:name-exists-condition-name))
+  
+  (define-condition-type &gzochi:name-not-bound
+                         &condition
+                         gzochi:make-name-not-bound-condition
+			 gzochi:name-not-bound-condition?
+    (name gzochi:name-not-bound-condition-name))
+  
+  (define-condition-type &gzochi:object-removed
+                         &condition
+			 gzochi:make-object-removed-condition
+			 gzochi:object-removed-condition?)
+  
+  (define-condition-type &gzochi:no-current-application
+                         &condition
+			 gzochi:make-no-current-application-condition
+			 gzochi:no-current-application-condition?)
+  
+  (define-condition-type &gzochi:transaction-aborted
+                         &condition
+			 gzochi:make-transaction-aborted-condition
+			 gzochi:transaction-aborted-condition?)
+  
+  (define-condition-type &gzochi:transaction-timeout
+                         &condition
+			 gzochi:make-transaction-timeout-condition
+			 gzochi:transaction-timeout-condition?)
 )
