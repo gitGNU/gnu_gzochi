@@ -163,11 +163,11 @@ static int data_prepare (gpointer data)
   if (flush_failed)
     return FALSE;
 
-  gzochid_storage_transaction_check (context->oids_transaction);
+  gzochid_storage_transaction_prepare (context->oids_transaction);
   if (context->oids_transaction->rollback)
     return FALSE;
 
-  gzochid_storage_transaction_check (context->names_transaction);
+  gzochid_storage_transaction_prepare (context->names_transaction);
   if (context->oids_transaction->rollback)
     return FALSE;
 

@@ -1,5 +1,5 @@
 /* storage-bdb.c: Database storage routines for gzochid (Berkeley DB)
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -310,7 +310,7 @@ void gzochid_storage_transaction_rollback (gzochid_storage_transaction *tx)
   txn->abort (txn);
 }
 
-void gzochid_storage_transaction_check (gzochid_storage_transaction *tx)
+void gzochid_storage_transaction_prepare (gzochid_storage_transaction *tx)
 {
 }
 

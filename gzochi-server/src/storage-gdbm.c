@@ -300,7 +300,7 @@ void gzochid_storage_transaction_rollback (gzochid_storage_transaction *tx)
   cleanup_transaction (tx);
 }
 
-void gzochid_storage_transaction_check (gzochid_storage_transaction *tx)
+void gzochid_storage_transaction_prepare (gzochid_storage_transaction *tx)
 {
 }
 
