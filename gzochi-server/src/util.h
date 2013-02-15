@@ -54,8 +54,4 @@ struct timeval gzochid_util_deserialize_timeval (GString *);
 
 gint gzochid_util_string_data_compare (gconstpointer, gconstpointer, gpointer);
 
-int gzochid_util_timeval_subtract 
-(struct timeval *, struct timeval *, struct timeval *);
-gint gzochid_util_timeval_compare (gconstpointer, gconstpointer);
-
 #endif /* GZOCHID_UTIL_H */
