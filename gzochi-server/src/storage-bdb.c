@@ -19,8 +19,10 @@
 #include <db.h>
 #include <glib.h>
 #include <libgen.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "log.h"
 #include "storage.h"
@@ -73,6 +75,9 @@ gzochid_storage_store *gzochid_storage_open (char *path)
     }
 
   assert (db_env_create (&context->db_env, 0) == 0);
+  assert (context->db_env->set_lk_detect 
+	  (context->db_env, DB_LOCK_YOUNGEST) == 0);
+
   env_flags = DB_CREATE
     | DB_INIT_LOCK
     | DB_INIT_MPOOL
@@ -87,6 +92,8 @@ gzochid_storage_store *gzochid_storage_open (char *path)
 	("Unable to open BDB environment in %s: %s", path, db_strerror (ret));
       return NULL;
     }
+
+  context->db_env->set_flags (context->db_env, DB_TXN_WRITE_NOSYNC, TRUE);
 
   assert (db_create (&context->db, context->db_env, 0) == 0);
   db_flags = DB_CREATE
@@ -288,7 +295,7 @@ gzochid_storage_transaction *gzochid_storage_transaction_begin
     calloc (1, sizeof (gzochid_storage_transaction));
   DB_TXN *txn;
 
-  context->db_env->txn_begin (context->db_env, NULL, &txn, DB_TXN_NOWAIT);
+  context->db_env->txn_begin (context->db_env, NULL, &txn, 0);
 
   transaction->store = store;
   transaction->txn = txn;
@@ -314,7 +321,7 @@ void gzochid_storage_transaction_commit (gzochid_storage_transaction *tx)
 {
   DB_TXN *txn = (DB_TXN *) tx->txn;
 
-  txn->commit (txn, 0);
+  assert (txn->commit (txn, 0) == 0);
 }
 
 void gzochid_storage_transaction_rollback (gzochid_storage_transaction *tx)
