@@ -1,5 +1,5 @@
-/* storage.c: Database storage routines for gzochid (GDBM)
- * Copyright (C) 2012 Julian Graham
+/* storage-gdbm.c: Database storage routines for gzochid (GDBM)
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,12 +18,26 @@
 #include <assert.h>
 #include <gdbm.h>
 #include <glib.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "storage.h"
 
 #define DEFAULT_BLOCK_SIZE 512
+
+enum gzochid_storage_lock_type
+  {
+    GZOCHID_STORAGE_LOCK_READ,
+    GZOCHID_STORAGE_LOCK_WRITE
+  };
+
+enum gzochid_storage_operation_type
+  {
+    GZOCHID_STORAGE_OPERATION_PUT,
+    GZOCHID_STORAGE_OPERATION_DELETE
+  };
 
 typedef struct _gdbm_context 
 {

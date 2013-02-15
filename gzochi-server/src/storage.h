@@ -1,5 +1,5 @@
 /* storage.h: Prototypes and declarations for storage.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,18 +21,7 @@
 #include <gdbm.h>
 #include <glib.h>
 #include <gmp.h>
-
-enum gzochid_storage_operation_type
-  {
-    GZOCHID_STORAGE_OPERATION_PUT,
-    GZOCHID_STORAGE_OPERATION_DELETE
-  };
-
-enum gzochid_storage_lock_type
-  {
-    GZOCHID_STORAGE_LOCK_READ,
-    GZOCHID_STORAGE_LOCK_WRITE
-  };
+#include <sys/time.h>
 
 typedef struct _gzochid_storage_store
 {
