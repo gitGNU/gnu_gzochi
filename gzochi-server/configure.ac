@@ -41,7 +41,7 @@ AC_ARG_WITH([storage-engine],
   [AS_HELP_STRING([--with-storage-engine=ENGINE],
     [storage engine ENGINE [bdb, gdbm]])],
   [GZOCHI_STORAGE_ENGINE="$withval"],
-  [GZOCHI_STORAGE_ENGINE="gdbm"])
+  [GZOCHI_STORAGE_ENGINE="bdb"])
 
 AS_CASE([$GZOCHI_STORAGE_ENGINE],
   [bdb], [AC_SEARCH_LIBS([db_create], [db]) AC_CHECK_HEADER([db.h])],
