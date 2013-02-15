@@ -326,12 +326,28 @@ static int transaction_execute
       rollback (transaction);
       success = FALSE;
     }
-  else commit (transaction);
+  else 
+    {
+      struct timeval tx_finish;
+      struct timeval remaining = time_remaining (&timing);
 
-  gettimeofday (&tx_finish, NULL);
-  ms = ((tx_finish.tv_sec - timing.start_time.tv_sec) * 1000)
-    + ((tx_finish.tv_usec - timing.start_time.tv_usec) / 1000);
-  gzochid_debug ("Transaction completed in %dms", ms);
+      if (timing.timeout != NULL 
+	  && remaining.tv_sec <= 0 
+	  && remaining.tv_usec <= 0)
+	{
+	  rollback (transaction);
+	  success = FALSE;
+	}
+      else commit (transaction);
+	  
+      gettimeofday (&tx_finish, NULL);
+      ms = ((tx_finish.tv_sec - timing.start_time.tv_sec) * 1000)
+	+ ((tx_finish.tv_usec - timing.start_time.tv_usec) / 1000);
+      
+      if (success)
+	gzochid_debug ("Transaction completed in %dms", ms);
+      else gzochid_warning ("Transaction timed out after %dms", ms);
+    }
 
   g_static_private_set (&thread_transaction_key, NULL, NULL);
 
