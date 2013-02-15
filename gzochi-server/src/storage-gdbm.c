@@ -247,6 +247,12 @@ gzochid_storage_transaction *gzochid_storage_transaction_begin
   return transaction;
 }
 
+gzochid_storage_transaction *gzochid_storage_transaction_begin_timed
+(gzochid_storage_store *store, struct timeval timeout)
+{
+  return gzochid_storage_transaction_begin (store);
+}
+
 static void cleanup_transaction (gzochid_storage_transaction *tx)
 {
   gdbm_transaction_context *txn = (gdbm_transaction_context *) tx->txn;

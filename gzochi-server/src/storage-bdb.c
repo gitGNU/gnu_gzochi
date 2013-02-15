@@ -296,6 +296,20 @@ gzochid_storage_transaction *gzochid_storage_transaction_begin
   return transaction;
 }
 
+gzochid_storage_transaction *gzochid_storage_transaction_begin_timed
+(gzochid_storage_store *store, struct timeval timeout)
+{
+  gzochid_storage_transaction *transaction = 
+    gzochid_storage_transaction_begin (store);
+  db_timeout_t t = timeout.tv_usec + timeout.tv_sec * 1000000;
+  DB_TXN *txn = (DB_TXN *) transaction->txn;
+
+  txn->set_timeout (txn, t, DB_SET_TXN_TIMEOUT);
+  txn->set_timeout (txn, t, DB_SET_LOCK_TIMEOUT);
+
+  return transaction;
+}
+
 void gzochid_storage_transaction_commit (gzochid_storage_transaction *tx)
 {
   DB_TXN *txn = (DB_TXN *) tx->txn;

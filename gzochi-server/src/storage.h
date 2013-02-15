@@ -51,6 +51,8 @@ char *gzochid_storage_next_key
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin
 (gzochid_storage_store *);
+gzochid_storage_transaction *gzochid_storage_transaction_begin_timed
+(gzochid_storage_store *, struct timeval);
 void gzochid_storage_transaction_commit (gzochid_storage_transaction *);
 void gzochid_storage_transaction_rollback (gzochid_storage_transaction *);
 void gzochid_storage_transaction_prepare (gzochid_storage_transaction *);
