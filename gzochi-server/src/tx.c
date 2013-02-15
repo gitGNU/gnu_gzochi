@@ -263,6 +263,37 @@ void gzochid_transaction_mark_for_rollback
   registration->rollback = TRUE;
 }
 
+static struct timeval time_remaining (gzochid_transaction_timing *timing)
+{
+  struct timeval now, ret, zero = { 0, 0 };
+
+  if (timing->timeout == NULL)
+    return zero;
+
+  gettimeofday (&now, NULL);
+  timersub (&now, &timing->start_time, &ret);
+  if (timercmp (&ret, timing->timeout, >))
+    ret = zero;
+  else 
+    {
+      struct timeval ret2;
+      timersub (timing->timeout, &ret, &ret2);
+      ret = ret2;
+    }
+
+  return ret; 
+}
+
+struct timeval gzochid_transaction_time_remaining ()
+{
+  gzochid_transaction_timing *timing = g_static_private_get 
+    (&thread_transaction_timing_key);
+
+  assert (timing != NULL);
+
+  return time_remaining (timing);  
+}
+
 static int transaction_execute
 (void (*func) (gpointer), gpointer data, struct timeval *timeout)
 {
@@ -346,13 +377,17 @@ gboolean gzochid_transaction_timed_out ()
 
   if (transaction->timing->timeout != NULL)
     {
-      struct timeval now, result;
-      gettimeofday (&now, NULL);
-
-      assert (gzochid_util_timeval_subtract
-	      (&result, &now, transaction->timing->timeout) == 0);
-      return gzochid_util_timeval_compare
-	(&result, &transaction->timing->start_time) <= 0;
+      struct timeval remaining = gzochid_transaction_time_remaining ();
+      return remaining.tv_sec <= 0 && remaining.tv_usec <= 0;
     }
   else return FALSE;
+}
+
+gboolean gzochid_transaction_timed ()
+{
+  gzochid_transaction_timing *timing = g_static_private_get 
+    (&thread_transaction_timing_key);
+
+  assert (timing != NULL);
+  return timing->timeout != NULL;
 }

@@ -47,6 +47,10 @@ int gzochid_transaction_execute_timed
 
 gboolean gzochid_transaction_active (void);
 gboolean gzochid_transaction_rollback_only (void);
+
+gboolean gzochid_transaction_timed (void);
 gboolean gzochid_transaction_timed_out (void);
+struct timeval gzochid_transaction_time_remaining (void);
+
 
 #endif /* GZOCHID_TX_H */
