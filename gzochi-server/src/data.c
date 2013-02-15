@@ -49,17 +49,27 @@ void gzochid_oid_holder_free (gzochid_oid_holder *holder)
 }
 
 static gzochid_data_transaction_context *create_transaction_context 
-(gzochid_application_context *app_context)
+(gzochid_application_context *app_context, struct timeval *timeout)
 {
   gzochid_data_transaction_context *tx_context = 
     calloc (1, sizeof (gzochid_data_transaction_context));
 
   tx_context->context = app_context;
 
-  tx_context->oids_transaction = 
-    gzochid_storage_transaction_begin (app_context->oids);
-  tx_context->names_transaction =
-    gzochid_storage_transaction_begin (app_context->names);
+  if (timeout != NULL)
+    {
+      tx_context->oids_transaction = 
+	gzochid_storage_transaction_begin_timed (app_context->oids, *timeout);
+      tx_context->names_transaction =
+	gzochid_storage_transaction_begin_timed (app_context->names, *timeout);
+    }
+  else
+    {
+      tx_context->oids_transaction = 
+	gzochid_storage_transaction_begin (app_context->oids);
+      tx_context->names_transaction =
+	gzochid_storage_transaction_begin (app_context->names);
+    }
 
   tx_context->oids_to_references = g_hash_table_new (g_str_hash, g_str_equal);
   tx_context->ptrs_to_references = g_hash_table_new 
@@ -503,8 +513,16 @@ static void join_transaction (gzochid_application_context *context)
 {
   if (!gzochid_transaction_active ()
       || gzochid_transaction_context (&data_participant) == NULL)
-    gzochid_transaction_join
-      (&data_participant, create_transaction_context (context));
+    {
+      gzochid_data_transaction_context *tx_context = NULL;
+      if (gzochid_transaction_timed ())
+	{
+	  struct timeval remaining = gzochid_transaction_time_remaining ();
+	  tx_context = create_transaction_context (context, &remaining);
+	}
+      else tx_context = create_transaction_context (context, NULL); 
+      gzochid_transaction_join (&data_participant, tx_context);
+    }
 }
 
 void *gzochid_data_get_binding
