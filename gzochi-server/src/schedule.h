@@ -1,5 +1,5 @@
 /* schedule.h: Prototypes and declarations for schedule.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -25,8 +25,7 @@
 enum gzochid_pending_task_state
   {
     GZOCHID_PENDING_TASK_STATE_PENDING,
-    GZOCHID_PENDING_TASK_STATE_COMPLETED,
-    GZOCHID_PENDING_TASK_STATE_ERROR
+    GZOCHID_PENDING_TASK_STATE_COMPLETED
   };
 
 typedef struct _gzochid_task_queue
