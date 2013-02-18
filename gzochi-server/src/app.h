@@ -97,9 +97,11 @@ typedef struct _gzochid_transactional_application_task_execution
 
 void gzochid_application_transactional_task_worker 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
-
 void gzochid_application_task_worker (gpointer);
 void gzochid_application_task_thread_worker (gpointer, gpointer);
+
+gboolean gzochid_application_should_retry 
+(gzochid_transactional_application_task_execution *);
 
 typedef struct _gzochid_application_worker_serialization
 {

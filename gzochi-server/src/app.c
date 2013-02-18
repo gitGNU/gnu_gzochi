@@ -35,6 +35,8 @@
 #include "tx.h"
 #include "util.h"
 
+#define GZOCHID_APPLICATION_MAX_ATTEMPTS_DEFAULT 3
+
 static GStaticPrivate thread_application_context_key = G_STATIC_PRIVATE_INIT;
 static GStaticPrivate thread_identity_key = G_STATIC_PRIVATE_INIT;
 
@@ -135,6 +137,13 @@ void gzochid_application_task_worker (gpointer data)
 void gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
 {
   gzochid_application_task_worker (data);
+}
+
+gboolean gzochid_application_should_retry 
+(gzochid_transactional_application_task_execution *execution)
+{
+  return execution->result == GZOCHID_TRANSACTION_SHOULD_RETRY
+    && execution->attempts < GZOCHID_APPLICATION_MAX_ATTEMPTS_DEFAULT;
 }
 
 static void run_async_transactional (gpointer data)
@@ -309,7 +318,8 @@ void gzochid_application_context_init
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, 
      GZOCHID_APPLICATION_STATE_RUNNING);
   gzochid_fsm_add_transition
-    (fsm, GZOCHID_APPLICATION_STATE_RUNNING, GZOCHID_APPLICATION_STATE_STOPPED);
+    (fsm, GZOCHID_APPLICATION_STATE_RUNNING, 
+     GZOCHID_APPLICATION_STATE_STOPPED);
   gzochid_fsm_add_transition
     (fsm, GZOCHID_APPLICATION_STATE_RUNNING, GZOCHID_APPLICATION_STATE_PAUSED);
   gzochid_fsm_add_transition
@@ -320,7 +330,8 @@ void gzochid_application_context_init
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_data, context);
   gzochid_fsm_on_enter 
-    (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_complete, context);
+    (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_complete, 
+     context);
   gzochid_fsm_on_enter (fsm, GZOCHID_APPLICATION_STATE_RUNNING, run, context);
   gzochid_fsm_on_enter (fsm, GZOCHID_APPLICATION_STATE_STOPPED, stop, context);
 
@@ -370,7 +381,12 @@ void gzochid_application_client_logged_in
   task.data = &application_task;
   gettimeofday (&task.target_execution_time, NULL);
 
-  gzochid_schedule_run_task (game_context->task_queue, &task);
+  while (TRUE)
+    {
+      gzochid_schedule_run_task (game_context->task_queue, &task);
+      if (!gzochid_application_should_retry (&execution))
+	break;
+    }
 }
 
 void gzochid_application_client_disconnected
@@ -480,7 +496,12 @@ void gzochid_application_session_received_message
       task.data = &application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
-      gzochid_schedule_run_task (game_context->task_queue, &task);
+      while (TRUE)
+	{
+	  gzochid_schedule_run_task (game_context->task_queue, &task);
+	  if (!gzochid_application_should_retry (&execution))
+	    break;
+	}
     }
 }
 
