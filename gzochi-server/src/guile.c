@@ -42,21 +42,15 @@ static SCM guile_catch_body (void *data)
 
   SCM procedure = (SCM) ptr[0];
   SCM args = (SCM) ptr[1];
+  SCM exception_var = (SCM) ptr[2];
   
-  return scm_apply_0 (procedure, args);
+  return scm_call_2 
+    (scm_r6rs_with_exception_handler,
+     scm_call_2 (scm_make_handler, scm_r6rs_exception_handler, exception_var),
+     scm_call_2 (scm_make_thunk, procedure, args));
 }
 
-static SCM guile_catch_handler (void *data, SCM tag, SCM throw_args)
-{
-  SCM exception_variable = (SCM) data;
-
-  if (scm_variable_p (exception_variable) == SCM_BOOL_T)
-    scm_variable_set_x (exception_variable, scm_cons (tag, throw_args));
-
-  return SCM_BOOL_F;
-}
-
-static SCM guile_pre_unwind_handler (void *data, SCM tag, SCM throw_args)
+static SCM r6rs_exception_handler (SCM exception_var, SCM cond)
 {
   scm_display_backtrace 
     (scm_make_stack (SCM_BOOL_T, SCM_EOL),
@@ -64,7 +58,41 @@ static SCM guile_pre_unwind_handler (void *data, SCM tag, SCM throw_args)
      SCM_BOOL_F, 
      SCM_BOOL_F);
 
-  scm_print_exception (scm_current_output_port (), SCM_BOOL_F, tag, throw_args);
+  scm_call_2 (scm_exception_printer, scm_current_output_port (), cond);
+
+  if (scm_variable_p (exception_var) == SCM_BOOL_T)
+    scm_variable_set_x (exception_var, cond);
+
+  return SCM_BOOL_F;
+}
+
+static SCM guile_catch_handler (void *data, SCM tag, SCM throw_args)
+{
+  SCM exception_variable = (SCM) data;
+
+  if (scm_variable_p (exception_variable) == SCM_BOOL_T
+      && scm_variable_ref (exception_variable) == SCM_UNSPECIFIED)
+    scm_variable_set_x (exception_variable, scm_cons (tag, throw_args));
+
+  return SCM_BOOL_F;
+}
+
+static SCM guile_pre_unwind_handler (void *data, SCM tag, SCM throw_args)
+{
+  SCM exception_variable = (SCM) data;
+
+  if (scm_variable_p (exception_variable) == SCM_BOOL_T
+      && scm_variable_ref (exception_variable) == SCM_UNSPECIFIED)
+    {
+      scm_display_backtrace 
+	(scm_make_stack (SCM_BOOL_T, SCM_EOL),
+	 scm_current_output_port (), 
+	 SCM_BOOL_F, 
+	 SCM_BOOL_F);
+  
+      scm_print_exception 
+	(scm_current_output_port (), SCM_BOOL_F, tag, throw_args);
+    }
 
   return SCM_BOOL_F;
 }
@@ -72,16 +100,17 @@ static SCM guile_pre_unwind_handler (void *data, SCM tag, SCM throw_args)
 SCM gzochid_guile_invoke (SCM procedure, SCM args, SCM exception_var)
 {
   SCM ret = SCM_BOOL_F;
-  void *sub_data[2];
+  void *sub_data[3];
 
   sub_data[0] = procedure;
   sub_data[1] = args;
+  sub_data[2] = exception_var;
 
   ret = scm_c_catch 
     (SCM_BOOL_T,
      guile_catch_body, sub_data, 
      guile_catch_handler, exception_var, 
-     guile_pre_unwind_handler, NULL);
+     guile_pre_unwind_handler, exception_var);
 
   scm_remember_upto_here_1 (procedure);
   scm_remember_upto_here_1 (args);
