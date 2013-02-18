@@ -26,6 +26,7 @@
 #include "context.h"
 #include "io.h"
 #include "storage.h"
+#include "tx.h"
 
 enum gzochid_application_state 
   {
@@ -79,6 +80,21 @@ typedef struct _gzochid_application_context
 typedef void (*gzochid_application_worker) 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
+typedef struct _gzochid_transactional_application_task
+{
+  gzochid_application_worker worker;
+  gpointer data;
+} gzochid_transactional_application_task;
+
+typedef struct _gzochid_transactional_application_task_execution
+{
+  gzochid_transactional_application_task *task;
+
+  struct timeval *timeout;
+  unsigned int attempts;
+  gzochid_transaction_result result;
+} gzochid_transactional_application_task_execution;
+
 void gzochid_application_transactional_task_worker 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
@@ -121,12 +137,6 @@ typedef struct _gzochid_durable_application_task
 
   mpz_t oid;
 } gzochid_durable_application_task;
-
-typedef struct _gzochid_transactional_application_task
-{
-  gzochid_application_worker worker;
-  gpointer data;
-} gzochid_transactional_application_task;
 
 gzochid_io_serialization gzochid_application_callback_serialization;
 
