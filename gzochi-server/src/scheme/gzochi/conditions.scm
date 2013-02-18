@@ -39,6 +39,10 @@
 	  gzochi:make-transaction-aborted-condition
 	  gzochi:transaction-aborted-condition?
 
+	  &gzochi:transaction-retry
+	  gzochi:make-transaction-retry-condition
+	  gzochi:transaction-retry-condition?
+
 	  &gzochi:transaction-timeout
 	  gzochi:make-transaction-timeout-condition
 	  gzochi:transaction-timeout-condition?)
@@ -73,6 +77,11 @@
                          &condition
 			 gzochi:make-transaction-aborted-condition
 			 gzochi:transaction-aborted-condition?)
+  
+  (define-condition-type &gzochi:transaction-retry
+                         &condition
+			 gzochi:make-transaction-retry-condition
+			 gzochi:transaction-retry-condition?)
   
   (define-condition-type &gzochi:transaction-timeout
                          &condition
