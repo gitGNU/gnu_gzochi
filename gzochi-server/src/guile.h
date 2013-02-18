@@ -1,5 +1,5 @@
 /* guile.h: Prototypes and declarations for guile.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -29,5 +29,7 @@ SCM gzochid_guile_invoke (SCM, SCM, SCM);
 void gzochid_guile_run (gzochid_thread_worker, gpointer);
 void gzochid_guile_thread_pool_push 
 (GThreadPool *, gzochid_thread_worker, gpointer, GError **);
+
+void gzochid_guile_init (void);
 
 #endif /* GZOCHID_GUILE_H */

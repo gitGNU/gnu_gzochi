@@ -1,5 +1,5 @@
 /* gzochid.c: Main server bootstrapping routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@
 #include "context.h"
 #include "fsm.h"
 #include "game.h"
+#include "guile.h"
 #include "gzochid.h"
 #include "log.h"
 #include "threads.h"
@@ -119,6 +120,17 @@ static void initialize (int from_state, int to_state, gpointer user_data)
   gzochid_thread_pool_push (context->pool, initialize_async, NULL, NULL);
 }
 
+static void *initialize_guile_inner (void *ptr)
+{
+  gzochid_guile_init ();
+  return NULL;
+}
+
+static void initialize_guile (int from_state, int to_state, gpointer user_data)
+{
+  scm_with_guile (initialize_guile_inner, NULL);
+}
+
 gzochid_server_context *gzochid_server_context_new (void)
 {
   return calloc (1, sizeof (gzochid_server_context));
@@ -134,6 +146,8 @@ void gzochid_server_context_init (gzochid_server_context *context)
 
   context->pool = gzochid_thread_pool_new (context, 1, TRUE, NULL);
 
+  gzochid_fsm_on_enter 
+    (fsm, GZOCHID_STATE_INITIALIZING, initialize_guile, context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_STATE_INITIALIZING, initialize, context);
   

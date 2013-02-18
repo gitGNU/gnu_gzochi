@@ -1,5 +1,5 @@
 /* guile.c: GNU Guile interface routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,6 +21,13 @@
 
 #include "guile.h"
 #include "threads.h"
+
+static SCM scm_r6rs_with_exception_handler;
+
+static SCM scm_r6rs_exception_handler;
+static SCM scm_exception_printer;
+static SCM scm_make_handler;
+static SCM scm_make_thunk;
 
 typedef struct _gzochid_guile_thread_work 
 {
@@ -119,4 +126,31 @@ void gzochid_guile_thread_pool_push
   work->data = data;
 
   gzochid_thread_pool_push (pool, guile_dispatch, work, error);
+}
+
+static void bind_scm (char *module, SCM *binding, char *name)
+{
+  SCM var = scm_c_public_variable (module, name);
+
+  if (scm_is_false (var))
+    g_error ("Missing Scheme binding for `%s'. Aborting...", name);
+
+  *binding = scm_variable_ref (var);
+  scm_gc_protect_object (*binding);
+}
+
+void gzochid_guile_init ()
+{
+  scm_r6rs_exception_handler = scm_c_make_gsubr 
+    ("r6rs_exception_handler", 2, 0, 0, r6rs_exception_handler);
+  scm_gc_protect_object (scm_r6rs_exception_handler);
+
+  bind_scm ("rnrs exceptions", &scm_r6rs_with_exception_handler, 
+	    "with-exception-handler");
+
+  bind_scm ("gzochi private guile", &scm_exception_printer, 
+	    "gzochi:exception-printer");
+  bind_scm ("gzochi private guile", &scm_make_handler, "gzochi:make-handler");
+  bind_scm ("gzochi private guile", &scm_make_thunk, "gzochi:make-thunk");
+
 }
