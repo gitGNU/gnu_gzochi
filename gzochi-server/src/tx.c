@@ -229,6 +229,23 @@ static gboolean rollback_only (gzochid_transaction *transaction)
   return FALSE;
 }
 
+static gboolean retryable (gzochid_transaction *transaction)
+{
+  GHashTableIter iter;
+  gpointer key, value;
+  
+  g_hash_table_iter_init (&iter, transaction->participants);
+  while (g_hash_table_iter_next (&iter, &key, &value))
+    {
+      gzochid_transaction_participant_registration *participant = 
+	(gzochid_transaction_participant_registration *) value;
+      if (participant->rollback && !participant->retryable)
+	return FALSE;
+    }
+
+  return TRUE;
+}
+
 static void rollback (gzochid_transaction *transaction)
 {
   GList *participants = g_hash_table_get_values (transaction->participants);
@@ -296,13 +313,13 @@ struct timeval gzochid_transaction_time_remaining ()
   return time_remaining (timing);  
 }
 
-static int transaction_execute
+static gzochid_transaction_result transaction_execute
 (void (*func) (gpointer), gpointer data, struct timeval *timeout)
 {
   gzochid_transaction *transaction = NULL;
   gzochid_transaction_timing timing;
   gboolean success = TRUE;
-  struct timeval tx_finish;
+  gboolean should_retry = FALSE;
   int ms = 0;
 
   /* Set up the transaction timing information here, even before any
@@ -321,7 +338,7 @@ static int transaction_execute
 
   transaction = g_static_private_get (&thread_transaction_key);
   if (transaction == NULL)
-    return TRUE;
+    return GZOCHID_TRANSACTION_SUCCESS;
 
   if (rollback_only (transaction) || !prepare (transaction))
     {
@@ -339,6 +356,7 @@ static int transaction_execute
 	{
 	  rollback (transaction);
 	  success = FALSE;
+	  should_retry = TRUE;
 	}
       else commit (transaction);
 	  
@@ -352,17 +370,25 @@ static int transaction_execute
     }
 
   g_static_private_set (&thread_transaction_key, NULL, NULL);
-
+  
+  if (!success)
+    should_retry |= retryable (transaction);
   transaction_free (transaction);
-  return success;
+  
+  if (success)
+    return GZOCHID_TRANSACTION_SUCCESS;
+  else return should_retry 
+	 ? GZOCHID_TRANSACTION_SHOULD_RETRY
+	 : GZOCHID_TRANSACTION_FAILURE;    
 }
 
-int gzochid_transaction_execute (void (*func) (gpointer), gpointer data)
+gzochid_transaction_result gzochid_transaction_execute 
+(void (*func) (gpointer), gpointer data)
 {
   return transaction_execute (func, data, NULL);
 }
 
-int gzochid_transaction_execute_timed
+gzochid_transaction_result gzochid_transaction_execute_timed
 (void (*func) (gpointer), gpointer data, struct timeval timeout)
 {
   return transaction_execute (func, data, &timeout);
@@ -409,3 +435,4 @@ gboolean gzochid_transaction_timed ()
   assert (timing != NULL);
   return timing->timeout != NULL;
 }
+

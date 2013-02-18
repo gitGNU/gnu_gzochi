@@ -25,6 +25,14 @@ typedef int (*gzochid_transaction_prepare) (gpointer);
 typedef void (*gzochid_transaction_commit) (gpointer);
 typedef void (*gzochid_transaction_rollback) (gpointer);
 
+typedef enum _gzochid_transaction_result
+  {
+    GZOCHID_TRANSACTION_PENDING = 0,
+    GZOCHID_TRANSACTION_SUCCESS = 1,
+    GZOCHID_TRANSACTION_FAILURE = 2,
+    GZOCHID_TRANSACTION_SHOULD_RETRY = 3
+  } gzochid_transaction_result;
+
 typedef struct _gzochid_transaction_participant
 {
   char *name;
@@ -41,8 +49,10 @@ void gzochid_transaction_participant_free (gzochid_transaction_participant *);
 
 void gzochid_transaction_join (gzochid_transaction_participant *, gpointer);
 gpointer gzochid_transaction_context (gzochid_transaction_participant *);
-int gzochid_transaction_execute (void (*) (gpointer), gpointer);
-int gzochid_transaction_execute_timed 
+
+gzochid_transaction_result gzochid_transaction_execute 
+(void (*) (gpointer), gpointer);
+gzochid_transaction_result gzochid_transaction_execute_timed 
 (void (*) (gpointer), gpointer, struct timeval);
 
 gboolean gzochid_transaction_active (void);
