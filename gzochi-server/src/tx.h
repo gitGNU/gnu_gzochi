@@ -52,5 +52,7 @@ gboolean gzochid_transaction_timed (void);
 gboolean gzochid_transaction_timed_out (void);
 struct timeval gzochid_transaction_time_remaining (void);
 
+void gzochid_transaction_mark_for_rollback 
+(gzochid_transaction_participant *, gboolean);
 
 #endif /* GZOCHID_TX_H */

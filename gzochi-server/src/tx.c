@@ -94,6 +94,7 @@ typedef struct _gzochid_transaction_participant_registration
 
   gpointer data;
   gboolean rollback;
+  gboolean retryable;
 } gzochid_transaction_participant_registration;
 
 gzochid_transaction_participant *gzochid_transaction_participant_new 
@@ -250,7 +251,7 @@ static void rollback (gzochid_transaction *transaction)
 }
 
 void gzochid_transaction_mark_for_rollback 
-(gzochid_transaction_participant *participant)
+(gzochid_transaction_participant *participant, gboolean retryable)
 {
   gzochid_transaction *transaction = (gzochid_transaction *) 
     g_static_private_get (&thread_transaction_key);  
@@ -261,6 +262,7 @@ void gzochid_transaction_mark_for_rollback
 
   assert (registration != NULL);
   registration->rollback = TRUE;
+  registration->retryable = retryable;
 }
 
 static struct timeval time_remaining (gzochid_transaction_timing *timing)

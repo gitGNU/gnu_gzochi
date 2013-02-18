@@ -175,7 +175,9 @@ void gzochid_scheme_application_worker
   *ret = scheme_invoke (context, identity, proc, args, exception_var);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    gzochid_transaction_mark_for_rollback (&scheme_participant);
+    gzochid_transaction_mark_for_rollback 
+      (&scheme_participant, 
+       is_transaction_retry (scm_variable_ref (exception_var)));
 }
 
 void gzochid_scheme_application_task_worker 
@@ -197,7 +199,9 @@ void gzochid_scheme_application_task_worker
      exception_var);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    gzochid_transaction_mark_for_rollback (&scheme_participant);
+    gzochid_transaction_mark_for_rollback 
+      (&scheme_participant,
+       is_transaction_retry (scm_variable_ref (exception_var)));
 }
 
 static gzochid_application_callback *scm_to_callback 
@@ -249,7 +253,9 @@ void gzochid_scheme_application_initialized_worker
      exception_var);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    gzochid_transaction_mark_for_rollback (&scheme_participant);
+    gzochid_transaction_mark_for_rollback 
+      (&scheme_participant,
+       is_transaction_retry (scm_variable_ref (exception_var)));
   else gzochid_data_set_binding_to_oid 
 	 (context, "s.initializer", callback_reference->oid);
 }
@@ -326,7 +332,9 @@ void gzochid_scheme_application_logged_in_worker
      exception_var);
   
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    gzochid_transaction_mark_for_rollback (&scheme_participant);
+    gzochid_transaction_mark_for_rollback 
+      (&scheme_participant, 
+       is_transaction_retry (scm_variable_ref (exception_var)));
   else if (scm_is_false (handler))
     gzochid_client_session_send_login_failure (context, session);
   else
@@ -387,7 +395,9 @@ void gzochid_scheme_application_received_message_worker
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
       gzochid_transaction_join (&scheme_participant, NULL);
-      gzochid_transaction_mark_for_rollback (&scheme_participant);
+      gzochid_transaction_mark_for_rollback 
+	(&scheme_participant, 
+	 is_transaction_retry (scm_variable_ref (exception_var)));
     }
 
   g_list_free (gpa);
@@ -430,7 +440,9 @@ void gzochid_scheme_application_disconnected_worker
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
       gzochid_transaction_join (&scheme_participant, NULL);
-      gzochid_transaction_mark_for_rollback (&scheme_participant);
+      gzochid_transaction_mark_for_rollback 
+	(&scheme_participant, 
+	 is_transaction_retry (scm_variable_ref (exception_var)));
     }
   else gzochid_data_remove_object (session_reference);
 
@@ -494,7 +506,9 @@ static void scheme_managed_record_serializer
       /* Don't join the transaction here as the serializer should only be
 	 called during the PREPARING phase, which is too late to join. */
 
-      gzochid_transaction_mark_for_rollback (&scheme_participant);      
+      gzochid_transaction_mark_for_rollback 
+	(&scheme_participant, 
+	 is_transaction_retry (scm_variable_ref (exception_var)));
       g_list_free (gpd);
       return;
     }
@@ -539,7 +553,9 @@ static void *scheme_managed_record_deserializer
      called during the PREPARING phase, which is too late to join. */
   
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    gzochid_transaction_mark_for_rollback (&scheme_participant);      
+    gzochid_transaction_mark_for_rollback 
+      (&scheme_participant, 
+       is_transaction_retry (scm_variable_ref (exception_var)));
   else scm_gc_protect_object (record);
 
   return record;
