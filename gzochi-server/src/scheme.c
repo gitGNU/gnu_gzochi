@@ -75,6 +75,7 @@ static SCM scm_r6rs_raise;
 static SCM scm_make_object_removed_condition;
 static SCM scm_make_name_exists_condition;
 static SCM scm_make_name_not_bound_condition;
+static SCM scm_transaction_retry_condition_p;
 
 static SCM resolve_procedure (char *procedure, GList *module)
 {
@@ -152,6 +153,11 @@ static void scheme_rollback (gpointer data) { }
 
 static gzochid_transaction_participant scheme_participant = 
   { "scheme", scheme_prepare, scheme_commit, scheme_rollback };
+
+static gboolean is_transaction_retry (SCM cond)
+{
+  return scm_is_true (scm_call_1 (scm_transaction_retry_condition_p, cond));
+}
 
 void gzochid_scheme_application_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
@@ -869,10 +875,6 @@ static void bind_scm (char *module, SCM *binding, char *name)
 
 static void *initialize_bindings (void *ptr)
 {
-  gzochid_scheme_scm_module_gzochi_private_app = 
-    scm_c_resolve_module ("gzochi private app");
-  scm_gc_protect_object (gzochid_scheme_scm_module_gzochi_private_app);
-  
   bind_scm ("rnrs exceptions", &scm_r6rs_raise, "raise");
 
   bind_scm ("rnrs hashtables", &gzochid_scheme_string_hash, "string-hash");
@@ -903,6 +905,8 @@ static void *initialize_bindings (void *ptr)
 	    "gzochi:make-name-not-bound-condition");
   bind_scm ("gzochi conditions", &scm_make_object_removed_condition,
 	    "gzochi:make-object-removed-condition");
+  bind_scm ("gzochi conditions", &scm_transaction_retry_condition_p,
+	    "gzochi:transaction-retry-condition?");
 
   bind_scm ("gzochi data", &scm_make_managed_hashtable, 
 	    "gzochi:make-managed-hashtable");
