@@ -23,8 +23,10 @@
 
 #include "util.h"
 
+static SCM scm_condition;
 static SCM scm_make_no_current_application_condition;
 static SCM scm_make_transaction_aborted_condition;
+static SCM scm_make_transaction_retry_condition;
 static SCM scm_make_transaction_timeout_condition;
 
 gzochid_application_context *gzochid_api_ensure_current_application_context ()
@@ -42,7 +44,9 @@ void gzochid_api_check_transaction ()
 {
   if (gzochid_transaction_timed_out ())
     gzochid_scheme_r6rs_raise
-      (scm_call_0 (scm_make_transaction_timeout_condition));
+      (scm_call_2 (scm_condition, 
+		   scm_call_0 (scm_make_transaction_timeout_condition),
+		   scm_call_0 (scm_make_transaction_retry_condition)));
 
   if (gzochid_transaction_rollback_only ())
     gzochid_scheme_r6rs_raise 
@@ -62,11 +66,14 @@ static void bind_scm (char *module, SCM *binding, char *name)
 
 void gzochid_api_util_init ()
 {
+  bind_scm ("rnrs conditions", &scm_condition, "condition");
   
   bind_scm ("gzochi conditions", &scm_make_no_current_application_condition,
 	    "gzochi:make-no-current-application-condition");
   bind_scm ("gzochi conditions", &scm_make_transaction_aborted_condition,
 	    "gzochi:make-transaction-aborted-condition");
+  bind_scm ("gzochi conditions", &scm_make_transaction_retry_condition,
+	    "gzochi:make-transaction-retry-condition");
   bind_scm ("gzochi conditions", &scm_make_transaction_timeout_condition,
 	    "gzochi:make-transaction-timeout-condition");
 }
