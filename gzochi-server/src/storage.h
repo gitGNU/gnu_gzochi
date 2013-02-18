@@ -34,6 +34,7 @@ typedef struct _gzochid_storage_transaction
   gzochid_storage_store *store;
   gpointer txn;
   gboolean rollback;
+  gboolean should_retry;
 } gzochid_storage_transaction;
 
 gzochid_storage_store *gzochid_storage_open (char *);

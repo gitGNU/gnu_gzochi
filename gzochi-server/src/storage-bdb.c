@@ -33,6 +33,11 @@ typedef struct _bdb_context
   DB_ENV *db_env;
 } bdb_context;
 
+static gboolean retryable (int ret)
+{
+  return ret == DB_LOCK_DEADLOCK || ret == DB_LOCK_NOTGRANTED;
+}
+
 gzochid_storage_store *gzochid_storage_open (char *path)
 {
   DB_TXN *dbopen_tx = NULL;
@@ -368,6 +373,7 @@ static char *transaction_get_internal
 	    ("Failed to retrieve key %s in transaction: %s", 
 	     key, db_strerror (ret)); 
 	  tx->rollback = TRUE;
+	  tx->should_retry = retryable (ret);
 	}
       return NULL;
     }
@@ -410,6 +416,7 @@ void gzochid_storage_transaction_put
       gzochid_warning 
 	("Failed to store key %s in transaction: %s", key, db_strerror (ret)); 
       tx->rollback = TRUE;
+      tx->should_retry = retryable (ret);
     }
 }
 
@@ -432,6 +439,7 @@ void gzochid_storage_transaction_delete
       gzochid_warning
 	("Failed to delete key %s in transaction: %s", key, db_strerror (ret)); 
       tx->rollback = TRUE;
+      tx->should_retry = retryable (ret);
     }
 }
 
@@ -457,6 +465,8 @@ char *gzochid_storage_transaction_first_key
       gzochid_warning
 	("Failed to seek to first key in transaction: %s", db_strerror (ret));
       tx->rollback = TRUE;
+      tx->should_retry = retryable (ret);
+
       return NULL;
     }
 
@@ -493,6 +503,7 @@ char *gzochid_storage_transaction_next_key
 	    ("Failed to seek to key %s in transaction: %s", 
 	     key, db_strerror (ret));
 	  tx->rollback = TRUE;
+	  tx->should_retry = retryable (ret);
 	}
       cursor->close (cursor);
       return NULL;
@@ -515,6 +526,7 @@ char *gzochid_storage_transaction_next_key
 	  gzochid_warning
 	    ("Failed to advance cursor in transaction: %s", db_strerror (ret));
 	  tx->rollback = TRUE;
+	  tx->should_retry = retryable (ret);
 	}
       return NULL;
     }
