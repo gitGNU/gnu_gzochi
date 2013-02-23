@@ -94,6 +94,46 @@ static void initialize_complete
     (game_context->pool, initialize_async, user_data, NULL);
 }
 
+static gzochid_transactional_application_task_execution *execution_new
+(gzochid_transactional_application_task *task, struct timeval *timeout)
+{
+  gzochid_transactional_application_task_execution *execution = 
+    malloc (sizeof (gzochid_transactional_application_task_execution));
+
+  execution->task = task;
+
+  execution->timeout = malloc (sizeof (struct timeval));
+  execution->timeout->tv_sec = timeout->tv_sec;
+  execution->timeout->tv_usec = timeout->tv_usec;
+
+  execution->attempts = 0;
+  execution->result = GZOCHID_TRANSACTION_PENDING;
+
+  return execution;
+}
+
+gzochid_transactional_application_task_execution *
+gzochid_transactional_application_task_execution_new 
+(gzochid_transactional_application_task *task)
+{
+  return execution_new (task, NULL);
+}
+
+gzochid_transactional_application_task_execution *
+gzochid_transactional_application_task_timed_execution_new 
+(gzochid_transactional_application_task *task, struct timeval timeout)
+{
+  return execution_new (task, &timeout);
+}
+
+void gzochid_transactional_application_task_execution_free
+(gzochid_transactional_application_task_execution *execution)
+{
+  if (execution->timeout != NULL)
+    free (execution->timeout);
+  free (execution);
+}
+
 static void transactional_task_worker (gpointer data)
 {
   void **args = (void **) data;

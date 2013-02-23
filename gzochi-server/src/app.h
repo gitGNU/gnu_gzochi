@@ -95,6 +95,17 @@ typedef struct _gzochid_transactional_application_task_execution
   gzochid_transaction_result result;
 } gzochid_transactional_application_task_execution;
 
+gzochid_transactional_application_task_execution *
+gzochid_transactional_application_task_execution_new 
+(gzochid_transactional_application_task *);
+
+gzochid_transactional_application_task_execution *
+gzochid_transactional_application_timed_task_execution_new 
+(gzochid_transactional_application_task *, struct timeval);
+
+void gzochid_transactional_application_task_execution_free
+(gzochid_transactional_application_task_execution *);
+
 void gzochid_application_transactional_task_worker 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 void gzochid_application_task_worker (gpointer);
