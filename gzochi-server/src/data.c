@@ -808,16 +808,6 @@ static void init_persistence_task
   task->holder = holder;
 } 
 
-static gzochid_persistence_task_data *gzochid_persistence_task_data_new
-(gzochid_io_serialization *serialization, gpointer data,
- gzochid_oid_holder *holder)
-{
-  gzochid_persistence_task_data *task = 
-    malloc (sizeof (gzochid_persistence_task_data));
-  init_persistence_task (task, serialization, data, holder);
-  return task;
-}
-
 static gzochid_prefix_binding_persistence_task_data *
 gzochid_prefix_binding_persistence_task_data_new
 (gzochid_io_serialization *serialization, gpointer data,
@@ -875,62 +865,19 @@ static void prefix_binding_persistence_task_worker
   g_string_free (binding, FALSE);
 }
 
-gzochid_task *gzochid_data_persistence_task_new 
-(gzochid_application_context *context, gzochid_auth_identity *identity,
- gzochid_io_serialization *serialization, gpointer data,
- gzochid_oid_holder *holder)
-{
-  gzochid_persistence_task_data *task_data =
-    gzochid_persistence_task_data_new (serialization, data, holder);
-  gzochid_transactional_application_task *transactional_task = 
-    gzochid_transactional_application_task_new 
-    (persistence_task_worker, task_data);
-  gzochid_transactional_application_task_execution *execution = 
-    calloc (1, sizeof (gzochid_transactional_application_task_execution));
-  gzochid_application_task *application_task = NULL;
-
-  execution->task = transactional_task;
-  execution->result = GZOCHID_TRANSACTION_PENDING;
-
-  application_task = gzochid_application_task_new 
-    (context, identity, gzochid_application_transactional_task_worker,
-     execution);
-
-  return gzochid_task_immediate_new 
-    (gzochid_application_task_thread_worker, application_task);
-}
-
-void gzochid_data_persistence_task_free (gzochid_task *task)
-{
-  gzochid_application_task *application_task = 
-    (gzochid_application_task *) task->data;
-  gzochid_transactional_application_task_execution *execution = 
-    (gzochid_transactional_application_task_execution *) 
-    application_task->data;
-  gzochid_transactional_application_task *transactional_task = execution->task;
-  gzochid_persistence_task_data *data = 
-    (gzochid_persistence_task_data *) transactional_task->data;
-
-  free (data);
-  free (transactional_task);
-  free (execution);
-  free (application_task);
-  free (task);
-}
-
 gzochid_task *gzochid_data_prefix_binding_persistence_task_new
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gzochid_io_serialization *serialization, gpointer data, 
  gzochid_oid_holder *holder, char *prefix)
 {
-  gzochid_transactional_application_task_execution *execution = 
-    calloc (1, sizeof (gzochid_transactional_application_task_execution));
   gzochid_prefix_binding_persistence_task_data *task_data =
     gzochid_prefix_binding_persistence_task_data_new 
     (serialization, data, holder, prefix);
   gzochid_transactional_application_task *transactional_task = 
     gzochid_transactional_application_task_new 
     (prefix_binding_persistence_task_worker, task_data);
+  gzochid_transactional_application_task_execution *execution = 
+    calloc (1, sizeof (gzochid_transactional_application_task_execution));
   gzochid_application_task *application_task = NULL;
 
   execution->task = transactional_task;
@@ -946,5 +893,18 @@ gzochid_task *gzochid_data_prefix_binding_persistence_task_new
 
 void gzochid_data_prefix_binding_persistence_task_free (gzochid_task *task)
 {
-  gzochid_data_persistence_task_free (task);
+  gzochid_application_task *application_task = 
+    (gzochid_application_task *) task->data;
+  gzochid_transactional_application_task_execution *execution = 
+    (gzochid_transactional_application_task_execution *) 
+    application_task->data;
+  gzochid_transactional_application_task *transactional_task = execution->task;
+  gzochid_persistence_task_data *data = 
+    (gzochid_persistence_task_data *) transactional_task->data;
+  
+  free (data);
+  free (transactional_task);
+  gzochid_transactional_application_task_execution_free (execution);
+  free (application_task);
+  free (task);
 }
