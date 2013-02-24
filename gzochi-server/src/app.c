@@ -124,9 +124,13 @@ static gzochid_transactional_application_task_execution *execution_new
 
   execution->task = task;
 
-  execution->timeout = malloc (sizeof (struct timeval));
-  execution->timeout->tv_sec = timeout->tv_sec;
-  execution->timeout->tv_usec = timeout->tv_usec;
+  if (timeout != NULL)
+    {
+      execution->timeout = malloc (sizeof (struct timeval));
+      execution->timeout->tv_sec = timeout->tv_sec;
+      execution->timeout->tv_usec = timeout->tv_usec;
+    }
+  else execution->timeout = NULL;
 
   execution->attempts = 0;
   execution->result = GZOCHID_TRANSACTION_PENDING;
