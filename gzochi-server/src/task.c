@@ -183,8 +183,6 @@ void serialize_durable_task
 void finalize_durable_task 
 (gzochid_application_context *context, gpointer data)
 {
-  gzochid_durable_application_task_free 
-    ((gzochid_durable_application_task *) data);
 }
 
 gzochid_io_serialization durable_task_serialization = 
