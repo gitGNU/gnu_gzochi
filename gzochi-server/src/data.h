@@ -1,5 +1,5 @@
 /* data.h: Prototypes and declarations for data.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -110,11 +110,6 @@ void gzochid_data_remove_object (gzochid_data_managed_reference *reference);
 
 void gzochid_data_mark 
 (gzochid_application_context *, gzochid_io_serialization *, void *);
-
-gzochid_task *gzochid_data_persistence_task_new 
-(gzochid_application_context *, gzochid_auth_identity *, 
- gzochid_io_serialization *, void *, gzochid_oid_holder *);
-void gzochid_data_persistence_task_free (gzochid_task *);
 
 gzochid_task *gzochid_data_prefix_binding_persistence_task_new 
 (gzochid_application_context *, gzochid_auth_identity *, 
