@@ -248,19 +248,70 @@ static gzochid_task *rebuild_durable_task
      task->target_execution_time);
 }
 
+static void commit_scheduled_task (gpointer data, gpointer user_data)
+{
+  gzochid_task_transaction_context *tx_context = 
+    (gzochid_task_transaction_context *) user_data;
+  gzochid_application_context *context = tx_context->context;
+  gzochid_game_context *game_context = (gzochid_game_context *)
+    ((gzochid_context *) context)->parent;
+
+  gzochid_task *task = (gzochid_task *) data;
+  
+  gzochid_schedule_submit_task (game_context->task_queue, task);
+}
+
+static void task_commit (gpointer data)
+{
+  gzochid_task_transaction_context *tx_context = 
+    (gzochid_task_transaction_context *) data;
+
+  g_list_foreach (tx_context->scheduled_tasks, commit_scheduled_task, data);
+
+  cleanup_transaction (tx_context);
+}
+
+static void task_rollback (gpointer data)
+{ 
+  gzochid_task_transaction_context *tx_context = 
+    (gzochid_task_transaction_context *) data;
+  cleanup_transaction (tx_context);
+}
+
+static gzochid_transaction_participant task_participant = 
+  { "task", task_prepare, task_commit, task_rollback };
+
+static gzochid_task_transaction_context *join_transaction 
+(gzochid_application_context *context)
+{
+  gzochid_task_transaction_context *tx_context = NULL;
+
+  if (!gzochid_transaction_active ()
+      || (tx_context = gzochid_transaction_context (&task_participant)) == NULL)
+    {
+      tx_context = create_transaction_context (context);
+      gzochid_transaction_join (&task_participant, tx_context);
+    }
+
+  return tx_context;
+}
+
 void gzochid_restart_tasks (gzochid_application_context *context)
 {
   mpz_t oid;
   char *next_binding = NULL;
   int prefix_len = strlen (PENDING_TASK_PREFIX);
-  gzochid_game_context *game_context = (gzochid_game_context *)
-    ((gzochid_context *) context)->parent;
+  gzochid_task_transaction_context *tx_context = NULL;
   int num_tasks = 0;
 
   mpz_init (oid);
   gzochid_tx_info (context, "Resubmitting durable tasks.");
   next_binding = gzochid_data_next_binding_oid 
     (context, PENDING_TASK_PREFIX, oid);
+
+  join_transaction (context);
+  tx_context = (gzochid_task_transaction_context *) 
+    gzochid_transaction_context (&task_participant);
 
   while (next_binding != NULL 
 	 && strncmp (PENDING_TASK_PREFIX, next_binding, prefix_len) == 0)
@@ -269,7 +320,8 @@ void gzochid_restart_tasks (gzochid_application_context *context)
 	gzochid_data_next_binding_oid (context, next_binding, oid);
       gzochid_task *task = rebuild_durable_task (context, oid);
       
-      gzochid_schedule_submit_task (game_context->task_queue, task);
+      tx_context->scheduled_tasks = g_list_append 
+	(tx_context->scheduled_tasks, task);
 
       free (next_binding);
       next_binding = next_next_binding;
@@ -361,59 +413,12 @@ static void durable_task_application_worker
       g_string_free (binding, FALSE);
       free (oid_str);
     }  
+
 }
-
-static void commit_scheduled_task (gpointer data, gpointer user_data)
-{
-  gzochid_task_transaction_context *tx_context = 
-    (gzochid_task_transaction_context *) user_data;
-  gzochid_application_context *context = tx_context->context;
-  gzochid_game_context *game_context = (gzochid_game_context *)
-    ((gzochid_context *) context)->parent;
-
-  gzochid_task *task = (gzochid_task *) data;
-  
-  gzochid_schedule_submit_task (game_context->task_queue, task);
-}
-
-static void task_commit (gpointer data)
-{
-  gzochid_task_transaction_context *tx_context = 
-    (gzochid_task_transaction_context *) data;
-
-  g_list_foreach (tx_context->scheduled_tasks, commit_scheduled_task, data);
-
-  cleanup_transaction (tx_context);
-}
-
-static void task_rollback (gpointer data)
-{ 
-  gzochid_task_transaction_context *tx_context = 
-    (gzochid_task_transaction_context *) data;
-  cleanup_transaction (tx_context);
-}
-
-static gzochid_transaction_participant task_participant = 
-  { "task", task_prepare, task_commit, task_rollback };
 
 void gzochid_task_free (gzochid_task *task)
 {
   free (task);
-}
-
-static gzochid_task_transaction_context *join_transaction 
-(gzochid_application_context *context)
-{
-  gzochid_task_transaction_context *tx_context = NULL;
-
-  if (!gzochid_transaction_active ()
-      || (tx_context = gzochid_transaction_context (&task_participant)) == NULL)
-    {
-      tx_context = create_transaction_context (context);
-      gzochid_transaction_join (&task_participant, tx_context);
-    }
-
-  return tx_context;
 }
 
 void gzochid_schedule_durable_task
