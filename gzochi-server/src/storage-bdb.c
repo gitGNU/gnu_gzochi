@@ -263,19 +263,15 @@ char *gzochid_storage_next_key
 
   db_key.data = key;
   db_key.size = key_len;
+  db_key.flags = DB_DBT_MALLOC;
 
-  ret = cursor->get (cursor, &db_key, &db_value, DB_SET);
-  if (ret != 0)
+  ret = cursor->get (cursor, &db_key, &db_value, DB_SET_RANGE);
+  if (ret == 0 && memcmp (db_key.data, key, key_len) == 0)
     {
-      if (ret != DB_NOTFOUND)
-	gzochid_err ("Failed to seek to key %s: %s", key, db_strerror (ret));
-      
-      cursor->close (cursor);
-      return NULL;
+      free (db_key.data);
+      ret = cursor->get (cursor, &db_key, &db_value, DB_NEXT);
     }
 
-  db_key.flags = DB_DBT_MALLOC;
-  ret = cursor->get (cursor, &db_key, &db_value, DB_NEXT);
   cursor->close (cursor);
 
   if (ret == 0)
@@ -492,25 +488,15 @@ char *gzochid_storage_transaction_next_key
 
   db_key.data = key;
   db_key.size = key_len;
+  db_key.flags = DB_DBT_MALLOC;
 
-  ret = cursor->get (cursor, &db_key, &db_value, DB_SET);
-
-  if (ret != 0)
+  ret = cursor->get (cursor, &db_key, &db_value, DB_SET_RANGE);
+  if (ret == 0 && memcmp (db_key.data, key, key_len) == 0)
     {
-      if (ret != DB_NOTFOUND)
-	{
-	  gzochid_warning
-	    ("Failed to seek to key %s in transaction: %s", 
-	     key, db_strerror (ret));
-	  tx->rollback = TRUE;
-	  tx->should_retry = retryable (ret);
-	}
-      cursor->close (cursor);
-      return NULL;
+      free (db_key.data);
+      ret = cursor->get (cursor, &db_key, &db_value, DB_NEXT);
     }
 
-  db_key.flags = DB_DBT_MALLOC;
-  ret = cursor->get (cursor, &db_key, &db_value, DB_NEXT);  
   cursor->close (cursor);
 
   if (ret == 0)
