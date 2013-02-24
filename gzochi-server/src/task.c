@@ -392,28 +392,23 @@ static void durable_task_application_worker
   gzochid_durable_application_task *task = 
     (gzochid_durable_application_task *) data;
   gzochid_application_task *inner_task = task->task;
-  gzochid_game_context *game_context = 
-    (gzochid_game_context *) ((gzochid_context *) context)->parent;
   
   inner_task->worker (context, identity, inner_task->data);
 
+  { char *oid_str = mpz_get_str (NULL, 16, task->oid);
+    GString *binding = g_string_new (PENDING_TASK_PREFIX);
+    
+    g_string_append (binding, oid_str);
+    
+    gzochid_data_remove_binding (context, binding->str);
+    
+    g_string_free (binding, FALSE);
+    free (oid_str);
+  }
+
   if (task->repeats) 
-    gzochid_schedule_submit_task 
-      (game_context->task_queue, 
-       build_durable_task (inner_task, task->serialization));
-  else 
-    {
-      char *oid_str = mpz_get_str (NULL, 16, task->oid);
-      GString *binding = g_string_new (PENDING_TASK_PREFIX);
-      
-      g_string_append (binding, oid_str);
-
-      gzochid_data_remove_binding (context, binding->str);
-
-      g_string_free (binding, FALSE);
-      free (oid_str);
-    }  
-
+    gzochid_schedule_durable_task 
+      (context, identity, inner_task, task->serialization);
 }
 
 void gzochid_task_free (gzochid_task *task)
