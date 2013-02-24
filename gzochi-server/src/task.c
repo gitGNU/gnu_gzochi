@@ -94,19 +94,6 @@ gzochid_application_task *gzochid_application_task_new
   return task;
 }
 
-static void gzochid_transactional_application_task_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
-{
-  void *args[3];
-  
-  args[0] = context;
-  args[1] = identity;
-  args[2] = data;
-
-  gzochid_transaction_execute (transactional_task_worker, args);  
-}
-
 gzochid_task *gzochid_task_make_transactional_application_task
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gzochid_application_worker worker, gpointer data, 
@@ -120,13 +107,10 @@ gzochid_task *gzochid_task_make_transactional_application_task
     gzochid_application_task_new 
     (context, identity, 
      gzochid_application_resubmitting_transactional_task_worker, execution);
-  gzochid_task *task = malloc (sizeof (gzochid_task));
   
-  task->worker = gzochid_application_task_thread_worker;
-  task->data = application_task;
-  task->target_execution_time = target_execution_time;
-
-  return task;
+  return gzochid_task_new 
+    (gzochid_application_task_thread_worker, application_task, 
+     target_execution_time);
 }
 
 gzochid_durable_application_task *gzochid_durable_application_task_new 
