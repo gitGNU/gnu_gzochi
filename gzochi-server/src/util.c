@@ -31,12 +31,17 @@ void gzochid_util_serialize_boolean (gboolean bool, GString *out)
   g_string_append_len (out, bool_str, 1);
 }
 
+void gzochid_util_serialize_int (int n, GString *out)
+{
+  unsigned char n_str[4];
+
+  gzochi_common_io_write_int (n, n_str, 0);
+  g_string_append_len (out, (char *) n_str, 4);
+}
+
 void gzochid_util_serialize_bytes (unsigned char *str, int len, GString *out)
 {
-  unsigned char len_str[4];
-
-  gzochi_common_io_write_int (len, len_str, 0);
-  g_string_append_len (out, (char *) len_str, 4);
+  gzochid_util_serialize_int (len, out);
   g_string_append_len (out, (char *) str, len);
 }
 
@@ -121,6 +126,13 @@ gboolean gzochid_util_deserialize_boolean (GString *in)
 {
   gboolean ret = in->str[0] == 0x1 ? TRUE : FALSE;
   g_string_erase (in, 0, 1);
+  return ret;
+}
+
+int gzochid_util_deserialize_int (GString *in)
+{
+  int ret = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
+  g_string_erase (in, 0, 4);
   return ret;
 }
 

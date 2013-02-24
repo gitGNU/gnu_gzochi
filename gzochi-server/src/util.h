@@ -23,6 +23,7 @@
 #include <sys/time.h>
 
 void gzochid_util_serialize_boolean (gboolean, GString *);
+void gzochid_util_serialize_int (int, GString *);
 void gzochid_util_serialize_mpz (mpz_t, GString *);
 void gzochid_util_serialize_bytes (unsigned char *, int, GString *);
 void gzochid_util_serialize_string (char *, GString *);
@@ -38,6 +39,7 @@ void gzochid_util_serialize_hash_table
 void gzochid_util_serialize_timeval (struct timeval, GString *);
 
 gboolean gzochid_util_deserialize_boolean (GString *);
+int gzochid_util_deserialize_int (GString *);
 void gzochid_util_deserialize_mpz (GString *, mpz_t);
 unsigned char *gzochid_util_deserialize_bytes (GString *, int *);
 char *gzochid_util_deserialize_string (GString *);
