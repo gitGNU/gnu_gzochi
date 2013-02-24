@@ -19,19 +19,25 @@
 (library (gzochi private reflect)
   (export gzochi:resolve-procedure)
   (import (guile)
+	  (ice-9 format)
 	  (rnrs conditions)
 	  (rnrs exceptions))
 
   (define (gzochi:resolve-procedure procedure module-name)
-    (let* ((module (resolve-module module-name))
-	   (variable (module-variable module procedure)))
-      (or variable 
+    (let ((module (resolve-module module-name)))
+      (or module
 	  (raise 
 	   (condition 
 	    (make-assertion-violation)
 	    (make-message-condition 
-	     (string-append 
-	      "No binding for " (symbol->string procedure) " in "
-	      module-name)))))
-      (variable-ref variable)))
+	     (format #f "Unable to resolve ~A" module-name)))))
+
+      (let ((variable (module-variable module procedure)))
+	(or variable 
+	    (raise 
+	     (condition 
+	      (make-assertion-violation)
+	      (make-message-condition 
+	       (format #f "No binding for ~A in ~A" procedure module-name)))))
+	(variable-ref variable))))
 )
