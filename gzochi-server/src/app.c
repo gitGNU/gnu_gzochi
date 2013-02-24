@@ -449,7 +449,10 @@ void gzochid_application_client_logged_in
 
   gzochid_application_task transactional_task;
   gzochid_application_task application_task;
-  gzochid_transactional_application_task_execution execution;
+  gzochid_transactional_application_task_execution *execution =
+    gzochid_transactional_application_task_timed_execution_new 
+    (&transactional_task, game_context->tx_timeout);
+
   gzochid_task task;
 
   char *session_oid_str = NULL;
@@ -467,15 +470,10 @@ void gzochid_application_client_logged_in
   transactional_task.identity = client->identity;
   transactional_task.data = session_oid_str;
 
-  execution.attempts = 0;
-  execution.timeout = &game_context->tx_timeout;
-  execution.task = &transactional_task;
-  execution.result = GZOCHID_TRANSACTION_PENDING;
-
   application_task.worker = gzochid_application_transactional_task_worker;
   application_task.context = context;
   application_task.identity = client->identity;
-  application_task.data = &execution;
+  application_task.data = execution;
 
   task.worker = gzochid_application_task_thread_worker;
   task.data = &application_task;
@@ -484,9 +482,11 @@ void gzochid_application_client_logged_in
   while (TRUE)
     {
       gzochid_schedule_run_task (game_context->task_queue, &task);
-      if (!gzochid_application_should_retry (&execution))
+      if (!gzochid_application_should_retry (execution))
 	break;
     }
+
+  gzochid_transactional_application_task_execution_free (execution);
 }
 
 void gzochid_application_client_disconnected
@@ -521,21 +521,14 @@ void gzochid_application_client_disconnected
       gzochid_task *task = NULL;
       struct timeval now;
 
-      execution->timeout = &game_context->tx_timeout;
-      execution->task = transactional_task;
-      execution->result = GZOCHID_TRANSACTION_PENDING;
-
-      application_task = gzochid_application_task_new
-	(context, client->identity,
-	 gzochid_application_transactional_task_worker, execution);
-
       gettimeofday (&now, NULL);
 
       g_hash_table_remove (context->clients_to_oids, client);
       g_hash_table_remove (context->oids_to_clients, session_oid_str);
       
-      task = gzochid_task_new 
-	(gzochid_application_task_thread_worker, application_task, now);
+      task = gzochid_task_new
+	(gzochid_application_task_thread_worker, application_task,
+	 now);
       
       gzochid_schedule_submit_task (game_context->task_queue, task);
       g_mutex_unlock (context->client_mapping_lock);
@@ -576,7 +569,9 @@ void gzochid_application_session_received_message
     {
       gzochid_application_task transactional_task;
       gzochid_application_task application_task;
-      gzochid_transactional_application_task_execution execution;
+      gzochid_transactional_application_task_execution *execution =
+	gzochid_transactional_application_task_timed_execution_new
+	(&transactional_task, game_context->tx_timeout);
       gzochid_task task;
 
       data[0] = session_oid_str;
@@ -589,15 +584,10 @@ void gzochid_application_session_received_message
       transactional_task.identity = client->identity;
       transactional_task.data = data;
       
-      execution.attempts = 0;
-      execution.timeout = &game_context->tx_timeout;
-      execution.task = &transactional_task;
-      execution.result = GZOCHID_TRANSACTION_PENDING;
-
       application_task.worker = gzochid_application_transactional_task_worker;
       application_task.context = context;
       application_task.identity = client->identity;
-      application_task.data = &execution;
+      application_task.data = execution;
       
       task.worker = gzochid_application_task_thread_worker;
       task.data = &application_task;
@@ -606,9 +596,11 @@ void gzochid_application_session_received_message
       while (TRUE)
 	{
 	  gzochid_schedule_run_task (game_context->task_queue, &task);
-	  if (!gzochid_application_should_retry (&execution))
+	  if (!gzochid_application_should_retry (execution))
 	    break;
 	}
+
+      gzochid_transactional_application_task_execution_free (execution);
     }
 }
 

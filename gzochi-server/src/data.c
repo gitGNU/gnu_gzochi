@@ -877,12 +877,6 @@ gzochid_task *gzochid_data_prefix_binding_persistence_task_new
     gzochid_application_task_new 
     (context, identity, prefix_binding_persistence_task_worker, task_data);
   gzochid_transactional_application_task_execution *execution = 
-    calloc (1, sizeof (gzochid_transactional_application_task_execution));
-  gzochid_application_task *application_task = NULL;
-
-  execution->task = transactional_task;
-  execution->result = GZOCHID_TRANSACTION_PENDING;
-
     gzochid_transactional_application_task_execution_new (transactional_task);
   gzochid_application_task *application_task = gzochid_application_task_new 
     (context, identity, 
