@@ -89,6 +89,20 @@ typedef struct _gzochid_application_task
 
 } gzochid_application_task;
 
+typedef struct _gzochid_application_worker_serialization
+{
+  void (*serializer) 
+  (gzochid_application_context *, gzochid_application_worker, GString *);
+  gzochid_application_worker (*deserializer) 
+  (gzochid_application_context *, GString *);
+} gzochid_application_worker_serialization;
+
+typedef struct _gzochid_application_task_serialization
+{
+  char *name;
+  gzochid_application_worker_serialization *worker_serialization;
+  gzochid_io_serialization *data_serialization;
+} gzochid_application_task_serialization;
 
 typedef struct _gzochid_transactional_application_task_execution
 {
@@ -98,6 +112,14 @@ typedef struct _gzochid_transactional_application_task_execution
   unsigned int attempts;
   gzochid_transaction_result result;
 } gzochid_transactional_application_task_execution;
+
+gzochid_application_task *gzochid_deserialize_application_task 
+(gzochid_application_context *, gzochid_application_task_serialization *, 
+ GString *);
+
+void gzochid_serialize_application_task 
+(gzochid_application_context *, gzochid_application_task_serialization *, 
+ gzochid_application_task *, GString *);
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_execution_new 
@@ -117,21 +139,6 @@ void gzochid_application_task_thread_worker (gpointer, gpointer);
 
 gboolean gzochid_application_should_retry 
 (gzochid_transactional_application_task_execution *);
-
-typedef struct _gzochid_application_worker_serialization
-{
-  void (*serializer) 
-  (gzochid_application_context *, gzochid_application_worker, GString *);
-  gzochid_application_worker (*deserializer) 
-  (gzochid_application_context *, GString *);
-} gzochid_application_worker_serialization;
-
-typedef struct _gzochid_application_task_serialization
-{
-  char *name;
-  gzochid_application_worker_serialization *worker_serialization;
-  gzochid_io_serialization *data_serialization;
-} gzochid_application_task_serialization;
 
 typedef struct _gzochid_durable_application_task
 {

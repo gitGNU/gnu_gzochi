@@ -37,7 +37,7 @@
 
 GHashTable *serialization_registry = NULL;
 
-static gzochid_application_task_serialization *
+gzochid_application_task_serialization *
 gzochid_lookup_task_serialization (char *name)
 {
   return (gzochid_application_task_serialization *) 
@@ -128,28 +128,6 @@ gzochid_task *gzochid_task_make_transactional_application_task
   return task;
 }
 
-gzochid_application_task *deserialize_application_task 
-(gzochid_application_context *context, 
- gzochid_application_task_serialization *serialization, GString *in)
-{
-  gzochid_auth_identity *identity = 
-    gzochid_auth_identity_deserializer (context, in);
-  gzochid_application_worker worker = 
-    serialization->worker_serialization->deserializer (context, in);
-  gpointer data = serialization->data_serialization->deserializer (context, in);
-  return gzochid_application_task_new (context, identity, worker, data);
-}
-
-void serialize_application_task
-(gzochid_application_context *context,
- gzochid_application_task_serialization *serialization, 
- gzochid_application_task *task, GString *out)
-{
-  gzochid_auth_identity_serializer (context, task->identity, out);
-  serialization->worker_serialization->serializer (context, task->worker, out);
-  serialization->data_serialization->serializer (context, task->data, out);
-}
-
 gzochid_durable_application_task *gzochid_durable_application_task_new 
 (gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization, 
@@ -182,7 +160,7 @@ gpointer deserialize_durable_task
   gzochid_application_task_serialization *serialization = 
     gzochid_lookup_task_serialization (serialization_name);
   gzochid_application_task *task =
-    deserialize_application_task (context, serialization, in);
+    gzochid_deserialize_application_task (context, serialization, in);
   struct timeval target_execution_time = gzochid_util_deserialize_timeval (in);
 
   return gzochid_durable_application_task_new 
@@ -196,7 +174,8 @@ void serialize_durable_task
     (gzochid_durable_application_task *) data;
 
   gzochid_util_serialize_string (task->serialization->name, out);  
-  serialize_application_task (context, task->serialization, task->task, out);
+  gzochid_serialize_application_task 
+    (context, task->serialization, task->task, out);
   gzochid_util_serialize_timeval (task->target_execution_time, out);
 }
 
