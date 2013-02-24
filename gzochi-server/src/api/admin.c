@@ -82,7 +82,9 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
   gzochid_auth_identity *debug_identity = calloc 
     (1, sizeof (gzochid_auth_identity));
 
-  gzochid_transactional_application_task transactional_task;
+  gzochid_application_task transactional_task;
+  gzochid_transactional_application_task_execution *execution = 
+    gzochid_transactional_application_task_execution_new (&transactional_task);
   gzochid_application_task application_task;
 
   SCM ret = SCM_UNDEFINED;
@@ -98,12 +100,14 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
   args[3] = &ret;
   
   transactional_task.worker = gzochid_scheme_application_worker;
+  transactional_task.context = app_context;
+  transactional_task.identity = debug_identity;
   transactional_task.data = args;
 
   application_task.worker = gzochid_application_transactional_task_worker;
   application_task.context = app_context;
   application_task.identity = debug_identity;
-  application_task.data = &transactional_task;
+  application_task.data = execution;
 
   gzochid_application_task_worker (&application_task);
 
@@ -114,6 +118,8 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
     scm_throw (SCM_CAR (exception), SCM_CDR (exception));
   else if (gzochid_transaction_active ())
     gzochid_api_check_transaction ();
+
+  gzochid_transactional_application_task_execution_free (execution);
 
   return ret;
 }

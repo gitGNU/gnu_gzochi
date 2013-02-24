@@ -80,15 +80,19 @@ typedef struct _gzochid_application_context
 typedef void (*gzochid_application_worker) 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
-typedef struct _gzochid_transactional_application_task
+typedef struct _gzochid_application_task
 {
   gzochid_application_worker worker;
+  gzochid_application_context *context;
+  gzochid_auth_identity *identity;
   gpointer data;
-} gzochid_transactional_application_task;
+
+} gzochid_application_task;
+
 
 typedef struct _gzochid_transactional_application_task_execution
 {
-  gzochid_transactional_application_task *task;
+  gzochid_application_task *task;
 
   struct timeval *timeout;
   unsigned int attempts;
@@ -97,11 +101,11 @@ typedef struct _gzochid_transactional_application_task_execution
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_execution_new 
-(gzochid_transactional_application_task *);
+(gzochid_application_task *);
 
 gzochid_transactional_application_task_execution *
-gzochid_transactional_application_timed_task_execution_new 
-(gzochid_transactional_application_task *, struct timeval);
+gzochid_transactional_application_task_timed_execution_new 
+(gzochid_application_task *, struct timeval);
 
 void gzochid_transactional_application_task_execution_free
 (gzochid_transactional_application_task_execution *);
@@ -128,15 +132,6 @@ typedef struct _gzochid_application_task_serialization
   gzochid_application_worker_serialization *worker_serialization;
   gzochid_io_serialization *data_serialization;
 } gzochid_application_task_serialization;
-
-typedef struct _gzochid_application_task
-{
-  gzochid_application_worker worker;
-  gzochid_application_context *context;
-  gzochid_auth_identity *identity;
-  gpointer data;
-
-} gzochid_application_task;
 
 typedef struct _gzochid_durable_application_task
 {

@@ -1,5 +1,5 @@
 /* task.h: Prototypes and declarations for task.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -54,10 +54,6 @@ typedef struct _gzochid_task_transaction_context
 gzochid_task *gzochid_task_new 
 (gzochid_thread_worker, gpointer, struct timeval);
 gzochid_task *gzochid_task_immediate_new (gzochid_thread_worker, gpointer);
-
-gzochid_transactional_application_task *
-gzochid_transactional_application_task_new 
-(gzochid_application_worker, gpointer);
 
 gzochid_application_task *gzochid_application_task_new 
 (gzochid_application_context *, gzochid_auth_identity *, 

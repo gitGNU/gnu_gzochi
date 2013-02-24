@@ -95,7 +95,7 @@ static void initialize_complete
 }
 
 static gzochid_transactional_application_task_execution *execution_new
-(gzochid_transactional_application_task *task, struct timeval *timeout)
+(gzochid_application_task *task, struct timeval *timeout)
 {
   gzochid_transactional_application_task_execution *execution = 
     malloc (sizeof (gzochid_transactional_application_task_execution));
@@ -114,14 +114,14 @@ static gzochid_transactional_application_task_execution *execution_new
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_execution_new 
-(gzochid_transactional_application_task *task)
+(gzochid_application_task *task)
 {
   return execution_new (task, NULL);
 }
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_timed_execution_new 
-(gzochid_transactional_application_task *task, struct timeval timeout)
+(gzochid_application_task *task, struct timeval timeout)
 {
   return execution_new (task, &timeout);
 }
@@ -141,8 +141,7 @@ static void transactional_task_worker (gpointer data)
   gzochid_application_context *context = 
     (gzochid_application_context *) args[0];
   gzochid_auth_identity *identity = (gzochid_auth_identity *) args[1];
-  gzochid_transactional_application_task *task = 
-    (gzochid_transactional_application_task *) args[2];
+  gzochid_application_task *task = (gzochid_application_task *) args[2];
   
   task->worker (context, identity, task->data);
 }
@@ -389,7 +388,7 @@ void gzochid_application_client_logged_in
   gzochid_client_session *session = 
     gzochid_client_session_new (client->identity);
 
-  gzochid_transactional_application_task transactional_task;
+  gzochid_application_task transactional_task;
   gzochid_application_task application_task;
   gzochid_transactional_application_task_execution execution;
   gzochid_task task;
@@ -405,6 +404,8 @@ void gzochid_application_client_logged_in
   g_hash_table_insert (context->clients_to_oids, client, session_oid_str);
 
   transactional_task.worker = gzochid_scheme_application_logged_in_worker;
+  transactional_task.context = context;
+  transactional_task.identity = client->identity;
   transactional_task.data = session_oid_str;
 
   execution.attempts = 0;
@@ -446,10 +447,10 @@ void gzochid_application_client_disconnected
     }
   else 
     {
-      gzochid_transactional_application_task *transactional_task =
-	gzochid_transactional_application_task_new
-	(gzochid_scheme_application_disconnected_worker, session_oid_str);
-      gzochid_application_task *application_task = NULL;
+      gzochid_application_task *transactional_task =
+	gzochid_application_task_new
+	(context, client->identity, 
+	 gzochid_scheme_application_disconnected_worker, session_oid_str);
       gzochid_transactional_application_task_execution *execution = 
 	calloc (1, sizeof (gzochid_transactional_application_task_execution));
 
@@ -509,7 +510,7 @@ void gzochid_application_session_received_message
     return;
   else 
     {
-      gzochid_transactional_application_task transactional_task;
+      gzochid_application_task transactional_task;
       gzochid_application_task application_task;
       gzochid_transactional_application_task_execution execution;
       gzochid_task task;
@@ -520,6 +521,8 @@ void gzochid_application_session_received_message
       
       transactional_task.worker = 
 	gzochid_scheme_application_received_message_worker;
+      transactional_task.context = context;
+      transactional_task.identity = client->identity;
       transactional_task.data = data;
       
       execution.attempts = 0;

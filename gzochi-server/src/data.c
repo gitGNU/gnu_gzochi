@@ -873,9 +873,9 @@ gzochid_task *gzochid_data_prefix_binding_persistence_task_new
   gzochid_prefix_binding_persistence_task_data *task_data =
     gzochid_prefix_binding_persistence_task_data_new 
     (serialization, data, holder, prefix);
-  gzochid_transactional_application_task *transactional_task = 
-    gzochid_transactional_application_task_new 
-    (prefix_binding_persistence_task_worker, task_data);
+  gzochid_application_task *transactional_task = 
+    gzochid_application_task_new 
+    (context, identity, prefix_binding_persistence_task_worker, task_data);
   gzochid_transactional_application_task_execution *execution = 
     calloc (1, sizeof (gzochid_transactional_application_task_execution));
   gzochid_application_task *application_task = NULL;
@@ -898,7 +898,7 @@ void gzochid_data_prefix_binding_persistence_task_free (gzochid_task *task)
   gzochid_transactional_application_task_execution *execution = 
     (gzochid_transactional_application_task_execution *) 
     application_task->data;
-  gzochid_transactional_application_task *transactional_task = execution->task;
+  gzochid_application_task *transactional_task = execution->task;
   gzochid_persistence_task_data *data = 
     (gzochid_persistence_task_data *) transactional_task->data;
   
