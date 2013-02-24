@@ -189,6 +189,43 @@ void gzochid_application_transactional_task_worker
   execution->attempts++;
 }
 
+void gzochid_application_resubmitting_transactional_task_worker 
+(gzochid_application_context *app_context, gzochid_auth_identity *identity, 
+ gpointer data)
+{
+  gzochid_transactional_application_task_execution *execution = 
+    (gzochid_transactional_application_task_execution *) data;
+
+  gzochid_application_transactional_task_worker 
+    (app_context, identity, execution);
+  
+  if (execution->result != GZOCHID_TRANSACTION_SUCCESS
+      && gzochid_application_should_retry (execution))
+    {
+      struct timeval now;
+      gzochid_context *context = (gzochid_context *) app_context;
+      gzochid_game_context *game_context = 
+	(gzochid_game_context *) context->parent;
+
+      gzochid_application_task *application_task = NULL;
+      gzochid_task *task = NULL;
+
+      execution->result = GZOCHID_TRANSACTION_PENDING;
+
+      application_task = gzochid_application_task_new
+	(app_context, identity,
+	 gzochid_application_resubmitting_transactional_task_worker, 
+	 execution);
+
+      gettimeofday (&now, NULL);
+
+      task = gzochid_task_new
+	(gzochid_application_task_thread_worker, application_task, now);
+
+      gzochid_schedule_submit_task (game_context->task_queue, task);
+    }
+}
+
 void gzochid_application_task_worker (gpointer data)
 {
   gzochid_application_task *task = (gzochid_application_task *) data;
@@ -474,7 +511,12 @@ void gzochid_application_client_disconnected
 	(context, client->identity, 
 	 gzochid_scheme_application_disconnected_worker, session_oid_str);
       gzochid_transactional_application_task_execution *execution = 
-	calloc (1, sizeof (gzochid_transactional_application_task_execution));
+	gzochid_transactional_application_task_timed_execution_new
+	(transactional_task, game_context->tx_timeout);
+      gzochid_application_task *application_task = gzochid_application_task_new
+	(context, client->identity,
+	 gzochid_application_resubmitting_transactional_task_worker, 
+	 execution);
 
       gzochid_task *task = NULL;
       struct timeval now;

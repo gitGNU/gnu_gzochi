@@ -114,11 +114,12 @@ gzochid_task *gzochid_task_make_transactional_application_task
 {
   gzochid_application_task *transactional_task = 
     gzochid_application_task_new (context, identity, worker, data);
+  gzochid_transactional_application_task_execution *execution = 
+    gzochid_transactional_application_task_execution_new (transactional_task);
   gzochid_application_task *application_task = 
     gzochid_application_task_new 
-    (context, identity, gzochid_transactional_application_task_worker, 
-     transactional_application_task);
-  
+    (context, identity, 
+     gzochid_application_resubmitting_transactional_task_worker, execution);
   gzochid_task *task = malloc (sizeof (gzochid_task));
   
   task->worker = gzochid_application_task_thread_worker;
@@ -217,6 +218,9 @@ static void durable_task_application_worker
 static gzochid_task *rebuild_durable_task 
 (gzochid_application_context *context, mpz_t oid)
 {
+  gzochid_game_context *game_context = (gzochid_game_context *) 
+    ((gzochid_context *) context)->parent;
+
   gzochid_data_managed_reference *task_reference = 
     gzochid_data_create_reference_to_oid 
     (context, &durable_task_serialization, oid);
@@ -229,11 +233,13 @@ static gzochid_task *rebuild_durable_task
   gzochid_data_dereference (task_reference);
 
   task = (gzochid_durable_application_task *) task_reference->obj;
-  transactional_task = gzochid_transactional_application_task_new 
-    (durable_task_application_worker, task);
+  transactional_task = gzochid_application_task_new 
+    (context, task->task->identity, durable_task_application_worker, task);
+  execution = gzochid_transactional_application_task_timed_execution_new 
+    (transactional_task, game_context->tx_timeout);
   application_task = gzochid_application_task_new
     (context, task->task->identity, 
-     gzochid_transactional_application_task_worker, transactional_task);
+     gzochid_application_resubmitting_transactional_task_worker, execution);
 
   mpz_set (task->oid, oid);
 
@@ -298,13 +304,18 @@ gzochid_task *build_durable_task
       prefix_len = strlen (PENDING_TASK_PREFIX);
     char *binding_name = calloc (oid_str_len + prefix_len + 1, sizeof (char));
  
+    gzochid_game_context *game_context = (gzochid_game_context *) 
+      ((gzochid_context *) task->context)->parent;
+   
     gzochid_application_task *transactional_task = gzochid_application_task_new
       (task->context, task->identity, durable_task_application_worker, 
        durable_task);
     gzochid_transactional_application_task_execution *execution = 
+      gzochid_transactional_application_task_timed_execution_new 
+      (transactional_task, game_context->tx_timeout);
     gzochid_application_task *application_task = gzochid_application_task_new
       (task->context, task->identity, 
-       gzochid_transactional_application_task_worker, transactional_task);
+       gzochid_application_resubmitting_transactional_task_worker, execution);
     
     gzochid_task *ret = gzochid_task_new 
       (gzochid_application_task_thread_worker, application_task, now);

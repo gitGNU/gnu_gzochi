@@ -883,9 +883,10 @@ gzochid_task *gzochid_data_prefix_binding_persistence_task_new
   execution->task = transactional_task;
   execution->result = GZOCHID_TRANSACTION_PENDING;
 
-  application_task = gzochid_application_task_new 
-    (context, identity, gzochid_application_transactional_task_worker,
-     execution);
+    gzochid_transactional_application_task_execution_new (transactional_task);
+  gzochid_application_task *application_task = gzochid_application_task_new 
+    (context, identity, 
+     gzochid_application_resubmitting_transactional_task_worker, execution);
 
   return gzochid_task_immediate_new 
     (gzochid_application_task_thread_worker, application_task);
