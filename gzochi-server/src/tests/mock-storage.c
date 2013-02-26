@@ -18,6 +18,7 @@
 #include <glib.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "../storage.h"
 
@@ -162,6 +163,17 @@ char *gzochid_storage_next_key
   else return NULL;
 }
 
+gzochid_storage_transaction *gzochid_storage_transaction_begin_timed
+(gzochid_storage_store *store, struct timeval tv)
+{
+  gzochid_storage_transaction *tx = 
+    calloc (1, sizeof (gzochid_storage_transaction));
+  
+  tx->store = store;
+
+  return tx;
+}
+
 gzochid_storage_transaction *gzochid_storage_transaction_begin
 (gzochid_storage_store *store)
 {
@@ -183,7 +195,7 @@ void gzochid_storage_transaction_rollback (gzochid_storage_transaction *tx)
   free (tx);
 }
 
-void gzochid_storage_transaction_check (gzochid_storage_transaction *tx)
+void gzochid_storage_transaction_prepare (gzochid_storage_transaction *tx)
 {
 }
 

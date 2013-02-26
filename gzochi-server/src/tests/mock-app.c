@@ -16,6 +16,7 @@
  */
 
 #include <glib.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 #include "../app.h"
@@ -34,32 +35,6 @@ gzochid_application_context *gzochid_application_context_new ()
   return context;
 }
 
-static void transactional_task_worker (gpointer data)
-{
-  void **args = (void **) data;
-  
-  gzochid_application_context *context = 
-    (gzochid_application_context *) args[0];
-  gzochid_auth_identity *identity = (gzochid_auth_identity *) args[1];
-  gzochid_transactional_application_task *task = 
-    (gzochid_transactional_application_task *) args[2];
-  
-  task->worker (context, identity, task->data);
-}
-
-void gzochid_application_transactional_task_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
-{
-  void *args[3];
-  
-  args[0] = context;
-  args[1] = identity;
-  args[2] = data;
-
-  gzochid_transaction_execute (transactional_task_worker, args);  
-}
-
 void gzochid_application_task_worker (gpointer data)
 {
   gzochid_application_task *task = (gzochid_application_task *) data;
@@ -69,4 +44,43 @@ void gzochid_application_task_worker (gpointer data)
 void gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
 {
   gzochid_application_task_worker (data);
+}
+
+gzochid_transactional_application_task_execution *
+gzochid_transactional_application_task_execution_new 
+(gzochid_application_task *task)
+{
+  return NULL;
+}
+
+gzochid_transactional_application_task_execution *
+gzochid_transactional_application_task_timed_execution_new 
+(gzochid_application_task *task, struct timeval timeout)
+{
+  return NULL;
+}
+
+void gzochid_serialize_application_task 
+(gzochid_application_context *context, 
+ gzochid_application_task_serialization *serialization, 
+ gzochid_application_task *task, GString *out)
+{
+}
+
+gzochid_application_task *gzochid_deserialize_application_task 
+(gzochid_application_context *context, 
+ gzochid_application_task_serialization *serialization, GString *in)
+{
+  return NULL;
+}
+
+void gzochid_transactional_application_task_execution_free
+(gzochid_transactional_application_task_execution *execution)
+{
+}
+
+void gzochid_application_resubmitting_transactional_task_worker 
+(gzochid_application_context *app_context, gzochid_auth_identity *identity, 
+ gpointer data)
+{
 }
