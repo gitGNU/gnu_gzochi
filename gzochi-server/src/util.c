@@ -205,7 +205,9 @@ GHashTable *gzochid_util_deserialize_hash_table
 
   while (len > 0)
     {
-      g_hash_table_insert (ret, key_deserializer (in), value_deserializer (in));
+      gpointer key = key_deserializer (in);
+      gpointer value = value_deserializer (in);
+      g_hash_table_insert (ret, key, value);
       len--;
     }
 
