@@ -1,5 +1,5 @@
 ;; gzochi/private/app.scm: Private infrastructure for application support
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -42,7 +42,6 @@
 			       (gzochi:make-uniform-list-serialization 
 				gzochi:symbol-serialization)))
 	    (immutable data))
-    (nongenerative gzochi:callback)
     (protocol 
      (lambda (n)
        (lambda (procedure module . args)

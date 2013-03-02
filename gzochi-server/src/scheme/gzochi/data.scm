@@ -1,5 +1,5 @@
 ;; gzochi/data.scm: Public exports for gzochi data API
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -97,7 +97,6 @@
 
     (fields (immutable ca gzochi:managed-pair-car)
 	    (immutable cd gzochi:managed-pair-cdr))
-    (nongenerative gzochi:managed-pair)
     (sealed #t))
 
   (define gzochi:car gzochi:managed-pair-car)
@@ -150,7 +149,6 @@
     gzochi:managed-serializable?)
    (fields (mutable callback-with-value 
 		    (serialization serialization-with-value-serialization)))
-   (nongenerative gzochi:managed-serializable)
    (protocol (lambda (n)
 	       (lambda (value serializer-callback deserializer-callback)
 		 (or (gzochi:callback? serializer-callback)
@@ -201,8 +199,6 @@
 		    managed-vector-entry-wrapped-value?
 		    managed-vector-entry-wrapped-value-set!
 		    (serialization gzochi:boolean-serialization)))
-
-   (nongenerative gzochi:managed-vector-entry)
 
    (protocol 
     (lambda (n)
@@ -262,7 +258,6 @@
 				      serialize-managed-vector
 				      deserialize-managed-vector))))
 
-   (nongenerative gzochi:managed-vector)
    (protocol (lambda (n) (lambda (l) (let ((p (n))) (p (make-vector l #f))))))
    (sealed #t))
 
@@ -333,7 +328,6 @@
 	    (serialization gzochi:boolean-serialization))
 	   (mutable next))
 
-   (nongenerative gzochi:managed-hashtable-entry)
    (protocol 
     (lambda (n)
       (lambda (hash 
@@ -412,7 +406,6 @@
 	   (immutable depth (serialization gzochi:integer-serialization))
 	   (mutable size (serialization gzochi:integer-serialization)))
 
-   (nongenerative gzochi:managed-hashtable-node)
    (protocol (lambda (n)
 	       (lambda (depth)
 		 (let ((p (n)))
@@ -426,7 +419,6 @@
 
     (fields hash-function equivalence-function root)
 
-    (nongenerative gzochi:managed-hashtable)
     (protocol (lambda (n)
 		(lambda (hash-callback equiv-callback)
 		  (let ((p (n)))

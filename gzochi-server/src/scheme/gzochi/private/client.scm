@@ -1,5 +1,5 @@
 ;; gzochi/private/client.scm: Private infrastructure for gzochi client API 
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -45,8 +45,7 @@
    (gzochi:client-session gzochi:make-client-session gzochi:client-session?)
 
    (fields (immutable name (serialization gzochi:string-serialization))
-	   (immutable oid (serialization gzochi:integer-serialization)))
-   (nongenerative gzochi:client-session))
+	   (immutable oid (serialization gzochi:integer-serialization))))
 
   (gzochi:define-managed-record-type 
    (gzochi:client-session-listener
@@ -54,7 +53,6 @@
     gzochi:client-session-listener?)
     
    (fields received-message disconnected)
-   (nongenerative gzochi:client-session-listener)
    (sealed #t))
 
   (define (gzochi:send-message session msg)

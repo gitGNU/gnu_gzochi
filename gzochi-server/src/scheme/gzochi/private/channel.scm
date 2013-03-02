@@ -1,5 +1,5 @@
 ;; gzochi/private/channel.scm: Private infrastructure for gzochi channel API 
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -39,7 +39,6 @@
   (gzochi:define-managed-record-type
    (gzochi:channel gzochi:make-channel gzochi:channel?)
    
-   (nongenerative gzochi:channel)
    (fields (immutable oid (serialization gzochi:integer-serialization))
 	   (immutable name (serialization gzochi:string-serialization))))
 
