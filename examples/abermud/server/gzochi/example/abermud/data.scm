@@ -1,6 +1,6 @@
 ;; data.scm --- Data structures for gzochi AberMUD example game
 
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; This software is provided 'as-is', without any express or implied
 ;; warranty. In no event will the authors be held liable for any damages
@@ -317,7 +317,6 @@
 	   (mutable next abermud:item-next abermudmud:set-item-next!)
 	   (immutable facets))
 
-   (nongenerative abermud:item)
    (protocol (lambda (n)
 	       (lambda (adjective noun)
 		 (let ((p (n)))
@@ -411,8 +410,7 @@
    (abermud:inouthere abermud:make-inouthere abermud:inouthere?)
    (fields (immutable in (serialization gzochi:string-serialization))
 	   (immutable out (serialization gzochi:string-serialization))
-	   (immutable here (serialization gzochi:string-serialization)))
-   (nongenerative abermud:inouthere))	   
+	   (immutable here (serialization gzochi:string-serialization))))
 
   ;; The object facet. Represents a non-player object in the gzochi abermud
   ;; game world. Includes a text description and a set of flags that describe
@@ -424,8 +422,7 @@
    (fields (immutable text (serialization gzochi:string-serialization))
 	   (immutable flags (serialization 
 			     (gzochi:make-uniform-list-serialization 
-			      gzochi:symbol-serialization))))
-   (nongenerative abermud:object))
+			      gzochi:symbol-serialization)))))
 
   ;; The player facet. Represents a player in the gzochi abermud game world,
   ;; independent of whether an active gzochi client session is "attached" to
@@ -440,7 +437,6 @@
 		    abermud:set-player-password!
 		    (serialization gzochi:string-serialization)))
 
-   (nongenerative abermud:player)
    (protocol (lambda (n) (lambda (name) (let ((p (n))) (p name ""))))))
 
   ;; The room facet. Rooms act as containers (via their parent-child 
@@ -460,7 +456,6 @@
 		      (serialization gzochi:string-serialization))
 	   channel
 	   exits)
-   (nongenerative abermud:room)
    (protocol (lambda (n)
 	       (lambda (short-description long-description)
 		 (let ((p (n)))
@@ -498,7 +493,6 @@
    (fields (immutable destination)
 	   (immutable message (serialization gzochi:string-serialization)))
 
-   (nongenerative abermud:exit)
    (protocol (lambda (n)
 	       (lambda* (destination #:optional message)
 		 (let ((p (n))) (p destination (or message "")))))))

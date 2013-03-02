@@ -1,6 +1,6 @@
 ;; session.scm --- Session-related structures and procedures
 
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; This software is provided 'as-is', without any express or implied
 ;; warranty. In no event will the authors be held liable for any damages
@@ -129,6 +129,7 @@
 		    abermud:session-session-state 
 		    abermud:set-session-session-state!
 		    (serialization gzochi:symbol-serialization))
-	   (mutable player abermud:session-player abermud:set-session-player!))
-   (nongenerative abermud:session))		   
+	   (mutable player 
+		    abermud:session-player 
+		    abermud:set-session-player!)))
 )

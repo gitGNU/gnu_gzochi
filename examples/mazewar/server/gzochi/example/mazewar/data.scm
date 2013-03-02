@@ -1,6 +1,6 @@
 ;; data.scm --- Data structures for gzochi mazewar example game
 
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; This software is provided 'as-is', without any express or implied
 ;; warranty. In no event will the authors be held liable for any damages
@@ -78,15 +78,13 @@
 	    (mutable north mazewar:tile-north mazewar:set-tile-north!)
 	    (mutable south mazewar:tile-south mazewar:set-tile-south!)
 	    (mutable east mazewar:tile-east mazewar:set-tile-east!)
-	    (mutable west mazewar:tile-west mazewar:set-tile-west!))
-    (nongenerative mazewar:tile))
+	    (mutable west mazewar:tile-west mazewar:set-tile-west!)))
 
   (gzochi:define-managed-record-type
    (mazewar:space mazewar:make-space mazewar:space?)
    
     (parent mazewar:tile)
-    (fields (mutable player mazewar:space-player mazewar:set-space-player!))
-    (nongenerative mazewar:space))
+    (fields (mutable player mazewar:space-player mazewar:set-space-player!)))
 
   ;; The following procedures perform relative orientation translations. The 
   ;; `left' procedure returns the cardinal direction to the left of the 
@@ -131,8 +129,7 @@
 		     (serialization gzochi:integer-serialization))
 
 	    (immutable name (serialization gzochi:string-serialization))
-	    session)
-    (nongenerative mazewar:player))
+	    session))
 
   (gzochi:define-managed-record-type 
    (mazewar:missile mazewar:make-missile mazewar:missile?)
@@ -140,8 +137,7 @@
     (fields (immutable orientation (serialization gzochi:symbol-serialization))
 	    (immutable player)
 	    
-	    (mutable space mazewar:missile-space mazewar:set-missile-space!))
-    (nongenerative mazewar:missile))
+	    (mutable space mazewar:missile-space mazewar:set-missile-space!)))
 
   (gzochi:define-managed-record-type 
    (mazewar:maze mazewar:make-maze mazewar:maze?)
@@ -149,7 +145,6 @@
     (fields (immutable spaces)
 	    (immutable bytes (serialization gzochi:bytevector-serialization))
     
-            (mutable players mazewar:maze-players mazewar:set-maze-players!))
+            (mutable players mazewar:maze-players mazewar:set-maze-players!)))
 
-    (nongenerative mazewar:map))
 )
