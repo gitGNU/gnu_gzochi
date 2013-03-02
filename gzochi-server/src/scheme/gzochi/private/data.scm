@@ -364,7 +364,9 @@
 			    (else #`(record-type-descriptor 
 				     gzochi:managed-record))))
                      (protocol (if (unspecified? _protocol) #f _protocol))
-                     (uid (if (unspecified? _nongenerative) #f _nongenerative))
+                     (uid (if (unspecified? _nongenerative) 
+			      #''record-name 
+			      _nongenerative))
                      (sealed? (if (unspecified? _sealed) #f _sealed))
                      (opaque? (if (unspecified? _opaque) #f _opaque)))
 
@@ -417,9 +419,8 @@
                   (raise (make-assertion-violation)))]
              [((nongenerative) . rest)
               (if (unspecified? _nongenerative)
-                  (loop _fields _parent _protocol _sealed _opaque
-                        #`(quote #,(datum->syntax #'record-name (gensym)))
-                        _constructor _parent-rtd #'rest)
+                  (loop _fields _parent _protocol _sealed _opaque 
+			#''record-name _constructor _parent-rtd #'rest)
                   (raise (make-assertion-violation)))]
              [((nongenerative uid) . rest)
               (if (unspecified? _nongenerative)
