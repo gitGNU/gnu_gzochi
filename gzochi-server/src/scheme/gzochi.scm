@@ -1,5 +1,5 @@
 ;; gzochi.scm: The gzochi composite library
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -43,6 +43,12 @@
 	  &gzochi:name-exists gzochi:make-name-exists-condition
 	  gzochi:name-exists-condition? &gzochi:name-not-bound
 	  gzochi:make-name-not-bound-condition gzochi:name-not-bound-condition?
+	  &gzochi:transaction-aborted gzochi:make-transaction-aborted-condition
+	  gzochi:transaction-aborted-condition? &gzochi:transaction-retry
+	  gzochi:make-transaction-retry-condition 
+	  gzochi:transaction-retry-condition? &gzochi:transaction-timeout 
+	  gzochi:make-transaction-timeout-condition
+	  gzochi:transaction-timeout-condition?
 
           ;; (gzochi data)
 
