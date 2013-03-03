@@ -321,15 +321,19 @@ void gzochid_restart_tasks (gzochid_application_context *context)
 
 gzochid_task *build_durable_task 
 (gzochid_application_task *task, 
- gzochid_application_task_serialization *serialization)
+ gzochid_application_task_serialization *serialization,
+ struct timeval delay)
 {
-  struct timeval now;
+  struct timeval target;
 
-  gettimeofday (&now, NULL);
+  gettimeofday (&target, NULL);
+
+  target.tv_sec += delay.tv_sec;
+  target.tv_usec += delay.tv_usec;
 
   {
     gzochid_durable_application_task *durable_task = 
-      gzochid_durable_application_task_new (task, serialization, now);
+      gzochid_durable_application_task_new (task, serialization, target);
     gzochid_data_managed_reference *reference = gzochid_data_create_reference 
       (task->context, &durable_task_serialization, durable_task);
     
@@ -352,7 +356,7 @@ gzochid_task *build_durable_task
        gzochid_application_resubmitting_transactional_task_worker, execution);
     
     gzochid_task *ret = gzochid_task_new 
-      (gzochid_application_task_thread_worker, application_task, now);
+      (gzochid_application_task_thread_worker, application_task, target);
 
     mpz_set (durable_task->oid, reference->oid);
     binding_name = strncat (binding_name, PENDING_TASK_PREFIX, prefix_len);
@@ -403,8 +407,9 @@ void gzochid_schedule_durable_task
  gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization)
 {
+  struct timeval immediate = { 0, 0 };
   gzochid_schedule_delayed_durable_task 
-    (context, identity, task, serialization, 0);
+    (context, identity, task, serialization, immediate);
 }
 
 void gzochid_schedule_delayed_durable_task
@@ -413,7 +418,7 @@ void gzochid_schedule_delayed_durable_task
  gzochid_application_task_serialization *serialization, 
  struct timeval delay)
 {
-  gzochid_task *wrapped_task = build_durable_task (task, serialization);
+  gzochid_task *wrapped_task = build_durable_task (task, serialization, delay);
   gzochid_task_transaction_context *tx_context = NULL;
   
   join_transaction (context);

@@ -1,5 +1,5 @@
 /* schedule.c: Task execution and task queue management routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -45,18 +45,13 @@ gpointer gzochid_schedule_task_executor (gpointer data)
       else 
 	{
 	  struct timeval current_time;
-	  GTimeVal wait_time;
 	  gzochid_pending_task *pending_task = 
 	    (gzochid_pending_task *) g_queue_peek_head (task_queue->queue);
 
 	  gettimeofday (&current_time, NULL);
 
-	  if (current_time.tv_sec 
-	      > pending_task->scheduled_execution_time.tv_sec
-	      || (current_time.tv_sec 
-		  == pending_task->scheduled_execution_time.tv_sec
-		  && (current_time.tv_usec 
-		      > pending_task->scheduled_execution_time.tv_usec)))
+	  if (timercmp 
+	      (&current_time, &pending_task->scheduled_execution_time, >))
 	    {
 	      pending_task = (gzochid_pending_task *) 
 		g_queue_pop_head (task_queue->queue);
@@ -65,15 +60,16 @@ gpointer gzochid_schedule_task_executor (gpointer data)
 	    }
 	  else 
 	    {
-	      wait_time.tv_sec = 
-		pending_task->scheduled_execution_time.tv_sec 
-		- current_time.tv_sec;
-	      wait_time.tv_usec = 
-		pending_task->scheduled_execution_time.tv_usec 
-		- current_time.tv_usec;
+	      struct timeval interval;
+	      gint64 until = g_get_monotonic_time ();
+	      
+	      timersub 
+		(&pending_task->scheduled_execution_time, 
+		 &current_time, 
+		 &interval);
 
-	      g_cond_timed_wait 
-		(task_queue->cond, task_queue->mutex, &wait_time);
+	      until += interval.tv_sec * G_TIME_SPAN_SECOND + interval.tv_usec;
+	      g_cond_wait_until (task_queue->cond, task_queue->mutex, until);
 	    }
 	}
     }
