@@ -70,12 +70,12 @@ void gzochid_schedule_durable_task
 void gzochid_schedule_delayed_durable_task 
 (gzochid_application_context *, gzochid_auth_identity *, 
  gzochid_application_task *, gzochid_application_task_serialization *, 
- unsigned long);
+ struct timeval);
 
 gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task 
 (gzochid_application_context *, gzochid_auth_identity *, 
  gzochid_application_task *, gzochid_application_task_serialization *, 
- unsigned long, unsigned long);
+ struct timeval, struct timeval);
 
 void gzochid_cancel_periodic_task (gzochid_periodic_task_handle *);
 

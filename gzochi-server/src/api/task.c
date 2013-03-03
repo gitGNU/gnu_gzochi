@@ -36,8 +36,13 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 2, 0, 0,
     (context, identity, gzochid_scheme_application_task_worker, callback);
   
   unsigned long d = scm_to_ulong (delay);
+  struct timeval tv;
+
+  tv.tv_sec = d / 1000;
+  tv.tv_usec = (d % 1000) * 1000; 
+
   gzochid_schedule_delayed_durable_task 
-    (context, identity, scheme_task, &gzochid_scheme_task_serialization, d);
+    (context, identity, scheme_task, &gzochid_scheme_task_serialization, tv);
 
   gzochid_api_check_transaction ();
 

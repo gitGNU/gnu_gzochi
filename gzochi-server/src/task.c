@@ -411,7 +411,7 @@ void gzochid_schedule_delayed_durable_task
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization, 
- unsigned long delay)
+ struct timeval delay)
 {
   gzochid_task *wrapped_task = build_durable_task (task, serialization);
   gzochid_task_transaction_context *tx_context = NULL;
