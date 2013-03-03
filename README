@@ -14,8 +14,11 @@ component of the distribution:
 * gzochi-common/ - the static utility library shared between the server and 
   client modules
 * gzochi-server/ - gzochid, the server for the gzochi framework
+* gzochi-client-common/ - the static utility library shared between the two 
+  reference client implementations
 * gzochi-client/ - libgzochi, the reference client library implementation
-* debug-client/ - mictlan, a low-level socket client implementation
+* gzochi-glib-client/ - libgzochi-glib, the GLib reference client library 
+  implementation
 * examples/ - some example games with client and server component 
   implementations intended to help new developers understand the gzochi
   framework
