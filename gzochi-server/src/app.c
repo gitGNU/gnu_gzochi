@@ -466,8 +466,10 @@ void gzochid_application_client_logged_in
   gzochid_client_session_persist (context, session, session_oid);
   session_oid_str = mpz_get_str (NULL, 16, session_oid);
 
+  g_mutex_lock (context->client_mapping_lock);
   g_hash_table_insert (context->oids_to_clients, session_oid_str, client);
   g_hash_table_insert (context->clients_to_oids, client, session_oid_str);
+  g_mutex_unlock (context->client_mapping_lock);
 
   transactional_task.worker = gzochid_scheme_application_logged_in_worker;
   transactional_task.context = context;
@@ -487,7 +489,22 @@ void gzochid_application_client_logged_in
     {
       gzochid_schedule_run_task (game_context->task_queue, &task);
       if (!gzochid_application_should_retry (execution))
-	break;
+	{
+	  if (execution->result != GZOCHID_TRANSACTION_SUCCESS)	
+	    {
+	      gzochid_info
+		("Disconnecting session '%s'; failed login transaction.", 
+		 session_oid_str);
+
+	      g_mutex_lock (context->client_mapping_lock);
+	      g_hash_table_remove (context->oids_to_clients, session_oid_str);
+	      g_hash_table_remove (context->clients_to_oids, client);
+	      g_mutex_unlock (context->client_mapping_lock);
+
+	      gzochid_protocol_client_disconnect (client);
+	    }
+	    break;
+	}
     }
 
   gzochid_transactional_application_task_execution_free (execution);

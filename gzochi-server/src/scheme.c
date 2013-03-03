@@ -33,6 +33,7 @@
 #include "session.h"
 #include "task.h"
 #include "tx.h"
+#include "txlog.h"
 
 #include "api/channel.h"
 #include "api/data.h"
@@ -336,7 +337,10 @@ void gzochid_scheme_application_logged_in_worker
       (&scheme_participant, 
        is_transaction_retry (scm_variable_ref (exception_var)));
   else if (scm_is_false (handler))
-    gzochid_client_session_send_login_failure (context, session);
+    {
+      gzochid_client_session_send_login_failure (context, session);
+      gzochid_client_session_disconnect (context, session);
+    }
   else
     {
       session->handler = (gzochid_client_session_handler *) 
@@ -421,8 +425,22 @@ void gzochid_scheme_application_disconnected_worker
 
   session_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_client_session_serialization, session_oid);
+  mpz_clear (session_oid);
   gzochid_data_dereference (session_reference);
   session = (gzochid_client_session *) session_reference->obj;
+
+  /* A client may disconnect before the login process has completed or after
+     it has failed enough times to stop being retried. */
+
+  if (session->handler == NULL)
+    {
+      gzochid_tx_warning 
+	(context, "Session '%s' disconnected after incomplete login.", ptr);
+
+      g_list_free (gpa);
+      gzochid_data_remove_object (session_reference);
+      return;
+    }
 
   callback_reference =
     gzochid_data_create_reference_to_oid
