@@ -43,20 +43,20 @@
 				gzochi:symbol-serialization)))
 	    (immutable data))
     (protocol 
-     (lambda (n)
+     (lambda (p)
        (lambda (procedure module . args)
-	 (let ((p (n))) 
-	   (if (null? args)
-	       (p procedure module #f)
-	       (let ((arg (car args)))
-		 (or (and (gzochi:managed-record? arg) (null? (cdr args)))
-		     (raise
-		      (condition
-		       (make-assertion-violation)
-		       (make-message-condition
-			"Callback data must be a single managed record or #f."
-			))))
-		 (p procedure module arg)))))))
+	 (if (null? args)
+	     (p procedure module #f)
+	     (let ((arg (car args)))
+	       (or (and (or (gzochi:managed-record? arg) (not arg))
+			(null? (cdr args)))
+		   (raise
+		    (condition
+		     (make-assertion-violation)
+		     (make-message-condition
+		      "Callback data must be a single managed record or #f."
+		      ))))
+	       (p procedure module arg))))))
     (sealed #t))
 
   (define (gzochi:execute-initialized callback properties)

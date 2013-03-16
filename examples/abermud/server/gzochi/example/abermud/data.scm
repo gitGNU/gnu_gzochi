@@ -317,11 +317,10 @@
 	   (mutable next abermud:item-next abermudmud:set-item-next!)
 	   (immutable facets))
 
-   (protocol (lambda (n)
+   (protocol (lambda (p)
 	       (lambda (adjective noun)
-		 (let ((p (n)))
-		   (p adjective noun #f #f #f
-		      (gzochi:make-managed-vector 10)))))))
+		 (p adjective noun #f #f #f
+		    (gzochi:make-managed-vector 10))))))
 
   ;; Add `child' to the set of children of `parent' and make `parent' the
   ;; parent item of `child'.
@@ -437,7 +436,7 @@
 		    abermud:set-player-password!
 		    (serialization gzochi:string-serialization)))
 
-   (protocol (lambda (n) (lambda (name) (let ((p (n))) (p name ""))))))
+   (protocol (lambda (p) (lambda (name) (p name "")))))
 
   ;; The room facet. Rooms act as containers (via their parent-child 
   ;; relationships) with other items in the game world. A room has a short text
@@ -456,13 +455,12 @@
 		      (serialization gzochi:string-serialization))
 	   channel
 	   exits)
-   (protocol (lambda (n)
+   (protocol (lambda (p)
 	       (lambda (short-description long-description)
-		 (let ((p (n)))
-		   (p short-description 
-		      long-description 
-		      (gzochi:create-channel (symbol->string (gensym)))
-		      (gzochi:make-managed-vector 12)))))))
+		 (p short-description 
+		    long-description 
+		    (gzochi:create-channel (symbol->string (gensym)))
+		    (gzochi:make-managed-vector 12))))))
   
   ;; Convert the symbolic representation of an exit direction to the index of
   ;; a directional exit in a room facet's exit vector.
@@ -493,9 +491,9 @@
    (fields (immutable destination)
 	   (immutable message (serialization gzochi:string-serialization)))
 
-   (protocol (lambda (n)
+   (protocol (lambda (p)
 	       (lambda* (destination #:optional message)
-		 (let ((p (n))) (p destination (or message "")))))))
+		 (p destination (or message ""))))))
 
   ;; Returns the exit record for the specified room going in the specified
   ;; direction, or `#f' if no such exit exists.

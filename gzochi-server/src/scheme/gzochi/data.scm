@@ -149,7 +149,7 @@
     gzochi:managed-serializable?)
    (fields (mutable callback-with-value 
 		    (serialization serialization-with-value-serialization)))
-   (protocol (lambda (n)
+   (protocol (lambda (p)
 	       (lambda (value serializer-callback deserializer-callback)
 		 (or (gzochi:callback? serializer-callback)
 		     (raise (condition 
@@ -160,10 +160,7 @@
 			     (make-assertion-violation)
 			     (make-irritants-condition deserializer-callback))))
 
-		 (let ((p (n)))
-		   (p (list serializer-callback 
-			    deserializer-callback 
-			    value)))))))
+		 (p (list serializer-callback deserializer-callback value))))))
  
   (define (gzochi:managed-serializable-serializer obj)
     (car (gzochi:managed-serializable-callback-with-value obj)))
@@ -201,7 +198,7 @@
 		    (serialization gzochi:boolean-serialization)))
 
    (protocol 
-    (lambda (n)
+    (lambda (p)
       (lambda (value value-serializer value-deserializer)
 	(or (gzochi:managed-record? value)
 	    (and (gzochi:callback? value-serializer)
@@ -211,8 +208,7 @@
 		    (make-message-condition 
 		     "Serialization must be specified for unmanaged values."))))
 
-	(let* ((p (n))
-	       (wrapped-value (not (gzochi:managed-record? value)))
+	(let* ((wrapped-value (not (gzochi:managed-record? value)))
 	       (value (if wrapped-value
 			  (gzochi:make-managed-serializable
 			   value value-serializer value-deserializer)
@@ -258,7 +254,7 @@
 				      serialize-managed-vector
 				      deserialize-managed-vector))))
 
-   (protocol (lambda (n) (lambda (l) (let ((p (n))) (p (make-vector l #f))))))
+   (protocol (lambda (p) (lambda (l) (p (make-vector l #f)))))
    (sealed #t))
 
   (define (gzochi:managed-vector-length vec)
@@ -329,7 +325,7 @@
 	   (mutable next))
 
    (protocol 
-    (lambda (n)
+    (lambda (p)
       (lambda (hash 
 	       key key-serializer key-deserializer 
 	       value value-serializer value-deserializer)
@@ -348,8 +344,7 @@
 		    (make-message-condition 
 		     "Serialization must be specified for unmanaged values."))))
 
-	(let* ((p (n))
-	       (wrapped-key (not (gzochi:managed-record? key)))
+	(let* ((wrapped-key (not (gzochi:managed-record? key)))
 	       (key (if wrapped-key
 			(gzochi:make-managed-serializable 
 			 key key-serializer key-deserializer)
@@ -406,10 +401,9 @@
 	   (immutable depth (serialization gzochi:integer-serialization))
 	   (mutable size (serialization gzochi:integer-serialization)))
 
-   (protocol (lambda (n)
+   (protocol (lambda (p)
 	       (lambda (depth)
-		 (let ((p (n)))
-		   (p #f #f #f #f (gzochi:make-managed-vector 256) depth 0)))))
+		 (p #f #f #f #f (gzochi:make-managed-vector 256) depth 0))))
    (sealed #t))
 
   (gzochi:define-managed-record-type 
@@ -419,12 +413,11 @@
 
     (fields hash-function equivalence-function root)
 
-    (protocol (lambda (n)
+    (protocol (lambda (p)
 		(lambda (hash-callback equiv-callback)
-		  (let ((p (n)))
-		    (let ((root (make-managed-hashtable-node 0)))
-		      (managed-hashtable-node-ensure-depth! root 6)
-		      (p hash-callback equiv-callback root))))))
+		  (let ((root (make-managed-hashtable-node 0)))
+		    (managed-hashtable-node-ensure-depth! root 6)
+		    (p hash-callback equiv-callback root)))))
     (sealed #t))
 
   (define (high-bits n num-bits)

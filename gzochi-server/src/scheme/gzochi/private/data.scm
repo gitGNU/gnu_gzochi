@@ -1,5 +1,5 @@
 ;; gzochi/private/data.scm: Private infrastructure for gzochi data API
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -151,38 +151,50 @@
 
   (define (gzochi:make-managed-record-constructor-descriptor 
 	   rtd parent-constructor-descriptor protocol)
-
     (define prtd (record-type-parent rtd))
+    (define (maybe-create-reference arg)
+      (if (gzochi:managed-record? arg) (gzochi:create-reference arg) arg))
     (define (default-inherited-protocol n)
       (lambda args
 	(receive 
-          (n-args p-args) 
-	  (split-at args (- (length args) 
-			    (vector-length (record-type-field-names rtd))))
-	  (let ((p (apply n n-args)))
-	    (apply p p-args)))))
+	 (n-args p-args) 
+	 (split-at args (- (length args) 
+			   (vector-length (record-type-field-names rtd))))
+	 (let ((field-binder (apply n n-args)))
+	   (apply field-binder p-args)))))
+    (define (managed-type? rtd)
+      (and rtd (or (eq? rtd gzochi:managed-record) 
+		   (managed-type? (record-type-parent rtd)))))
+    (define (wrap-field-binder field-binder)
+      (lambda args (apply field-binder (map maybe-create-reference args))))
 
-    (define (create-reference arg)
-      (if (gzochi:managed-record? arg) (gzochi:create-reference arg) arg))
+    (or (managed-type? rtd) (raise (make-assertion-violation)))
 
-    (make-record-constructor-descriptor 
-     rtd
-     (or parent-constructor-descriptor
-	 (and prtd
-	      (not (eq? prtd gzochi:managed-record)) 
-	      (gzochi:make-managed-record-constructor-descriptor prtd #f #f)))
+    (if (eq? prtd gzochi:managed-record)
+	(make-record-constructor-descriptor 
+	 rtd
+	 (record-constructor-descriptor gzochi:managed-record)
+	 (if protocol
+	     (lambda (mr-constructor)
+	       (protocol (lambda args
+			   (apply (mr-constructor) 
+				  (map maybe-create-reference args)))))
+	     (lambda (mr-constructor) 
+	       (lambda args (apply (mr-constructor) 
+				   (map maybe-create-reference args))))))
 
-     (lambda (parent-constructor)
-       (let ((wrapped-parent-constructor
-	      (lambda args		
-		(let ((field-binder 
-		       (apply parent-constructor (map create-reference args))))
-		  (lambda args 
-		    (apply field-binder (map create-reference args)))))))
+	(make-record-constructor-descriptor 
+	 rtd
+	 (or parent-constructor-descriptor
+	     (gzochi:make-managed-record-constructor-descriptor prtd #f #f))
+	 (lambda (parent-constructor)
+	   ((or protocol default-inherited-protocol)
+	    (lambda n-args
+	      (let ((field-binder (apply parent-constructor n-args)))
+		(lambda p-args
+		  (apply field-binder
+			 (map maybe-create-reference p-args))))))))))
 
-	 ((or protocol default-inherited-protocol) 
-	  wrapped-parent-constructor)))))
- 
   (define managed-record-type-registry (make-eq-hashtable))
 
   (define (register-managed-record-type name rtd rcd)
@@ -281,7 +293,8 @@
 		    (guess-accessor-name #'name)
 		    #f)]
         [else
-         (syntax-violation 'define-record-type "Invalid field specifier" x)]))
+         (syntax-violation 
+	  'gzochi:define-managed-record-type "Invalid field specifier" x)]))
     (map f fields))
 
   (define-syntax gzochi:define-managed-record-type
@@ -353,16 +366,14 @@
 				#,_parent))
 			    ((not (unspecified? _parent-rtd))
 			     (cadr _parent-rtd))
-			    (else  #`(record-constructor-descriptor 
-				      gzochi:managed-record))))
+			    (else #f)))
                      (parent-rtd
 		      (cond ((not (unspecified? _parent))
 			     #`(gzochi:managed-record-type-descriptor 
 				#,_parent))
 			    ((not (unspecified? _parent-rtd))
 			     (car _parent-rtd))
-			    (else #`(record-type-descriptor 
-				     gzochi:managed-record))))
+			    (else #f)))
                      (protocol (if (unspecified? _protocol) #f _protocol))
                      (uid (if (unspecified? _nongenerative) 
 			      #''record-name 
@@ -380,8 +391,9 @@
 		    (let ()
 		      (register-managed-record-type 
 		       (quote record-name)
-		       record-name (make-record-constructor-descriptor 
-				    record-name #,parent-cd #,protocol)))
+		       record-name 
+		       (gzochi:make-managed-record-constructor-descriptor 
+			record-name #,parent-cd #,protocol)))
 
                     (define constructor-name
                       (record-constructor
