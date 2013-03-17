@@ -476,6 +476,30 @@ The user associated with the gzochid process must have read and
 execute access to this directory---but it does not need to be able
 to write files here.
 
+@item tx.timeout
+The maximum duration, in milliseconds, for time-limited transactions
+executed on behalf of a game application. Any task or callback whose
+execution time exceeds this value will fail and be retried (if it 
+has not used up its maximum retries). This setting also bounds the 
+amount of time the container's data services will wait to obtain a 
+lock for exclusive access to any single datum such as a managed 
+reference; if the wait time expires, the transaction attempting to 
+access the data will be marked for rollback. 
+
+By design, this setting has an impact on the task execution 
+throughput of game applications. The longer a task takes to execute, 
+and the more data it accesses as part of its execution, the more 
+constraints it places on the transactional work that can be done 
+concurrent with its execution. As a corollary, the shorter a task's
+duration and the less data it accesses, the less risk there is that
+it will conflict with other tasks. Before increasing this value 
+beyond its default, consider refactoring a failing task to perform
+fewer operations and access less data.
+
+Certain lifecycle events, such as application initialization, are 
+executed in transactions without time limits; this setting has no 
+effect on the processing of those events.
+
 @end table
 
 @node Application deployment
