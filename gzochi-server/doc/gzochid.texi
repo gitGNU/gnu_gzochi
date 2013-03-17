@@ -502,6 +502,19 @@ effect on the processing of those events.
 
 @end table
 
+@emph{log}
+
+These settings control the system-wide logging behavior of gzochid.
+
+@table @samp
+@item priority.threshold
+The lowest severity of log message that will be recorded in the logs
+(both to console and to the server's log file). Valid values of this
+settings are, in order of decreasing severity: @code{ERR}, 
+@code{WARNING}, @code{NOTICE}, @code{INFO}, and @code{DEBUG}.
+
+@end table
+
 @node Application deployment
 @chapter Application deployment
 
