@@ -1,4 +1,4 @@
-This is version 0.1 of libgzochi, the client library for the gzochi game
+This is version 0.3 of libgzochi, the client library for the gzochi game
 development framework.
 
 gzochi is a framework for developing massively multiplayer online games. A
@@ -20,16 +20,16 @@ the INSTALL file. libgzochi-specific information and configuration options can
 be found below.
 
 libgzochi depends on the following external libraries.
-- libgzochi-common
+- libgzochi-client-common
 
-libgzochi-common is provided as part of the gzochi distribution and is assumed
-to have been built in a directory adjacent to the directory in which libgzochi
-is being configured and built.
+libgzochi-client-common is provided as part of the gzochi distribution and is 
+assumed to have been built in a directory adjacent to the directory in which 
+libgzochi is being configured and built.
 
 
 Special Instructions For Some Systems =========================================
 
-We would like libgzochhi to build on all systems using the simple instructions 
+We would like libgzochi to build on all systems using the simple instructions 
 above, but a few systems may need special treatment.  If you can send us fixes
 for system-specific problems, we'd be grateful.
 
