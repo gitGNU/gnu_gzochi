@@ -1,0 +1,79 @@
+This is version 0.3 of libgzochi-glib, the GLib-compatible client library for 
+the gzochi game development framework.
+
+gzochi is a framework for developing massively multiplayer online games. A
+server container provides services to deployed games, which are written in GNU
+Guile Scheme, that abstract and simplify some of the most challenging and
+error-prone aspects of online game development: Concurrency, data persistence, 
+and network communications. A very thin client library can be embedded to 
+provide connectivity for client applications written in any language.
+
+libgzochi-glib is a reference client library implementation that provides an 
+API for authentication and communication with a gzochi application endpoint,
+and integrates easily with the GLib library's "main loop" functionality. It is
+intended for use in the implementation of gzochi game client applications.
+
+
+Additional INSTALL instructions ===============================================
+
+Generic instructions for configuring and compiling libgzochi-glib can be found 
+in the INSTALL file. libgzochi-specific information and configuration options 
+can be found below.
+
+libgzochi-glib depends on the following external libraries.
+- libg
+- libgzochi-client-common
+
+The dependency on libg is configured using `pkg-config'.
+
+libgzochi-client-common is provided as part of the gzochi distribution and is 
+assumed to have been built in a directory adjacent to the directory in which 
+libgzochi-glib is being configured and built.
+
+
+Required External Packages ====================================================
+
+gzochid requires the following external packages:
+
+  - GNU GLib, at least version 2.28
+
+    GLib is used throughout gzochid for its general-purpose utility functions
+    and data structures. It is available from http://www.gtk.org/ .
+
+  - pkg-config
+
+    libgzochi-glib's ./configure script uses pkg-config to discover the correct 
+    compile and link options for the GLib library above.
+
+
+Special Instructions For Some Systems =========================================
+
+We would like libgzochi-glib to build on all systems using the simple 
+instructions above, but a few systems may need special treatment.  If you can 
+send us fixed for system-specific problems, we'd be grateful.
+
+   <none yet listed>
+
+
+About This Distribution =======================================================
+
+Interesting files include:
+
+- COPYING, which contains the terms of GNU General Public License.
+- INSTALL, which contains generl instructions for building/installing 
+  libgzochi-glib.
+- NEWS, which describes user-visible changes since the last release of 
+  libgzochi-glib.
+
+Files are usually installed according to the prefix specified to configure,
+/usr/local by default. Building and installing gives you:
+
+Libraries, in ${prefix}/lib. Depending on the platform and options given to
+        given to configure, you may get shared libraries in addition to or
+        instead of these static libraries.
+
+ libgzochi-glib.a --- an object library containing the gzochi GLib client API.
+
+Header files, in ${prefix}/include:
+
+ libgzochi-glib.h --- Prototypes and declarations for libgzochi-glib.
