@@ -220,10 +220,10 @@ context, meaning that the side effects produced by a portion of code
 are delayed until its successful completion, at which point all of 
 them guaranteed to take effect together; or the side effects are 
 ``rolled back'' and the block of code is either retried, with no 
-external indication that an error occurred, or abandoned. And other 
-portions of code that are concurrently accessing the same bits of 
-data are guaranteed a consistent view of that data for the duration
-of their execution.
+indication to the client that an error occurred, or abandoned. And 
+other portions of code that are concurrently accessing the same bits 
+of data are guaranteed a consistent view of that data for the 
+duration of their execution.
 
 @node Network communication
 @section Network communication
@@ -603,6 +603,7 @@ expectation is that most non-trivial games will depend heavily on
 all of the services the container provides.
 
 @menu
+* Transaction management::
 * Managed records::
 * Data binding and storage::
 * Client session management::
@@ -610,6 +611,39 @@ all of the services the container provides.
 * Task scheduling::
 * Transactional logging::
 @end menu
+
+@node Transaction management
+@section Transaction management
+
+All game application code that executes within the gzochid container 
+executes in the context of a transaction, meaning that all of its 
+side effects, such as sending messages or modifying data, have the 
+four ACID properties: Atomicity, consistency, isolation, and 
+durability. The services described in the following sections are the
+primary means by which side effects are achieved in a gzochi 
+application, and all of them participate in the container's 
+two-phase commit protocol, which verifies that each participant is 
+prepared to commit before issuing the request to do so.
+
+When a transaction commits, the side effects requested from each 
+service by application code are made permanent: Messages are sent to
+clients, changes to data are saved to the data store. When a 
+transaction fails to commit, each service participating in the 
+commit rolls back any transaction-local state that was created 
+during the lifetime of the transaction.
+
+A transaction may fail to commit for any of several reasons: It may
+have exceeded the maximum running specified by the @code{tx.timeout}
+setting; it may have attempted to access data in a way that brought
+it into conflict with another currently-executing transaction; an
+external resource (such as a network connection) required by the
+transaction may be unavailable; code executing in a transactional 
+context may exit non-locally. If a transactional task or callback 
+fails to commit but the container determines that it is safe and 
+desirable to re-attempt it, it will automatically be returned to the
+queue of items eligible for execution. A transactional unit of work 
+that fails in a ``retryable'' way will be retried up to a configured 
+maximum number of times (3, by default) before being abandoned.
 
 @node Managed records
 @section Managed records
@@ -657,6 +691,17 @@ record---that is to say, gzochid knows when a field in one managed
 record contains a reference to another managed record and only
 persists the portions of the object graph that change during the
 execution of application code.
+
+Like the rest of the operations provided by the container, access to
+data follows transactional semantics. Any single flow of execution 
+within an application is guaranteed a consistent view of data over 
+the lifetime of its execution, and the set of changes it makes to 
+data during this lifetime will be persisted together or not at all. 
+These operations are also subject to transactional constraints, such 
+as the requirement that they complete within a configured timeout 
+and that they not conflict with operations accessing the same data in 
+other transactions. If these constraints are violated, the operation 
+will fail and the task will be retried or abandoned.
 
 Bindings can be manipulated using the @code{gzochid:set-binding!},
 @code{gzochid:get-binding} and @code{gzochid:remove-binding!}
@@ -992,7 +1037,9 @@ the container.
 The longer a task runs and the more resources it accesses, the more
 likely it is to disrupt the behavior of other 
 simultaneously-executing tasks, and the less likely its transaction
-will be able to commit successfully. If there is a lot of work to be
+will be able to commit successfully---tasks whose execution time 
+exceeds the configured value of @code{tx.timeout} will be aborted or
+otherwise prevented from committing. If there is a lot of work to be
 done or there are many objects to be modified, try breaking a large
 task into a series of smaller tasks, each of which does a portion of
 the work and then schedules the next portion to run as soon as
@@ -1342,7 +1389,7 @@ condition, @code{#f} otherwise.
 @end deffn
 
 A @code{&gzochi:transaction-aborted} condition is raised when a 
-transactional operation is in attempted and the transaction bound to
+transactional operation is attempted and the transaction bound to
 the current thread has been found to be in an inconsistent 
 state---that is to say, it has been rolled back or marked for 
 rollback.
