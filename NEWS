@@ -1,10 +1,37 @@
 gzochi NEWS -- history of user-visible changes
-Copyright (C) 2012 Julian Graham
+Copyright (C) 2013 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.3 (since 0.2)
 
+* Changes to the distribution
+
+** New client support static library: libgzochi-client-common
+
+Some of the trickier aspects of client communication with a gzochi server
+instance, such as maintaining a buffer for partial message delivery, have been
+factored out of libgzochi and into a static library, with a source distribution
+under the "gzochi-client-common/" tree, that can be built into other client 
+implementations. 
+
+** New reference client library implementation: libgzochi-glib
+
+libgzochi-client-common already has a consumer in the distribution:
+libgzochi-glib, a new reference client implementation that integrates easily 
+with the "main loop" functionality in the popular GNU GLib library to support
+the development of single-threaded client applications. The source distribution
+for libgzochi-glibis under the "gzochi-glib-client/" tree.
+
+** Removed deprecated debugging client
+
+mictlan, the primitive "debugging client" included with earlier versions of the
+gzochi framework, has been removed from the distribution. Its functionality has
+been superceded by the debugging capabilities of gzochid itself, which can be 
+accessed using a telnet client.
+
+
 Changes in 0.2 (since 0.1)
 
 * Changes to the distribution
@@ -19,7 +46,7 @@ in which state is shared between multiple players.
 
 Copyright information:
 
-Copyright (C) 2012 Julian Graham
+Copyright (C) 2013 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the
