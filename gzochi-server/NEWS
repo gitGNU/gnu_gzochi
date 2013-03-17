@@ -1,10 +1,64 @@
 gzochid NEWS -- history of user-visible changes
-Copyright (C) 2012 Julian Graham
+Copyright (C) 2013 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.3 (since 0.2):
 
+* Notable changes
+
+** Configurable transaction timeouts
+
+When an application transaction's execution exceeds a configured timeout, it
+will now be automatically marked for rollback (or prevented from committing), 
+preventing slow or data-hungry tasks from bottlenecking application 
+performance and task throughput. See "The server configuration file" in the
+manual for more information on configuring this timeout.
+
+** Transaction retry support
+
+Application transactions that fail for transient reasons, such as exceeding the
+timeout described above, will be automatically retried by the gzochid
+transaction management system.
+
+** Simpler declarations of managed record types
+
+Two inconvenient aspects of declaring a new managed record type have been
+eliminated in this release: Managed records no longer need to be made 
+explicitly "nongenerative," as the type definition system will choose a stable
+uid for the type automatically; and managed record "base" types (i.e., ones
+without a "parent" clause) no longer need to invoke the empty base constructor 
+from inside their protocol implementation, since the procedure passed to their
+protocol will now be a field-binder.
+
+** Dependency on GNU Serveez 0.2
+
+Prior to this release, gzochid depended on a pre-release version of GNU Serveez
+0.2, which was required for GNU Guile 2.x support. Since the release of gzochid
+0.2, the Serveez team has created a formal 0.2 release, and the build files for
+gzochid have been updated to reflect this. Grab the Serveez source code at
+http://www.gnu.org/software/serveez/.
+
+* New interfaces
+
+** &gzochi:transaction-retry and &gzochi:transaction-timeout
+
+Two new condition types related to the enhanced transaction support described
+above have been added to the `(gzochi conditions)' library (and to the 
+`(gzochi)' aggregation library). See "gzochi conditions" in the manual for more
+information on these condition types and how the container raises and handles 
+them.
+
+* Bug fixes
+
+** Channel manager should remove sessions that are found to be dead
+** Managed record protocol delegation should hide managed record parenthood
+** Non-local exit during serialization should trigger a rollback.
+** SEGV when `logged-in' transaction fails
+** Task delays not being respected
+
+
 Changes in 0.2 (since 0.1):
 
 * Notable changes
@@ -102,7 +156,7 @@ API counterparts) from the `(gzochi data)' and `(gzochi)' libraries:
 
 Copyright information:
 
-Copyright (C) 2012 Julian Graham
+Copyright (C) 2013 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the
