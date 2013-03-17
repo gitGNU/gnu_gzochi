@@ -1373,7 +1373,54 @@ Contructs a new @code{&gzochi:transaction-aborted} condition.
 @end deffn
 
 @deffn {Scheme Procedure} gzochi:transaction-aborted-condition?
-Returns @code{#t} of @var{obj} is a @code{&gzochi:transaction-aborted}
+Returns @code{#t} if @var{obj} is a @code{&gzochi:transaction-aborted}
+condition, @code{#f} otherwise.
+@end deffn
+
+A @code{&gzochi:transaction-retry} condition is raised when a 
+transactional operation or an interaction with the gzochi API fails
+but is safe to retry and worth retrying because it might succeed on 
+a subsequent execution attempt. This condition is often raised as a
+composite condition with a @code{&gzochi:transaction-timeout} 
+condition when a task's execution times out. The container's Scheme 
+interface recognizes this condition type, and the container uses it
+as part of determining whether to reschedule or abandon a task.
+
+Application code may raise this condition explicitly, so as to
+release resources if it can determine ahead of time that the current
+transaction will not be able to commit.
+
+@deffn {Condition Type} &gzochi:transaction-retry
+The condition type, for introspection or use as a base type for
+other conditions.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-transaction-retry-condition
+Constructs a new @code{&gzochi:transaction-retry} condition.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:transaction-retry-condition?
+Returns @code{#t} if @var{obj} is a @code{&gzochi:transaction-retry}
+condition, @code{#f} otherwise.
+@end deffn
+
+A @code{&gzochi:transaction-timeout} condition is raised when a 
+transactional operation takes longer than the time remaining for the
+current transaction to run, or when the current transaction attempts
+a transactional operation after its allotted running time has 
+elapsed.
+
+@deffn {Condition Type} &gzochi:transaction-timeout
+The condition type, for introspection or use as a base type for
+other conditions.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-transaction-timeout-condition
+Constructs a new @code{&gzochi:transaction-timeout} condition.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:transaction-timeout-condition?
+Returns @code{#t} if @var{obj} is a @code{&gzochi:transaction-timeout}
 condition, @code{#f} otherwise.
 @end deffn
 
