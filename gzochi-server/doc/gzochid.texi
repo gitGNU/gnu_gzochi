@@ -654,10 +654,11 @@ A managed record is just like an R6RS record---in fact, a managed
 record @emph{is} an R6RS record that has the record-type
 @code{gzochi:managed-record} as its parent---with a few additional
 rules. First of all, managed record-type definitions must be unique
-according to the R6RS record specification, meaning that they are
-defined with a @code{nongenerative} clause if using a syntactic
-record definition form or a @var{uid} argument that is not @code{#f}
-if they are defined procedurally. 
+according to the R6RS record specification, and so a 
+@code{nongenerative} clause will be automatically created if it is
+not specified as part of a syntactic record type definition form; 
+when defining a type procedurally, the record's name will be used if
+the @var{uid} argument is @code{#f}.
 
 Second, the fields of a managed record must be annotated to assist 
 the container in persisting them to the data store. This is done via
@@ -1495,14 +1496,11 @@ The structure of @var{name-spec} and the @var{record-clause}
 sub-forms are the same as in the R6RS @code{define-record-type},
 with the following exceptions:
 
-First, as all managed records are nongenerative, a 
-@code{nongenerative} clause must be present as one of the 
-@var{record-clause} sub-forms. Note that the record uid is used 
-internally by the data serialization system, so, while you are free
-to omit the @code{uid} component of this clause, doing so may lead
-to corruption of your persisted data if the 
-@code{gzochi:define-managed-record-type} form is re-expanded and a
-new uid is generated.
+First, as all managed records are nongenerative, if a 
+@code{nongenerative} clause is not present as one of the 
+@var{record-clause} sub-forms---or if the @code{uid} component of
+this clause is not specified---then the record name will be used as
+the record type's uid.
 
 Second, each field definition that appears in a @code{fields} 
 declaration of a @code{record-clause} sub-form of a managed record
