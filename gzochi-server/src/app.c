@@ -40,6 +40,8 @@
 static GStaticPrivate thread_application_context_key = G_STATIC_PRIVATE_INIT;
 static GStaticPrivate thread_identity_key = G_STATIC_PRIVATE_INIT;
 
+G_LOCK_DEFINE_STATIC (load_path);
+
 static void initialize_async (gpointer data, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) data;
@@ -77,6 +79,31 @@ static void initialize_data (int from_state, int to_state, gpointer user_data)
   free (meta_db);
   free (oids_db);
   free (names_db);
+}
+
+static void initialize_load_paths_guile_worker
+(gpointer data, gpointer user_data)
+{
+  GList *load_path_ptr = (GList *) data;
+
+  while (load_path_ptr != NULL)
+    {
+      gzochid_scheme_append_load_path ((char *) load_path_ptr->data);
+      load_path_ptr = load_path_ptr->next;
+    }
+}
+
+static void initialize_load_paths
+(int from_state, int to_state, gpointer user_data)
+{
+  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_application_context *app_context = 
+    (gzochid_application_context *) context;
+  
+  G_LOCK (load_path);
+  gzochid_guile_run 
+    (initialize_load_paths_guile_worker, app_context->descriptor->load_paths);
+  G_UNLOCK (load_path);
 }
 
 static void initialize_complete 
@@ -431,6 +458,9 @@ void gzochid_application_context_init
 
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_data, context);
+  gzochid_fsm_on_enter 
+    (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_load_paths, 
+     context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_complete, 
      context);

@@ -122,30 +122,9 @@ SCM gzochid_scheme_invoke
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  char *procedure, GList *module, SCM args, SCM exception_var)
 {
-  SCM ret = SCM_EOL;
-  SCM load_path = SCM_EOL, new_load_path = SCM_EOL, backup_load_path = SCM_EOL;
-  GList *path_ptr = context->descriptor->load_paths;
-
-  load_path = scm_module_variable 
-    (scm_c_resolve_module ("guile"), scm_from_locale_symbol ("%load-path"));
-  backup_load_path = scm_variable_ref (load_path);
-  new_load_path = backup_load_path;
-
-  while (path_ptr != NULL)
-    {
-      new_load_path = scm_cons 
-	(scm_from_locale_string ((char *) path_ptr->data), new_load_path);      
-      path_ptr = path_ptr->prev;
-    }
-  
-  scm_variable_set_x (load_path, new_load_path);
-
-  ret = scheme_invoke 
+  return scheme_invoke 
     (context, identity, resolve_procedure (procedure, module), args, 
      exception_var);
-
-  scm_variable_set_x (load_path, backup_load_path);
-  return ret;
 }
 
 static int scheme_prepare (gpointer data) { return TRUE; }
@@ -1001,4 +980,13 @@ void gzochid_scheme_initialize_bindings (void)
 
   gzochid_task_register_serialization 
     ("scheme", &gzochid_scheme_task_serialization);
+}
+
+void gzochid_scheme_append_load_path (char *load_path)
+{
+  SCM scm_load_path = scm_module_variable 
+    (scm_c_resolve_module ("guile"), scm_from_locale_symbol ("%load-path"));
+  scm_variable_set_x 
+    (scm_load_path, scm_cons
+     (scm_from_locale_string (load_path), scm_variable_ref (scm_load_path)));
 }
