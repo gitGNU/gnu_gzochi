@@ -291,8 +291,7 @@
     (define constructor
       (gzochi:managed-record-constructor
        (gzochi:make-managed-record-constructor-descriptor
-	managed-vector #f 
-	(lambda (n) (lambda (vec) (let ((p (n))) (p vec)))))))
+	managed-vector #f (lambda (p) (lambda (vec) (p vec))))))
 
     (constructor 
      (list->vector 
