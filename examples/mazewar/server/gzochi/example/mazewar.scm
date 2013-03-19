@@ -49,19 +49,23 @@
     (define maze (gzochi:get-binding "maze"))
     (define space-vector (mazewar:maze-spaces maze))
 
-    ;; Copy the spaces in the maze to a list and loop over it in random order,
-    ;; removing each space as it is considered.
+    ;; Copy the indexes of potentially free spaces in the maze to a list and 
+    ;; loop over it in random order, removing each index as it is considered.
 
-    (let loop ((spaces (gzochi:managed-vector->list space-vector))
-	       (num-spaces (gzochi:managed-vector-length space-vector)))
-      (if (null? spaces)
-	  (raise (condition
-		  (make-message-condition "No unoccupied spaces available.")
-		  (make-assertion-violation)))
-	  (let ((space (list-ref spaces (random num-spaces))))
-	    (if (mazewar:space-player space)
-		(loop (remq space spaces) (- num-spaces 1))
-		space)))))
+    (let* ((len (gzochi:managed-vector-length space-vector))
+	   (free-spaces (let loop ((i 0) (lst (list)))
+			  (if (eqv? i len) lst (loop (+ i 1) (cons i lst))))))
+
+      (let loop ((free-spaces free-spaces) (num-spaces len))
+	(if (null? free-spaces)
+	    (raise (condition
+		    (make-message-condition "No unoccupied spaces available.")
+		    (make-assertion-violation)))
+	    (let* ((index (list-ref free-spaces (random num-spaces)))
+		   (space (gzochi:managed-vector-ref space-vector index)))
+	      (if (mazewar:space-player space)
+		  (loop (remq space free-spaces) (- num-spaces 1))
+		  space))))))
 
   ;; Sends the specified message to each player in the list of observers.
 
