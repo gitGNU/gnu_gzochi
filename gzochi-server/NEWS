@@ -57,6 +57,7 @@ them.
 ** Non-local exit during serialization should trigger a rollback.
 ** SEGV when `logged-in' transaction fails
 ** Task delays not being respected
+** Multiple applications cannot start at the same time
 
 
 Changes in 0.2 (since 0.1):
