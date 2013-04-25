@@ -30,7 +30,8 @@ LT_INIT
 
 PKG_CHECK_MODULES([GZOCHI], [gzochi])
 
-AC_SEARCH_LIBS([initscr], [ncurses])
+AC_SEARCH_LIBS([initscr], [ncurses], [], 
+               [AC_MSG_ERROR([libncurses is required.])])
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile])
