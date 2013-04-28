@@ -1,6 +1,6 @@
 dnl configure.ac --- food for -*-autoconf-*- et al
 dnl
-dnl Copyright (C) 2012 Julian Graham
+dnl Copyright (C) 2013 Julian Graham
 dnl
 dnl This is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -31,7 +31,8 @@ LT_INIT
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
 PKG_CHECK_MODULES([GZOCHI], [gzochi])
 
-AC_CHECK_LIB(SDL, SDL_Init, , AC_MSG_ERROR([*** Unable to find libSDL.]))
+AC_SEARCH_LIBS([SDL_Init], [SDL], [], AC_MSG_ERROR([libSDL is required.]))
+AC_CHECK_HEADERS([SDL/SDL.h], [], AC_MSG_ERROR([SDL/SDL.h is required.]))
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile])

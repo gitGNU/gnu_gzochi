@@ -46,10 +46,11 @@ AC_ARG_WITH([storage-engine],
 AS_CASE([$GZOCHI_STORAGE_ENGINE],
   [bdb], [AC_SEARCH_LIBS([db_create], [db], [], 
                          [AC_MSG_ERROR([libdb is required.])]) 
-          AC_CHECK_HEADER([db.h])],
+          AC_CHECK_HEADER([db.h], [], [AC_MSG_ERROR([db.h is required.])])],
   [gdbm], [AC_SEARCH_LIBS([gdbm_open], [gdbm], [], 
                           [AC_MSG_ERROR([libgdbm is required.])]) 
-           AC_CHECK_HEADER([gdbm.h])],
+           AC_CHECK_HEADER([gdbm.h], [], 
+                           [AC_MSG_ERROR([gdbm.h is required.])])],
   [AC_MSG_ERROR([Invalid storage engine $STORAGE_ENGINE.])])
 
 AC_SUBST(GZOCHI_STORAGE_ENGINE)
@@ -57,7 +58,7 @@ AM_CONDITIONAL([STORAGE_ENGINE_BDB], [test x$GZOCHI_STORAGE_ENGINE = xbdb])
 AM_CONDITIONAL([STORAGE_ENGINE_GDBM], [test x$GZOCHI_STORAGE_ENGINE = xgdbm])
 
 AC_SEARCH_LIBS([__gmpz_init], [gmp], [], [AC_MSG_ERROR([libgmp is required.])])
-AC_CHECK_HEADER([gmp.h])
+AC_CHECK_HEADER([gmp.h], [], [AC_MSG_ERROR([gmp.h is required.])])
 
 GZOCHI_COMMON="$PWD/../gzochi-common"
 AC_SUBST(GZOCHI_COMMON)
