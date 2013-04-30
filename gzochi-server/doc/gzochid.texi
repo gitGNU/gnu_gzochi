@@ -350,15 +350,16 @@ This will install the gzochid executable @file{gzochid} to a
 standard location, depending on the installation prefix---on most
 Unix-like systems, this will be @file{/usr/local}, with executable
 files being copied to @file{/usr/local/bin}. A server configuration
-file with the default settings will be installed to the @file{/etc/}
-directory under the installation prefix.
+file with the default settings will be installed to the @file{/etc}
+directory under the installation prefix---by default, 
+@file{/usr/local/etc}.
 
-This configuration file (@file{gzochid.conf}) will be processed
-prior to installation to set references to the gzochid deployment
-and data directories---where the server looks for deployed games and
-where it stores game state data, respectively---to locations 
-relative to the installation prefix. 
-@xref{The server configuration file}, for more information.
+This configuration file will be processed prior to installation to 
+set references to the gzochid deployment and data 
+directories---where the server looks for deployed games and where it
+stores game state data, respectively---to locations relative to the 
+installation prefix. @xref{The server configuration file}, for more 
+information.
 
 @node Running gzochid
 @chapter Running gzochid
