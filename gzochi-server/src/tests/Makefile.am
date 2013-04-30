@@ -22,6 +22,7 @@ check_PROGRAMS = $(test_programs)
 
 test_programs = \
 	test-data \
+	test-event \
 	test-util
 
 TESTS = $(test_programs)
@@ -33,6 +34,10 @@ GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 test_data_SOURCES = mock-app.c mock-schedule.c mock-storage.c test-data.c 
 test_data_LDADD = ../auth.o ../data.o ../log.o ../task.o \
 	../tx.o ../txlog.o ../util.o \
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
+
+test_event_SOURCES = mock-app.c mock-storage.c test-event.c
+test_event_LDADD = ../event.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
 
 test_util_SOURCES = test-util.c
