@@ -23,12 +23,6 @@ SUBDIRS = api scheme tests
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
-AM_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
-	@GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @MICROHTTPD_CFLAGS@ \
-	@ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ \
-	$(GZOCHI_COMMON_CFLAGS) \
-	-Wall -pedantic
-
 bin_PROGRAMS = gzochid
 dist_noinst_DATA = dtd/game.dtd
 dist_sysconf_DATA = conf/gzochid.conf
@@ -38,6 +32,11 @@ noinst_HEADERS = admin.h app.h auth.h auth_int.h channel.h config.h context.h \
 	log.h protocol.h reloc.h schedule.h scheme.h session.h socket.h \
 	storage.h task.h threads.h tx.h txlog.h util.h
 
+gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
+	@GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ \
+	@MICROHTTPD_CFLAGS@ @ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ \
+	$(GZOCHI_COMMON_CFLAGS) \
+	-Wall -pedantic
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	debug.c event.c fsm.c game.c guile.c gzochid.c httpd.c log.c \
