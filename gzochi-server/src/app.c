@@ -21,6 +21,7 @@
 
 #include "app.h"
 #include "auth.h"
+#include "auth_int.h"
 #include "context.h"
 #include "fsm.h"
 #include "game.h"

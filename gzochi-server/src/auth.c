@@ -22,6 +22,7 @@
 
 #include "app.h"
 #include "auth.h"
+#include "auth_int.h"
 
 gzochid_auth_identity *gzochid_auth_identity_new (char *name)
 {

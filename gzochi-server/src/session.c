@@ -23,6 +23,7 @@
 
 #include "app.h"
 #include "auth.h"
+#include "auth_int.h"
 #include "data.h"
 #include "game.h"
 #include "io.h"

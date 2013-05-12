@@ -33,10 +33,11 @@ bin_PROGRAMS = gzochid
 dist_noinst_DATA = dtd/game.dtd
 dist_sysconf_DATA = conf/gzochid.conf
 
-noinst_HEADERS = admin.h app.h auth.h channel.h config.h context.h data.h \
-	debug.h event.h fsm.h game.h guile.h gzochid.h httpd.h io.h log.h \
-	protocol.h reloc.h schedule.h scheme.h session.h socket.h storage.h \
-	task.h threads.h tx.h txlog.h util.h
+noinst_HEADERS = admin.h app.h auth.h auth_int.h channel.h config.h context.h \
+	data.h debug.h event.h fsm.h game.h guile.h gzochid.h httpd.h io.h \
+	log.h protocol.h reloc.h schedule.h scheme.h session.h socket.h \
+	storage.h task.h threads.h tx.h txlog.h util.h
+
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	debug.c event.c fsm.c game.c guile.c gzochid.c httpd.c log.c \
@@ -56,7 +57,7 @@ endif
 
 admin.c: admin.h
 app.c: app.h
-auth.c: auth.h
+auth.c: auth.h auth_int.h
 channel.c: channel.h
 config.c: config.h
 context.c: context.h
