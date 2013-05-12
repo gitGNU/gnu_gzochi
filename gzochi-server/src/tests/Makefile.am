@@ -29,19 +29,21 @@ test_programs = \
 
 TESTS = $(test_programs)
 
-AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
-
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
+test_data_CFLAGS = @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_data_SOURCES = mock-app.c mock-schedule.c mock-storage.c test-data.c 
-test_data_LDADD = ../auth.o ../data.o ../log.o ../task.o \
-	../tx.o ../txlog.o ../util.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
+test_data_LDADD = ../gzochid-auth.o ../gzochid-data.o ../gzochid-log.o \
+	../gzochid-task.o ../gzochid-tx.o ../gzochid-txlog.o \
+	../gzochid-util.o \
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@
 
+test_event_CFLAGS = @GLIB_CFLAGS@
 test_event_SOURCES = mock-app.c mock-storage.c test-event.c
-test_event_LDADD = ../event.o \
+test_event_LDADD = ../gzochid-event.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
 
+test_util_CFLAGS = @GLIB_CFLAGS@
 test_util_SOURCES = test-util.c
-test_util_LDADD = ../util.o \
+test_util_LDADD = ../gzochid-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
