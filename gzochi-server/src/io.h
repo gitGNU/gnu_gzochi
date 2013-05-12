@@ -20,6 +20,8 @@
 
 #include <glib.h>
 
+struct _gzochid_application_context;
+
 typedef struct _gzochid_io_serialization
 {
   void (*serializer) (struct _gzochid_application_context *, void *, GString *);
