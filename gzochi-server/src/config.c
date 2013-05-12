@@ -131,10 +131,7 @@ static void descriptor_start_element (GMarkupParseContext *context,
 	    *error = g_error_new 
 	      (G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE, 
 	       "'name' must be provided.");
-	  else 
-	    {
-	      descriptor->name = strdup (attribute_value);
-	    }
+	  else descriptor->name = strdup (attribute_value);
 	}
       else *error = g_error_new 
 	     (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
@@ -161,6 +158,24 @@ static void descriptor_start_element (GMarkupParseContext *context,
 	  (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
 	   "Invalid position for 'load-path' element.");
     }
+  else if (strcmp (element_name, "auth") == 0)
+    {
+      if (parent == NULL || strcmp (parent, "game") != 0)
+	*error = g_error_new 
+	  (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
+	   "Invalid position for 'auth' element.");
+      else 
+	{
+	  const gchar *type = find_attribute_value 
+	    ("type", attribute_names, attribute_values);
+
+	  if (type == NULL)
+	    *error = g_error_new
+	      (G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+	       "Attribute 'type' is required for 'auth' element.");
+	  else descriptor->auth_type = strdup (type);
+	}
+    }
   else if (strcmp (element_name, "initialized") == 0
 	   || strcmp (element_name, "logged-in") == 0)
     {
@@ -173,64 +188,50 @@ static void descriptor_start_element (GMarkupParseContext *context,
     {
       if (parent != NULL)
 	{
+	  const gchar *procedure = find_attribute_value 
+	    ("procedure", attribute_names, attribute_values);
+	  const gchar *module_name_str = find_attribute_value 
+	    ("module", attribute_names, attribute_values);
+	  GList *module_name = to_module_name (module_name_str);
+
+	  mpz_t scm_oid;
+	  
+	  mpz_init (scm_oid);
+	  mpz_set_si (scm_oid, -1);
+
 	  if (strcmp (parent, "initialized") == 0)
-	    {
-	      const gchar *procedure = find_attribute_value 
-		("procedure", attribute_names, attribute_values);
-	      const gchar *module_name_str = find_attribute_value 
-		("module", attribute_names, attribute_values);
-	      GList *module_name = to_module_name (module_name_str);
-
-	      mpz_t scm_oid;
-
-	      mpz_init (scm_oid);
-	      mpz_set_si (scm_oid, -1);
-
-	      descriptor->initialized = gzochid_application_callback_new 
-		(strdup (procedure), module_name, scm_oid);
-
-	      mpz_clear (scm_oid);
-	    }
+	    descriptor->initialized = gzochid_application_callback_new 
+	      (strdup (procedure), module_name, scm_oid);
 	  else if (strcmp (parent, "logged-in") == 0)
-	    {
-	      const gchar *procedure = find_attribute_value 
-		("procedure", attribute_names, attribute_values);
-	      const gchar *module_name_str = find_attribute_value 
-		("module", attribute_names, attribute_values);
-	      GList *module_name = to_module_name (module_name_str);
-
-	      mpz_t scm_oid;
-
-	      mpz_init (scm_oid);
-	      mpz_set_si (scm_oid, -1);
-
-	      descriptor->logged_in = gzochid_application_callback_new 
-		(strdup (procedure), module_name, scm_oid);
-
-	      mpz_clear (scm_oid);
-	    }
+	    descriptor->logged_in = gzochid_application_callback_new 
+	      (strdup (procedure), module_name, scm_oid);
 	  else *error = g_error_new 
 		 (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
 		  "Invalid position for 'callback' element.");
+
+	  mpz_clear (scm_oid);
 	}
       else;
     }
   else if (strcmp (element_name, "property") == 0)
     {
-      if (parent == NULL || strcmp (parent, "game") != 0)
-	*error = g_error_new 
-	  (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
-	   "Invalid position for 'property' element.");
-      else
+      if (parent != NULL)
 	{
 	  const gchar *name = find_attribute_value 
 	    ("name", attribute_names, attribute_values);
 	  const gchar *value = find_attribute_value 
 	    ("value", attribute_names, attribute_values);
 	  
-	  g_hash_table_insert 
-	    (descriptor->properties, strdup (name), strdup (value));
-	}
+	  if (strcmp (parent, "game") == 0)
+	    g_hash_table_insert 
+	      (descriptor->properties, strdup (name), strdup (value));
+	  else if (strcmp (parent, "auth") == 0)
+	    g_hash_table_insert 
+	      (descriptor->auth_properties, strdup (name), strdup (value));
+	  else *error = g_error_new 
+		 (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
+		  "Invalid position for 'property' element.");
+	}	
     }
   else *error = g_error_new
 	 (G_MARKUP_ERROR, G_MARKUP_ERROR_UNKNOWN_ELEMENT, 
@@ -326,6 +327,7 @@ gzochid_application_descriptor *gzochid_config_parse_application_descriptor
 
   descriptor = calloc (1, sizeof (gzochid_application_descriptor));
   descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);
+  descriptor->auth_properties = g_hash_table_new (g_str_hash, g_str_equal);
   descriptor->deployment_root = strdup (deployment_root);
   descriptor->load_paths = g_list_append (NULL, strdup (deployment_root));
 
