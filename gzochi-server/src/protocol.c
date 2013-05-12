@@ -1,5 +1,5 @@
 /* protocol.c: Application communication protocol routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@ static void dispatch_login_request
 (gzochid_protocol_client *client, char *endpoint, unsigned char *cred, 
  short cred_len)
 {
+  GError *error = NULL;
   gzochid_context *context = (gzochid_context *) client->sock->data;
   gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
 
@@ -56,11 +57,19 @@ static void dispatch_login_request
 
   assert (client->context->authenticator != NULL);
   client->identity = client->context->authenticator 
-    (client->context, cred, cred_len);
+    (cred, cred_len, client->context->auth_data, &error);
  
   if (client->identity == NULL)
-    gzochid_warning ("Client at %s failed to authenticate to endpoint %s", 
-		     client->connection_description, endpoint);
+    {
+      if (error != NULL)
+	gzochid_err 
+	  ("Error from authenticator for endpoint '%s': %s", error->message);
+      else gzochid_warning 
+	     ("Client at %s failed to authenticate to endpoint %s", 
+	      client->connection_description, endpoint);
+
+      g_clear_error (&error);
+    }
   else 
     {
       gzochid_info

@@ -19,18 +19,50 @@
 #define GZOCHID_AUTH_H
 
 #include <glib.h>
+#include <gmodule.h>
 
 typedef struct _gzochid_auth_identity
 {
   char *name;
 } gzochid_auth_identity;
 
+typedef struct _gzochid_auth_plugin_info
+{
+  char *name;
+  gpointer (*initialize) (GHashTable *, GError **);
+  gzochid_auth_identity *(*authenticate) 
+  (unsigned char *, short, gpointer, GError **);
+} gzochid_auth_plugin_info;
+
+typedef struct _gzochid_auth_plugin
+{
+  GModule *handle;
+  gzochid_auth_plugin_info *info;
+} gzochid_auth_plugin;
 struct _gzochid_application_context;
 
 gzochid_auth_identity *gzochid_auth_function_pass_thru
-(struct _gzochid_application_context *, unsigned char *, short);
+(unsigned char *, short, gpointer, GError **);
 gzochid_auth_identity *gzochid_auth_function_scheme
 (struct _gzochid_application_context *, unsigned char *, short);
 
+#define GZOCHID_AUTH_INIT_PLUGIN(info) \
+  G_MODULE_EXPORT gint gzochid_auth_init_plugin(gzochid_auth_plugin *plugin); \
+  G_MODULE_EXPORT gint gzochid_auth_init_plugin(gzochid_auth_plugin *plugin) \
+  { \
+    plugin->info = &(info); \
+    return 0; \
+  }
+
+#define GZOCHID_AUTH_PLUGIN_ERROR gzochid_auth_plugin_error_quark ()
+
+GQuark gzochid_auth_plugin_error_quark (void);
+
+typedef enum 
+  {
+    GZOCHID_AUTH_PLUGIN_ERROR_INIT,
+    GZOCHID_AUTH_PLUGIN_ERROR_AUTH
+  }
+  GzochidAuthPluginError;
 
 #endif /* GZOCHID_AUTH_H */

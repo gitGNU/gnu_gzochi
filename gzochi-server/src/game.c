@@ -26,6 +26,7 @@
 #include <syslog.h>
 
 #include "app.h"
+#include "auth_int.h"
 #include "config.h"
 #include "context.h"
 #include "fsm.h"
@@ -81,6 +82,13 @@ static void initialize_async (gpointer data, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
   gzochid_fsm_to_state (context->fsm, GZOCHID_GAME_STATE_RUNNING);
+}
+
+static void initialize_auth (int from_state, int to_state, gpointer user_data)
+{
+  gzochid_game_context *context = (gzochid_game_context *) user_data;
+
+  gzochid_auth_init (context);
 }
 
 static void initialize_server (int from_state, int to_state, gpointer user_data)
@@ -151,6 +159,10 @@ gzochid_game_context *gzochid_game_context_new (void)
 void gzochid_game_context_free (gzochid_game_context *context)
 {
   gzochid_context_free ((gzochid_context *) context);
+
+  g_hash_table_destroy (context->applications);
+  g_hash_table_destroy (context->auth_plugins);
+
   free (context);
 } 
 
@@ -213,11 +225,14 @@ void gzochid_game_context_init
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, 
      initialize_client_received_message_task_serialization, context);
   gzochid_fsm_on_enter 
+    (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_auth, context);
+  gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_apps, context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_complete, context);
   
   context->applications = g_hash_table_new (g_str_hash, g_str_equal);
+  context->auth_plugins = g_hash_table_new (g_str_hash, g_str_equal);
 
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
 }

@@ -18,6 +18,8 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+plugindir = $(libdir)/gzochid
+
 SUBDIRS = api scheme tests
 
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
@@ -33,18 +35,19 @@ noinst_HEADERS = admin.h app.h auth.h auth_int.h channel.h config.h context.h \
 	storage.h task.h threads.h tx.h txlog.h util.h
 
 gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
-	@GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ \
-	@MICROHTTPD_CFLAGS@ @ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ \
-	$(GZOCHI_COMMON_CFLAGS) \
+	-DGZOCHID_AUTH_PLUGIN_LOCATION=\"$(plugindir)\" @GUILE_CFLAGS@ \
+	@GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ @MICROHTTPD_CFLAGS@ \
+	@ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
 	-Wall -pedantic
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	debug.c event.c fsm.c game.c guile.c gzochid.c httpd.c log.c \
 	protocol.c reloc.c schedule.c scheme.c session.c socket.c task.c \
 	threads.c tx.c txlog.c util.c
+
 gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
-	@GLIB_LIBS@ @GTHREAD_LIBS@ @MICROHTTPD_LIBS@ @ZLIB_LIBS@ \
-	@SERVEEZ_LDFLAGS@
+	@GLIB_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ @MICROHTTPD_LIBS@ \
+	@ZLIB_LIBS@ @SERVEEZ_LDFLAGS@
 
 if STORAGE_ENGINE_BDB
 gzochid_SOURCES += storage-bdb.c

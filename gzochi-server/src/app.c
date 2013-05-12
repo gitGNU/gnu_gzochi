@@ -49,6 +49,55 @@ static void initialize_async (gpointer data, gpointer user_data)
   gzochid_fsm_to_state (context->fsm, GZOCHID_APPLICATION_STATE_RUNNING);
 }
 
+static void initialize_auth (int from_state, int to_state, gpointer user_data)
+{
+  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_application_context *app_context = 
+    (gzochid_application_context *) context;
+  gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
+
+  if (app_context->descriptor->auth_type != NULL)
+    {
+      if (g_hash_table_contains 
+	  (game_context->auth_plugins, app_context->descriptor->auth_type))
+	{
+	  GError *error = NULL;
+	  gzochid_auth_plugin *plugin = g_hash_table_lookup 
+	    (game_context->auth_plugins, app_context->descriptor->auth_type);
+
+	  gzochid_debug 
+	    ("Initializing auth plugin '%s' for application '%'.",
+	     app_context->descriptor->auth_type,
+	     app_context->descriptor->name);
+
+	  app_context->auth_data = plugin->info->initialize 
+	    (app_context->descriptor->auth_properties, &error);
+	  if (error != NULL)
+	    gzochid_err
+	      ("Auth plugin '%s' failed to initialize "
+	       "for application '%s': %s",
+	       app_context->descriptor->auth_type,
+	       app_context->descriptor->name,
+	       error->message);
+	  
+	  g_clear_error (&error);
+	  app_context->authenticator = plugin->info->authenticate;
+	}
+      else gzochid_err 
+	     ("Unknown auth type '%s' for application '%s'.", 
+	      app_context->descriptor->auth_type,
+	      app_context->descriptor->name);
+    }
+  else 
+    {
+      gzochid_info 
+	("No auth plugin specified for application '%s'; " 
+	 "pass-thru authentication will be used.", 
+	 app_context->descriptor->name);
+      app_context->authenticator = gzochid_auth_function_pass_thru;
+    }
+}
+
 static void initialize_data (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
@@ -457,6 +506,8 @@ void gzochid_application_context_init
   gzochid_fsm_add_transition
     (fsm, GZOCHID_APPLICATION_STATE_PAUSED, GZOCHID_APPLICATION_STATE_STOPPED);
 
+  gzochid_fsm_on_enter 
+    (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_auth, context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_data, context);
   gzochid_fsm_on_enter 

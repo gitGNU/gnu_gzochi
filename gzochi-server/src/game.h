@@ -1,5 +1,5 @@
 /* game.h: Prototypes and declarations for game.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -45,6 +45,7 @@ typedef struct _gzochid_game_context
   struct timeval tx_timeout;
 
   GHashTable *applications;
+  GHashTable *auth_plugins;
   gzochid_socket_server_context *server;
   
 } gzochid_game_context;

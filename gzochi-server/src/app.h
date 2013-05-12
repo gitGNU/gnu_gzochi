@@ -65,9 +65,11 @@ typedef struct _gzochid_application_context
   gzochid_context base;
 
   gzochid_application_descriptor *descriptor;
-  gzochid_auth_identity *(*authenticator)
-    (struct _gzochid_application_context *, unsigned char *, short);
 
+  gzochid_auth_identity *(*authenticator) 
+    (unsigned char *, short, gpointer, GError **);
+  gpointer auth_data;
+  
   GList *free_oid_blocks;
   GMutex *free_oids_lock;
 

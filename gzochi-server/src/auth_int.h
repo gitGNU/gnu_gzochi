@@ -30,4 +30,6 @@ void *gzochid_auth_identity_deserializer
 void gzochid_auth_identity_finalizer
 (struct _gzochid_application_context *, void *);
 
+void gzochid_auth_init (struct _gzochid_game_context *);
+
 #endif /* GZOCHID_AUTH_INT_H */
