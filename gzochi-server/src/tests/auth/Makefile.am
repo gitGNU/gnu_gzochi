@@ -18,30 +18,19 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = auth
-
 check_PROGRAMS = $(test_programs)
 
 test_programs = \
-	test-data \
-	test-event \
-	test-util
+	test-password_file
 
 TESTS = $(test_programs)
 
-AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
-
+GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
-test_data_SOURCES = mock-app.c mock-schedule.c mock-storage.c test-data.c 
-test_data_LDADD = ../auth.o ../data.o ../log.o ../task.o \
-	../tx.o ../txlog.o ../util.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
+AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ @GMODULE_CFLAGS@ $(GZOCHI_COMMON_CFLAGS)
 
-test_event_SOURCES = mock-app.c mock-storage.c test-event.c
-test_event_LDADD = ../event.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
-
-test_util_SOURCES = test-util.c
-test_util_LDADD = ../util.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
+test_password_file_SOURCES = test-password_file.c
+test_password_file_LDADD = ../../auth/password_file.o ../../auth.o \
+	../../log.o ../../util.o \
+	@GLIB_LIBS@ @GMODULE_LIBS@ $(GZOCHI_COMMON_LIBS)

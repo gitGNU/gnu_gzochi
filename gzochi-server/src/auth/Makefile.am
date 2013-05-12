@@ -18,30 +18,12 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = auth
+plugindir = $(libdir)/gzochid
 
-check_PROGRAMS = $(test_programs)
+plugin_LTLIBRARIES = \
+	password_file.la
 
-test_programs = \
-	test-data \
-	test-event \
-	test-util
-
-TESTS = $(test_programs)
-
-AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@
-
-GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
-
-test_data_SOURCES = mock-app.c mock-schedule.c mock-storage.c test-data.c 
-test_data_LDADD = ../auth.o ../data.o ../log.o ../task.o \
-	../tx.o ../txlog.o ../util.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
-
-test_event_SOURCES = mock-app.c mock-storage.c test-event.c
-test_event_LDADD = ../event.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
-
-test_util_SOURCES = test-util.c
-test_util_LDADD = ../util.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
+password_file_la_SOURCES = password_file.c
+password_file_la_CFLAGS = @GLIB_CFLAGS@ -Wall -pedantic
+password_file_la_LIBADD = @GLIB_LIBS@
+password_file_la_LDFLAGS = -module -avoid-version
