@@ -39,12 +39,9 @@ typedef struct _gzochid_auth_plugin
   GModule *handle;
   gzochid_auth_plugin_info *info;
 } gzochid_auth_plugin;
-struct _gzochid_application_context;
 
 gzochid_auth_identity *gzochid_auth_function_pass_thru
 (unsigned char *, short, gpointer, GError **);
-gzochid_auth_identity *gzochid_auth_function_scheme
-(struct _gzochid_application_context *, unsigned char *, short);
 
 #define GZOCHID_AUTH_INIT_PLUGIN(info) \
   G_MODULE_EXPORT gint gzochid_auth_init_plugin(gzochid_auth_plugin *plugin); \
