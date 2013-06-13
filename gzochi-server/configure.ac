@@ -37,6 +37,13 @@ PKG_CHECK_MODULES([GMODULE], [gmodule-2.0])
 PKG_CHECK_MODULES([MICROHTTPD], [libmicrohttpd])
 PKG_CHECK_MODULES([ZLIB], [zlib])
 
+AC_ARG_ENABLE([KERBEROS], 
+  [AS_HELP_STRING([--enable-kerberos], [use Kerberos v5])],
+  [ if test "$enableval" != "no"; then 
+      AC_KERBEROS_V5([yes]) 
+    fi ],
+  [AC_KERBEROS_V5([no])])
+
 GUILE_SITE_DIR
 
 AC_ARG_WITH([storage-engine],

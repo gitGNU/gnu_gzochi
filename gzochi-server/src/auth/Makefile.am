@@ -21,9 +21,15 @@
 plugindir = $(libdir)/gzochid
 
 plugin_LTLIBRARIES = \
-	password_file.la
+	password_file.la \
+	krb5.la
 
 password_file_la_SOURCES = password_file.c
 password_file_la_CFLAGS = @GLIB_CFLAGS@ -Wall -pedantic
 password_file_la_LIBADD = @GLIB_LIBS@
 password_file_la_LDFLAGS = -module -avoid-version
+
+krb5_la_SOURCES = krb5.c
+krb5_la_CFLAGS = @GLIB_CFLAGS@ @KRB5_CFLAGS@ -Wall -pedantic
+krb5_la_LIBADD = @GLIB_LIBS@ @KRB5_LIBS@
+krb5_la_LDFLAGS = -module -avoid-version
