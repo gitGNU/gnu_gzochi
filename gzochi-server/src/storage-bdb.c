@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <db.h>
 #include <glib.h>
+#include <glib/gstdio.h>
 #include <libgen.h>
 #include <stddef.h>
 #include <stdlib.h>
