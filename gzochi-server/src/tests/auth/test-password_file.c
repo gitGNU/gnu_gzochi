@@ -1,4 +1,4 @@
-/* test-data.c: Test routines for data.c in gzochid.
+/* test-password_file.c: Test routines for the password file auth plugin.
  * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
