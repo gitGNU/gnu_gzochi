@@ -1,5 +1,5 @@
 /* threads.c: Threadpool implementation and thread support routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,12 +21,6 @@
 
 #include "threads.h"
 #include "tx.h"
-
-typedef struct _gzochid_thread_work
-{
-  gzochid_thread_worker worker;
-  gpointer data;
-} gzochid_thread_work;
 
 static void dispatcher (gpointer data, gpointer user_data)
 {
