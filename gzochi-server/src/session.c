@@ -31,6 +31,7 @@
 #include "protocol.h"
 #include "scheme.h"
 #include "session.h"
+#include "task.h"
 #include "tx.h"
 #include "txlog.h"
 #include "util.h"
@@ -434,6 +435,126 @@ void gzochid_client_session_send_message
   tx_context->operations = g_list_append 
     (tx_context->operations, 
      create_message_operation (reference->oid, msg, len));
+}
+
+typedef struct _gzochid_persistence_task_data
+{
+  gpointer data;
+  gzochid_io_serialization *serialization;
+  gzochid_oid_holder *holder;
+} gzochid_persistence_task_data;
+
+
+typedef struct _gzochid_prefix_binding_persistence_task_data
+{
+  gzochid_persistence_task_data base;
+
+  char *prefix;
+} gzochid_prefix_binding_persistence_task_data;
+
+static void init_persistence_task 
+(gzochid_persistence_task_data *task, gzochid_io_serialization *serialization, 
+ gpointer data, gzochid_oid_holder *holder)
+{
+  task->data = data;
+  task->serialization = serialization;
+  task->holder = holder;
+} 
+
+static gzochid_prefix_binding_persistence_task_data *
+gzochid_prefix_binding_persistence_task_data_new
+(gzochid_io_serialization *serialization, gpointer data,
+ gzochid_oid_holder *holder, char *prefix)
+{
+  gzochid_prefix_binding_persistence_task_data *task = 
+    malloc (sizeof (gzochid_prefix_binding_persistence_task_data));
+
+  init_persistence_task 
+    ((gzochid_persistence_task_data *) task, serialization, data, holder);
+  task->prefix = prefix;
+
+  return task;
+}
+
+void gzochid_persistence_task_data_free (gzochid_persistence_task_data *task)
+{
+  free (task);
+}
+
+static void persistence_task_worker
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gpointer data)
+{
+  gzochid_persistence_task_data *persistence_task = 
+    (gzochid_persistence_task_data *) data;
+
+  gzochid_data_managed_reference *reference = 
+    gzochid_data_create_reference 
+    (context, persistence_task->serialization, persistence_task->data);
+  
+  mpz_set (persistence_task->holder->oid, reference->oid);
+}
+
+static void prefix_binding_persistence_task_worker
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gpointer data)
+{
+  gzochid_prefix_binding_persistence_task_data *
+    prefix_binding_persistence_task = 
+    (gzochid_prefix_binding_persistence_task_data *) data;
+  gzochid_persistence_task_data *persistence_task =
+    (gzochid_persistence_task_data *) prefix_binding_persistence_task;
+  GString *binding = g_string_new (prefix_binding_persistence_task->prefix);
+  char *oid_str = NULL;
+
+  persistence_task_worker (context, identity, data);
+  
+  oid_str = mpz_get_str (NULL, 16, persistence_task->holder->oid);
+  g_string_append (binding, oid_str);
+  free (oid_str);
+
+  gzochid_data_set_binding_to_oid 
+    (context, binding->str, persistence_task->holder->oid);
+  g_string_free (binding, FALSE);
+}
+
+gzochid_task *gzochid_data_prefix_binding_persistence_task_new
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gzochid_io_serialization *serialization, gpointer data, 
+ gzochid_oid_holder *holder, char *prefix)
+{
+  gzochid_prefix_binding_persistence_task_data *task_data =
+    gzochid_prefix_binding_persistence_task_data_new 
+    (serialization, data, holder, prefix);
+  gzochid_application_task *transactional_task = 
+    gzochid_application_task_new 
+    (context, identity, prefix_binding_persistence_task_worker, task_data);
+  gzochid_transactional_application_task_execution *execution = 
+    gzochid_transactional_application_task_execution_new (transactional_task);
+  gzochid_application_task *application_task = gzochid_application_task_new 
+    (context, identity, 
+     gzochid_application_resubmitting_transactional_task_worker, execution);
+
+  return gzochid_task_immediate_new 
+    (gzochid_application_task_thread_worker, application_task);
+}
+
+void gzochid_data_prefix_binding_persistence_task_free (gzochid_task *task)
+{
+  gzochid_application_task *application_task = 
+    (gzochid_application_task *) task->data;
+  gzochid_transactional_application_task_execution *execution = 
+    (gzochid_transactional_application_task_execution *) 
+    application_task->data;
+  gzochid_application_task *transactional_task = execution->task;
+  gzochid_persistence_task_data *data = 
+    (gzochid_persistence_task_data *) transactional_task->data;
+  
+  free (data);
+  free (transactional_task);
+  gzochid_transactional_application_task_execution_free (execution);
+  free (application_task);
+  free (task);
 }
 
 void gzochid_client_session_persist 

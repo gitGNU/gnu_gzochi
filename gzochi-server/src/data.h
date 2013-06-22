@@ -25,7 +25,6 @@
 #include "auth.h"
 #include "io.h"
 #include "storage.h"
-#include "task.h"
 
 typedef struct _gzochid_oid_holder
 {
@@ -110,10 +109,5 @@ void gzochid_data_remove_object (gzochid_data_managed_reference *reference);
 
 void gzochid_data_mark 
 (gzochid_application_context *, gzochid_io_serialization *, void *);
-
-gzochid_task *gzochid_data_prefix_binding_persistence_task_new 
-(gzochid_application_context *, gzochid_auth_identity *, 
- gzochid_io_serialization *, void *, gzochid_oid_holder *, char *);
-void gzochid_data_prefix_binding_persistence_task_free (gzochid_task *);
 
 #endif /* GZOCHID_DATA_H */
