@@ -93,7 +93,7 @@ void gzochid_data_set_binding
 void gzochid_data_set_binding_to_oid
 (gzochid_application_context *, char *, mpz_t);
 void gzochid_data_remove_binding (gzochid_application_context *, char *);
-int gzochid_data_binding_exists (gzochid_application_context *, char *);
+gboolean gzochid_data_binding_exists (gzochid_application_context *, char *);
 char *gzochid_data_next_binding_oid 
 (gzochid_application_context *, char *, mpz_t);
 

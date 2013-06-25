@@ -633,11 +633,11 @@ void gzochid_data_remove_binding
   free (oid_str);
 }
 
-int gzochid_data_binding_exists
+gboolean gzochid_data_binding_exists
 (gzochid_application_context *context, char *name)
 {
   mpz_t oid;
-  int ret = TRUE;
+  gboolean ret = TRUE;
 
   gzochid_data_transaction_context *tx_context = NULL;
 
