@@ -42,6 +42,7 @@ typedef struct _gzochid_durable_application_task_handle
   struct timeval target_execution_time;
 } gzochid_durable_application_task_handle;
 
+typedef gzochid_durable_application_task_handle gzochid_periodic_task_handle;
 
 typedef struct _gzochid_task
 {
@@ -85,7 +86,8 @@ gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task
  gzochid_application_task *, gzochid_application_task_serialization *, 
  struct timeval, struct timeval);
 
-void gzochid_cancel_periodic_task (gzochid_periodic_task_handle *);
+void gzochid_cancel_periodic_task 
+(gzochid_application_context *, gzochid_periodic_task_handle *);
 
 void gzochid_task_initialize_serialization_registry (void);
 void gzochid_task_register_serialization 

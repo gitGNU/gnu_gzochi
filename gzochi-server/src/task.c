@@ -18,11 +18,13 @@
 #include <assert.h>
 #include <glib.h>
 #include <libguile.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "app.h"
 #include "auth.h"
+#include "auth_int.h"
 #include "data.h"
 #include "game.h"
 #include "guile.h"
@@ -145,9 +147,22 @@ gzochid_durable_application_task_handle *create_durable_task_handle
   durable_task_handle->target_execution_time = target_execution_time;
 
   return durable_task_handle;
+}
 
+gzochid_durable_application_task_handle *create_durable_periodic_task_handle
+(gzochid_data_managed_reference *task_data_reference, 
+ gzochid_application_task_serialization *serialization, 
+ gzochid_auth_identity *identity, struct timeval target_execution_time, 
+ struct timeval period)
+{
+  gzochid_durable_application_task_handle *durable_task_handle = 
+    create_durable_task_handle 
+    (task_data_reference, serialization, identity, target_execution_time);
+
+  durable_task_handle->repeats = TRUE;
+  durable_task_handle->period = period;
   
-  return durable_task;
+  return durable_task_handle;
 }
 
 void gzochid_durable_application_task_free 
@@ -387,8 +402,8 @@ void gzochid_restart_tasks (gzochid_application_context *context)
 
 gzochid_durable_application_task_handle *build_durable_task_handle
 (gzochid_application_task *task, 
- gzochid_application_task_serialization *serialization,
- struct timeval delay)
+ gzochid_application_task_serialization *serialization, 
+ struct timeval delay, struct timeval *period)
 {
   struct timeval target;
 
@@ -408,8 +423,11 @@ gzochid_durable_application_task_handle *build_durable_task_handle
   task_data_reference = gzochid_data_create_reference 
     (task->context, serialization->data_serialization, task->data);
 
-    durable_task_handle = create_durable_task_handle
-      (task_data_reference, serialization, task->identity, target);
+  if (period != NULL)
+    durable_task_handle = create_durable_periodic_task_handle
+      (task_data_reference, serialization, task->identity, target, *period);
+  else durable_task_handle = create_durable_task_handle
+	 (task_data_reference, serialization, task->identity, target);
 
   handle_reference = gzochid_data_create_reference 
     (task->context, &gzochid_durable_application_task_handle_serialization, 
@@ -454,6 +472,31 @@ static void durable_task_application_worker
 
   inner_task->worker (context, identity, inner_task->data);
 
+  if (handle->repeats)
+    {
+      gzochid_task_transaction_context *tx_context = NULL;
+      gzochid_task *wrapped_task = NULL;
+      struct timeval now;
+
+      gettimeofday (&now, NULL);
+      timeradd (&handle->period, 
+		&handle->target_execution_time, 
+		&handle->target_execution_time);
+
+      gzochid_data_mark 
+	(context, &gzochid_durable_application_task_handle_serialization, 
+	 handle);
+      wrapped_task = wrap_durable_task (context, identity, task, handle);
+
+      join_transaction (context);
+      tx_context = (gzochid_task_transaction_context *) 
+	gzochid_transaction_context (&task_participant);
+      
+      tx_context->scheduled_tasks = g_list_append 
+	(tx_context->scheduled_tasks, wrapped_task);
+    }
+  else
+    { 
       char *oid_str = mpz_get_str (NULL, 16, task->handle_oid);
       GString *binding = g_string_new (PENDING_TASK_PREFIX);
       
@@ -463,6 +506,7 @@ static void durable_task_application_worker
       
       g_string_free (binding, FALSE);
       free (oid_str);
+    }
 }
 
 void gzochid_task_free (gzochid_task *task)
@@ -511,4 +555,30 @@ void gzochid_schedule_delayed_durable_task
   schedule_durable_task (context, wrapped_task);     
 }
 
+gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task 
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gzochid_application_task *task,
+ gzochid_application_task_serialization *serialization, 
+ struct timeval delay, struct timeval period)
+{
+  gzochid_durable_application_task_handle *handle = 
+    build_durable_task_handle (task, serialization, delay, &period);
+  gzochid_data_managed_reference *handle_reference = 
+    gzochid_data_create_reference 
+    (context, &gzochid_durable_application_task_handle_serialization, handle);
+  gzochid_task *wrapped_task = wrap_durable_task
+    (context, identity,
+     gzochid_durable_application_task_new (handle_reference->oid), handle);
+
+  schedule_durable_task (context, wrapped_task);
+
+  return handle;
+}
+
+void gzochid_cancel_periodic_task 
+(gzochid_application_context *context, gzochid_periodic_task_handle *handle)
+{
+  handle->repeats = FALSE;
+  gzochid_data_mark 
+    (context, &gzochid_durable_application_task_handle_serialization, handle);
 }
