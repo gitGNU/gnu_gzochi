@@ -978,8 +978,7 @@ void gzochid_scheme_initialize_bindings (void)
 {
   scm_with_guile (initialize_bindings, NULL);
 
-  gzochid_task_register_serialization 
-    ("scheme", &gzochid_scheme_task_serialization);
+  gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
 }
 
 void gzochid_scheme_append_load_path (char *load_path)

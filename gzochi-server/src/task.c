@@ -45,9 +45,10 @@ gzochid_lookup_task_serialization (char *name)
 }
 
 void gzochid_task_register_serialization 
-(char *name, gzochid_application_task_serialization *serialization)
+(gzochid_application_task_serialization *serialization)
 {
-  g_hash_table_insert (serialization_registry, name, serialization);
+  g_hash_table_insert 
+    (serialization_registry, serialization->name, serialization);
 }
 
 void gzochid_task_initialize_serialization_registry (void)

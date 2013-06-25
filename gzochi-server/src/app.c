@@ -762,5 +762,5 @@ gzochid_auth_identity *gzochid_get_current_identity (void)
 void gzochid_register_client_received_message_task_serialization (void)
 {
   gzochid_task_register_serialization 
-    ("received-message", &gzochid_client_received_message_task_serialization);
+    (&gzochid_client_received_message_task_serialization);
 }
