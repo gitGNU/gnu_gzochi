@@ -25,6 +25,7 @@ check_PROGRAMS = $(test_programs)
 test_programs = \
 	test-data \
 	test-event \
+	test-task \
 	test-util
 
 TESTS = $(test_programs)
@@ -40,8 +41,16 @@ test_data_LDADD = ../gzochid-auth.o ../gzochid-data.o ../gzochid-log.o \
 
 test_event_CFLAGS = @GLIB_CFLAGS@
 test_event_SOURCES = mock-app.c mock-storage.c test-event.c
-test_event_LDADD = ../gzochid-event.o \
+test_event_LDADD = ../gzochid-event.o ../gzochid-log.o ../gzochid-tx.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
+
+test_task_CFLAGS = @GLIB_CFLAGS@ @GMODULE_CFLAGS@
+test_task_SOURCES = test-task.c mock-app.c mock-guile.c mock-storage.c 
+test_task_LDADD = ../gzochid-auth.o ../gzochid-data.o \
+	../gzochid-task.o ../gzochid-log.o ../gzochid-schedule.o \
+	../gzochid-threads.o ../gzochid-tx.o ../gzochid-txlog.o \
+	../gzochid-util.o \
+	$(GZOCHI_COMMON_LIBS) @GMODULE_LIBS@ @GLIB_LIBS@
 
 test_util_CFLAGS = @GLIB_CFLAGS@
 test_util_SOURCES = test-util.c
