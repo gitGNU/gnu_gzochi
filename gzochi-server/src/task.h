@@ -24,14 +24,24 @@
 
 #include "app.h"
 #include "auth.h"
+#include "data.h"
 #include "io.h"
 #include "threads.h"
 
-typedef struct _gzochid_periodic_task_handle
+typedef struct _gzochid_durable_application_task_handle
 {
-  mpz_t descriptor_oid;
-  mpz_t scm_oid;
-} gzochid_periodic_task_handle;
+  gzochid_application_task_serialization *serialization;
+
+  gzochid_application_worker task_worker;
+  gzochid_data_managed_reference *task_data_reference;
+
+  gzochid_auth_identity *identity;
+  
+  gboolean repeats;
+  struct timeval period;
+  struct timeval target_execution_time;
+} gzochid_durable_application_task_handle;
+
 
 typedef struct _gzochid_task
 {

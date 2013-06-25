@@ -148,19 +148,6 @@ void gzochid_application_task_thread_worker (gpointer, gpointer);
 gboolean gzochid_application_should_retry 
 (gzochid_transactional_application_task_execution *);
 
-typedef struct _gzochid_durable_application_task
-{
-  gzochid_application_task *task;
-  gzochid_application_task_serialization *serialization;
-
-  gboolean repeats;
-  long period;
-
-  struct timeval target_execution_time;
-
-  mpz_t oid;
-} gzochid_durable_application_task;
-
 gzochid_io_serialization gzochid_application_callback_serialization;
 
 gzochid_application_callback *gzochid_application_callback_new 
