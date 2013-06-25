@@ -22,6 +22,20 @@
 #include "schedule.h"
 #include "task.h"
 
+gzochid_task_queue *gzochid_schedule_task_queue_new (GThreadPool *pool)
+{
+  gzochid_task_queue *task_queue = malloc (sizeof (gzochid_task_queue));
+  
+  task_queue->cond = g_cond_new ();
+  task_queue->mutex = g_mutex_new ();
+  task_queue->queue = g_queue_new ();
+
+  task_queue->pool = pool;
+  task_queue->consumer_thread = NULL;
+
+  return task_queue;
+}
+
 static void pending_task_executor (gpointer data, gpointer user_data)
 {
   gzochid_pending_task *pending_task = (gzochid_pending_task *) data;

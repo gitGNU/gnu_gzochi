@@ -166,20 +166,6 @@ void gzochid_game_context_free (gzochid_game_context *context)
   free (context);
 } 
 
-gzochid_task_queue *gzochid_task_queue_new (GThreadPool *pool)
-{
-  gzochid_task_queue *task_queue = malloc (sizeof (gzochid_task_queue));
-  
-  task_queue->cond = g_cond_new ();
-  task_queue->mutex = g_mutex_new ();
-  task_queue->queue = g_queue_new ();
-
-  task_queue->pool = pool;
-  task_queue->consumer_thread = NULL;
-
-  return task_queue;
-}
-
 void gzochid_game_context_init
 (gzochid_game_context *context, gzochid_context *parent, GHashTable *config)
 {
@@ -195,7 +181,7 @@ void gzochid_game_context_init
      gzochid_config_to_int 
      (g_hash_table_lookup (config, "thread_pool.max_threads"), 4), 
      TRUE, NULL);
-  context->task_queue = gzochid_task_queue_new (context->pool);
+  context->task_queue = gzochid_schedule_task_queue_new (context->pool);
 
   gzochid_schedule_task_queue_start (context->task_queue);
 
