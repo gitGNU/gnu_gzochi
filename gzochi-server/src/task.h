@@ -47,8 +47,6 @@ typedef struct _gzochid_task_transaction_context
   gzochid_auth_identity *identity;
 
   GList *scheduled_tasks;
-  GList *scheduled_recurring_tasks;
-  GList *canceled_recurring_tasks;
 } gzochid_task_transaction_context;
 
 gzochid_task *gzochid_task_new 

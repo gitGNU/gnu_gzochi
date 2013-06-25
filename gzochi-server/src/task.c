@@ -75,9 +75,6 @@ static gzochid_task_transaction_context *create_transaction_context
 static void cleanup_transaction (gzochid_task_transaction_context *tx_context)
 {
   g_list_free (tx_context->scheduled_tasks);
-  g_list_free_full (tx_context->scheduled_recurring_tasks, free);
-  g_list_free_full (tx_context->canceled_recurring_tasks, free);
-
   free (tx_context);
 }
 
