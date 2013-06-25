@@ -18,6 +18,7 @@
 #include <glib.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 
 #include "../storage.h"
@@ -88,9 +89,13 @@ char *gzochid_storage_get
 
   if (val != NULL)
     {
+      char *data = malloc (sizeof (char) * val->len);
+      memcpy (data, val->str, val->len);
+
       if (len != NULL)
 	*len = val->len;
-      return val->str;
+      
+      return data;
     }
   else return NULL;
 }
