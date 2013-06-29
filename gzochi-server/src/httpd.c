@@ -44,6 +44,13 @@
 #define OID_SUFFIX_LEN 29
 #define OID_LINE_LEN 80
 
+#define GREETING \
+  "<h1>Hello, browser!</h1>\n" \
+  "<p>This is the administrative web console for the gzochid game " \
+  "application server. You can use this console to interrogate the state of " \
+  "applications running within container, including their attached data " \
+  "stores.</p>"
+
 struct data_state 
 {
   char *data;
@@ -227,6 +234,8 @@ static int dispatch_oids
       
       g_string_append (response_str, "<html>\n");
       g_string_append (response_str, "  <body>\n");
+      g_string_append_printf 
+	(response_str, "    <h1>%s</h1><br />\n", context->descriptor->name);
       g_string_append (response_str, "    <ul>\n");
       
       while (k != NULL)
@@ -287,6 +296,8 @@ static int dispatch_names (struct MHD_Connection *connection,
 
   g_string_append (response_str, "<html>\n");
   g_string_append (response_str, "  <body>\n");
+  g_string_append_printf 
+    (response_str, "    <h1>%s</h1><br />\n", context->descriptor->name);
   g_string_append (response_str, "    <ul>\n");
 
   while (k != NULL)
@@ -445,9 +456,17 @@ static int dispatch (void *cls, struct MHD_Connection *connection,
 
   if (strcmp (url, "/") == 0)
     {
-      const char *page = "<html><body>Hello, browser!</body></html>";
+      GString *response_str = g_string_new (NULL);
+
+      g_string_append (response_str, "<html><body>");
+      g_string_append (response_str, GREETING);
+      g_string_append (response_str, "<a href=\"app/\">app/</a>");
+      g_string_append (response_str, "</body></html>");
+      
       response = MHD_create_response_from_data 
-	(strlen (page), (void *) page, FALSE, FALSE);
+	(response_str->len, (void *) response_str->str, TRUE, FALSE);
+      g_string_free (response_str, FALSE);
+
       ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
       MHD_destroy_response (response);
     }
