@@ -213,35 +213,11 @@ static int dispatch_oid (struct MHD_Connection *connection,
 }
 
 static int dispatch_oids 
-(struct MHD_Connection *connection, const char *url, const char *path,
+(struct MHD_Connection *connection, const char *url,
  gzochid_application_context *context)
 {
   int ret = 0;
-  if (path == NULL)
-    {
-      GString *url_str = g_string_new (url);
-      struct MHD_Response *response = MHD_create_response_from_data 
-	(0, "", FALSE, FALSE);
-      
-      g_string_append (url_str, "/");
-      MHD_add_response_header (response, "Location", url_str->str);
-      g_string_free (url_str, TRUE);
-      
-      return MHD_queue_response 
-	(connection, MHD_HTTP_MOVED_PERMANENTLY, response);
-    }
-  else if (strlen (path) > 1)
-    {
-      mpz_t oid;
-
-      mpz_init (oid);
-      mpz_set_str (oid, path + 1, 16);
-      ret = dispatch_oid (connection, context, oid);
-      mpz_clear (oid);
-
-      return ret;
-    }
-  else
+  if (strlen (url) == 0)
     {
       GString *response_str = g_string_new (NULL);
       struct MHD_Response *response = NULL;
@@ -279,6 +255,22 @@ static int dispatch_oids
       
       ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
       MHD_destroy_response (response);
+      return ret;
+    }
+  else
+    {
+      mpz_t oid;
+
+      mpz_init (oid);
+      if (mpz_set_str (oid, url, 16) < 0)
+	{	  
+	  mpz_clear (oid);
+	  return not_found404_default (connection);
+	}
+
+      ret = dispatch_oid (connection, context, oid);
+      mpz_clear (oid);
+
       return ret;
     }
 }
@@ -322,38 +314,121 @@ static int dispatch_names (struct MHD_Connection *connection,
   ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
   MHD_destroy_response (response);
   return ret;
+}
 
-  return MHD_queue_response (connection, MHD_HTTP_OK, response);
+static int list_apps 
+(struct MHD_Connection *connection, gzochid_game_context *game_context)
+{
+  struct MHD_Response *response = NULL;
+  GList *apps = gzochid_game_context_get_applications (game_context);
+
+  if (apps == NULL)
+    return not_found404 
+      (connection, "<html><body>No applications.</body></html>", FALSE, FALSE);
+  else 
+    {
+      int ret = 0;
+      GList *apps_ptr = apps;
+      GString *response_str = g_string_new (NULL);
+
+      g_string_append (response_str, "<html>\n");
+      g_string_append (response_str, "  <body>\n");
+      g_string_append (response_str, "    <ul>\n");
+      
+      while (apps_ptr != NULL)
+	{
+	  gzochid_application_context *app = 
+	    (gzochid_application_context *) apps_ptr->data;
+	  
+  	  g_string_append_printf 
+	    (response_str, 
+	     "      <li><a href=\"/app/%s/\">%s</a></li><br />\n", 
+	     app->descriptor->name, app->descriptor->name);
+
+	  apps_ptr = apps_ptr->next;
+	}
+
+      g_string_append (response_str, "    </ul>\n");
+      g_string_append (response_str, "  </body>\n");
+      g_string_append (response_str, "</html>");
+
+      response = MHD_create_response_from_data
+	(response_str->len, response_str->str, TRUE, FALSE);
+      g_string_free (response_str, FALSE);
+
+      ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
+      MHD_destroy_response (response);
+      return ret;
+    }
+}
+
+static int app_info 
+(struct MHD_Connection *connection, gzochid_application_context *app_context)
+{
+  int ret = 0;
+  struct MHD_Response *response = NULL;
+  GString *response_str = g_string_new (NULL);
+
+  g_string_append (response_str, "<html>\n");
+  g_string_append (response_str, "  <body>\n");
+
+  g_string_append_printf 
+    (response_str, "    <h1>%s</h1><br />\n", app_context->descriptor->name);
+  g_string_append_printf 
+    (response_str, "    <a href=\"/app/%s/names/\">names</a><br />\n", 
+     app_context->descriptor->name);
+  g_string_append_printf 
+    (response_str, "    <a href=\"/app/%s/oids/\">oids</a><br />\n", 
+     app_context->descriptor->name);
+
+  g_string_append (response_str, "  </body>\n");
+  g_string_append (response_str, "</html>");
+
+  response = MHD_create_response_from_data 
+    (response_str->len, response_str->str, TRUE, FALSE);
+  g_string_free (response_str, FALSE);
+
+  ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
+  MHD_destroy_response (response);
+  return ret;
 }
 
 static int dispatch_app (struct MHD_Connection *connection, const char *url,
 			 gzochid_game_context *game_context)
 {
   gzochid_application_context *app_context = NULL;
-  const char *app_url = url + 5;
-  int app_len = 0;
-
-  char *rest = strchr (app_url, '/');
+  char *rest = strchr (url, '/');
   char *name = NULL;
+  int name_len = 0;
   
-  app_len = rest - app_url;
-  name = calloc (app_len + 1, sizeof (char));  
-  name = strncpy (name, app_url, app_len);
+  if (rest == NULL)
+    return not_found404_default (connection);
 
+  name_len = rest - url;
+  name = strndup (url, name_len);  
   app_context = gzochid_game_context_lookup_application (game_context, name);
   free (name);
-  
+
   if (app_context != NULL)
     {
-      char *operation = strchr (rest, '/');
-      if (strncmp (operation, "/names", 6) == 0)
+      if (strcmp (rest, "/") == 0)
+	return app_info (connection, app_context);
+      if (strncmp (rest, "/names/", 7) == 0)
 	return dispatch_names (connection, app_context);
-      else if (strncmp (operation, "/oids", 5) == 0)
+      else if (strncmp (rest, "/oids/", 6) == 0)
 	return dispatch_oids 
-	  (connection, url, strchr (operation + 1, '/'), app_context);
+	  (connection, rest + 6, app_context);
       else return not_found404_default (connection);
     }
   else return not_found404_default (connection);
+}
+
+static int dispatch_apps (struct MHD_Connection *connection, const char *url,
+			  gzochid_game_context *game_context)
+{
+  if (strlen (url) == 0)
+    return list_apps (connection, game_context);
+  else return dispatch_app (connection, url, game_context);
 }
 
 static int dispatch (void *cls, struct MHD_Connection *connection, 
@@ -385,7 +460,7 @@ static int dispatch (void *cls, struct MHD_Connection *connection,
       gzochid_game_context *game_context = (gzochid_game_context *)
 	server_context->game_context;
 
-      return dispatch_app (connection, url, game_context);
+      return dispatch_apps (connection, url + 5, game_context);
     }
   else return not_found404_default (connection);
 
