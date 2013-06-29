@@ -170,6 +170,25 @@ static void free_data_state (void *ptr)
   free (state);
 }
 
+static int not_found404 
+(struct MHD_Connection *connection, const char *page, 
+ int must_free, int must_copy)
+{
+  struct MHD_Response *response = MHD_create_response_from_data 
+    (strlen (page), (void *) page, must_free, must_copy);
+  int ret = MHD_queue_response (connection, 404, response);
+
+  MHD_destroy_response (response);
+
+  return ret;
+}
+
+static int not_found404_default (struct MHD_Connection *connection)
+{
+  return not_found404 
+    (connection, "<html><body>Not found.</body></html>", FALSE, FALSE);
+}
+
 static int dispatch_oid (struct MHD_Connection *connection, 
 			 gzochid_application_context *context, mpz_t oid)
 {
@@ -320,9 +339,9 @@ static int dispatch_app (struct MHD_Connection *connection, const char *url,
       else if (strncmp (operation, "/oids", 5) == 0)
 	return dispatch_oids 
 	  (connection, url, strchr (operation + 1, '/'), app_context);
-      else return 404;
+      else return not_found404_default (connection);
     }
-  else return 404;
+  else return not_found404_default (connection);
 }
 
 static int dispatch (void *cls, struct MHD_Connection *connection, 
@@ -355,15 +374,7 @@ static int dispatch (void *cls, struct MHD_Connection *connection,
 
       return dispatch_app (connection, url, game_context);
     }
-  else 
-    {
-      const char *page = "<html><body>Not found.</body></html>";
-      response = MHD_create_response_from_data 
-	(strlen (page), (void *) page, TRUE, TRUE);
-      ret = MHD_queue_response (connection, 404, response);
-    }
-
-  MHD_destroy_response (response);
+  else return not_found404_default (connection);
 
   return ret;
 }
