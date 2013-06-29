@@ -1,5 +1,5 @@
 /* httpd.c: Embedded informational web server for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,18 +15,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ctype.h>
 #include <glib.h>
 #include <gmp.h>
-
-#include <ctype.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <stdint.h>
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+
 #include <microhttpd.h>
 
 #include "admin.h"
@@ -63,7 +63,7 @@ static void next_line (struct data_state *state)
   gboolean needs_prefix = state->data_offset == 0;
   gboolean needs_suffix = remaining <= 16;
 
-  int line_length = OID_LINE_LEN - (16 - num_bytes);
+  int line_length = OID_LINE_LEN - (16 - num_bytes) + 1;
   
   if (state->data_offset == state->data_length)
     return;
@@ -74,7 +74,7 @@ static void next_line (struct data_state *state)
     line_length += OID_SUFFIX_LEN;
   
   state->current_line = malloc (sizeof (char) * (line_length + 1));
-  state->current_line_length = line_length + 1;
+  state->current_line_length = line_length;
 
   buf = state->current_line;
 
