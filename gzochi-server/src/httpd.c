@@ -192,6 +192,7 @@ static int not_found404_default (struct MHD_Connection *connection)
 static int dispatch_oid (struct MHD_Connection *connection, 
 			 gzochid_application_context *context, mpz_t oid)
 {
+  int ret = 0;
   size_t data_length = 0;
   char *oid_str = mpz_get_str (NULL, 16, oid);
   char *data = gzochid_storage_get 
@@ -206,13 +207,16 @@ static int dispatch_oid (struct MHD_Connection *connection,
     (-1, OID_PREFIX_LEN + OID_LINE_LEN + OID_SUFFIX_LEN, write_data_line, 
      state, free_data_state);
 
-  return MHD_queue_response (connection, MHD_HTTP_OK, response);
+  ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
+  MHD_destroy_response (response);
+  return ret;
 }
 
 static int dispatch_oids 
 (struct MHD_Connection *connection, const char *url, const char *path,
  gzochid_application_context *context)
 {
+  int ret = 0;
   if (path == NULL)
     {
       GString *url_str = g_string_new (url);
@@ -229,7 +233,6 @@ static int dispatch_oids
   else if (strlen (path) > 1)
     {
       mpz_t oid;
-      int ret = 0;
 
       mpz_init (oid);
       mpz_set_str (oid, path + 1, 16);
@@ -270,16 +273,20 @@ static int dispatch_oids
       g_string_append (response_str, "  </body>\n");
       g_string_append (response_str, "</html>");
       
-      response = MHD_create_response_from_data 
-	(response_str->len, response_str->str, TRUE, TRUE);
+      response = MHD_create_response_from_data
+	(response_str->len, response_str->str, TRUE, FALSE);
+      g_string_free (response_str, FALSE);
       
-      return MHD_queue_response (connection, MHD_HTTP_OK, response);
+      ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
+      MHD_destroy_response (response);
+      return ret;
     }
 }
 
 static int dispatch_names (struct MHD_Connection *connection, 
 			   gzochid_application_context *context)
 {
+  int ret = 0;
   GString *response_str = g_string_new (NULL);
   struct MHD_Response *response = NULL;
   
@@ -309,7 +316,12 @@ static int dispatch_names (struct MHD_Connection *connection,
   g_string_append (response_str, "</html>");
 
   response = MHD_create_response_from_data 
-    (response_str->len, response_str->str, TRUE, TRUE);
+    (response_str->len, response_str->str, TRUE, FALSE);
+  g_string_free (response_str, FALSE);
+  
+  ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
+  MHD_destroy_response (response);
+  return ret;
 
   return MHD_queue_response (connection, MHD_HTTP_OK, response);
 }
@@ -349,7 +361,7 @@ static int dispatch (void *cls, struct MHD_Connection *connection,
 		     const char *upload_data, size_t *upload_data_size, 
 		     void **con_cls)
 {
-  int ret = MHD_NO;
+  int ret = 0;
   struct MHD_Response *response = NULL;
   gzochid_httpd_context *context = (gzochid_httpd_context *) cls;
 
@@ -360,8 +372,9 @@ static int dispatch (void *cls, struct MHD_Connection *connection,
     {
       const char *page = "<html><body>Hello, browser!</body></html>";
       response = MHD_create_response_from_data 
-	(strlen (page), (void *) page, TRUE, TRUE);
+	(strlen (page), (void *) page, FALSE, FALSE);
       ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
+      MHD_destroy_response (response);
     }
   else if (strncmp (url, "/app/", 5) == 0)
     {
