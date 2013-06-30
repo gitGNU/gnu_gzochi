@@ -1,5 +1,5 @@
 /* socket.c: Application socket server implementation for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 #include <glib.h>
 #include <gzochi-common.h>
 #include <libserveez.h>
+#include <signal.h>
 #include <stdlib.h>
 
 #include "context.h"
@@ -187,6 +188,8 @@ static void initialize (int from_state, int to_state, gpointer user_data)
   svz_portcfg_t *portcfg = NULL;
   svz_server_t *server = NULL;
   
+  struct sigaction orig_act;
+
   svz_boot ("gzochid");
 
   portcfg = svz_portcfg_create ();
@@ -210,13 +213,16 @@ static void initialize (int from_state, int to_state, gpointer user_data)
   server = svz_server_get ("game-default");
   server->data = server_context;
 
+  sigaction (SIGINT, NULL, &orig_act);
   svz_updn_all_coservers (-1);
+
   if (svz_updn_all_servers (1) < 0)
     gzochid_err ("Server failed to initialize");
 
   if (svz_server_bind (server, portcfg) != 0)
     gzochid_err ("Failed to bind server to port %d", game_context->port);
 
+  sigaction (SIGINT, &orig_act, NULL);
   gzochid_notice ("Game server listening on port %d", game_context->port);
 
   gzochid_thread_pool_push 
