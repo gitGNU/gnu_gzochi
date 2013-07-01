@@ -692,7 +692,8 @@ static void application_persist_data
       sub_reference_holder.reference = NULL;
       sub_reference_holder.serialization = reference_holder->serialization;
 
-      gzochid_transaction_execute (persist_data, &sub_reference_holder);
+      gzochid_application_transaction_execute 
+	(context, persist_data, &sub_reference_holder);
       reference_holder->reference = sub_reference_holder.reference;
     }
 }
@@ -731,7 +732,8 @@ gzochid_data_managed_reference *gzochid_data_create_reference_sync
       reference_holder.reference = gzochid_data_create_reference_to_oid 
 	(context, serialization, reference_holder.reference->oid);
     }
-  else gzochid_transaction_execute (persist_data, &reference_holder);
+  else gzochid_application_transaction_execute 
+	 (context, persist_data, &reference_holder);
   return reference_holder.reference;
 }
 

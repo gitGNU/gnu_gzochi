@@ -384,10 +384,10 @@ void gzochid_application_transactional_task_worker
   args[2] = execution->task;
 
   if (execution->timeout != NULL)
-    execution->result = gzochid_transaction_execute_timed 
-      (transactional_task_worker, args, *execution->timeout);
-  else execution->result = 
-	 gzochid_transaction_execute (transactional_task_worker, args);
+    execution->result = gzochid_application_transaction_execute_timed 
+      (context, transactional_task_worker, args, *execution->timeout);
+  else execution->result = gzochid_application_transaction_execute 
+	 (context, transactional_task_worker, args);
 
   execution->attempts++;
 }
@@ -482,7 +482,8 @@ static void run_async_transactional (gpointer data)
 
 static void run_async (gpointer data, gpointer user_data)
 {
-  gzochid_transaction_execute (run_async_transactional, data);
+  gzochid_application_transaction_execute 
+    ((gzochid_application_context *) data, run_async_transactional, data);
 }
 
 static void run (int from_state, int to_state, gpointer user_data)
