@@ -38,7 +38,7 @@ gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 	-DGZOCHID_AUTH_PLUGIN_LOCATION=\"$(plugindir)\" @GUILE_CFLAGS@ \
 	@GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ @MICROHTTPD_CFLAGS@ \
 	@ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
-	-Wall -pedantic
+	-Wall -Werror
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	debug.c event.c fsm.c game.c guile.c gzochid.c httpd.c log.c \

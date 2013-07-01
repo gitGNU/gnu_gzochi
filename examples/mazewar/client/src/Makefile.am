@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2012 Julian Graham
+# Copyright (C) 2013 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ @GZOCHI_CFLAGS@ -Wall -pedantic -pthread
+AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ @GZOCHI_CFLAGS@ -Wall -Werror -pthread
 
 AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@ @GZOCHI_LIBS@
 

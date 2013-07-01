@@ -19,7 +19,7 @@
 #
 
 AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ \
-	@SERVEEZ_CFLAGS@ -Wall -pedantic
+	@SERVEEZ_CFLAGS@ -Wall -Werror
 
 noinst_LIBRARIES = libgzochid-server-api.a
 noinst_HEADERS = admin.h channel.h data.h log.h session.h task.h util.h

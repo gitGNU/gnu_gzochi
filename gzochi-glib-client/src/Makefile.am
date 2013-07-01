@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2012 Julian Graham
+# Copyright (C) 2013 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,8 +22,7 @@ GZOCHI_CLIENT_COMMON_CFLAGS = -I@GZOCHI_CLIENT_COMMON@/src
 GZOCHI_CLIENT_COMMON_LIBS = \
 	@GZOCHI_CLIENT_COMMON@/src/libgzochi-client-common.la
 
-AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ $(GZOCHI_CLIENT_COMMON_CFLAGS) -Wall \
-	-pedantic
+AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ $(GZOCHI_CLIENT_COMMON_CFLAGS) -Wall -Werror
 AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@
 
 lib_LTLIBRARIES = libgzochi-glib.la
