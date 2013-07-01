@@ -35,6 +35,12 @@ typedef struct _gzochid_application_event
   struct timeval timestamp;
 } gzochid_application_event;
 
+typedef struct _gzochid_application_transaction_event
+{
+  gzochid_application_event base;
+  struct timeval duration;
+} gzochid_application_transaction_event;
+
 typedef struct _gzochid_application_event_source 
 gzochid_application_event_source;
 

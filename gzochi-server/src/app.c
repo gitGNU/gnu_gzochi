@@ -44,6 +44,12 @@ static GStaticPrivate thread_identity_key = G_STATIC_PRIVATE_INIT;
 
 G_LOCK_DEFINE_STATIC (load_path);
 
+typedef struct _gzochid_event_transaction_context
+{
+  gzochid_application_context *app_context;
+  struct timeval start_time;
+} gzochid_event_transaction_context;
+
 static void initialize_async (gpointer data, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) data;
@@ -192,6 +198,121 @@ void gzochid_serialize_application_task
   gzochid_auth_identity_serializer (context, task->identity, out);
   serialization->worker_serialization->serializer (context, task->worker, out);
   serialization->data_serialization->serializer (context, task->data, out);
+}
+
+static gzochid_event_transaction_context *create_transaction_context 
+(gzochid_application_context *app_context)
+{
+  gzochid_event_transaction_context *tx_context = 
+    malloc (sizeof (gzochid_event_transaction_context));
+
+  tx_context->app_context = app_context;
+  gettimeofday (&tx_context->start_time, NULL);
+
+  return tx_context;
+}
+
+static int event_prepare (gpointer data)
+{
+  return TRUE;
+}
+
+static void event_commit (gpointer data)
+{
+  gzochid_event_transaction_context *tx_context = 
+    (gzochid_event_transaction_context *) data;
+  gzochid_application_transaction_event *event = 
+    malloc (sizeof (gzochid_application_transaction_event));
+  gzochid_application_event *base_event = (gzochid_application_event *) event;
+  struct timeval now;
+
+  gettimeofday (&now, NULL);
+  base_event->type = TRANSACTION_COMMIT;
+  gettimeofday (&base_event->timestamp, NULL);
+  timersub (&now, &tx_context->start_time, &event->duration);
+
+  gzochid_application_event_dispatch 
+    (tx_context->app_context->event_source, base_event);
+  free (tx_context);
+}
+
+static void event_rollback (gpointer data)
+{
+  gzochid_event_transaction_context *tx_context = 
+    (gzochid_event_transaction_context *) data;
+
+  gzochid_application_transaction_event *event = 
+    malloc (sizeof (gzochid_application_transaction_event));
+  gzochid_application_event *base_event = (gzochid_application_event *) event;
+  struct timeval now;
+
+  gettimeofday (&now, NULL);
+  base_event->type = TRANSACTION_ROLLBACK;
+  gettimeofday (&base_event->timestamp, NULL);
+  timersub (&now, &tx_context->start_time, &event->duration);
+
+  gzochid_application_event_dispatch 
+    (tx_context->app_context->event_source, base_event);
+  free (tx_context);
+}
+
+static gzochid_transaction_participant event_participant = 
+  { "event", event_prepare, event_commit, event_rollback };
+
+static void join_transaction (gzochid_application_context *context)
+{
+  if (!gzochid_transaction_active ()
+      || gzochid_transaction_context (&event_participant) == NULL)
+    {
+      gzochid_event_transaction_context *tx_context =
+	create_transaction_context (context); 
+      gzochid_transaction_join (&event_participant, tx_context);
+    }
+}
+
+static void event_func_wrapper (gpointer data)
+{
+  gpointer *args = (gpointer *) data;
+  gzochid_application_context *context = 
+    (gzochid_application_context *) args[0];
+  void (*func) (gpointer) = (void (*) (gpointer)) args[1];
+  gpointer func_data = args[2];
+
+  gzochid_application_event *event = 
+    malloc (sizeof (gzochid_application_event));
+
+  event->type = TRANSACTION_START;
+  gettimeofday (&event->timestamp, NULL);
+
+  join_transaction (context);
+
+  gzochid_application_event_dispatch (context->event_source, event);
+  func (func_data);  
+}
+
+gzochid_transaction_result gzochid_application_transaction_execute 
+(gzochid_application_context *context, void (*func) (gpointer), gpointer data)
+{
+  gpointer args[3];
+
+  args[0] = context;
+  args[1] = func;
+  args[2] = data;
+
+  return gzochid_transaction_execute (event_func_wrapper, args);
+}
+
+gzochid_transaction_result gzochid_application_transaction_execute_timed 
+(gzochid_application_context *context, void (*func) (gpointer), gpointer data,
+ struct timeval timeout)
+{
+  gpointer args[3];
+
+  args[0] = context;
+  args[1] = func;
+  args[2] = data;
+
+  return gzochid_transaction_execute_timed (event_func_wrapper, args, timeout);
 }
 
 static gzochid_transactional_application_task_execution *execution_new

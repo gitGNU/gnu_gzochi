@@ -129,6 +129,12 @@ void gzochid_serialize_application_task
 (gzochid_application_context *, gzochid_application_task_serialization *, 
  gzochid_application_task *, GString *);
 
+gzochid_transaction_result gzochid_application_transaction_execute 
+(gzochid_application_context *, void (*) (gpointer), gpointer);
+
+gzochid_transaction_result gzochid_application_transaction_execute_timed 
+(gzochid_application_context *, void (*) (gpointer), gpointer, struct timeval);
+
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_execution_new 
 (gzochid_application_task *);
