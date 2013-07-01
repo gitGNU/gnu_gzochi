@@ -22,6 +22,8 @@
 #include "app.h"
 #include "event.h"
 
+#define DEFAULT_EVENT_POLL_INTERVAL 1000
+
 typedef struct _gzochid_application_event_handler_registration
 {
   gzochid_application_event_handler handler;
@@ -40,8 +42,13 @@ static gboolean prepare (GSource *source, gint *timeout)
 {
   gzochid_application_event_source *event_source = 
     (gzochid_application_event_source *) source;
-  
-  return !g_queue_is_empty (event_source->events);
+
+  if (g_queue_is_empty (event_source->events))
+    {
+      *timeout = DEFAULT_EVENT_POLL_INTERVAL;
+      return FALSE;
+    }
+  else return TRUE;
 }
 
 static gboolean check (GSource *source)
@@ -101,6 +108,15 @@ gzochid_application_event_source *gzochid_application_event_source_new ()
   source->mutex = g_mutex_new ();
   
   return source;
+}
+
+void gzochid_application_event_source_free 
+(gzochid_application_event_source *source)
+{
+  g_mutex_free (source->mutex);
+  g_list_free (source->handlers);
+  g_queue_free (source->events);
+  g_source_unref ((GSource *) source);
 }
 
 void gzochid_application_event_attach 
