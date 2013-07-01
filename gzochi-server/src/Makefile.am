@@ -32,7 +32,7 @@ dist_sysconf_DATA = conf/gzochid.conf
 noinst_HEADERS = admin.h app.h auth.h auth_int.h channel.h config.h context.h \
 	data.h debug.h event.h fsm.h game.h guile.h gzochid.h httpd.h io.h \
 	log.h protocol.h reloc.h schedule.h scheme.h session.h socket.h \
-	storage.h task.h threads.h tx.h txlog.h util.h
+	stats.h storage.h task.h threads.h tx.h txlog.h util.h
 
 gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 	-DGZOCHID_AUTH_PLUGIN_LOCATION=\"$(plugindir)\" @GUILE_CFLAGS@ \
@@ -42,8 +42,8 @@ gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	debug.c event.c fsm.c game.c guile.c gzochid.c httpd.c log.c \
-	protocol.c reloc.c schedule.c scheme.c session.c socket.c task.c \
-	threads.c tx.c txlog.c util.c
+	protocol.c reloc.c schedule.c scheme.c session.c socket.c stats.c \
+	task.c threads.c tx.c txlog.c util.c
 
 gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
 	@GLIB_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ @MICROHTTPD_LIBS@ \
@@ -78,6 +78,7 @@ schedule.c: schedule.h
 scheme.c: scheme.h
 session.c: session.h
 socket.c: socket.h
+stats.c: stats.h
 storage-bdb.c: storage.h
 storage-gdbm.c: storage.h
 task.c: task.h
