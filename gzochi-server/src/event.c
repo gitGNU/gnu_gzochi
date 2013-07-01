@@ -31,7 +31,6 @@ typedef struct _gzochid_application_event_handler_registration
 struct _gzochid_application_event_source
 {
   GSource base;
-  gzochid_application_context *context;
   GList *handlers;
   GQueue *events;
   GMutex *mutex;
@@ -58,13 +57,8 @@ static void dispatch_inner_inner (gpointer data, gpointer user_data)
   gzochid_application_event_handler_registration *registration = 
     (gzochid_application_event_handler_registration *) data;
 
-  gpointer *context_and_event = (gpointer *) user_data;
-  gzochid_application_context *context = 
-    (gzochid_application_context *) context_and_event[0];
-  gzochid_application_event *event = 
-    (gzochid_application_event *) context_and_event[1];
-      
-  registration->handler (context, event, registration->user_data);
+  registration->handler 
+    ((gzochid_application_event *) user_data, registration->user_data);
 }
 
 static void dispatch_inner (gpointer data, gpointer user_data)
@@ -72,13 +66,8 @@ static void dispatch_inner (gpointer data, gpointer user_data)
   gzochid_application_event_source *event_source = 
     (gzochid_application_event_source *) user_data;
   
-  gpointer context_and_event[2];
-  context_and_event[0] = event_source->context;
-  context_and_event[1] = data;
-
   g_list_foreach 
-    (event_source->handlers, dispatch_inner_inner, context_and_event);
-
+    (event_source->handlers, dispatch_inner_inner, data);
   free (data);
 }
 
@@ -101,14 +90,12 @@ static void finalize (GSource *source)
 
 static GSourceFuncs event_funcs = { prepare, check, dispatch, finalize };
 
-gzochid_application_event_source *gzochid_application_event_source_new 
-(gzochid_application_context *context)
+gzochid_application_event_source *gzochid_application_event_source_new ()
 {
   gzochid_application_event_source *source = 
     (gzochid_application_event_source *) g_source_new
     (&event_funcs, sizeof (gzochid_application_event_source));
 
-  source->context = context;
   source->events = g_queue_new ();
   source->handlers = NULL;
   source->mutex = g_mutex_new ();

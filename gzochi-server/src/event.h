@@ -21,8 +21,6 @@
 #include <glib.h>
 #include <sys/time.h>
 
-#include "app.h"
-
 typedef enum _gzochid_application_event_type
   {
     TRANSACTION_START, /* An application transaction has been started. */
@@ -40,11 +38,12 @@ typedef struct _gzochid_application_event
 typedef struct _gzochid_application_event_source 
 gzochid_application_event_source;
 
-gzochid_application_event_source *gzochid_application_event_source_new 
-(gzochid_application_context *);
+gzochid_application_event_source *gzochid_application_event_source_new (void);
+void gzochid_application_event_source_free 
+(gzochid_application_event_source *);
 
 typedef void (*gzochid_application_event_handler) 
-(gzochid_application_context *, gzochid_application_event *, gpointer);
+(gzochid_application_event *, gpointer);
 
 /**
    Attaches the specified application event handler to the event source.
