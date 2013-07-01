@@ -37,6 +37,7 @@
 #include "gzochid.h"
 #include "log.h"
 #include "httpd.h"
+#include "stats.h"
 #include "storage.h"
 #include "threads.h"
 
@@ -384,7 +385,10 @@ static int app_info
   g_string_append (response_str, "  <body>\n");
 
   g_string_append_printf 
-    (response_str, "    <h1>%s</h1><br />\n", app_context->descriptor->name);
+    (response_str, "    <h1>%s</h1>\n", app_context->descriptor->name);
+  g_string_append_printf 
+    (response_str, "    <p>%s</p>\n", app_context->descriptor->description);
+  g_string_append (response_str, "    <h2>Application data</h2>\n");
   g_string_append_printf 
     (response_str, "    <a href=\"/app/%s/names/\">names</a><br />\n", 
      app_context->descriptor->name);
@@ -392,6 +396,27 @@ static int app_info
     (response_str, "    <a href=\"/app/%s/oids/\">oids</a><br />\n", 
      app_context->descriptor->name);
 
+  g_string_append (response_str, "    <h2>Application statistics</h2>\n");
+  g_string_append (response_str, "    <table>\n");
+
+  g_string_append (response_str, "      <tr>\n");
+  g_string_append (response_str, "        <td>Transactions started</td>\n");
+  g_string_append_printf (response_str, "        <td>%u</td>\n", 
+			  app_context->stats->num_transactions_started);
+  g_string_append (response_str, "      </tr>\n");
+  g_string_append (response_str, "      <tr>\n");
+  g_string_append (response_str, "        <td>Transactions committed</td>\n");
+  g_string_append_printf (response_str, "        <td>%u</td>\n", 
+			  app_context->stats->num_transactions_committed);
+  g_string_append (response_str, "      </tr>\n");
+  g_string_append (response_str, "      <tr>\n");
+  g_string_append 
+    (response_str, "        <td>Transactions rolled back</td>\n");
+  g_string_append_printf (response_str, "        <td>%u</td>\n", 
+			  app_context->stats->num_transactions_rolled_back);
+  g_string_append (response_str, "      </tr>\n");
+
+  g_string_append (response_str, "    </table>\n");
   g_string_append (response_str, "  </body>\n");
   g_string_append (response_str, "</html>");
 
