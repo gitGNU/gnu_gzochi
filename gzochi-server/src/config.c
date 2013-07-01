@@ -282,17 +282,13 @@ static void descriptor_text (GMarkupParseContext *context,
   gzochid_application_descriptor *descriptor =
     (gzochid_application_descriptor *) user_data;
   const GSList *stack = g_markup_parse_context_get_element_stack (context);
-  char *parent = stack->next == NULL ? NULL : (char *) stack->next->data;
+  char *parent = (char *) stack->data;
 
   if (parent != NULL)
     {
       if (strcmp (parent, "description") == 0)
 	descriptor->description = strndup (text, text_len);
-      else if (strcmp (parent, "load-path") == 0)
-	;
-      else;
     }
-  else;
 }
 
 static void descriptor_error 
