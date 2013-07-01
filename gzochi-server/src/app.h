@@ -26,6 +26,7 @@
 #include "context.h"
 #include "event.h"
 #include "io.h"
+#include "stats.h"
 #include "storage.h"
 #include "tx.h"
 
@@ -83,6 +84,7 @@ typedef struct _gzochid_application_context
   GMutex *client_mapping_lock;
   
   gzochid_application_event_source *event_source;
+  gzochid_application_stats *stats;
 } gzochid_application_context;
 
 typedef void (*gzochid_application_worker) 

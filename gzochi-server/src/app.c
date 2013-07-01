@@ -590,6 +590,7 @@ gzochid_application_context *gzochid_application_context_new (void)
   context->client_mapping_lock = g_mutex_new ();
 
   context->event_source = gzochid_application_event_source_new ();
+  context->stats = calloc (1, sizeof (gzochid_application_stats));
   return context;
 }
 
@@ -602,8 +603,15 @@ void gzochid_application_context_free (gzochid_application_context *app_context)
   g_list_free (app_context->free_oid_blocks);
 
   gzochid_application_event_source_free (app_context->event_source);
+  free (app_context->stats);
+
   free (context->fsm->name);
   free (context);
+}
+
+static void update_stats (gzochid_application_event *event, gpointer data)
+{
+  gzochid_stats_update_from_event ((gzochid_application_stats *) data, event);
 }
 
 void gzochid_application_context_init 
@@ -647,6 +655,9 @@ void gzochid_application_context_init
   context->authenticator = gzochid_auth_function_pass_thru;
   context->descriptor = descriptor;
   
+  gzochid_application_event_attach
+    (context->event_source, update_stats, context->stats);
+
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
 }
 
