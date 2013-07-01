@@ -24,6 +24,7 @@
 
 #include "auth.h"
 #include "context.h"
+#include "event.h"
 #include "io.h"
 #include "storage.h"
 #include "tx.h"
@@ -80,6 +81,8 @@ typedef struct _gzochid_application_context
   GHashTable *oids_to_clients;
   GHashTable *clients_to_oids;
   GMutex *client_mapping_lock;
+  
+  gzochid_application_event_source *event_source;
 } gzochid_application_context;
 
 typedef void (*gzochid_application_worker) 

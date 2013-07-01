@@ -23,6 +23,7 @@
 
 #include "app.h"
 #include "context.h"
+#include "event.h"
 #include "schedule.h"
 #include "socket.h"
 
@@ -47,7 +48,8 @@ typedef struct _gzochid_game_context
   GHashTable *applications;
   GHashTable *auth_plugins;
   gzochid_socket_server_context *server;
-  
+
+  GMainLoop *event_loop;
 } gzochid_game_context;
 
 gzochid_game_context *gzochid_game_context_new (void);

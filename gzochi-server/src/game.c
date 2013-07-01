@@ -41,12 +41,23 @@
 
 #define DEFAULT_TX_TIMEOUT_MS 100
 
+static void initialize_application 
+(gzochid_game_context *context, gzochid_application_descriptor *descriptor)
+{
+  gzochid_application_context *application_context =
+    gzochid_application_context_new ();
+  
+  gzochid_application_context_init
+    (application_context, (gzochid_context *) context, descriptor);
+  g_source_attach ((GSource *) application_context->event_source, 
+		   g_main_loop_get_context (context->event_loop));
+}
+
 static void scan_app_dir (gzochid_game_context *context, char *dir)
 {
   char *descriptor_file = g_strconcat (dir, "/", GAME_DESCRIPTOR_XML, NULL);
 
   gzochid_application_descriptor *descriptor = NULL;
-  gzochid_application_context *application_context = NULL;
 
   if (!g_file_test (descriptor_file, G_FILE_TEST_IS_REGULAR))
     {
@@ -55,11 +66,8 @@ static void scan_app_dir (gzochid_game_context *context, char *dir)
       return;
     }
 
-  application_context = gzochid_application_context_new ();
-  
   descriptor = gzochid_config_parse_application_descriptor (descriptor_file);
-  gzochid_application_context_init 
-    (application_context, (gzochid_context *) context, descriptor);
+  initialize_application (context, descriptor);
 }
 
 static void scan_apps_dir (gzochid_game_context *context)
@@ -151,6 +159,19 @@ static void initialize_complete
   gzochid_thread_pool_push (context->pool, initialize_async, NULL, NULL);  
 }
 
+static gpointer event_loop (gpointer data)
+{
+  gzochid_game_context *context = (gzochid_game_context *) data;
+  g_main_loop_run (context->event_loop);
+  return NULL;
+}
+
+static void initialize_event_loop 
+(int from_state, int to_state, gpointer user_data)
+{
+  g_thread_new ("event-loop", event_loop, user_data);
+}
+
 gzochid_game_context *gzochid_game_context_new (void)
 {
   return calloc (1, sizeof (gzochid_game_context));
@@ -172,9 +193,12 @@ void gzochid_game_context_init
   long tx_timeout_ms = 0;
   gzochid_fsm *fsm = gzochid_fsm_new 
     ("game", GZOCHID_GAME_STATE_INITIALIZING, "INITIALIZING");
+  GMainContext *event_context = g_main_context_new ();
 
   gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_RUNNING, "RUNNING");
   gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_STOPPED, "STOPPED");
+
+  context->event_loop = g_main_loop_new (event_context, FALSE);
 
   context->pool = gzochid_thread_pool_new 
     (context, 
@@ -200,6 +224,8 @@ void gzochid_game_context_init
   gzochid_fsm_add_transition
     (fsm, GZOCHID_GAME_STATE_RUNNING, GZOCHID_GAME_STATE_STOPPED);
 
+  gzochid_fsm_on_enter
+    (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_event_loop, context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_server, context);
   gzochid_fsm_on_enter 

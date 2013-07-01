@@ -23,6 +23,7 @@
 #include "auth.h"
 #include "auth_int.h"
 #include "context.h"
+#include "event.h"
 #include "fsm.h"
 #include "game.h"
 #include "guile.h"
@@ -466,6 +467,7 @@ gzochid_application_context *gzochid_application_context_new (void)
   context->free_oids_lock = g_mutex_new ();
   context->client_mapping_lock = g_mutex_new ();
 
+  context->event_source = gzochid_application_event_source_new ();
   return context;
 }
 
@@ -477,6 +479,7 @@ void gzochid_application_context_free (gzochid_application_context *app_context)
   g_mutex_free (app_context->free_oids_lock);
   g_list_free (app_context->free_oid_blocks);
 
+  gzochid_application_event_source_free (app_context->event_source);
   free (context->fsm->name);
   free (context);
 }
