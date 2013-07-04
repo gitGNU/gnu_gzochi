@@ -15,14 +15,34 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
+
 #include "event.h"
 #include "stats.h"
+
+static void update_from_data_event
+(gzochid_application_stats *stats, gzochid_application_event_type type,
+ gzochid_application_data_event *event)
+{
+  switch (type)
+    {
+    case BYTES_READ: stats->bytes_read += event->bytes; break;
+    case BYTES_WRITTEN: stats->bytes_written += event->bytes; break;
+    default: assert (1 == 0);
+    }
+}
 
 void gzochid_stats_update_from_event 
 (gzochid_application_stats *stats, gzochid_application_event *event)
 {
   switch (event->type)
     {
+    case BYTES_READ:
+    case BYTES_WRITTEN:
+      update_from_data_event
+	(stats, event->type, (gzochid_application_data_event *) event);
+      break;
+
     case TRANSACTION_START: stats->num_transactions_started++; break;
     case TRANSACTION_COMMIT: stats->num_transactions_committed++; break;
     case TRANSACTION_ROLLBACK: stats->num_transactions_rolled_back++; break;

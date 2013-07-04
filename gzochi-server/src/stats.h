@@ -25,6 +25,9 @@ typedef struct _gzochid_application_stats
   unsigned int num_transactions_started;
   unsigned int num_transactions_committed;
   unsigned int num_transactions_rolled_back;
+
+  unsigned long bytes_read;
+  unsigned long bytes_written;
 } gzochid_application_stats;
 
 void gzochid_stats_update_from_event
