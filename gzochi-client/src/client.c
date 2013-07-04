@@ -1,5 +1,5 @@
 /* client.c: Main client API routines for libgzochi
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -41,12 +41,12 @@ gzochi_client_session_received_message_callback;
 
 static int read_and_dispatch (gzochi_client_session *session, int connecting)
 {
-  int dispatched = connecting 
-    ? gzochi_client_protocol_dispatch (session)
-    : gzochi_client_protocol_dispatch_all (session);
-
-  while (TRUE)
+  do
     {
+      int dispatched = connecting 
+	? gzochi_client_protocol_dispatch (session)
+	: gzochi_client_protocol_dispatch_all (session);
+
       if (connecting && dispatched)
 	break;
   
@@ -58,9 +58,8 @@ static int read_and_dispatch (gzochi_client_session *session, int connecting)
 
 	  return -1;
 	}
-
-      dispatched = gzochi_client_protocol_dispatch_all (session);
     }
+  while (TRUE);
 
   return 0;
 }
