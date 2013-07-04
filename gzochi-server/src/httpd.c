@@ -400,6 +400,17 @@ static int app_info
   g_string_append (response_str, "    <table>\n");
 
   g_string_append (response_str, "      <tr>\n");
+  g_string_append (response_str, "        <td>Bytes read</td>\n");
+  g_string_append_printf (response_str, "        <td>%lu</td>\n", 
+			  app_context->stats->bytes_read);
+  g_string_append (response_str, "      </tr>\n");
+  g_string_append (response_str, "      <tr>\n");
+  g_string_append (response_str, "        <td>Bytes written</td>\n");
+  g_string_append_printf (response_str, "        <td>%lu</td>\n", 
+			  app_context->stats->bytes_written);
+  g_string_append (response_str, "      </tr>\n");
+
+  g_string_append (response_str, "      <tr>\n");
   g_string_append (response_str, "        <td>Transactions started</td>\n");
   g_string_append_printf (response_str, "        <td>%u</td>\n", 
 			  app_context->stats->num_transactions_started);
