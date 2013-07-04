@@ -23,6 +23,9 @@
 
 typedef enum _gzochid_application_event_type
   {
+    BYTES_READ,
+    BYTES_WRITTEN,
+
     TRANSACTION_START, /* An application transaction has been started. */
     TRANSACTION_COMMIT, /* A transaction has been committed. */
     TRANSACTION_ROLLBACK /* A transaction has been rolled back. */
@@ -40,6 +43,12 @@ typedef struct _gzochid_application_transaction_event
   gzochid_application_event base;
   struct timeval duration;
 } gzochid_application_transaction_event;
+
+typedef struct _gzochid_application_data_event
+{
+  gzochid_application_event base;
+  long bytes;
+} gzochid_application_data_event;
 
 typedef struct _gzochid_application_event_source 
 gzochid_application_event_source;
