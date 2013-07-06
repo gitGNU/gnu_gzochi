@@ -893,18 +893,149 @@ uninterpreted to a handler registered by game code.
 
 gzochid employs a pluggable authentication mechanism to allow each
 game application endpoint to specify an authentication scheme that
-meets its security requirements. The plugins currently available
-are listed below.
+meets its security requirements. Authentication plugins are built
+and distributed as shared libraries and installed to the ``gzochid'' 
+directory under the library directory of the installation prefix;
+for example, @samp{/usr/local/lib/gzochid}. This directory is
+scanned on server startup and any discovered plugins are dynamically 
+loaded. Plugins are configured for use by individual game 
+applications via the @code{auth} element in the game descriptor 
+file. Nested @code{property} elements can be used pass 
+application-specific configuration to the plugin like so:
 
-@itemize @bullet
-@item
-@dfn{pass-thru}: This is the default authentication plugin. No
-actual authentication is performed---all login requests are 
-accepted---and the contents of the byte sequence included as part of
-the login request are interpeted as a UTF-8-encoded text string and
-are used as the name portion of the identity for the resulting 
-client sessions.
-@end itemize
+@example
+  <auth type="password_file">
+    <property name="path" value="/path/to/passwords.txt" />
+  </auth>
+@end example
+
+The plugins currently available are described in the following 
+sections.
+
+@menu
+* Pass-thru authentication::
+* Password file authentication::
+* Kerberos v5 authentication::
+@end menu
+
+@node Pass-thru authentication
+@section Pass-thru authentication
+
+The pass-thru authentication plugin performs no actual 
+authentication---all login requests are accepted---and the contents
+of the byte sequence included as part of the login request are 
+interpeted as a UTF-8-encoded text string and are used as the name
+portion of the identity for the resulting client sessions.
+
+Note that pass-thru authentication is built into the gzochid server 
+container and does not need to be loaded or otherwise configured. 
+This scheme is what will be used by applications that do not 
+explicitly specify another authentication plugin.
+
+@node Password file authentication
+@section Password file authentication
+
+The password file authentication plugin allows a game application to
+authenticate users against a list defined in a text file. The 
+location of this file is given by the required ``path'' property 
+described below. Each row of the password file gives a username,
+followed by the equals (``='') character, followed by a password,
+and terminated by a newline.
+
+@example
+testuser=password123
+@end example
+
+This plugin interprets the byte string passed by the client during
+authentication as follows: All characters up to (but not including)
+a NULL byte (@code{0x00}) are interpreted as a username and are used
+as the name portion of the identity for the client session following
+successful authentication; all characters following this NULL byte
+are interpreted as a password and must match the password component
+of the row corresponding to the username in the password file.
+
+To use the password file plugin to authenticate clients of an 
+application, specify ``password_file'' as the value of the 
+@code{type} attribute in an @code{auth} element in the application's
+game descriptor file. This plugin accepts the following 
+configuration properties.
+
+@multitable @columnfractions .20 .20 .60
+@headitem Property @tab Required? @tab Description
+@item path
+@tab @code{true}
+@tab The absolute path to the password file.
+@end multitable
+
+@node Kerberos v5 authentication
+@section Kerberos v5 authentication
+
+The Kerberos v5 authentication plugin allows a game application to
+act as a host-based service in a Kerberos authentication realm, and 
+verify tickets generated for a user by a ticket granting server. The
+contents of the byte sequence included as part of the login request 
+are interpeted as an @code{AP-REQ} request and passed to the 
+@code{krb5_rd_req} Kerberos API function. The name portion of the 
+identity created for the resulting client session is obtained by
+calling the @code{krb5_unparse_name} function on the parsed request 
+ticket.
+
+See the @file{README} file included in the gzochi source 
+distribution for instructions for building the Kerberos 
+authentication plugin and linking with the Kerberos libraries. To 
+use the Kerberos plugin to authenticate the users of an application,
+specify ``krb5'' as the value of the @code{type} attribute in an 
+@code{auth} element in the application's game descriptor file. This 
+plugin accepts the following configuration properties.
+
+@multitable @columnfractions .20 .20 .60
+@headitem Property @tab Required? @tab Description
+@item service_name
+@tab @code{false}
+@tab The service principal name to use (defaults to ``gzochi'').
+@item keytab_file
+@tab @code{false}
+@tab The absolute path to the keytab file to be used by the service.
+@end multitable
+
+The configured service principal name must match the target service
+principal for which the client generated the ticket. The following 
+sample code extracts the credentials for the current user principal 
+from a local credentials cache and encodes a request that can be 
+read by the Kerberos authentication plugin. It may be useful as a 
+basis for building clients of applications that use this plugin.
+
+@example
+
+#include <krb5.h>
+#include <stddef.h>
+
+void
+authenticate ()
+@{
+  krb5_auth_context auth_context;
+  krb5_ccache ccache;
+  krb5_context k5_ctx;
+  krb5_data outbuf;
+
+  krb5_init_context (&k5_ctx);  
+  krb5_cc_default (k5_ctx, &ccache);
+  krb5_auth_con_init (k5_ctx, &auth_context);
+  krb5_mk_req (k5_ctx, &auth_context, 0, "gzochi", 
+               "localhost.localdomain", NULL, ccache, &outbuf);
+
+  /* The contents of outbuf.data should be sent as the payload of an
+     authentication request to the gzochid server. */
+
+  ...
+@}
+
+@end example
+
+Note that because of the one-way nature of the gzochi client
+authentication protocol, game applications cannot prove their 
+identity to an authenticating client, and the 
+@code{AP_OPTS_MUTUAL_REQUIRED} flag should not be used by clients.
 
 @node Monitoring
 @chapter Monitoring
