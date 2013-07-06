@@ -46,6 +46,13 @@ libgzochi-common is provided as part of the gzochi distribution and is assumed
 to have been built in a directory adjacent to the directory in which gzochid is
 being configured and built.
 
+To build the optional `krb5' authentication plugin, development files for MIT
+Kerberos 5 must be installed. The build process will search for these files by
+default, but if the `--enable-kerberos' option is given, their absence will 
+cause the build to fail. Use the `--with-krb5' option to specify the location 
+of the `krb5-config' program, which is used to determine the compile- and 
+link-time flags to be used to build the plugin.
+
 
 Required External Packages ====================================================
 
@@ -99,6 +106,18 @@ gzochid requires the following external packages:
 
     gzochid's ./configure script uses pkg-config to discover the correct 
     compile and link options for a number of the libraries above.
+
+
+Optional External Packages ====================================================
+
+The following external packages are necessary to enable specific optional
+features of gzochid.
+
+  - MIT Kerberos 5, at least version 1.10
+
+  MIT Kerberos 5 is used by the `krb5' authentication plugin to authenticate
+  clients of gzochid game applications. It is available from 
+  http://web.mit.edu/kerberos/ .
 
 
 Special Instructions For Some Systems =========================================
