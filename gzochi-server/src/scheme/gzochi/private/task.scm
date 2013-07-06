@@ -1,5 +1,5 @@
 ;; gzochi/private/task.scm: Private infrastructure for gzochi task API
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2013 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -18,14 +18,25 @@
 
 (library (gzochi private task)
   (export gzochi:run-task
-	  gzochi:schedule-task)
+	  gzochi:schedule-task
+	  gzochi:make-task-handle
+	  gzochi:task-handle?
+	  gzochi:task-handle-oid)
 
   (import (guile)
+	  (gzochi io)
 	  (gzochi private app)
+	  (gzochi private data)
 	  (gzochi private reflect)
+	  (ice-9 optargs)
 	  (rnrs base)
 	  (rnrs conditions)
 	  (rnrs exceptions))
+
+  (gzochi:define-managed-record-type
+   (gzochi:task-handle gzochi:make-task-handle gzochi:task-handle?)
+
+   (fields (immutable oid (serialization gzochi:integer-serialization))))
 
   (define primitive-schedule-task #f)
   
@@ -35,18 +46,22 @@
 		      (gzochi:callback-module callback))))
       (procedure (gzochi:callback-data callback))))
 
-  (define (gzochi:schedule-task callback . args)
+  (define* (gzochi:schedule-task callback #:optional delay period)
     (or (gzochi:callback? callback)
 	(raise (condition (make-assertion-violation)
 			  (make-irritants-condition callback))))
 
-    (if (null? args)
-	(primitive-schedule-task callback 0)
-	(or (and (eqv? (length args) 1)
-		 (let ((x (car args))) 
-		   (and (integer? x) 
-			(>= x 0) 
-			(primitive-schedule-task callback x))))
-	    (raise (condition (make-assertion-violation)
-			      (make-irritants-condition args))))))
+    (if delay
+	(begin
+	  (or (and (integer? delay) (>= delay 0))
+	      (raise (condition (make-assertion-violation)
+				(make-irritants-condition delay))))
+	  (if period
+	      (begin
+		(or (and (integer? period) (>= period 0))
+		    (raise (condition (make-assertion-violation)
+				      (make-irritants-condition period))))
+		(primitive-schedule-task callback delay period))
+	      (primitive-schedule-task callback delay)))
+	(primitive-schedule-task callback)))
 )

@@ -69,6 +69,8 @@ static SCM scm_client_session_oid;
 static SCM scm_make_channel;
 static SCM scm_channel_oid;
 
+static SCM scm_make_task_handle;
+static SCM scm_task_handle_oid;
 static SCM scm_run_task;
 
 static SCM scm_r6rs_raise;
@@ -875,6 +877,20 @@ SCM gzochid_scheme_create_channel (gzochid_channel *channel, mpz_t oid)
   return ret;
 }
 
+SCM gzochid_scheme_create_periodic_task_handle (mpz_t oid)
+{
+  char *oid_str = mpz_get_str (NULL, 16, oid);
+  
+  SCM scm_oid = scm_string_to_number
+    (scm_from_locale_string (oid_str), scm_from_short (16));
+  SCM ret = scm_call_1 (scm_make_task_handle, scm_oid);
+
+  free (oid_str);
+  scm_gc_protect_object (ret);
+
+  return ret;
+}
+
 static void bind_scm (char *module, SCM *binding, char *name)
 {
   SCM var = scm_c_public_variable (module, name);
@@ -940,6 +956,10 @@ static void *initialize_bindings (void *ptr)
   bind_scm ("gzochi private data", &scm_make_managed_reference, 
 	    "gzochi:make-managed-reference");
  
+  bind_scm ("gzochi private task", &scm_make_task_handle, 
+	    "gzochi:make-task-handle");
+  bind_scm ("gzochi private task", &scm_task_handle_oid, 
+	    "gzochi:task-handle-oid");
   bind_scm ("gzochi private task", &scm_run_task, "gzochi:run-task");
  
   gzochid_api_channel_init ();
@@ -966,6 +986,17 @@ void gzochid_scheme_managed_reference_oid (SCM reference, mpz_t oid)
 void gzochid_scheme_channel_oid (SCM channel, mpz_t oid)
 {
   SCM num = scm_call_1 (scm_channel_oid, channel);
+  char *oid_str = scm_to_locale_string
+    (scm_number_to_string (num, scm_from_short (16)));
+  
+  mpz_set_str (oid, oid_str, 16);
+
+  free (oid_str);
+}
+
+void gzochid_scheme_task_handle_oid (SCM handle, mpz_t oid)
+{
+  SCM num = scm_call_1 (scm_task_handle_oid, handle);
   char *oid_str = scm_to_locale_string
     (scm_number_to_string (num, scm_from_short (16)));
   

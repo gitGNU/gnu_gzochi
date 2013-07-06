@@ -1,4 +1,4 @@
-/* protocol.h: Prototypes and declarations for protocol.c
+/* scheme.h: Prototypes and declarations for scheme.c
  * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -82,10 +82,12 @@ SCM gzochid_scheme_create_client_session (gzochid_client_session *, mpz_t);
 SCM gzochid_scheme_create_managed_hashtable (GHashTable *);
 SCM gzochid_scheme_create_managed_reference (gzochid_data_managed_reference *);
 SCM gzochid_scheme_create_channel (gzochid_channel *, mpz_t);
+SCM gzochid_scheme_create_periodic_task_handle (mpz_t);
 
 void gzochid_scheme_managed_reference_oid (SCM, mpz_t);
 void gzochid_scheme_client_session_oid (SCM, mpz_t);
 void gzochid_scheme_channel_oid (SCM, mpz_t);
+void gzochid_scheme_task_handle_oid (SCM, mpz_t);
 
 void gzochid_scheme_initialize_bindings (void);
 
