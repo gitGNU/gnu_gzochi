@@ -24,6 +24,8 @@ test_programs = \
 	test-krb5 \
 	test-password_file
 
+dist_noinst_DATA = passwords.txt
+
 TESTS = $(test_programs)
 
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
