@@ -18,6 +18,8 @@
 
 (library (gzochi task)	 
 
-  (export gzochi:cancel-task gzochi:schedule-task)
+  (export gzochi:cancel-task 
+	  gzochi:schedule-task
+	  gzochi:task-handle?)
   (import (gzochi private task))
 )
