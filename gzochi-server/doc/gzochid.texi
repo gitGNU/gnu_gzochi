@@ -1887,40 +1887,32 @@ executed on behalf of a game application. All tasks are executed in
 a fully transactional context, meaning that their side effects enjoy
 guarantees of atomicity.
 
-@deffn {Scheme Procedure} gzochi:schedule-task callback [delay]
+@deffn {Scheme Procedure} gzochi:schedule-task callback [delay] [period]
 Transactionally schedules the @code{gzochi:callback} @var{callback} 
 for future execution. If @var{delay} is specified, it must be a
-positive integer giving the number of milliseconsd by which the
-execution of @var{callback} should be delayed. If @var{delay} is
-omitted, the behavior of this procedure is as if @var{delay} were
-zero: @var{callback} will be eligible for exeuction immediately
-upon the successful commit of the current transaction. 
+non-negative integer giving the number of milliseconds by which the
+execution of @var{callback} should be delayed. If @var{period} is 
+also specified, the execution of @var{callback} will be executed
+repeatedly, and @var{period} must be a non-negative integer giving 
+the number of milliseconds that must elapse between executions of
+@var{callback}.
 
-Note that the execution delay of a scheduled task is ``best 
-effort.'' The task will not be eligible for execution until at least
-the specified number of milliseconds have elapsed, but may be 
-delayed further depending on the current state of the server.
+If @var{period} is specified, this procedure futhermore returns a 
+``perodic task handle,'' an opaque managed record that can be used 
+to control the scheduling behavior of the resulting task.
+
+Note that the execution delay of a scheduled task, as well as the
+period of a periodic task, is ``best effort.'' The task will not be 
+eligible for execution until at least the specified number of 
+milliseconds have elapsed, but may be delayed further depending on 
+the current state of the server.
 @end deffn
 
-@deffn {Scheme Procedure} gzochi:schedule-periodic-task callback period [delay]
-Transactionally schedules the @code{gzochi:callback} @var{callback}
-for periodic execution. @var{period} is the number of milliseconds
-that must elapse between executions of @var{callback}, and must be a
-positive integer. If @var{delay} is given, it must also be a 
-positive integer, and specifies the desired delay before the 
-@emph{first} execution of the task.
-
-This procedure returns a ``perodic task handle,'' an opaque managed
-record that can be used to control the scheduling behavior of the
-resulting periodic task.
+@deffn {Scheme Procedure} gzochi:task-handle? obj
+Returns @code{#t} if @var{obj} is a task handle, @code{#f} otherwise.
 @end deffn
 
-@deffn {Scheme Procedure} gzochi:periodic-task-handle? obj
-Returns @code{#t} if @var{obj} is a periodic task handle, @code{#f}
-otherwise.
-@end deffn
-
-@deffn {Scheme Procedure} gzochi:cancel-periodic-task handle
+@deffn {Scheme Procedure} gzochi:cancel-task handle
 Cancels the periodic task associated with the periodic task handle
 @var{handle}. Note that depending on the state of the container's
 task execution schedule, the task may still be eligible for 
