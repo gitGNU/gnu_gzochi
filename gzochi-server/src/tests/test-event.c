@@ -20,12 +20,10 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#include "../app.h"
 #include "../event.h"
 
 static void test_handler 
-(gzochid_application_context *context, gzochid_application_event *event, 
- gpointer user_data)
+(gzochid_application_event *event, gpointer user_data)
 {
   *((gboolean *) user_data) = TRUE;
 }
@@ -43,7 +41,7 @@ static void test_event_dispatch ()
   GMainContext *main_context = g_main_loop_get_context (main_loop);
 
   gzochid_application_event_source *event_source = 
-    gzochid_application_event_source_new (gzochid_application_context_new ());
+    gzochid_application_event_source_new ();
   GSource *timeout_source = g_timeout_source_new (100);
   gzochid_application_event *event = 
     malloc (sizeof (gzochid_application_event));

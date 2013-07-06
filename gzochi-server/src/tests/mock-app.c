@@ -21,6 +21,7 @@
 
 #include "../app.h"
 #include "../auth.h"
+#include "../event.h"
 #include "../storage.h"
 #include "../tx.h"
 
@@ -35,6 +36,8 @@ gzochid_application_context *gzochid_application_context_new ()
   context->meta = gzochid_storage_open ("/dev/null");
   context->oids = gzochid_storage_open ("/dev/null");
   context->names = gzochid_storage_open ("/dev/null");
+
+  context->event_source = gzochid_application_event_source_new ();
 
   return context;
 }
@@ -147,4 +150,17 @@ void gzochid_application_resubmitting_transactional_task_worker
   
   gzochid_application_transactional_task_worker 
     (app_context, identity, execution);
+}
+
+gzochid_transaction_result gzochid_application_transaction_execute 
+(gzochid_application_context *context, void (*fn) (gpointer), gpointer data)
+{
+  gzochid_transaction_execute (fn, data);
+}
+
+gzochid_transaction_result gzochid_application_transaction_execute_timed 
+(gzochid_application_context *context, void (*fn) (gpointer), gpointer data, 
+ struct timeval timeout)
+{
+  gzochid_transaction_execute_timed (fn, data, timeout);
 }

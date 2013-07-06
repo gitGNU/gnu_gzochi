@@ -34,8 +34,8 @@ GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
 test_data_CFLAGS = @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_data_SOURCES = mock-app.c mock-schedule.c mock-storage.c test-data.c 
-test_data_LDADD = ../gzochid-auth.o ../gzochid-data.o ../gzochid-log.o \
-	../gzochid-task.o ../gzochid-tx.o ../gzochid-txlog.o \
+test_data_LDADD = ../gzochid-auth.o ../gzochid-data.o ../gzochid-event.o \
+	../gzochid-log.o ../gzochid-task.o ../gzochid-tx.o ../gzochid-txlog.o \
 	../gzochid-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@
 
@@ -46,7 +46,7 @@ test_event_LDADD = ../gzochid-event.o ../gzochid-log.o ../gzochid-tx.o \
 
 test_task_CFLAGS = @GLIB_CFLAGS@ @GMODULE_CFLAGS@
 test_task_SOURCES = test-task.c mock-app.c mock-guile.c mock-storage.c 
-test_task_LDADD = ../gzochid-auth.o ../gzochid-data.o \
+test_task_LDADD = ../gzochid-auth.o ../gzochid-data.o ../gzochid-event.o \
 	../gzochid-task.o ../gzochid-log.o ../gzochid-schedule.o \
 	../gzochid-threads.o ../gzochid-tx.o ../gzochid-txlog.o \
 	../gzochid-util.o \
