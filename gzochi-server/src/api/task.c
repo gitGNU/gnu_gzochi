@@ -88,9 +88,29 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
 	  return ret;
 	}
     }
+}
 
-  gzochid_schedule_delayed_durable_task 
-    (context, identity, scheme_task, &gzochid_scheme_task_serialization, tv);
+SCM_DEFINE (primitive_cancel_task, "primitive-cancel-task", 1, 0, 0, 
+	    (SCM scm_handle), "Cancel a previously scheduled periodic task.")
+{
+  gzochid_application_context *context = 
+    gzochid_api_ensure_current_application_context ();   
+  gzochid_data_managed_reference *handle_reference = NULL;
+  gzochid_periodic_task_handle *task_handle = NULL;
+  mpz_t oid;
+  
+  mpz_init (oid);
+  
+  gzochid_scheme_task_handle_oid (scm_handle, oid);
+  handle_reference = gzochid_data_create_reference_to_oid 
+    (context, &gzochid_durable_application_task_handle_serialization, oid);
+
+  gzochid_data_dereference (handle_reference);
+  
+  task_handle = (gzochid_periodic_task_handle *) handle_reference->obj;
+  gzochid_cancel_periodic_task (context, task_handle);
+
+  mpz_clear (oid);
 
   gzochid_api_check_transaction ();
 

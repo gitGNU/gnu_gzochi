@@ -17,8 +17,10 @@
 #!r6rs
 
 (library (gzochi private task)
-  (export gzochi:run-task
+  (export gzochi:cancel-task
+	  gzochi:run-task
 	  gzochi:schedule-task
+
 	  gzochi:make-task-handle
 	  gzochi:task-handle?
 	  gzochi:task-handle-oid)
@@ -38,8 +40,16 @@
 
    (fields (immutable oid (serialization gzochi:integer-serialization))))
 
+  (define primitive-cancel-task #f)
   (define primitive-schedule-task #f)
-  
+
+  (define (gzochi:cancel-task handle)
+    (or (gzochi:task-handle? handle)
+	(raise (condition (make-assertion-violation)
+			  (make-irritants-condition handle))))
+    
+    (primitive-cancel-task handle))
+
   (define (gzochi:run-task callback)
     (let ((procedure (gzochi:resolve-procedure 
 		      (gzochi:callback-procedure callback)
