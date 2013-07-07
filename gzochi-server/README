@@ -1,4 +1,4 @@
-This is version 0.2 of gzochid, the server container for the gzochi game
+This is version 0.4 of gzochid, the server container for the gzochi game
 development framework.
 
 gzochi is a framework for developing massively multiplayer online games. A
@@ -22,15 +22,15 @@ found below.
 
 gzochid depends on the following external libraries.
 - libg
-- libgdbm
+- libdb
 - libgmp
 - libguile
 - libgzochi-common
 - libmicrohttpd
 - libserveez
 - libz
-The libdb library may be used in place of libgdbm if it is available and the
-`--with-storage-engine=bdb' option has been specified.
+The libgdbm library may be used in place of libdb if it is available and the
+`--with-storage-engine=gdbm' option has been specified.
 
 There is a corresponding `--with-XXX-prefix' option for libgdbm and libgmp that
 you can use when invoking ./configure, if you have these libraries installed in
