@@ -4,6 +4,53 @@ See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.4 (since 0.3):
+
+* Notable changes
+
+** Periodic task scheduling
+
+Application tasks can now be scheduled to repeat on a configurable period,
+without the need for explicit resubmission. This rescheduling behavior is
+durable, such that a task scheduled to repeat periodically will automatically
+continue to do so following a server restart.
+
+** Pluggable authentication
+
+The user authentication system in the gzochid container has been restructured
+to support multiple methods of authentication, instead of just the fake 
+"pass-thru" mechanism provided in previous releases. And there are now two 
+additional ways to authenticate users of an application: Against a "password 
+file" of usernames and passwords; or using Kerberos 5. See "User 
+authentication" in the manual for the details of how authentication plugins are
+loaded and for a description of the behavior of the new authentication plugins 
+included in this release.
+
+** Application statistics
+
+Some simple metrics are now collected about the behavior of running game 
+applications: The numbers of successful and failed transactions, the numbers of
+bytes read from and written the to game data store. The embedded web console 
+now reports on these metrics for each running application.
+
+* New interfaces
+
+** gzochi:task-handle and gzochi:cancel-task
+
+The contract of `gzochi:schedule-task' has been extended to support periodic
+task scheduling. Consequently, when a task is schedule to repeat on a specified
+period, a task handle is returned to the caller. Task handles are managed 
+records that can be stored in user-defined data structures and passed to other 
+tasks or callbacks. In particular, a task handle may be given as the argument 
+to `gzochi:cancel-task', which stops a periodic task from repeating further. 
+See "(gzochi task)" in the manual for more information on task scheduling.
+
+* Bug fixes
+
+** gzochid configure script doesn't fail on missing Serveez
+** Documentation: Clarify the install path of gzochid.conf
+
+
 Changes in 0.3 (since 0.2):
 
 * Notable changes
