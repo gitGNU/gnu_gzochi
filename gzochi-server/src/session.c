@@ -329,6 +329,23 @@ gzochid_io_serialization gzochid_client_session_serialization =
     finalize_client_session 
   };
 
+static void remove_session_binding 
+(gzochid_application_context *context, const char *oid_str)
+{
+  GString *binding = g_string_new (SESSION_PREFIX);
+
+  g_string_append (binding, oid_str);
+  gzochid_data_remove_binding (context, binding->str);
+  g_string_free (binding, FALSE);
+}
+
+void gzochid_client_session_disconnected_worker
+(gzochid_application_context *context, gzochid_auth_identity *identity,
+ gpointer data)
+{
+  remove_session_binding (context, (const char *) data);
+}
+
 gzochid_client_session *gzochid_client_session_new 
 (gzochid_auth_identity *identity)
 {
@@ -361,7 +378,6 @@ void gzochid_client_session_disconnect
 (gzochid_application_context *context, gzochid_client_session *session)
 {
   char *oid_str = NULL;
-  GString *binding = g_string_new (SESSION_PREFIX);
   gzochid_client_session_transaction_context *tx_context = NULL;
   gzochid_data_managed_reference *reference = NULL;
   
@@ -373,9 +389,7 @@ void gzochid_client_session_disconnect
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
-  g_string_append (binding, oid_str);
-  gzochid_data_remove_binding (context, binding->str);
-  g_string_free (binding, FALSE);
+  remove_session_binding (context, oid_str);
   free (oid_str);
 
   tx_context->operations = g_list_append 

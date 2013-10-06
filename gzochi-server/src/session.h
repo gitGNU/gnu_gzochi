@@ -1,5 +1,5 @@
 /* session.h: Prototypes and declarations for session.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -45,9 +45,11 @@ typedef struct _gzochid_client_session
 
 gzochid_io_serialization gzochid_client_session_serialization;
 
+void gzochid_client_session_disconnected_worker
+(gzochid_application_context *, gzochid_auth_identity *, gpointer);
+
 gzochid_client_session *gzochid_client_session_new (gzochid_auth_identity *);
 void gzochid_client_session_free (gzochid_client_session *);
-
 void gzochid_client_session_disconnect 
 (gzochid_application_context *, gzochid_client_session *);
 void gzochid_client_session_send_login_success 
