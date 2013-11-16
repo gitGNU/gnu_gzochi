@@ -1,5 +1,5 @@
 /* protocol.h: Prototypes and declarations for protocol.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -33,6 +33,7 @@ typedef struct _gzochid_protocol_client
   mpz_t oid;
   
   gboolean disconnected;
+  GMutex *sock_mutex;
   svz_socket_t *sock;
   char *connection_description;
 } gzochid_protocol_client;
