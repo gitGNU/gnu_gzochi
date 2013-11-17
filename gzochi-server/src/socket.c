@@ -44,13 +44,28 @@ static int detect_proto (svz_server_t *server, svz_socket_t *sock)
   return 1;
 }
 
-static int disconnected_socket (svz_socket_t *sock)
+static int write_socket (svz_socket_t *sock)
 {
   gzochid_socket_server_context *context = 
     (gzochid_socket_server_context *) sock->data;
   gzochid_protocol_client *client = 
     g_hash_table_lookup (context->clients, sock);
-  
+  int ret = 0;
+
+  g_mutex_lock (&client->sock_mutex);
+  ret = client->write_socket (sock);
+  g_mutex_unlock (&client->sock_mutex);
+
+  return ret;
+}
+
+static int disconnected_socket (svz_socket_t *sock)
+{  
+  gzochid_socket_server_context *context = 
+    (gzochid_socket_server_context *) sock->data;
+  gzochid_protocol_client *client = 
+    g_hash_table_lookup (context->clients, sock);
+
   gzochid_debug ("Socket disconnected.");
   gzochid_protocol_client_disconnected (client);
 
@@ -99,16 +114,17 @@ static int connect_socket (svz_server_t *server, svz_socket_t *sock)
 {
   gzochid_socket_server_context *context = 
     (gzochid_socket_server_context *) server->data;
+  gzochid_protocol_client *client = gzochid_protocol_client_accept (sock);
 
   sock->data = context;
   sock->disconnected_socket = disconnected_socket;
   sock->check_request = check_request;
   sock->handle_request = server->handle_request;
+  sock->write_socket = write_socket;
   
   gzochid_debug ("Received socket connection."); 
 
-  g_hash_table_insert
-    (context->clients, sock, gzochid_protocol_client_accept (sock));
+  g_hash_table_insert (context->clients, sock, client);
   return 0;
 }
 

@@ -118,7 +118,8 @@ gzochid_protocol_client *gzochid_protocol_client_accept (svz_socket_t *sock)
   mpz_init (client->oid);
   mpz_set_si (client->oid, -1);
 
-  client->sock_mutex = g_mutex_new ();
+  g_mutex_init (&client->sock_mutex);
+  client->write_socket = sock->write_socket;
   client->sock = sock;
   client->connection_description = g_strdup_printf 
     ("%s:%d", "addr", sock->remote_port);
@@ -129,7 +130,6 @@ gzochid_protocol_client *gzochid_protocol_client_accept (svz_socket_t *sock)
 void gzochid_protocol_client_free (gzochid_protocol_client *client)
 {
   mpz_clear (client->oid);
-  g_mutex_free (client->sock_mutex);
   g_free (client->connection_description);
   free (client);
 }
@@ -176,28 +176,19 @@ void gzochid_protocol_client_dispatch
 void gzochid_protocol_client_disconnect (gzochid_protocol_client *client)
 {
   char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECTED };
-  
-  g_mutex_lock (client->sock_mutex);
   svz_sock_write (client->sock, buf, 3);
-  g_mutex_unlock (client->sock_mutex);
 }
 
 void gzochid_protocol_client_login_success (gzochid_protocol_client *client)
 {
   char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_LOGIN_SUCCESS };
-
-  g_mutex_lock (client->sock_mutex);
   svz_sock_write (client->sock, buf, 3);
-  g_mutex_unlock (client->sock_mutex);
 }
 
 void gzochid_protocol_client_login_failure (gzochid_protocol_client *client)
 {
   char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_LOGIN_FAILURE };
-
-  g_mutex_lock (client->sock_mutex);
   svz_sock_write (client->sock, buf, 3);
-  g_mutex_unlock (client->sock_mutex);
 }
 
 void gzochid_protocol_client_send 
@@ -208,8 +199,6 @@ void gzochid_protocol_client_send
   gzochi_common_io_write_short (len, len_str, 0);
   len_str[2] = GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE;
 
-  g_mutex_lock (client->sock_mutex);
   svz_sock_write (client->sock, (char *) len_str, 3);
   svz_sock_write (client->sock, (char *) msg, len);
-  g_mutex_unlock (client->sock_mutex);
 }

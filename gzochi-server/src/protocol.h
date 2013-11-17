@@ -33,7 +33,8 @@ typedef struct _gzochid_protocol_client
   mpz_t oid;
   
   gboolean disconnected;
-  GMutex *sock_mutex;
+  GMutex sock_mutex;
+  int (*write_socket) (svz_socket_t *);
   svz_socket_t *sock;
   char *connection_description;
 } gzochid_protocol_client;
