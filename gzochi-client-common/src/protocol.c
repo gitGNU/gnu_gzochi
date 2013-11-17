@@ -1,5 +1,5 @@
 /* protocol.c: Client-side protocol I/O routines for libgzochi
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@ static int send_fully (int sock, unsigned char *data, int len)
   while (total_sent < len)
     {
       int bytes_sent = send 
-	(sock, (char *) data + total_sent, len - total_sent, 0);
+	(sock, (char *) data + total_sent, len - total_sent, MSG_NOSIGNAL);
       
       if (bytes_sent < 0)
 	return -1;

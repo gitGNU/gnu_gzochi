@@ -1,5 +1,5 @@
 /* client.c: GSource interface for libgzochi-glib
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2013 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -177,7 +177,8 @@ void gzochi_glib_client_disconnect (gzochi_glib_client_session *session)
 void gzochi_glib_client_send 
 (gzochi_glib_client_session *session, unsigned char *msg, short len)
 {
-  gzochi_client_protocol_send_session_message (session, msg, len);
+  if (gzochi_client_protocol_send_session_message (session, msg, len) < 0)
+    gzochi_client_common_session_disconnect (session);
 }
 
 char *gzochi_glib_client_session_endpoint (gzochi_glib_client_session *session)

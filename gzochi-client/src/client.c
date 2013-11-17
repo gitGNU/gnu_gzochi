@@ -52,10 +52,7 @@ static int read_and_dispatch (gzochi_client_session *session, int connecting)
   
       if (gzochi_client_protocol_read (session) < 0)
 	{
-	  if (session->disconnected_callback != NULL)
-	    session->disconnected_callback 
-	      (session, session->disconnected_user_data);
-
+	  gzochi_client_common_session_disconnect (session);
 	  return -1;
 	}
     }
@@ -89,7 +86,7 @@ gzochi_client_session *gzochi_client_connect
   if (hostinfo == NULL)
     return NULL;
 
-  name.sin_addr  = *(struct in_addr *) hostinfo->h_addr;
+  name.sin_addr = *(struct in_addr *) hostinfo->h_addr;
 
   if (connect (sock, (struct sockaddr *) &name, 
 	       sizeof (struct sockaddr_in)) < 0)
@@ -121,7 +118,8 @@ void gzochi_client_disconnect (gzochi_client_session *session)
 void gzochi_client_send 
 (gzochi_client_session *session, unsigned char *msg, short len)
 {
-  gzochi_client_protocol_send_session_message (session, msg, len);
+  if (gzochi_client_protocol_send_session_message (session, msg, len) < 0)
+    gzochi_client_common_session_disconnect (session);
 }
 
 char *gzochi_client_session_endpoint (gzochi_client_session *session)
