@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <glib.h>
 #include <gmp.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -612,9 +613,13 @@ char *gzochid_data_next_binding_oid
 	gzochid_transaction_mark_for_rollback 
 	  (&data_participant, tx_context->names_transaction->should_retry);
 
-      mpz_set_str (oid, next_value, 16);
-      free (next_value);
-      return next_key;
+      if (next_value != NULL)
+	{
+	  mpz_set_str (oid, next_value, 16);
+	  free (next_value);
+	  return next_key;
+	}
+      else return NULL;
     }
   else return NULL;
 }
@@ -807,7 +812,9 @@ void gzochid_data_mark
 	gzochid_transaction_mark_for_rollback 
 	  (&data_participant, tx_context->oids_transaction->should_retry);
 
+      if (data != NULL)
+	free (data);
+
       free (oid_str);
-      free (data);
     }
 }
