@@ -35,6 +35,11 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
 
   gzochid_application_task *scheme_task = gzochid_application_task_new 
     (context, identity, gzochid_scheme_application_task_worker, callback);
+
+  /* FIXME: This object will stay protected even if the current transaction
+     gets rolled back. */
+
+  scm_gc_protect_object (callback);
   
   if (scm_is_false (delay))
     {
