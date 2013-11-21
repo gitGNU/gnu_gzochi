@@ -41,7 +41,7 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
 
   scm_gc_protect_object (callback);
   
-  if (scm_is_false (delay))
+  if (scm_is_false (delay) || scm_is_eq (delay, SCM_UNDEFINED))
     {
       gzochid_schedule_durable_task 
 	(context, identity, scheme_task, &gzochid_scheme_task_serialization);
@@ -58,7 +58,7 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
       delay_tv.tv_sec = d / 1000;
       delay_tv.tv_usec = (d % 1000) * 1000; 
 
-      if (scm_is_false (period))
+      if (scm_is_false (period) || scm_is_eq (period, SCM_UNDEFINED))
 	{
 	  gzochid_schedule_delayed_durable_task 
 	    (context, identity, scheme_task, 
