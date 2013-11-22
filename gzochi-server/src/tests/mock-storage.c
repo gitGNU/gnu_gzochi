@@ -50,7 +50,13 @@ static void g_string_destroy (gpointer data)
   g_string_free ((GString *) data, TRUE);
 }
 
-gzochid_storage_store *gzochid_storage_open (char *path)
+gzochid_storage_context *gzochid_storage_initialize (char *path)
+{
+  return NULL;
+}
+
+gzochid_storage_store *gzochid_storage_open 
+(gzochid_storage_context *context, char *path)
 {
   gzochid_storage_store *store = calloc (1, sizeof (gzochid_storage_store));
 
@@ -169,23 +175,23 @@ char *gzochid_storage_next_key
 }
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin_timed
-(gzochid_storage_store *store, struct timeval tv)
+(gzochid_storage_context *context, struct timeval tv)
 {
   gzochid_storage_transaction *tx = 
     calloc (1, sizeof (gzochid_storage_transaction));
   
-  tx->store = store;
+  tx->context = context;
 
   return tx;
 }
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin
-(gzochid_storage_store *store)
+(gzochid_storage_context *context)
 {
   gzochid_storage_transaction *tx = 
     calloc (1, sizeof (gzochid_storage_transaction));
   
-  tx->store = store;
+  tx->context = context;
 
   return tx;
 }
@@ -205,38 +211,42 @@ void gzochid_storage_transaction_prepare (gzochid_storage_transaction *tx)
 }
 
 char *gzochid_storage_transaction_get 
-(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len, size_t *len)
 {
-  return gzochid_storage_get (tx->store, key, key_len, len);
+  return gzochid_storage_get (store, key, key_len, len);
 }
 
 char *gzochid_storage_transaction_get_for_update
-(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len, size_t *len)
 {
-  return gzochid_storage_get (tx->store, key, key_len, len);
+  return gzochid_storage_get (store, key, key_len, len);
 }
 
 void gzochid_storage_transaction_put
-(gzochid_storage_transaction *tx, char *key, size_t key_len, char *data, 
- size_t data_len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len, char *data, size_t data_len)
 {
-  gzochid_storage_put (tx->store, key, key_len, data, data_len);
+  gzochid_storage_put (store, key, key_len, data, data_len);
 }
 
 void gzochid_storage_transaction_delete
-(gzochid_storage_transaction *tx, char *key, size_t key_len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len)
 {
-  gzochid_storage_delete (tx->store, key, key_len);
+  gzochid_storage_delete (store, key, key_len);
 }
 
 char *gzochid_storage_transaction_first_key 
-(gzochid_storage_transaction *tx, size_t *len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, size_t *len)
 {
-  return gzochid_storage_first_key (tx->store, len);
+  return gzochid_storage_first_key (store, len);
 }
 
 char *gzochid_storage_transaction_next_key 
-(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len, size_t *len)
 {
-  return gzochid_storage_next_key (tx->store, key, key_len, len);
+  return gzochid_storage_next_key (store, key, key_len, len);
 }
