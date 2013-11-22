@@ -53,10 +53,6 @@ if STORAGE_ENGINE_BDB
 gzochid_SOURCES += storage-bdb.c
 endif
 
-if STORAGE_ENGINE_GDBM
-gzochid_SOURCES += storage-gdbm.c
-endif
-
 admin.c: admin.h
 app.c: app.h
 auth.c: auth.h auth_int.h
@@ -80,7 +76,6 @@ session.c: session.h
 socket.c: socket.h
 stats.c: stats.h
 storage-bdb.c: storage.h
-storage-gdbm.c: storage.h
 task.c: task.h
 threads.c: threads.h
 tx.c: tx.h
