@@ -118,6 +118,8 @@ static void initialize_data (int from_state, int to_state, gpointer user_data)
   char *oids_db = g_strconcat (data_dir, "/oids", NULL);
   char *names_db = g_strconcat (data_dir, "/names", NULL);
 
+  gzochid_storage_context *storage_context = NULL;
+
   if (!g_file_test (data_dir, G_FILE_TEST_EXISTS))
     {
       gzochid_notice 
@@ -128,9 +130,12 @@ static void initialize_data (int from_state, int to_state, gpointer user_data)
   else if (!g_file_test (data_dir, G_FILE_TEST_IS_DIR))
     gzochid_err ("%s is not a directory.", data_dir);
 
-  app_context->meta = gzochid_storage_open (meta_db);
-  app_context->oids = gzochid_storage_open (oids_db);
-  app_context->names = gzochid_storage_open (names_db);
+  storage_context = gzochid_storage_initialize (data_dir);
+
+  app_context->storage_context = storage_context;
+  app_context->meta = gzochid_storage_open (storage_context, meta_db);
+  app_context->oids = gzochid_storage_open (storage_context, oids_db);
+  app_context->names = gzochid_storage_open (storage_context, names_db);
 
   free (data_dir);
   free (meta_db);

@@ -23,21 +23,29 @@
 #include <gmp.h>
 #include <sys/time.h>
 
+typedef struct _gzochid_storage_context
+{
+  gpointer environment;
+} gzochid_storage_context;
+
 typedef struct _gzochid_storage_store
 {
   GMutex *mutex;
+  gzochid_storage_context *context;
   gpointer database;
 } gzochid_storage_store;
 
 typedef struct _gzochid_storage_transaction
 {
-  gzochid_storage_store *store;
+  gzochid_storage_context *context;
   gpointer txn;
   gboolean rollback;
   gboolean should_retry;
 } gzochid_storage_transaction;
 
-gzochid_storage_store *gzochid_storage_open (char *);
+gzochid_storage_context *gzochid_storage_initialize (char *);
+gzochid_storage_store *gzochid_storage_open 
+(gzochid_storage_context *, char *);
 void gzochid_storage_close (gzochid_storage_store *);
 void gzochid_storage_lock (gzochid_storage_store *);
 void gzochid_storage_unlock (gzochid_storage_store *);
@@ -51,23 +59,27 @@ char *gzochid_storage_next_key
 (gzochid_storage_store *, char *, size_t, size_t *);
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin
-(gzochid_storage_store *);
+(gzochid_storage_context *);
 gzochid_storage_transaction *gzochid_storage_transaction_begin_timed
-(gzochid_storage_store *, struct timeval);
+(gzochid_storage_context *, struct timeval);
 void gzochid_storage_transaction_commit (gzochid_storage_transaction *);
 void gzochid_storage_transaction_rollback (gzochid_storage_transaction *);
 void gzochid_storage_transaction_prepare (gzochid_storage_transaction *);
 char *gzochid_storage_transaction_get 
-(gzochid_storage_transaction *, char *, size_t, size_t *);
+(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t, 
+ size_t *);
 char *gzochid_storage_transaction_get_for_update 
-(gzochid_storage_transaction *, char *, size_t, size_t *);
+(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t, 
+ size_t *);
 void gzochid_storage_transaction_put 
-(gzochid_storage_transaction *, char *, size_t, char *, size_t);
+(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t, 
+ char *, size_t);
 void gzochid_storage_transaction_delete 
-(gzochid_storage_transaction *, char *, size_t);
+(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t);
 char *gzochid_storage_transaction_first_key 
-(gzochid_storage_transaction *, size_t *);
+(gzochid_storage_transaction *, gzochid_storage_store *, size_t *);
 char *gzochid_storage_transaction_next_key 
-(gzochid_storage_transaction *, char *, size_t, size_t *);
+(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t, 
+ size_t *);
 
 #endif /* GZOCHID_STORAGE_H */

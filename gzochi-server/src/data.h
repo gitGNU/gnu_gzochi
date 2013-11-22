@@ -67,8 +67,7 @@ typedef struct _gzochid_data_transaction_context
   gzochid_data_oid_block *free_oids;
   GList *used_oid_blocks;
 
-  gzochid_storage_transaction *oids_transaction;
-  gzochid_storage_transaction *names_transaction;
+  gzochid_storage_transaction *transaction;
 
   GHashTable *oids_to_references;
   GHashTable *ptrs_to_references;

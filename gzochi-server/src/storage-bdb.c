@@ -28,39 +28,19 @@
 #include "log.h"
 #include "storage.h"
 
-typedef struct _bdb_context
-{
-  DB *db;
-  DB_ENV *db_env;
-} bdb_context;
-
 static gboolean retryable (int ret)
 {
   return ret == DB_LOCK_DEADLOCK || ret == DB_LOCK_NOTGRANTED;
 }
 
-gzochid_storage_store *gzochid_storage_open (char *path)
+gzochid_storage_context *gzochid_storage_initialize (char *path)
 {
-  DB_TXN *dbopen_tx = NULL;
-  int pathlen = strlen (path);
-  int pathbaselen = 0;
-  gzochid_storage_store *store = calloc (1, sizeof (gzochid_storage_store));
-  bdb_context *context = malloc (sizeof (bdb_context));
-  u_int32_t db_flags, env_flags = 0;
+  DB_ENV *db_env = NULL;
+  u_int32_t env_flags = 0;
+  gzochid_storage_context *context = 
+    calloc (1, sizeof (gzochid_storage_context));
   int ret = 0;
 
-  char *pathcopy = strndup (path, pathlen);
-  char *pathbase = basename (pathcopy); 
-  char *filename = NULL;
-
-  pathbaselen = strlen (pathbase);
-  filename = malloc (sizeof (char) * (pathlen + pathbaselen + 5));
-  
-  filename = strncpy (filename, path, pathlen + 1);
-  filename = strncat (filename, "/", 1);
-  filename = strncat (filename, pathbase, pathbaselen);
-  filename = strncat (filename, ".db", 3);
-  
   if (g_file_test (path, G_FILE_TEST_EXISTS))
     {
       if (!g_file_test (path, G_FILE_TEST_IS_DIR))
@@ -80,9 +60,8 @@ gzochid_storage_store *gzochid_storage_open (char *path)
 	}
     }
 
-  assert (db_env_create (&context->db_env, 0) == 0);
-  assert (context->db_env->set_lk_detect 
-	  (context->db_env, DB_LOCK_YOUNGEST) == 0);
+  assert (db_env_create (&db_env, 0) == 0);
+  assert (db_env->set_lk_detect (db_env, DB_LOCK_YOUNGEST) == 0);
 
   env_flags = DB_CREATE
     | DB_INIT_LOCK
@@ -91,7 +70,7 @@ gzochid_storage_store *gzochid_storage_open (char *path)
     | DB_RECOVER
     | DB_THREAD;
 
-  ret = context->db_env->open (context->db_env, path, env_flags, 0);
+  ret = db_env->open (db_env, path, env_flags, 0);
   if (ret != 0)
     {
       gzochid_err 
@@ -99,16 +78,37 @@ gzochid_storage_store *gzochid_storage_open (char *path)
       return NULL;
     }
 
-  context->db_env->set_flags (context->db_env, DB_TXN_WRITE_NOSYNC, TRUE);
+  db_env->set_flags (db_env, DB_TXN_WRITE_NOSYNC, TRUE);
 
-  assert (db_create (&context->db, context->db_env, 0) == 0);
+  context->environment = db_env;
+
+  return context;
+}
+
+gzochid_storage_store *gzochid_storage_open 
+(gzochid_storage_context *context, char *path)
+{
+  DB *db = NULL;
+  DB_TXN *dbopen_tx = NULL;
+  DB_ENV *db_env = (DB_ENV *) context->environment;
+
+  int pathlen = strlen (path);
+  gzochid_storage_store *store = calloc (1, sizeof (gzochid_storage_store));
+  u_int32_t db_flags = 0;
+  int ret = 0;
+
+  char *filename = malloc (sizeof (char) * (pathlen + 4));
+
+  filename = strncpy (filename, path, pathlen + 1);
+  filename = strncat (filename, ".db", 3);
+  
+  assert (db_create (&db, db_env, 0) == 0);
   db_flags = DB_CREATE
     | DB_MULTIVERSION
     | DB_THREAD;
 
-  context->db_env->txn_begin (context->db_env, NULL, &dbopen_tx, 0);
-  ret = context->db->open 
-    (context->db, dbopen_tx, filename, NULL, DB_BTREE, db_flags, 0);
+  db_env->txn_begin (db_env, NULL, &dbopen_tx, 0);
+  ret = db->open (db, dbopen_tx, filename, NULL, DB_BTREE, db_flags, 0);
   if (ret != 0)
     {
       gzochid_err
@@ -118,10 +118,10 @@ gzochid_storage_store *gzochid_storage_open (char *path)
     }
   dbopen_tx->commit (dbopen_tx, 0);
 
-  store->database = context;
+  store->database = db;
+  store->context = context;
   store->mutex = g_mutex_new ();
 
-  free (pathcopy);
   free (filename);
 
   return store;
@@ -129,14 +129,11 @@ gzochid_storage_store *gzochid_storage_open (char *path)
 
 void gzochid_storage_close (gzochid_storage_store *store)
 {
-  bdb_context *context = store->database;
+  DB *db = (DB *) store->database;
 
   g_mutex_free (store->mutex);
 
-  context->db->close (context->db, 0);
-  context->db_env->close (context->db_env, 0);
-  free (store->database);
-
+  db->close (db, 0);
   free (store);
 }
 
@@ -153,7 +150,7 @@ void gzochid_storage_unlock (gzochid_storage_store *store)
 char *gzochid_storage_get 
 (gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
 {
-  bdb_context *context = (bdb_context *) store->database;
+  DB *db = (DB *) store->database;
   DBT db_key, db_data;
   int ret = 0;
 
@@ -164,7 +161,7 @@ char *gzochid_storage_get
   db_key.size = key_len;
 
   db_data.flags = DB_DBT_MALLOC;
-  ret = context->db->get (context->db, NULL, &db_key, &db_data, 0);
+  ret = db->get (db, NULL, &db_key, &db_data, 0);
   if (ret == 0)
     {
       if (db_data.data != NULL && len != NULL)
@@ -183,7 +180,7 @@ void gzochid_storage_put
 (gzochid_storage_store *store, char *key, size_t key_len, char *data, 
  size_t data_len)
 {
-  bdb_context *context = (bdb_context *) store->database;
+  DB *db = (DB *) store->database;
   DBT db_key, db_data;
   int ret = 0;
 
@@ -196,7 +193,7 @@ void gzochid_storage_put
   db_data.data = data;
   db_data.size = data_len;
 
-  ret = context->db->put (context->db, NULL, &db_key, &db_data, 0);
+  ret = db->put (db, NULL, &db_key, &db_data, 0);
 
   if (ret != 0)
     gzochid_err ("Failed to store key %s: %s", key, db_strerror (ret));
@@ -205,7 +202,7 @@ void gzochid_storage_put
 void gzochid_storage_delete 
 (gzochid_storage_store *store, char *key, size_t key_len)
 {
-  bdb_context *context = (bdb_context *) store->database;
+  DB *db = (DB *) store->database;
   DBT db_key;
   int ret = 0;
 
@@ -213,7 +210,7 @@ void gzochid_storage_delete
   db_key.data = key;
   db_key.size = key_len;
 
-  ret = context->db->del (context->db, NULL, &db_key, 0);
+  ret = db->del (db, NULL, &db_key, 0);
 
   if (ret != 0)
     gzochid_err ("Failed to delete key %s: %s", key, db_strerror (ret));
@@ -221,12 +218,12 @@ void gzochid_storage_delete
 
 char *gzochid_storage_first_key (gzochid_storage_store *store, size_t *len)
 {
-  bdb_context *context = (bdb_context *) store->database;
+  DB *db = (DB *) store->database;
   DBC *cursor = NULL;
   DBT db_key, db_value;
   int ret = 0;
 
-  context->db->cursor (context->db, NULL, &cursor, 0);
+  db->cursor (db, NULL, &cursor, 0);
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_value, 0, sizeof (DBT));
 
@@ -252,12 +249,12 @@ char *gzochid_storage_first_key (gzochid_storage_store *store, size_t *len)
 char *gzochid_storage_next_key 
 (gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
 {
-  bdb_context *context = (bdb_context *) store->database;
+  DB *db = (DB *) store->database;
   DBC *cursor = NULL;
   DBT db_key, db_value;
   int ret = 0;
 
-  context->db->cursor (context->db, NULL, &cursor, 0);
+  db->cursor (db, NULL, &cursor, 0);
 
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_value, 0, sizeof (DBT));
@@ -290,31 +287,34 @@ char *gzochid_storage_next_key
 }
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin
-(gzochid_storage_store *store)
+(gzochid_storage_context *context)
 {
-  bdb_context *context = (bdb_context *) store->database;
+  DB_ENV *db_env = (DB_ENV *) context->environment;
+
   gzochid_storage_transaction *transaction = 
     calloc (1, sizeof (gzochid_storage_transaction));
   DB_TXN *txn;
 
-  context->db_env->txn_begin (context->db_env, NULL, &txn, 0);
+  db_env->txn_begin (db_env, NULL, &txn, 0);
 
-  transaction->store = store;
+  transaction->context = context;
   transaction->txn = txn;
 
   return transaction;
 }
 
 gzochid_storage_transaction *gzochid_storage_transaction_begin_timed
-(gzochid_storage_store *store, struct timeval timeout)
+(gzochid_storage_context *context, struct timeval timeout)
 {
   gzochid_storage_transaction *transaction = 
-    gzochid_storage_transaction_begin (store);
+    gzochid_storage_transaction_begin (context);
   db_timeout_t t = timeout.tv_usec + timeout.tv_sec * 1000000;
   DB_TXN *txn = (DB_TXN *) transaction->txn;
 
-  txn->set_timeout (txn, t, DB_SET_TXN_TIMEOUT);
-  txn->set_timeout (txn, t, DB_SET_LOCK_TIMEOUT);
+  assert (t > 0);
+
+  assert (txn->set_timeout (txn, t, DB_SET_TXN_TIMEOUT) == 0);
+  assert (txn->set_timeout (txn, t, DB_SET_LOCK_TIMEOUT) == 0);
 
   return transaction;
 }
@@ -338,10 +338,10 @@ void gzochid_storage_transaction_prepare (gzochid_storage_transaction *tx)
 }
 
 static char *transaction_get_internal
-(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len,
- gboolean write_lock)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len, size_t *len, gboolean write_lock)
 {
-  bdb_context *context = (bdb_context *) tx->store->database;
+  DB *db = (DB *) store->database;
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBT db_key, db_data;
   u_int32_t flags = write_lock ? DB_RMW : 0;
@@ -354,7 +354,7 @@ static char *transaction_get_internal
   db_key.size = key_len;
 
   db_data.flags = DB_DBT_MALLOC;
-  ret = context->db->get (context->db, txn, &db_key, &db_data, flags);
+  ret = db->get (db, txn, &db_key, &db_data, flags);
   if (ret == 0)
     {
       if (db_data.data != NULL && len != NULL)
@@ -377,22 +377,25 @@ static char *transaction_get_internal
 }
 
 char *gzochid_storage_transaction_get 
-(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len, size_t *len)
 {
-  return transaction_get_internal (tx, key, key_len, len, FALSE);
+  return transaction_get_internal (tx, store, key, key_len, len, FALSE);
 }
 
 char *gzochid_storage_transaction_get_for_update
-(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len, size_t *len)
 {
-  return transaction_get_internal (tx, key, key_len, len, TRUE);
+  return transaction_get_internal (tx, store, key, key_len, len, TRUE);
 }
 
 void gzochid_storage_transaction_put
-(gzochid_storage_transaction *tx, char *key, size_t key_len, char *data, 
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len, char *data, 
  size_t data_len)
 {
-  bdb_context *context = (bdb_context *) tx->store->database;
+  DB *db = (DB *) store->database;
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBT db_key, db_data;
   int ret = 0;
@@ -406,7 +409,7 @@ void gzochid_storage_transaction_put
   db_data.data = data;
   db_data.size = data_len;
 
-  ret = context->db->put (context->db, txn, &db_key, &db_data, 0);
+  ret = db->put (db, txn, &db_key, &db_data, 0);
 
   if (ret != 0)
     {
@@ -418,9 +421,10 @@ void gzochid_storage_transaction_put
 }
 
 void gzochid_storage_transaction_delete
-(gzochid_storage_transaction *tx, char *key, size_t key_len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len)
 {
-  bdb_context *context = (bdb_context *) tx->store->database;
+  DB *db = (DB *) store->database;
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBT db_key;
   int ret = 0;
@@ -429,7 +433,7 @@ void gzochid_storage_transaction_delete
   db_key.data = key;
   db_key.size = key_len;
 
-  ret = context->db->del (context->db, txn, &db_key, 0);
+  ret = db->del (db, txn, &db_key, 0);
 
   if (ret != 0)
     {
@@ -441,15 +445,15 @@ void gzochid_storage_transaction_delete
 }
 
 char *gzochid_storage_transaction_first_key 
-(gzochid_storage_transaction *tx, size_t *len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, size_t *len)
 {
-  bdb_context *context = (bdb_context *) tx->store->database;
+  DB *db = (DB *) store->database;
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBC *cursor = NULL;
   DBT db_key, db_value;
   int ret = 0;
 
-  context->db->cursor (context->db, txn, &cursor, 0);
+  db->cursor (db, txn, &cursor, 0);
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_value, 0, sizeof (DBT));
 
@@ -474,15 +478,16 @@ char *gzochid_storage_transaction_first_key
 }
 
 char *gzochid_storage_transaction_next_key 
-(gzochid_storage_transaction *tx, char *key, size_t key_len, size_t *len)
+(gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
+ size_t key_len, size_t *len)
 {
-  bdb_context *context = (bdb_context *) tx->store->database;
+  DB *db = (DB *) store->database;
   DB_TXN *txn = (DB_TXN *) tx->txn;
   DBC *cursor = NULL;
   DBT db_key, db_value;
   int ret = 0;
 
-  context->db->cursor (context->db, txn, &cursor, 0);
+  db->cursor (db, txn, &cursor, 0);
 
   memset (&db_key, 0, sizeof (DBT));
   memset (&db_value, 0, sizeof (DBT));

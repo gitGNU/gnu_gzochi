@@ -75,6 +75,7 @@ typedef struct _gzochid_application_context
   GList *free_oid_blocks;
   GMutex *free_oids_lock;
 
+  gzochid_storage_context *storage_context;
   gzochid_storage_store *meta;
   gzochid_storage_store *oids;
   gzochid_storage_store *names;

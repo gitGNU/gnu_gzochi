@@ -58,19 +58,10 @@ static gzochid_data_transaction_context *create_transaction_context
   tx_context->context = app_context;
 
   if (timeout != NULL)
-    {
-      tx_context->oids_transaction = 
-	gzochid_storage_transaction_begin_timed (app_context->oids, *timeout);
-      tx_context->names_transaction =
-	gzochid_storage_transaction_begin_timed (app_context->names, *timeout);
-    }
-  else
-    {
-      tx_context->oids_transaction = 
-	gzochid_storage_transaction_begin (app_context->oids);
-      tx_context->names_transaction =
-	gzochid_storage_transaction_begin (app_context->names);
-    }
+    tx_context->transaction = gzochid_storage_transaction_begin_timed 
+      (app_context->storage_context, *timeout);
+  else tx_context->transaction = gzochid_storage_transaction_begin 
+	 (app_context->storage_context);
 
   tx_context->oids_to_references = g_hash_table_new (g_str_hash, g_str_equal);
   tx_context->ptrs_to_references = g_hash_table_new 
@@ -136,8 +127,8 @@ static gboolean flush_reference
 	}
 
       gzochid_storage_transaction_put
-	(context->oids_transaction, oid_str, strlen (oid_str) + 1, 
-	 out->str, out->len);
+	(context->transaction, context->context->oids, oid_str, 
+	 strlen (oid_str) + 1, out->str, out->len);
 
       event = malloc (sizeof (gzochid_application_data_event));
       base_event = (gzochid_application_event *) event;
@@ -187,12 +178,8 @@ static int data_prepare (gpointer data)
   if (flush_failed)
     return FALSE;
 
-  gzochid_storage_transaction_prepare (context->oids_transaction);
-  if (context->oids_transaction->rollback)
-    return FALSE;
-
-  gzochid_storage_transaction_prepare (context->names_transaction);
-  if (context->oids_transaction->rollback)
+  gzochid_storage_transaction_prepare (context->transaction);
+  if (context->transaction->rollback)
     return FALSE;
 
   return TRUE;
@@ -224,8 +211,7 @@ static void data_commit (gpointer data)
   gzochid_data_transaction_context *context = 
     (gzochid_data_transaction_context *) data;
 
-  gzochid_storage_transaction_commit (context->oids_transaction);
-  gzochid_storage_transaction_commit (context->names_transaction);
+  gzochid_storage_transaction_commit (context->transaction);
 
   finalize_references (context);
 
@@ -240,8 +226,7 @@ static void data_rollback (gpointer data)
   gzochid_data_transaction_context *context = 
     (gzochid_data_transaction_context *) data;
 
-  gzochid_storage_transaction_rollback (context->oids_transaction);
-  gzochid_storage_transaction_rollback (context->names_transaction);
+  gzochid_storage_transaction_rollback (context->transaction);
 
   finalize_references (context);
 
@@ -318,10 +303,11 @@ static void get_binding
 (gzochid_data_transaction_context *context, char *name, mpz_t oid)
 {
   char *oid_str = gzochid_storage_transaction_get 
-    (context->names_transaction, name, strlen (name) + 1, NULL);
-  if (context->names_transaction->rollback)
+    (context->transaction, context->context->names, name, strlen (name) + 1, 
+     NULL);
+  if (context->transaction->rollback)
     gzochid_transaction_mark_for_rollback 
-      (&data_participant, context->names_transaction->should_retry);
+      (&data_participant, context->transaction->should_retry);
 
   if (oid_str != NULL)
     {
@@ -336,12 +322,12 @@ static void set_binding
 {
   char *oid_str = mpz_get_str (NULL, 16, oid);
   gzochid_storage_transaction_put 
-    (context->names_transaction, name, strlen (name) + 1, oid_str, 
-     strlen (oid_str) + 1);
+    (context->transaction, context->context->names, name, strlen (name) + 1, 
+     oid_str, strlen (oid_str) + 1);
 
-  if (context->names_transaction->rollback)
+  if (context->transaction->rollback)
     gzochid_transaction_mark_for_rollback 
-      (&data_participant, context->names_transaction->should_retry);
+      (&data_participant, context->transaction->should_retry);
 
   free (oid_str);
 }
@@ -469,10 +455,11 @@ void dereference
   gzochid_debug ("Retrieving data for reference '%s'.", oid_str);
 
   data = gzochid_storage_transaction_get
-    (context->oids_transaction, oid_str, strlen (oid_str) + 1, &data_len);
-  if (context->oids_transaction->rollback)
+    (context->transaction, context->context->oids, oid_str, 
+     strlen (oid_str) + 1, &data_len);
+  if (context->transaction->rollback)
     gzochid_transaction_mark_for_rollback 
-      (&data_participant, context->oids_transaction->should_retry);
+      (&data_participant, context->transaction->should_retry);
 
   if (data == NULL)
     {
@@ -511,7 +498,8 @@ static void remove_object (gzochid_data_transaction_context *context, mpz_t oid)
   char *oid_str = mpz_get_str (NULL, 16, oid);
   gzochid_debug ("Removing reference '%s'.", oid_str);      
   gzochid_storage_transaction_delete 
-    (context->oids_transaction, oid_str, strlen (oid_str) + 1);
+    (context->transaction, context->context->oids, oid_str, 
+     strlen (oid_str) + 1);
   free (oid_str);
 }
 
@@ -600,18 +588,20 @@ char *gzochid_data_next_binding_oid
   join_transaction (context);
   tx_context = gzochid_transaction_context (&data_participant);
   next_key = gzochid_storage_transaction_next_key 
-    (tx_context->names_transaction, key, strlen (key) + 1, NULL);
-  if (tx_context->names_transaction->rollback)
+    (tx_context->transaction, tx_context->context->names, key, 
+     strlen (key) + 1, NULL);
+  if (tx_context->transaction->rollback)
     gzochid_transaction_mark_for_rollback 
-      (&data_participant, tx_context->names_transaction->should_retry);
+      (&data_participant, tx_context->transaction->should_retry);
 
   if (next_key != NULL)
     {
       char *next_value = gzochid_storage_transaction_get 
-	(tx_context->names_transaction, next_key, strlen (next_key) + 1, NULL);
-      if (tx_context->names_transaction->rollback)
+	(tx_context->transaction, tx_context->context->names, next_key, 
+	 strlen (next_key) + 1, NULL);
+      if (tx_context->transaction->rollback)
 	gzochid_transaction_mark_for_rollback 
-	  (&data_participant, tx_context->names_transaction->should_retry);
+	  (&data_participant, tx_context->transaction->should_retry);
 
       if (next_value != NULL)
 	{
@@ -655,10 +645,11 @@ void gzochid_data_remove_binding
   mpz_clear (oid);
 
   gzochid_storage_transaction_delete 
-    (tx_context->names_transaction, name, strlen (name) + 1);
-  if (tx_context->names_transaction->rollback)
+    (tx_context->transaction, tx_context->context->names, name, 
+     strlen (name) + 1);
+  if (tx_context->transaction->rollback)
     gzochid_transaction_mark_for_rollback 
-      (&data_participant, tx_context->names_transaction->should_retry);
+      (&data_participant, tx_context->transaction->should_retry);
 
   free (oid_str);
 }
@@ -807,10 +798,11 @@ void gzochid_data_mark
       gzochid_debug ("Marking reference '%s' for update.", oid_str);
 
       data = gzochid_storage_transaction_get_for_update
-	(tx_context->oids_transaction, oid_str, strlen (oid_str) + 1, NULL);
-      if (tx_context->oids_transaction->rollback)
+	(tx_context->transaction, tx_context->context->oids, oid_str, 
+	 strlen (oid_str) + 1, NULL);
+      if (tx_context->transaction->rollback)
 	gzochid_transaction_mark_for_rollback 
-	  (&data_participant, tx_context->oids_transaction->should_retry);
+	  (&data_participant, tx_context->transaction->should_retry);
 
       if (data != NULL)
 	free (data);
