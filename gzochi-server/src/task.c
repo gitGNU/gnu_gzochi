@@ -278,14 +278,15 @@ gzochid_task *wrap_durable_task
 {
   gzochid_game_context *game_context = (gzochid_game_context *) 
     ((gzochid_context *) context)->parent;
-  
+  gzochid_auth_identity *cloned_identity = 
+    gzochid_auth_identity_clone (identity);
   gzochid_application_task *transactional_task = gzochid_application_task_new
-    (context, identity, durable_task_application_worker, durable_task);
+    (context, cloned_identity, durable_task_application_worker, durable_task);
   gzochid_transactional_application_task_execution *execution = 
     gzochid_transactional_application_task_timed_execution_new 
     (transactional_task, game_context->tx_timeout);
   gzochid_application_task *application_task = gzochid_application_task_new
-    (context, identity,
+    (context, cloned_identity,
      gzochid_application_resubmitting_transactional_task_worker, execution);
 
   return gzochid_task_new 

@@ -352,7 +352,7 @@ gzochid_client_session *gzochid_client_session_new
   gzochid_client_session *session = (gzochid_client_session *)
     calloc (1, sizeof (gzochid_client_session));
 
-  session->identity = identity;
+  session->identity = gzochid_auth_identity_clone (identity);
   session->channels = g_sequence_new (NULL);
   mpz_init (session->scm_oid);
 

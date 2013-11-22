@@ -20,8 +20,12 @@
 
 #include <glib.h>
 
+#include "auth.h"
+
 struct _gzochid_application_context;
 struct _gzochid_game_context;
+
+gzochid_auth_identity *gzochid_auth_identity_clone (gzochid_auth_identity *);
 
 void gzochid_auth_identity_serializer 
 (struct _gzochid_application_context *, void *, GString *);

@@ -63,6 +63,12 @@ gzochid_auth_identity *gzochid_auth_function_pass_thru
   return gzochid_auth_identity_new (strndup ((char *) cred, cred_len));
 }
 
+gzochid_auth_identity *gzochid_auth_identity_clone
+(gzochid_auth_identity *identity)
+{
+  return gzochid_auth_identity_new (strdup (identity->name));
+}
+
 void gzochid_auth_identity_serializer 
 (gzochid_application_context *context, void *ptr, GString *out)
 {

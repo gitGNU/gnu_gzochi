@@ -19,6 +19,7 @@
 
 #include "../app.h"
 #include "../auth.h"
+#include "../auth_int.h"
 #include "../scheme.h"
 #include "../task.h"
 
@@ -31,8 +32,8 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
 {
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context (); 
-  gzochid_auth_identity *identity = gzochid_get_current_identity ();
-
+  gzochid_auth_identity *identity =
+    gzochid_auth_identity_clone (gzochid_get_current_identity ());
   gzochid_application_task *scheme_task = gzochid_application_task_new 
     (context, identity, gzochid_scheme_application_task_worker, callback);
 
