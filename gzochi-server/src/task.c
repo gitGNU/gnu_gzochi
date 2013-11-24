@@ -524,7 +524,8 @@ static void durable_task_application_worker
       
       g_string_append (binding, oid_str);
       
-      if (gzochid_data_remove_binding (context, binding->str) != 0)
+      if (gzochid_data_remove_binding (context, binding->str) != 0
+	  || gzochid_data_remove_object (handle_reference) != 0)
 	
 	/* Nothing to be done here. */
       
