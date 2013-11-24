@@ -110,9 +110,6 @@ char *gzochid_data_next_binding_oid
 
 gzochid_data_managed_reference *gzochid_data_create_reference
 (gzochid_application_context *, gzochid_io_serialization *, void *);
-gzochid_data_managed_reference *gzochid_data_create_reference_sync
-(gzochid_application_context *, gzochid_auth_identity *, 
- gzochid_io_serialization *, void *);
 gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
 (gzochid_application_context *, gzochid_io_serialization *, mpz_t);
 
