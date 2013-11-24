@@ -427,6 +427,17 @@ static int app_info
 			  app_context->stats->num_transactions_rolled_back);
   g_string_append (response_str, "      </tr>\n");
 
+  if (app_context->stats->num_transactions_committed > 0)
+    {
+      g_string_append (response_str, "      <tr>\n");
+      g_string_append
+	(response_str, "        <td>Average transaction duration</td>\n");
+      g_string_append_printf 
+	(response_str, "        <td>%.2f</td>\n", 
+	 app_context->stats->average_transaction_duration);
+      g_string_append (response_str, "      </tr>\n");
+    }
+
   g_string_append (response_str, "    </table>\n");
   g_string_append (response_str, "  </body>\n");
   g_string_append (response_str, "</html>");

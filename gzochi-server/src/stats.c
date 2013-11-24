@@ -32,6 +32,36 @@ static void update_from_data_event
     }
 }
 
+static long timeval_to_milliseconds (struct timeval tv)
+{
+  return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+}
+
+static void update_from_transaction_event
+(gzochid_application_stats *stats, gzochid_application_event_type type,
+ gzochid_application_transaction_event *event)
+{
+  switch (type)
+    {
+    case TRANSACTION_START: stats->num_transactions_started++; break;
+    case TRANSACTION_COMMIT: 
+      stats->num_transactions_committed++;
+      
+      if (stats->num_transactions_committed == 1)
+	stats->average_transaction_duration = 
+	  timeval_to_milliseconds (event->duration);
+      else stats->average_transaction_duration = 
+	     (timeval_to_milliseconds (event->duration) 
+	      + ((stats->num_transactions_committed - 1) 
+		 * stats->average_transaction_duration))
+	     / stats->num_transactions_committed;
+
+      break;
+    case TRANSACTION_ROLLBACK: stats->num_transactions_rolled_back++; break;
+    default: assert (1 == 0);
+    }
+}
+
 void gzochid_stats_update_from_event 
 (gzochid_application_stats *stats, gzochid_application_event *event)
 {
@@ -43,8 +73,11 @@ void gzochid_stats_update_from_event
 	(stats, event->type, (gzochid_application_data_event *) event);
       break;
 
-    case TRANSACTION_START: stats->num_transactions_started++; break;
-    case TRANSACTION_COMMIT: stats->num_transactions_committed++; break;
-    case TRANSACTION_ROLLBACK: stats->num_transactions_rolled_back++; break;
+    case TRANSACTION_START:
+    case TRANSACTION_COMMIT:
+    case TRANSACTION_ROLLBACK:
+      update_from_transaction_event
+	(stats, event->type, (gzochid_application_transaction_event *) event);
+      break;
     }
 }
