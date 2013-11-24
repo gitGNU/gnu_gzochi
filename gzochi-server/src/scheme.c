@@ -71,7 +71,6 @@ static SCM scm_channel_oid;
 
 static SCM scm_make_task_handle;
 static SCM scm_task_handle_oid;
-static SCM scm_run_task;
 
 static SCM scm_r6rs_raise;
 
@@ -1007,7 +1006,6 @@ static void *initialize_bindings (void *ptr)
 	    "gzochi:make-task-handle");
   bind_scm ("gzochi private task", &scm_task_handle_oid, 
 	    "gzochi:task-handle-oid");
-  bind_scm ("gzochi private task", &scm_run_task, "gzochi:run-task");
  
   gzochid_api_channel_init ();
   gzochid_api_data_init ();
