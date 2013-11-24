@@ -329,7 +329,7 @@ gzochid_io_serialization gzochid_client_session_serialization =
     finalize_client_session 
   };
 
-static int remove_session_binding 
+static int remove_session
 (gzochid_application_context *context, const char *oid_str)
 {
   int ret = 0;
@@ -337,6 +337,21 @@ static int remove_session_binding
 
   g_string_append (binding, oid_str);
   ret = gzochid_data_remove_binding (context, binding->str);
+  if (ret == 0)
+    {
+      mpz_t oid;
+      gzochid_data_managed_reference *session_reference = NULL;
+
+      mpz_init (oid);
+      mpz_set_str (oid, oid_str, 16);
+
+      session_reference = gzochid_data_create_reference_to_oid 
+	(context, &gzochid_client_session_serialization, oid);
+      ret = gzochid_data_remove_object (session_reference);
+
+      mpz_clear (oid);
+    }
+   
   g_string_free (binding, FALSE);
 
   return ret;
@@ -346,7 +361,7 @@ void gzochid_client_session_disconnected_worker
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gpointer data)
 {
-  if (remove_session_binding (context, (const char *) data) != 0)
+  if (remove_session (context, (const char *) data) != 0)
 
     /* No worries, the transaction will be retried. */
 
@@ -397,7 +412,7 @@ void gzochid_client_session_disconnect
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
 
-  if (remove_session_binding (context, oid_str) == 0)
+  if (remove_session (context, oid_str) == 0)
     tx_context->operations = g_list_append 
       (tx_context->operations, create_disconnect_operation (reference->oid));
 
@@ -617,8 +632,12 @@ void gzochid_sweep_client_sessions (gzochid_application_context *context)
          && strncmp (SESSION_PREFIX, next_binding, prefix_len) == 0)
     {
       char *next_next_binding = NULL;
+      gzochid_data_managed_reference *session_reference = 
+	gzochid_data_create_reference_to_oid 
+	(context, &gzochid_client_session_serialization, oid);
 
       assert (gzochid_data_remove_binding (context, next_binding) == 0);
+      assert (gzochid_data_remove_object (session_reference) == 0);
 
       next_next_binding = gzochid_data_next_binding_oid 
 	(context, next_binding, oid);
