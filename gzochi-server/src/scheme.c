@@ -238,8 +238,13 @@ void gzochid_scheme_application_initialized_worker
     gzochid_transaction_mark_for_rollback 
       (&scheme_participant,
        is_transaction_retry (scm_variable_ref (exception_var)));
-  else gzochid_data_set_binding_to_oid 
-	 (context, "s.initializer", callback_reference->oid);
+  else if (gzochid_data_set_binding_to_oid 
+	   (context, "s.initializer", callback_reference->oid) != 0)
+    
+    /* Nothing to be done in this case. The transaction will likely have been
+       marked for rollback anyway. */
+    
+    ;
 }
 
 static gpointer unpack_handler (gpointer data)
@@ -287,7 +292,13 @@ void gzochid_scheme_application_logged_in_worker
     (context, &gzochid_client_session_serialization, session_oid);
   mpz_clear (session_oid);
 
-  gzochid_data_dereference (session_reference);
+  if (gzochid_data_dereference (session_reference) != 0)
+
+    /* The dereference may fail if there's a deadlock. It's safe to bail out; 
+       the transaction will be rolled back, anyway. */
+
+    return;
+
   session = (gzochid_client_session *) session_reference->obj;
 
   scm_session = gzochid_scheme_create_client_session 
@@ -328,9 +339,9 @@ void gzochid_scheme_application_logged_in_worker
 	gzochid_with_application_context 
 	(context, identity, unpack_handler, handler);
 
-      gzochid_data_mark 
-	(context, &gzochid_client_session_serialization, session);
-      gzochid_client_session_send_login_success (context, session);
+      if (gzochid_data_mark 
+	  (context, &gzochid_client_session_serialization, session) == 0)
+	gzochid_client_session_send_login_success (context, session);
     }
 }
 
@@ -360,7 +371,14 @@ void gzochid_scheme_application_received_message_worker
 
   session_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_client_session_serialization, session_oid);
-  gzochid_data_dereference (session_reference);
+
+  if (gzochid_data_dereference (session_reference) != 0)
+
+    /* The dereference may fail if there's a deadlock. It's safe to bail out; 
+       the transaction will be rolled back, anyway. */
+
+    return;
+
   session = (gzochid_client_session *) session_reference->obj;
 
   bv = gzochid_scheme_create_bytevector (message, *message_len_ptr);
@@ -368,7 +386,13 @@ void gzochid_scheme_application_received_message_worker
     gzochid_data_create_reference_to_oid
     (context, &gzochid_scheme_data_serialization, 
      session->handler->received_message->scm_oid);
-  gzochid_data_dereference (callback_reference);
+
+  if (gzochid_data_dereference (callback_reference) != 0)
+
+    /* The dereference may fail if there's a deadlock. It's safe to bail out; 
+       the transaction will be rolled back, anyway. */
+
+    return;
       
   gzochid_scheme_invoke
     (context, 
@@ -407,7 +431,14 @@ void gzochid_scheme_application_disconnected_worker
   session_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_client_session_serialization, session_oid);
   mpz_clear (session_oid);
-  gzochid_data_dereference (session_reference);
+
+  if (gzochid_data_dereference (session_reference) != 0)
+
+    /* The dereference may fail if there's a deadlock. It's safe to bail out; 
+       the transaction will be rolled back, anyway. */
+
+    return;
+
   session = (gzochid_client_session *) session_reference->obj;
 
   /* A client may disconnect before the login process has completed or after
@@ -419,7 +450,12 @@ void gzochid_scheme_application_disconnected_worker
 	(context, "Session '%s' disconnected after incomplete login.", ptr);
 
       g_list_free (gpa);
-      gzochid_data_remove_object (session_reference);
+
+      if (gzochid_data_remove_object (session_reference) != 0)
+	
+	/* Nothing to be done in this case. The transaction will likely have 
+	   been marked for rollback anyway. */    
+
       return;
     }
 
@@ -427,7 +463,13 @@ void gzochid_scheme_application_disconnected_worker
     gzochid_data_create_reference_to_oid
     (context, &gzochid_scheme_data_serialization, 
      session->handler->disconnected->scm_oid);
-  gzochid_data_dereference (callback_reference);
+
+  if (gzochid_data_dereference (callback_reference) != 0)
+
+    /* The dereference may fail if there's a deadlock. It's safe to bail out; 
+       the transaction will be rolled back, anyway. */
+
+    return;
       
   gzochid_scheme_invoke
     (context, 
@@ -443,7 +485,12 @@ void gzochid_scheme_application_disconnected_worker
 	(&scheme_participant, 
 	 is_transaction_retry (scm_variable_ref (exception_var)));
     }
-  else gzochid_data_remove_object (session_reference);
+  else if (gzochid_data_remove_object (session_reference) != 0)
+    
+    /* Nothing to be done in this case. The transaction will likely have been
+       marked for rollback anyway. */    
+
+    ;
 
   g_list_free (gpa);
 }

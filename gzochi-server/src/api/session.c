@@ -40,12 +40,12 @@ SCM_DEFINE (primitive_send_message, "primitive-send-message", 2, 0, 0,
   gzochid_scheme_client_session_oid (session, c_oid);
   reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, c_oid);
-  gzochid_data_dereference (reference);
- 
-  gzochid_client_session_send_message 
-    (context, (gzochid_client_session *) reference->obj, payload, len);
 
   mpz_clear (c_oid);
+
+  if (gzochid_data_dereference (reference) == 0)
+    gzochid_client_session_send_message 
+      (context, (gzochid_client_session *) reference->obj, payload, len);
 
   gzochid_api_check_transaction ();
 
@@ -64,12 +64,12 @@ SCM_DEFINE (primitive_disconnect, "primitive-disconnect", 1, 0, 0,
   gzochid_scheme_client_session_oid (session, c_oid);
   reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, c_oid);
-  gzochid_data_dereference (reference);
- 
-  gzochid_client_session_disconnect 
-    (context, (gzochid_client_session *) reference->obj);
 
   mpz_clear (c_oid);
+
+  if (gzochid_data_dereference (reference) == 0)
+    gzochid_client_session_disconnect 
+      (context, (gzochid_client_session *) reference->obj);
 
   gzochid_api_check_transaction ();
 

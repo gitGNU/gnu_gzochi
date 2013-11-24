@@ -111,12 +111,13 @@ SCM_DEFINE (primitive_cancel_task, "primitive-cancel-task", 1, 0, 0,
   handle_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_durable_application_task_handle_serialization, oid);
 
-  gzochid_data_dereference (handle_reference);
-  
-  task_handle = (gzochid_periodic_task_handle *) handle_reference->obj;
-  gzochid_cancel_periodic_task (context, task_handle);
-
   mpz_clear (oid);
+
+  if (gzochid_data_dereference (handle_reference) == 0)
+    {
+      task_handle = (gzochid_periodic_task_handle *) handle_reference->obj;
+      gzochid_cancel_periodic_task (context, task_handle);
+    }
 
   gzochid_api_check_transaction ();
 

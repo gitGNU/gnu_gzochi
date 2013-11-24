@@ -36,12 +36,14 @@ SCM_DEFINE (primitive_create_channel, "primitive-create-channel", 1, 0, 0,
   gzochid_data_managed_reference *scm_reference = 
     gzochid_data_create_reference_to_oid 
     (context, &gzochid_scheme_data_serialization, channel->scm_oid);
+  SCM ret = SCM_BOOL_F;
 
-  gzochid_data_dereference (scm_reference);
+  if (gzochid_data_dereference (scm_reference) == 0)
+    ret = (SCM) scm_reference->obj;
 
   gzochid_api_check_transaction ();
 
-  return (SCM) scm_reference->obj;
+  return ret;
 }
 
 SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
@@ -59,8 +61,8 @@ SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
       gzochid_data_managed_reference *scm_reference = 
 	gzochid_data_create_reference_to_oid 
 	(context, &gzochid_scheme_data_serialization, channel->scm_oid);
-      gzochid_data_dereference (scm_reference);
-      ret = (SCM) scm_reference->obj;
+      if (gzochid_data_dereference (scm_reference) == 0)
+	ret = (SCM) scm_reference->obj;
     }
 
   gzochid_api_check_transaction ();
@@ -87,13 +89,13 @@ SCM_DEFINE (primitive_join_channel, "primitive-join-channel", 2, 0, 0,
     (context, &gzochid_channel_serialization, channel_oid);
   session_reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, session_oid);
-  gzochid_data_dereference (channel_reference);
-  gzochid_data_dereference (session_reference);
 
-  gzochid_channel_join 
-    (context, 
-     (gzochid_channel *) channel_reference->obj, 
-     (gzochid_client_session *) session_reference->obj);
+  if (gzochid_data_dereference (channel_reference) == 0
+      && gzochid_data_dereference (session_reference) == 0)      
+    gzochid_channel_join 
+      (context, 
+       (gzochid_channel *) channel_reference->obj, 
+       (gzochid_client_session *) session_reference->obj);
 
   gzochid_api_check_transaction ();
 
@@ -120,13 +122,13 @@ SCM_DEFINE (primitive_leave_channel, "primitive-leave-channel", 2, 0, 0,
     (context, &gzochid_channel_serialization, channel_oid);
   session_reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, session_oid);
-  gzochid_data_dereference (channel_reference);
-  gzochid_data_dereference (session_reference);
-
-  gzochid_channel_leave 
-    (context, 
-     (gzochid_channel *) channel_reference->obj, 
-     (gzochid_client_session *) session_reference->obj);
+  
+  if (gzochid_data_dereference (channel_reference) == 0
+      && gzochid_data_dereference (session_reference) == 0)
+    gzochid_channel_leave 
+      (context, 
+       (gzochid_channel *) channel_reference->obj, 
+       (gzochid_client_session *) session_reference->obj);
 
   gzochid_api_check_transaction ();
 
@@ -152,10 +154,9 @@ SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message",
   
   channel_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, channel_oid);
-  gzochid_data_dereference (channel_reference);
-
-  gzochid_channel_send 
-    (context, (gzochid_channel *) channel_reference->obj, msg, len);
+  if (gzochid_data_dereference (channel_reference) == 0)
+    gzochid_channel_send 
+      (context, (gzochid_channel *) channel_reference->obj, msg, len);
 
   gzochid_api_check_transaction ();
 
@@ -174,9 +175,10 @@ SCM_DEFINE (primitive_close_channel, "primitive-close-channel", 1, 0, 0,
   gzochid_scheme_channel_oid (channel, channel_oid);  
   channel_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, channel_oid);
-  gzochid_data_dereference (channel_reference);
 
-  gzochid_channel_close (context, (gzochid_channel *) channel_reference->obj);
+  if (gzochid_data_dereference (channel_reference) == 0)
+    gzochid_channel_close 
+      (context, (gzochid_channel *) channel_reference->obj);
 
   gzochid_api_check_transaction ();
 

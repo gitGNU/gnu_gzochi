@@ -329,21 +329,28 @@ gzochid_io_serialization gzochid_client_session_serialization =
     finalize_client_session 
   };
 
-static void remove_session_binding 
+static int remove_session_binding 
 (gzochid_application_context *context, const char *oid_str)
 {
+  int ret = 0;
   GString *binding = g_string_new (SESSION_PREFIX);
 
   g_string_append (binding, oid_str);
-  gzochid_data_remove_binding (context, binding->str);
+  ret = gzochid_data_remove_binding (context, binding->str);
   g_string_free (binding, FALSE);
+
+  return ret;
 }
 
 void gzochid_client_session_disconnected_worker
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gpointer data)
 {
-  remove_session_binding (context, (const char *) data);
+  if (remove_session_binding (context, (const char *) data) != 0)
+
+    /* No worries, the transaction will be retried. */
+
+    ;
 }
 
 gzochid_client_session *gzochid_client_session_new 
@@ -389,11 +396,12 @@ void gzochid_client_session_disconnect
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
-  remove_session_binding (context, oid_str);
-  free (oid_str);
 
-  tx_context->operations = g_list_append 
-    (tx_context->operations, create_disconnect_operation (reference->oid));
+  if (remove_session_binding (context, oid_str) == 0)
+    tx_context->operations = g_list_append 
+      (tx_context->operations, create_disconnect_operation (reference->oid));
+
+  free (oid_str);
 }
 
 void gzochid_client_session_send_login_success
@@ -527,8 +535,13 @@ static void prefix_binding_persistence_task_worker
   g_string_append (binding, oid_str);
   free (oid_str);
 
-  gzochid_data_set_binding_to_oid 
-    (context, binding->str, persistence_task->holder->oid);
+  if (gzochid_data_set_binding_to_oid 
+      (context, binding->str, persistence_task->holder->oid) != 0)
+    
+    /* No worries, the transaction will be retried. */
+
+    ;
+
   g_string_free (binding, FALSE);
 }
 
@@ -605,7 +618,8 @@ void gzochid_sweep_client_sessions (gzochid_application_context *context)
     {
       char *next_next_binding = NULL;
 
-      gzochid_data_remove_binding (context, next_binding);
+      assert (gzochid_data_remove_binding (context, next_binding) == 0);
+
       next_next_binding = gzochid_data_next_binding_oid 
 	(context, next_binding, oid);
 

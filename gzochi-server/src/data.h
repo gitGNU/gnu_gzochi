@@ -26,6 +26,12 @@
 #include "io.h"
 #include "storage.h"
 
+#ifdef __GNUC__
+#define WARN_UNUSED_RESULT __attribute__ ((warn_unused_result))
+#else
+#define WARN_UNUSED_RESULT
+#endif /* __GNUC__ */
+
 typedef struct _gzochid_oid_holder
 {
   mpz_t oid;
@@ -87,11 +93,17 @@ void gzochid_oid_holder_free (gzochid_oid_holder *);
 
 void *gzochid_data_get_binding 
 (gzochid_application_context *, char *, gzochid_io_serialization *);
-void gzochid_data_set_binding
-(gzochid_application_context *, char *, gzochid_io_serialization *, void *);
-void gzochid_data_set_binding_to_oid
-(gzochid_application_context *, char *, mpz_t);
-void gzochid_data_remove_binding (gzochid_application_context *, char *);
+
+int gzochid_data_set_binding
+(gzochid_application_context *, char *, gzochid_io_serialization *, void *)
+  WARN_UNUSED_RESULT;
+
+int gzochid_data_set_binding_to_oid
+(gzochid_application_context *, char *, mpz_t) WARN_UNUSED_RESULT;
+
+int gzochid_data_remove_binding (gzochid_application_context *, char *)
+  WARN_UNUSED_RESULT;
+
 gboolean gzochid_data_binding_exists (gzochid_application_context *, char *);
 char *gzochid_data_next_binding_oid 
 (gzochid_application_context *, char *, mpz_t);
@@ -103,10 +115,15 @@ gzochid_data_managed_reference *gzochid_data_create_reference_sync
  gzochid_io_serialization *, void *);
 gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
 (gzochid_application_context *, gzochid_io_serialization *, mpz_t);
-void gzochid_data_dereference (gzochid_data_managed_reference *reference);
-void gzochid_data_remove_object (gzochid_data_managed_reference *reference);
 
-void gzochid_data_mark 
-(gzochid_application_context *, gzochid_io_serialization *, void *);
+int gzochid_data_dereference (gzochid_data_managed_reference *reference)
+  WARN_UNUSED_RESULT;
+
+int gzochid_data_remove_object (gzochid_data_managed_reference *reference)
+  WARN_UNUSED_RESULT;
+
+int gzochid_data_mark 
+(gzochid_application_context *, gzochid_io_serialization *, void *)
+  WARN_UNUSED_RESULT;
 
 #endif /* GZOCHID_DATA_H */

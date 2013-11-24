@@ -61,17 +61,20 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
 
   reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_scm_location_aware_serialization, oid);
-  gzochid_data_dereference (reference);
 
-  if (reference->obj == NULL
-      || reference->state == GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED)
-    gzochid_scheme_r6rs_raise 
-      (gzochid_scheme_make_object_removed_condition ());
-  else 
+  if (gzochid_data_dereference (reference) == 0)
     {
-      gzochid_scm_location_info *location = 
-	(gzochid_scm_location_info *) reference->obj;
-      ret = gzochid_scm_location_resolve (context, location);
+      if (reference->obj == NULL
+	  || reference->state == 
+	  GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED)
+	gzochid_scheme_r6rs_raise 
+	  (gzochid_scheme_make_object_removed_condition ());
+      else 
+	{
+	  gzochid_scm_location_info *location = 
+	    (gzochid_scm_location_info *) reference->obj;
+	  ret = gzochid_scm_location_resolve (context, location);
+	}
     }
 
   gzochid_api_check_transaction ();
@@ -115,7 +118,9 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
       gzochid_scm_location_info *location = 
 	(gzochid_scm_location_info *) gzochid_data_get_binding 
 	(context, prefixed_name, &gzochid_scm_location_aware_serialization);
-      ret = gzochid_scm_location_resolve (context, location);
+
+      if (location != NULL)
+	ret = gzochid_scm_location_resolve (context, location);
 
       free (cname);
       free (prefixed_name);
@@ -149,9 +154,14 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
 
       scm_gc_protect_object (obj);
       
-      gzochid_data_set_binding 
-	(context, prefixed_name, &gzochid_scm_location_aware_serialization, 
-	 obj_loc);
+      if (gzochid_data_set_binding 
+	  (context, prefixed_name, &gzochid_scm_location_aware_serialization, 
+	   obj_loc) != 0)
+
+	/* No need to take action in this case, we'll be checking the 
+	   transaction in a moment. */
+       
+	;
       
       free (cname);
       free (prefixed_name);
@@ -180,7 +190,12 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
     }
   else
     {
-      gzochid_data_remove_binding (context, prefixed_name);
+      if (gzochid_data_remove_binding (context, prefixed_name) != 0)
+
+	/* No need to take action in this case, we'll be checking the 
+	   transaction in a moment. */
+	
+	;
 
       free (cname);
       free (prefixed_name);
@@ -201,7 +216,13 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
 
   scm_gc_protect_object (obj);    
 
-  gzochid_data_remove_object (reference);
+  if (gzochid_data_remove_object (reference) != 0)
+
+    /* No need to take action in this case, we'll be checking the 
+       transaction in a moment. */
+
+    ;
+
   gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
@@ -216,8 +237,14 @@ SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
 
   scm_gc_protect_object (obj);    
 
-  gzochid_data_mark 
-    (context, &gzochid_scm_location_aware_serialization, obj_loc);
+  if (gzochid_data_mark 
+      (context, &gzochid_scm_location_aware_serialization, obj_loc) != 0)
+
+    /* No need to take action in this case, we'll be checking the 
+       transaction in a moment. */
+
+    ;
+
   gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
