@@ -150,7 +150,7 @@ static void initialize_load_paths_guile_worker
 
   while (load_path_ptr != NULL)
     {
-      gzochid_scheme_append_load_path ((char *) load_path_ptr->data);
+      gzochid_guile_add_to_load_path ((char *) load_path_ptr->data);
       load_path_ptr = load_path_ptr->next;
     }
 }

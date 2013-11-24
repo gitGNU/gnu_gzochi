@@ -17,9 +17,15 @@
 #!r6rs
 
 (library (gzochi private guile)
-  (export gzochi:exception-printer gzochi:make-handler gzochi:make-thunk)
-  (import (only (guile) format newline filter)
+  (export gzochi:add-to-load-path 
+	  gzochi:exception-printer 
+	  gzochi:make-handler 
+	  gzochi:make-thunk)
+  (import (only (guile) add-to-load-path format newline filter)
 	  (rnrs))
+
+  (define (gzochi:add-to-load-path path)
+    (add-to-load-path path))
 
   (define (gzochi:exception-printer port condition)
     (let ((components (simple-conditions condition)))

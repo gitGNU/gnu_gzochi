@@ -1058,12 +1058,3 @@ void gzochid_scheme_initialize_bindings (void)
 
   gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
 }
-
-void gzochid_scheme_append_load_path (char *load_path)
-{
-  SCM scm_load_path = scm_module_variable 
-    (scm_c_resolve_module ("guile"), scm_from_locale_symbol ("%load-path"));
-  scm_variable_set_x 
-    (scm_load_path, scm_cons
-     (scm_from_locale_string (load_path), scm_variable_ref (scm_load_path)));
-}

@@ -91,6 +91,4 @@ void gzochid_scheme_task_handle_oid (SCM, mpz_t);
 
 void gzochid_scheme_initialize_bindings (void);
 
-void gzochid_scheme_append_load_path (char *);
-
 #endif /* GZOCHID_SCHEME_H */

@@ -27,6 +27,7 @@
 SCM gzochid_guile_invoke (SCM, SCM, SCM);
 
 void gzochid_guile_run (gzochid_thread_worker, gpointer);
+void gzochid_guile_add_to_load_path (char *);
 void gzochid_guile_thread_pool_push 
 (GThreadPool *, gzochid_thread_worker, gpointer, GError **);
 

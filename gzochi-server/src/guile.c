@@ -17,6 +17,7 @@
 
 #include <glib.h>
 #include <libguile.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 #include "guile.h"
@@ -28,6 +29,8 @@ static SCM scm_r6rs_exception_handler;
 static SCM scm_exception_printer;
 static SCM scm_make_handler;
 static SCM scm_make_thunk;
+
+static SCM scm_add_to_load_path;
 
 typedef struct _gzochid_guile_thread_work 
 {
@@ -163,6 +166,15 @@ void gzochid_guile_thread_pool_push
   gzochid_thread_pool_push (pool, guile_dispatch, work, error);
 }
 
+void gzochid_guile_add_to_load_path (char *path)
+{
+  SCM scm_path = scm_from_locale_string (path);
+
+  gzochid_guile_invoke 
+    (scm_add_to_load_path, scm_list_1 (scm_path), SCM_BOOL_F);
+  printf ("Added %s\n", path);
+}
+
 static void bind_scm (char *module, SCM *binding, char *name)
 {
   SCM var = scm_c_public_variable (module, name);
@@ -183,9 +195,12 @@ void gzochid_guile_init ()
   bind_scm ("rnrs exceptions", &scm_r6rs_with_exception_handler, 
 	    "with-exception-handler");
 
+  bind_scm ("gzochi private guile", &scm_add_to_load_path, 
+	    "gzochi:add-to-load-path");
   bind_scm ("gzochi private guile", &scm_exception_printer, 
 	    "gzochi:exception-printer");
   bind_scm ("gzochi private guile", &scm_make_handler, "gzochi:make-handler");
   bind_scm ("gzochi private guile", &scm_make_thunk, "gzochi:make-thunk");
 
+  
 }
