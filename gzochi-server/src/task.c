@@ -141,7 +141,7 @@ gzochid_durable_application_task_handle *create_durable_task_handle
 
   durable_task_handle->task_data_reference = task_data_reference;
   durable_task_handle->serialization = serialization;
-  durable_task_handle->identity = identity;
+  durable_task_handle->identity = gzochid_auth_identity_clone (identity);
   durable_task_handle->repeats = FALSE;
   durable_task_handle->period = immediate;
   durable_task_handle->target_execution_time = target_execution_time;
@@ -380,7 +380,7 @@ void gzochid_restart_tasks (gzochid_application_context *context)
       char *next_next_binding = 
 	gzochid_data_next_binding_oid (context, next_binding, oid);
       gzochid_task *task = rebuild_durable_task (context, oid);
-      
+ 
       tx_context->scheduled_tasks = g_list_append 
 	(tx_context->scheduled_tasks, task);
 
