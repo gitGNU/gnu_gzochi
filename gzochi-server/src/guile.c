@@ -52,13 +52,19 @@ static SCM guile_catch_body (void *data)
 
 static SCM r6rs_exception_handler (SCM exception_var, SCM cond)
 {
-  scm_display_backtrace 
-    (scm_make_stack (SCM_BOOL_T, SCM_EOL),
-     scm_current_output_port (), 
-     SCM_BOOL_F, 
-     SCM_BOOL_F);
+  SCM output = scm_open_output_string ();
+  SCM output_string = SCM_BOOL_F;
+  char *str = NULL;
 
-  scm_call_2 (scm_exception_printer, scm_current_output_port (), cond);
+  scm_display_backtrace 
+    (scm_make_stack (SCM_BOOL_T, SCM_EOL), output, SCM_BOOL_F, SCM_BOOL_F);
+
+  scm_call_2 (scm_exception_printer, output, cond);
+
+  output_string = scm_get_output_string (output);
+  str = scm_to_locale_string (output_string);
+
+  fprintf (stderr, "%s", str);
 
   if (scm_variable_p (exception_var) == SCM_BOOL_T)
     scm_variable_set_x (exception_var, cond);
