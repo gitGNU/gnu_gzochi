@@ -82,7 +82,7 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
 	  ret = gzochid_scm_location_resolve (context, location);
 	}
     }
-  else g_error_free (err);
+  else gzochid_api_check_not_found (err);
 
   gzochid_api_check_transaction ();
 
@@ -134,7 +134,7 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
 	  if (location != NULL)
 	    ret = gzochid_scm_location_resolve (context, location);
 	}
-      else g_error_free (err);
+      else gzochid_api_check_not_found (err);
 
       free (cname);
       free (prefixed_name);

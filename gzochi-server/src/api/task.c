@@ -123,7 +123,7 @@ SCM_DEFINE (primitive_cancel_task, "primitive-cancel-task", 1, 0, 0,
       task_handle = (gzochid_periodic_task_handle *) handle_reference->obj;
       gzochid_cancel_periodic_task (context, task_handle);
     }
-  else g_error_free (err);
+  else gzochid_api_check_not_found (err);
 
   gzochid_api_check_transaction ();
 

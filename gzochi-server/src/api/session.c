@@ -52,7 +52,7 @@ SCM_DEFINE (primitive_send_message, "primitive-send-message", 2, 0, 0,
   if (err == NULL)
     gzochid_client_session_send_message 
       (context, (gzochid_client_session *) reference->obj, payload, len);
-  else g_error_free (err);
+  else gzochid_api_check_not_found (err);
 
   gzochid_api_check_transaction ();
 
@@ -80,7 +80,7 @@ SCM_DEFINE (primitive_disconnect, "primitive-disconnect", 1, 0, 0,
   if (err == NULL)
     gzochid_client_session_disconnect 
       (context, (gzochid_client_session *) reference->obj);
-  else g_error_free (err);
+  else gzochid_api_check_not_found (err);
 
   gzochid_api_check_transaction ();
 

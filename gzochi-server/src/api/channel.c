@@ -65,7 +65,7 @@ SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
 
       if (err == NULL)
 	ret = (SCM) scm_reference->obj;
-      else g_error_free (err); 
+      else gzochid_api_check_not_found (err);
     }
 
   gzochid_api_check_transaction ();
@@ -104,9 +104,9 @@ SCM_DEFINE (primitive_join_channel, "primitive-join-channel", 2, 0, 0,
 	  (context, 
 	   (gzochid_channel *) channel_reference->obj, 
 	   (gzochid_client_session *) session_reference->obj);
-      else g_error_free (err);
+      else gzochid_api_check_not_found (err);
     }
-  else g_error_free (err);
+  else gzochid_api_check_not_found (err);
   
   gzochid_api_check_transaction ();
 
@@ -145,9 +145,9 @@ SCM_DEFINE (primitive_leave_channel, "primitive-leave-channel", 2, 0, 0,
 	  (context, 
 	   (gzochid_channel *) channel_reference->obj, 
 	   (gzochid_client_session *) session_reference->obj);
-      else g_error_free (err);
+      else gzochid_api_check_not_found (err);
     }
-  else g_error_free (err);
+  else gzochid_api_check_not_found (err);
   
   gzochid_api_check_transaction ();
 
@@ -179,7 +179,7 @@ SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message",
   if (err == NULL)
     gzochid_channel_send 
       (context, (gzochid_channel *) channel_reference->obj, msg, len);
-  else g_error_free (err);
+  else gzochid_api_check_not_found (err);
 
   gzochid_api_check_transaction ();
 
@@ -205,7 +205,7 @@ SCM_DEFINE (primitive_close_channel, "primitive-close-channel", 1, 0, 0,
   if (err == NULL)
     gzochid_channel_close 
       (context, (gzochid_channel *) channel_reference->obj);
-  else g_error_free (err);
+  else gzochid_api_check_not_found (err);
 
   gzochid_api_check_transaction ();
 

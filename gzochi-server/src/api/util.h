@@ -18,10 +18,14 @@
 #ifndef GZOCHID_API_UTIL_H
 #define GZOCHID_API_UTIL_H
 
+#include <glib.h>
+
 #include "../app.h"
 
 gzochid_application_context *gzochid_api_ensure_current_application_context 
 (void);
+
+void gzochid_api_check_not_found (GError *);
 
 void gzochid_api_check_transaction (void);
 

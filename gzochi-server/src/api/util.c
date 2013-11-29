@@ -15,6 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
+#include <glib.h>
 #include <libguile.h>
 
 #include "../app.h"
@@ -38,6 +40,18 @@ gzochid_application_context *gzochid_api_ensure_current_application_context ()
       (scm_call_0 (scm_make_no_current_application_condition));
 
   return context;
+}
+
+void gzochid_api_check_not_found (GError *err)
+{
+  assert (err != NULL);
+  if (err->code == GZOCHID_DATA_ERROR_NOT_FOUND)
+    {
+      g_error_free (err);
+      gzochid_scheme_r6rs_raise_continuable
+	(gzochid_scheme_make_object_removed_condition ());
+    }
+  else g_error_free (err);
 }
 
 void gzochid_api_check_transaction ()
