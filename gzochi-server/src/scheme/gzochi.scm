@@ -48,7 +48,8 @@
 	  gzochi:make-transaction-retry-condition 
 	  gzochi:transaction-retry-condition? &gzochi:transaction-timeout 
 	  gzochi:make-transaction-timeout-condition
-	  gzochi:transaction-timeout-condition?
+	  gzochi:transaction-timeout-condition? &gzochi:object-removed
+	  gzochi:make-object-removed-condition gzochi:object-removed-condition?
 
           ;; (gzochi data)
 
