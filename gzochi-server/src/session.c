@@ -387,12 +387,20 @@ void gzochid_client_session_free (gzochid_client_session *session)
   free (session);
 }
 
-static void join_transaction (gzochid_application_context *context)
+static gzochid_client_session_transaction_context *join_transaction 
+(gzochid_application_context *context)
 {
-  if (!gzochid_transaction_active()
-      || gzochid_transaction_context (&session_participant) == NULL)
-    gzochid_transaction_join
-      (&session_participant, create_transaction_context (context));
+  gzochid_client_session_transaction_context *tx_context = NULL;
+
+  if (! gzochid_transaction_active ()
+      || (tx_context = gzochid_transaction_context (&session_participant)) 
+      == NULL)
+    {
+      tx_context = create_transaction_context (context);
+      gzochid_transaction_join (&session_participant, tx_context);
+    }
+
+  return tx_context;
 }
 
 void gzochid_client_session_disconnect 
@@ -400,12 +408,9 @@ void gzochid_client_session_disconnect
 {
   GError *err = NULL;
   char *oid_str = NULL;
-  gzochid_client_session_transaction_context *tx_context = NULL;
-  gzochid_data_managed_reference *reference = NULL;
-  
-  join_transaction (context);
-  tx_context = gzochid_transaction_context (&session_participant);
-  reference = gzochid_data_create_reference 
+  gzochid_client_session_transaction_context *tx_context = 
+    join_transaction (context);
+  gzochid_data_managed_reference *reference = gzochid_data_create_reference 
     (context, &gzochid_client_session_serialization, session);
 
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
@@ -425,12 +430,9 @@ void gzochid_client_session_disconnect
 void gzochid_client_session_send_login_success
 (gzochid_application_context *context, gzochid_client_session *session)
 {
-  gzochid_client_session_transaction_context *tx_context = NULL;
-  gzochid_data_managed_reference *reference = NULL;
-
-  join_transaction (context);
-  tx_context = gzochid_transaction_context (&session_participant);
-  reference = gzochid_data_create_reference 
+  gzochid_client_session_transaction_context *tx_context =
+    join_transaction (context);
+  gzochid_data_managed_reference *reference = gzochid_data_create_reference 
     (context, &gzochid_client_session_serialization, session);
 
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
@@ -443,12 +445,9 @@ void gzochid_client_session_send_login_success
 void gzochid_client_session_send_login_failure
 (gzochid_application_context *context, gzochid_client_session *session)
 {
-  gzochid_client_session_transaction_context *tx_context = NULL;
-  gzochid_data_managed_reference *reference = NULL;
-
-  join_transaction (context);
-  tx_context = gzochid_transaction_context (&session_participant);
-  reference = gzochid_data_create_reference 
+  gzochid_client_session_transaction_context *tx_context =
+    join_transaction (context);
+  gzochid_data_managed_reference *reference = gzochid_data_create_reference 
     (context, &gzochid_client_session_serialization, session);
 
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
@@ -462,12 +461,9 @@ void gzochid_client_session_send_message
 (gzochid_application_context *context, gzochid_client_session *session, 
  unsigned char *msg, short len)
 {
-  gzochid_client_session_transaction_context *tx_context = NULL;
-  gzochid_data_managed_reference *reference = NULL;
-
-  join_transaction (context);
-  tx_context = gzochid_transaction_context (&session_participant);
-  reference = gzochid_data_create_reference 
+  gzochid_client_session_transaction_context *tx_context =
+    join_transaction (context);
+  gzochid_data_managed_reference *reference = gzochid_data_create_reference 
     (context, &gzochid_client_session_serialization, session);
 
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
