@@ -172,7 +172,6 @@ void gzochid_guile_add_to_load_path (char *path)
 
   gzochid_guile_invoke 
     (scm_add_to_load_path, scm_list_1 (scm_path), SCM_BOOL_F);
-  printf ("Added %s\n", path);
 }
 
 static void bind_scm (char *module, SCM *binding, char *name)
