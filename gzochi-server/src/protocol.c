@@ -194,11 +194,12 @@ void gzochid_protocol_client_login_failure (gzochid_protocol_client *client)
 void gzochid_protocol_client_send 
 (gzochid_protocol_client *client, unsigned char *msg, short len)
 {
-  unsigned char len_str[3];
+  unsigned char *buf = malloc (sizeof (unsigned char) * (len + 3));
 
-  gzochi_common_io_write_short (len, len_str, 0);
-  len_str[2] = GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE;
+  gzochi_common_io_write_short (len, buf, 0);
+  buf[2] = GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE;
+  memcpy (buf + 3, msg, len);
 
-  svz_sock_write (client->sock, (char *) len_str, 3);
-  svz_sock_write (client->sock, (char *) msg, len);
+  svz_sock_write (client->sock, (char *) buf, len + 3);
+  free (buf);
 }
