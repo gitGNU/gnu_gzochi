@@ -23,6 +23,10 @@
 #include <gmp.h>
 #include <sys/time.h>
 
+#define GZOCHID_STORAGE_EFAILURE -1
+#define GZOCHID_STORAGE_ENOTFOUND -2
+#define GZOCHID_STORAGE_ETXFAILURE -3
+
 typedef struct _gzochid_storage_context
 {
   gpointer environment;
@@ -53,7 +57,7 @@ void gzochid_storage_unlock (gzochid_storage_store *);
 char *gzochid_storage_get (gzochid_storage_store *, char *, size_t, size_t *);
 void gzochid_storage_put 
 (gzochid_storage_store *, char *, size_t, char *, size_t);
-void gzochid_storage_delete (gzochid_storage_store *, char *, size_t);
+int gzochid_storage_delete (gzochid_storage_store *, char *, size_t);
 char *gzochid_storage_first_key (gzochid_storage_store *, size_t *);
 char *gzochid_storage_next_key 
 (gzochid_storage_store *, char *, size_t, size_t *);
@@ -74,7 +78,7 @@ char *gzochid_storage_transaction_get_for_update
 void gzochid_storage_transaction_put 
 (gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t, 
  char *, size_t);
-void gzochid_storage_transaction_delete 
+int gzochid_storage_transaction_delete 
 (gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t);
 char *gzochid_storage_transaction_first_key 
 (gzochid_storage_transaction *, gzochid_storage_store *, size_t *);

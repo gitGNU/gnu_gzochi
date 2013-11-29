@@ -116,12 +116,13 @@ void gzochid_storage_put
      g_string_new_len (data, data_len));
 }
 
-void gzochid_storage_delete 
+int gzochid_storage_delete 
 (gzochid_storage_store *store, char *key, size_t key_len)
 {
   GString *str = g_string_new_len (key, key_len);
   g_tree_remove ((GTree *) store->database, str);
   g_string_free (str, TRUE);
+  return 0;
 }
 
 static gboolean first_key (gpointer key, gpointer value, gpointer data)
@@ -231,11 +232,11 @@ void gzochid_storage_transaction_put
   gzochid_storage_put (store, key, key_len, data, data_len);
 }
 
-void gzochid_storage_transaction_delete
+int gzochid_storage_transaction_delete
 (gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
  size_t key_len)
 {
-  gzochid_storage_delete (store, key, key_len);
+  return gzochid_storage_delete (store, key, key_len);
 }
 
 char *gzochid_storage_transaction_first_key 

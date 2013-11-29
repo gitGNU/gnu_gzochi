@@ -199,7 +199,7 @@ void gzochid_storage_put
     gzochid_err ("Failed to store key %s: %s", key, db_strerror (ret));
 }
 
-void gzochid_storage_delete 
+int gzochid_storage_delete 
 (gzochid_storage_store *store, char *key, size_t key_len)
 {
   DB *db = (DB *) store->database;
@@ -213,7 +213,13 @@ void gzochid_storage_delete
   ret = db->del (db, NULL, &db_key, 0);
 
   if (ret != 0)
-    gzochid_err ("Failed to delete key %s: %s", key, db_strerror (ret));
+    {
+      gzochid_err ("Failed to delete key %s: %s", key, db_strerror (ret));
+      if (ret == DB_NOTFOUND)
+	return GZOCHID_STORAGE_ENOTFOUND;
+      else return GZOCHID_STORAGE_EFAILURE;
+    }
+  return 0;
 }
 
 char *gzochid_storage_first_key (gzochid_storage_store *store, size_t *len)
@@ -420,7 +426,7 @@ void gzochid_storage_transaction_put
     }
 }
 
-void gzochid_storage_transaction_delete
+int gzochid_storage_transaction_delete
 (gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key, 
  size_t key_len)
 {
@@ -439,9 +445,17 @@ void gzochid_storage_transaction_delete
     {
       gzochid_warning
 	("Failed to delete key %s in transaction: %s", key, db_strerror (ret)); 
-      tx->rollback = TRUE;
-      tx->should_retry = retryable (ret);
+      
+      if (ret == DB_NOTFOUND)
+	return GZOCHID_STORAGE_ENOTFOUND;
+      else
+	{
+	  tx->rollback = TRUE;
+	  tx->should_retry = retryable (ret);
+	  return GZOCHID_STORAGE_ETXFAILURE;
+	}
     }
+  else return 0;
 }
 
 char *gzochid_storage_transaction_first_key 
