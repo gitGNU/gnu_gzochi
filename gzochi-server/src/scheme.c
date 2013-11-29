@@ -275,7 +275,6 @@ void gzochid_scheme_application_logged_in_worker
   gzochid_data_managed_reference *session_reference = NULL;
 
   SCM scm_session = SCM_BOOL_F;
-  gzochid_data_managed_reference *session_scm_reference = NULL;
 
   SCM cb = SCM_BOOL_F;
   gzochid_data_managed_reference *callback_reference = NULL;
@@ -301,9 +300,6 @@ void gzochid_scheme_application_logged_in_worker
 
   scm_session = gzochid_scheme_create_client_session 
     (session, session_reference->oid);
-  session_scm_reference = 
-    gzochid_data_create_reference
-    (context, &gzochid_scheme_data_serialization, scm_session);
 
   cb = gzochid_scheme_create_callback (context->descriptor->logged_in, NULL);
   callback_reference = gzochid_data_create_reference 
@@ -318,8 +314,7 @@ void gzochid_scheme_application_logged_in_worker
      g_list_append
      (g_list_append
       (g_list_append (NULL, "gzochi"), "private"), "app"),
-     scm_list_2 ((SCM) callback_reference->obj, 
-		 (SCM) session_scm_reference->obj), 
+     scm_list_2 ((SCM) callback_reference->obj, (SCM) scm_session), 
      exception_var);
   
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
@@ -341,6 +336,14 @@ void gzochid_scheme_application_logged_in_worker
 	(context, &gzochid_client_session_serialization, session, &err);
       if (err == NULL)
 	{
+	  gzochid_scm_location_info *scm_session_reloc = 
+	    gzochid_scm_location_get (context, scm_session);
+	  gzochid_data_managed_reference *reloc_reference = 
+	    gzochid_data_create_reference 
+	    (context, &gzochid_scm_location_aware_serialization, 
+	     scm_session_reloc);
+
+	  mpz_set (session->scm_oid, reloc_reference->oid);
 	  gzochid_client_session_send_login_success (context, session);
 	}
       else g_error_free (err);

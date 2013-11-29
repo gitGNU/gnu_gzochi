@@ -30,6 +30,7 @@
 #include "io.h"
 #include "log.h"
 #include "protocol.h"
+#include "reloc.h"
 #include "scheme.h"
 #include "session.h"
 #include "task.h"
@@ -350,8 +351,23 @@ static void remove_session
 	(context, &gzochid_client_session_serialization, oid);
       gzochid_data_dereference (session_reference, &local_err);
 
-      if (local_err != NULL)
-	g_propagate_error (err, local_err);
+      if (local_err == NULL)
+	{
+	  gzochid_client_session *session = 
+	    (gzochid_client_session *) session_reference->obj;
+	  gzochid_data_managed_reference *scm_session_reference =
+	    gzochid_data_create_reference_to_oid 
+	    (context, &gzochid_scm_location_aware_serialization, 
+	     session->scm_oid);
+	  
+	  gzochid_data_remove_object (scm_session_reference, &local_err);
+
+	  if (local_err == NULL)
+	    gzochid_data_remove_object (session_reference, &local_err);
+	  
+	  if (local_err != NULL)
+	    g_propagate_error (err, local_err);	  
+	}
 
       mpz_clear (oid);
     }
@@ -631,15 +647,12 @@ void gzochid_sweep_client_sessions (gzochid_application_context *context)
   while (next_binding != NULL 
          && strncmp (SESSION_PREFIX, next_binding, prefix_len) == 0)
     {
+      char *oid_str = mpz_get_str (NULL, 16, oid);
       char *next_next_binding = NULL;
-      gzochid_data_managed_reference *session_reference = 
-	gzochid_data_create_reference_to_oid 
-	(context, &gzochid_client_session_serialization, oid);
-      gzochid_data_remove_binding (context, next_binding, &err);
+      
+      remove_session (context, oid_str, &err);
 
-      assert (err == NULL);
-
-      gzochid_data_remove_object (session_reference, &err);
+      free (oid_str);
 
       assert (err == NULL || err->code == GZOCHID_DATA_ERROR_NOT_FOUND);
 
