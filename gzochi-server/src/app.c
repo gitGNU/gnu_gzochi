@@ -466,7 +466,7 @@ static void run_async_transactional (gpointer data)
 {
   gzochid_application_context *context = (gzochid_application_context *) data;
   SCM persisted_callback = (SCM) gzochid_data_get_binding 
-    (context, "s.initializer", &gzochid_scheme_data_serialization);
+    (context, "s.initializer", &gzochid_scheme_data_serialization, NULL);
 
   gzochid_auth_identity *system_identity = calloc 
     (1, sizeof (gzochid_auth_identity));

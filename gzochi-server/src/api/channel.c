@@ -15,7 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <glib.h>
 #include <libguile.h>
+#include <stddef.h>
 
 #include "../app.h"
 #include "../channel.h"
@@ -36,19 +38,17 @@ SCM_DEFINE (primitive_create_channel, "primitive-create-channel", 1, 0, 0,
   gzochid_data_managed_reference *scm_reference = 
     gzochid_data_create_reference_to_oid 
     (context, &gzochid_scheme_data_serialization, channel->scm_oid);
-  SCM ret = SCM_BOOL_F;
 
-  if (gzochid_data_dereference (scm_reference) == 0)
-    ret = (SCM) scm_reference->obj;
-
+  gzochid_data_dereference (scm_reference, NULL);
   gzochid_api_check_transaction ();
 
-  return ret;
+  return (SCM) scm_reference->obj;
 }
 
 SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
 	    (SCM name), "Retrieves the channel with the specified name.")
 {
+  GError *err = NULL;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
@@ -61,8 +61,11 @@ SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
       gzochid_data_managed_reference *scm_reference = 
 	gzochid_data_create_reference_to_oid 
 	(context, &gzochid_scheme_data_serialization, channel->scm_oid);
-      if (gzochid_data_dereference (scm_reference) == 0)
+      gzochid_data_dereference (scm_reference, &err);
+
+      if (err == NULL)
 	ret = (SCM) scm_reference->obj;
+      else g_error_free (err); 
     }
 
   gzochid_api_check_transaction ();
@@ -78,6 +81,7 @@ SCM_DEFINE (primitive_join_channel, "primitive-join-channel", 2, 0, 0,
   gzochid_data_managed_reference *channel_reference = NULL;
   gzochid_data_managed_reference *session_reference = NULL;
   mpz_t channel_oid, session_oid;
+  GError *err = NULL;
 
   mpz_init (channel_oid);
   mpz_init (session_oid);
@@ -90,13 +94,20 @@ SCM_DEFINE (primitive_join_channel, "primitive-join-channel", 2, 0, 0,
   session_reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, session_oid);
 
-  if (gzochid_data_dereference (channel_reference) == 0
-      && gzochid_data_dereference (session_reference) == 0)      
-    gzochid_channel_join 
-      (context, 
-       (gzochid_channel *) channel_reference->obj, 
-       (gzochid_client_session *) session_reference->obj);
+  gzochid_data_dereference (channel_reference, &err);
+  if (err == NULL)
+    {
+      gzochid_data_dereference (session_reference, &err);
 
+      if (err == NULL)
+	gzochid_channel_join 
+	  (context, 
+	   (gzochid_channel *) channel_reference->obj, 
+	   (gzochid_client_session *) session_reference->obj);
+      else g_error_free (err);
+    }
+  else g_error_free (err);
+  
   gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
@@ -106,6 +117,7 @@ SCM_DEFINE (primitive_leave_channel, "primitive-leave-channel", 2, 0, 0,
 	    (SCM channel, SCM session), 
 	    "Remove a client session from a channel.")
 {
+  GError *err = NULL;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
   gzochid_data_managed_reference *channel_reference = NULL;
@@ -123,13 +135,20 @@ SCM_DEFINE (primitive_leave_channel, "primitive-leave-channel", 2, 0, 0,
   session_reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, session_oid);
   
-  if (gzochid_data_dereference (channel_reference) == 0
-      && gzochid_data_dereference (session_reference) == 0)
-    gzochid_channel_leave 
-      (context, 
-       (gzochid_channel *) channel_reference->obj, 
-       (gzochid_client_session *) session_reference->obj);
+  gzochid_data_dereference (channel_reference, &err);
 
+  if (err == NULL)
+    {
+      gzochid_data_dereference (session_reference, &err);
+      if (err == NULL)
+	gzochid_channel_leave 
+	  (context, 
+	   (gzochid_channel *) channel_reference->obj, 
+	   (gzochid_client_session *) session_reference->obj);
+      else g_error_free (err);
+    }
+  else g_error_free (err);
+  
   gzochid_api_check_transaction ();
 
   return SCM_UNSPECIFIED;
@@ -139,6 +158,7 @@ SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message",
 	    2, 0, 0, (SCM channel, SCM bv), 
 	    "Send a message to the sessions that belong to a channel.")
 {
+  GError *err = NULL;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
 
@@ -154,9 +174,12 @@ SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message",
   
   channel_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, channel_oid);
-  if (gzochid_data_dereference (channel_reference) == 0)
+  gzochid_data_dereference (channel_reference, &err);
+
+  if (err == NULL)
     gzochid_channel_send 
       (context, (gzochid_channel *) channel_reference->obj, msg, len);
+  else g_error_free (err);
 
   gzochid_api_check_transaction ();
 
@@ -166,6 +189,7 @@ SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message",
 SCM_DEFINE (primitive_close_channel, "primitive-close-channel", 1, 0, 0,
 	    (SCM channel, SCM msg), "Shut down a channel.")
 {
+  GError *err = NULL;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
   gzochid_data_managed_reference *channel_reference = NULL;
@@ -176,9 +200,12 @@ SCM_DEFINE (primitive_close_channel, "primitive-close-channel", 1, 0, 0,
   channel_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, channel_oid);
 
-  if (gzochid_data_dereference (channel_reference) == 0)
+  gzochid_data_dereference (channel_reference, &err);
+
+  if (err == NULL)
     gzochid_channel_close 
       (context, (gzochid_channel *) channel_reference->obj);
+  else g_error_free (err);
 
   gzochid_api_check_transaction ();
 

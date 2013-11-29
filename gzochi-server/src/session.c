@@ -330,15 +330,15 @@ gzochid_io_serialization gzochid_client_session_serialization =
     finalize_client_session 
   };
 
-static int remove_session
-(gzochid_application_context *context, const char *oid_str)
+static void remove_session
+(gzochid_application_context *context, const char *oid_str, GError **err)
 {
-  int ret = 0;
+  GError *local_err = NULL;
   GString *binding = g_string_new (SESSION_PREFIX);
 
   g_string_append (binding, oid_str);
-  ret = gzochid_data_remove_binding (context, binding->str);
-  if (ret == 0)
+  gzochid_data_remove_binding (context, binding->str, &local_err);
+  if (local_err == NULL)
     {
       mpz_t oid;
       gzochid_data_managed_reference *session_reference = NULL;
@@ -348,25 +348,23 @@ static int remove_session
 
       session_reference = gzochid_data_create_reference_to_oid 
 	(context, &gzochid_client_session_serialization, oid);
-      ret = gzochid_data_remove_object (session_reference);
+      gzochid_data_dereference (session_reference, &local_err);
+
+      if (local_err != NULL)
+	g_propagate_error (err, local_err);
 
       mpz_clear (oid);
     }
+  else g_propagate_error (err, local_err);
    
   g_string_free (binding, FALSE);
-
-  return ret;
 }
 
 void gzochid_client_session_disconnected_worker
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gpointer data)
 {
-  if (remove_session (context, (const char *) data) != 0)
-
-    /* No worries, the transaction will be retried. */
-
-    ;
+  remove_session (context, (const char *) data, NULL);
 }
 
 gzochid_client_session *gzochid_client_session_new 
@@ -400,6 +398,7 @@ static void join_transaction (gzochid_application_context *context)
 void gzochid_client_session_disconnect 
 (gzochid_application_context *context, gzochid_client_session *session)
 {
+  GError *err = NULL;
   char *oid_str = NULL;
   gzochid_client_session_transaction_context *tx_context = NULL;
   gzochid_data_managed_reference *reference = NULL;
@@ -413,9 +412,12 @@ void gzochid_client_session_disconnect
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
 
-  if (remove_session (context, oid_str) == 0)
+  remove_session (context, oid_str, &err);
+
+  if (err == NULL)
     tx_context->operations = g_list_append 
       (tx_context->operations, create_disconnect_operation (reference->oid));
+  else g_error_free (err);
 
   free (oid_str);
 }
@@ -551,12 +553,8 @@ static void prefix_binding_persistence_task_worker
   g_string_append (binding, oid_str);
   free (oid_str);
 
-  if (gzochid_data_set_binding_to_oid 
-      (context, binding->str, persistence_task->holder->oid) != 0)
-    
-    /* No worries, the transaction will be retried. */
-
-    ;
+  gzochid_data_set_binding_to_oid 
+    (context, binding->str, persistence_task->holder->oid, NULL);
 
   g_string_free (binding, FALSE);
 }
@@ -623,12 +621,16 @@ void gzochid_client_session_persist
 void gzochid_sweep_client_sessions (gzochid_application_context *context)
 {
   mpz_t oid;
+  GError *err = NULL;
   char *next_binding = NULL;
   int prefix_len = strlen (SESSION_PREFIX), num_sessions = 0;
 
   mpz_init (oid);
   gzochid_tx_info (context, "Sweeping old client sessions.");
-  next_binding = gzochid_data_next_binding_oid (context, SESSION_PREFIX, oid);
+  next_binding = gzochid_data_next_binding_oid 
+    (context, SESSION_PREFIX, oid, &err);
+
+  assert (err == NULL);
 
   while (next_binding != NULL 
          && strncmp (SESSION_PREFIX, next_binding, prefix_len) == 0)
@@ -637,12 +639,18 @@ void gzochid_sweep_client_sessions (gzochid_application_context *context)
       gzochid_data_managed_reference *session_reference = 
 	gzochid_data_create_reference_to_oid 
 	(context, &gzochid_client_session_serialization, oid);
+      gzochid_data_remove_binding (context, next_binding, &err);
 
-      assert (gzochid_data_remove_binding (context, next_binding) == 0);
-      assert (gzochid_data_remove_object (session_reference) == 0);
+      assert (err == NULL);
+
+      gzochid_data_remove_object (session_reference, &err);
+
+      assert (err == NULL || err->code == GZOCHID_DATA_ERROR_NOT_FOUND);
 
       next_next_binding = gzochid_data_next_binding_oid 
-	(context, next_binding, oid);
+	(context, next_binding, oid, &err);
+
+      assert (err == NULL);
 
       free (next_binding);
       next_binding = next_next_binding;

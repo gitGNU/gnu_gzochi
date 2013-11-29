@@ -121,7 +121,7 @@ static void test_periodic_cancel_inner1 (gpointer data)
      &gzochid_durable_application_task_handle_serialization, 
      context->handle_oid);
 
-  gzochid_data_dereference (handle_ref);
+  gzochid_data_dereference (handle_ref, NULL);
 
   gzochid_cancel_periodic_task 
     (context->app_context, 

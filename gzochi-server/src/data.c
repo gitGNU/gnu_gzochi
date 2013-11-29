@@ -34,6 +34,11 @@
 
 #define NEXT_OID_KEY 0x00
 
+GQuark gzochid_data_error_quark (void)
+{
+  return g_quark_from_static_string ("gzochid-data-error-quark");
+}
+
 gzochid_oid_holder *gzochid_oid_holder_new (void)
 {
   gzochid_oid_holder *holder = malloc (sizeof (gzochid_oid_holder));
@@ -300,25 +305,34 @@ static gzochid_data_oid_block *reserve_oids
 }
 
 static void get_binding 
-(gzochid_data_transaction_context *context, char *name, mpz_t oid)
+(gzochid_data_transaction_context *context, char *name, mpz_t oid, 
+ GError **err)
 {
   char *oid_str = gzochid_storage_transaction_get 
     (context->transaction, context->context->names, name, strlen (name) + 1, 
      NULL);
-  if (context->transaction->rollback)
-    gzochid_transaction_mark_for_rollback 
-      (&data_participant, context->transaction->should_retry);
 
-  if (oid_str != NULL)
+  if (context->transaction->rollback)
+    {
+      gzochid_transaction_mark_for_rollback 
+	(&data_participant, context->transaction->should_retry);
+      g_set_error
+	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	 "Transaction rolled back while retrieving binding.");
+    }
+  else if (oid_str != NULL)
     {
       mpz_set_str (oid, oid_str, 16);
       free (oid_str);
     }
-  else mpz_set_si (oid, -1);
+  else g_set_error
+	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
+	 "No data found for binding '%s'.", name);
 }
 
-static int set_binding 
-(gzochid_data_transaction_context *context, char *name, mpz_t oid)
+static void set_binding 
+(gzochid_data_transaction_context *context, char *name, mpz_t oid, 
+ GError **err)
 {
   char *oid_str = mpz_get_str (NULL, 16, oid);
   gzochid_storage_transaction_put 
@@ -331,9 +345,10 @@ static int set_binding
     {
       gzochid_transaction_mark_for_rollback 
 	(&data_participant, context->transaction->should_retry);
-      return 1;
+      g_set_error 
+	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	 "Transaction rolled back while setting binding.");
     }
-  else return 0;
 }
 
 static gzochid_data_managed_reference *create_empty_reference
@@ -442,9 +457,9 @@ static gzochid_data_managed_reference *get_reference_by_ptr
   return reference;
 }
 
-int dereference 
+static void dereference 
 (gzochid_data_transaction_context *context, 
- gzochid_data_managed_reference *reference)
+ gzochid_data_managed_reference *reference, GError **err)
 {
   size_t data_len = 0;
   char *oid_str = NULL; 
@@ -453,7 +468,7 @@ int dereference
   
   if (reference->obj != NULL 
       || reference->state == GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY)
-    return 0;
+    return;
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
   gzochid_debug ("Retrieving data for reference '%s'.", oid_str);
@@ -466,13 +481,17 @@ int dereference
     {
       gzochid_transaction_mark_for_rollback 
 	(&data_participant, context->transaction->should_retry);
+      g_set_error 
+	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	 "Transaction rolled back while retrieving reference '%s'.", oid_str);
       free (oid_str);
-      return 1;
     }
-
-  if (data == NULL)
+  else if (data == NULL)
     {
-      gzochid_info ("No data found for reference '%s'.", oid_str);
+      g_set_error 
+	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
+	 "No data found for reference '%s'.", oid_str);
+
       free (oid_str);
     }
   else 
@@ -501,11 +520,13 @@ int dereference
       g_string_free (in, TRUE);
     }
 
-  return 0;
+  return;
 }
 
-static int remove_object (gzochid_data_transaction_context *context, mpz_t oid)
+static void remove_object 
+(gzochid_data_transaction_context *context, mpz_t oid, GError **err)
 {
+  int ret = 0;
   char *oid_str = mpz_get_str (NULL, 16, oid);
 
   /* The transaction is presumed to have already been joined at this point. */
@@ -514,45 +535,50 @@ static int remove_object (gzochid_data_transaction_context *context, mpz_t oid)
     gzochid_transaction_context (&data_participant);
 
   gzochid_debug ("Removing reference '%s'.", oid_str);      
-  gzochid_storage_transaction_delete 
+  ret = gzochid_storage_transaction_delete 
     (context->transaction, context->context->oids, oid_str, 
      strlen (oid_str) + 1);
 
-  if (tx_context->transaction->rollback)
+  if (ret == GZOCHID_STORAGE_ENOTFOUND)
+    g_set_error (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
+		 "No data found for reference '%s'.", oid_str);
+  else if (ret == GZOCHID_STORAGE_ETXFAILURE)
     {
       gzochid_transaction_mark_for_rollback 
 	(&data_participant, tx_context->transaction->should_retry);
-      return 1;
+      g_set_error 
+	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	 "Transaction rolled back while removing reference '%s'.", oid_str);
     }
-  else return 0;
+
+  free (oid_str);
+  return;
 }
 
-static int remove_reference 
+static void remove_reference 
 (gzochid_data_transaction_context *context, 
- gzochid_data_managed_reference *reference)
+ gzochid_data_managed_reference *reference, GError **err)
 {
   switch (reference->state)
     {
     case GZOCHID_MANAGED_REFERENCE_STATE_EMPTY:
       
-      if (remove_object (context, reference->oid) != 0)
-	return 1;
-
+      remove_object (context, reference->oid, err);
       reference->state = GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY;
+
       break;
 
     case GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED:
     case GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED:
 
-      if (remove_object (context, reference->oid) != 0)
-	return 1;
+      remove_object (context, reference->oid, err);
 
     case GZOCHID_MANAGED_REFERENCE_STATE_NEW:
       reference->state = GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED;
     default: break;
     }
 
-  return 0;
+  return;
 }
 
 static void join_transaction (gzochid_application_context *context)
@@ -573,7 +599,7 @@ static void join_transaction (gzochid_application_context *context)
 
 void *gzochid_data_get_binding
 (gzochid_application_context *context, char *name, 
- gzochid_io_serialization *serialization)
+ gzochid_io_serialization *serialization, GError **err)
 {
   mpz_t oid;
   gzochid_data_managed_reference *reference = NULL;
@@ -582,11 +608,14 @@ void *gzochid_data_get_binding
   join_transaction (context);
   tx_context = gzochid_transaction_context (&data_participant);
 
+  GError *local_err = NULL;
+  
   mpz_init (oid);
-  get_binding (tx_context, name, oid);
+  get_binding (tx_context, name, oid, &local_err);
 
-  if (mpz_cmp_si (oid, -1) == 0)
+  if (local_err != NULL)
     {
+      g_propagate_error (err, local_err);
       mpz_clear (oid);
       return NULL;
     }
@@ -594,22 +623,22 @@ void *gzochid_data_get_binding
   reference = get_reference_by_oid (context, oid, serialization);  
   mpz_clear (oid);
 
-  dereference (tx_context, reference);
+  dereference (tx_context, reference, err);
   return reference->obj;
 }
 
-int gzochid_data_set_binding_to_oid
-(gzochid_application_context *context, char *name, mpz_t oid)
+void gzochid_data_set_binding_to_oid
+(gzochid_application_context *context, char *name, mpz_t oid, GError **err)
 {
   gzochid_data_transaction_context *tx_context = NULL;
  
   join_transaction (context);
   tx_context = gzochid_transaction_context (&data_participant);
-  return set_binding (tx_context, name, oid);
+  set_binding (tx_context, name, oid, err);
 }
 
 char *gzochid_data_next_binding_oid
-(gzochid_application_context *context, char *key, mpz_t oid)
+(gzochid_application_context *context, char *key, mpz_t oid, GError **err)
 {
   char *next_key = NULL;
   gzochid_data_transaction_context *tx_context = NULL;
@@ -643,68 +672,70 @@ char *gzochid_data_next_binding_oid
   else return NULL;
 }
 
-int gzochid_data_set_binding 
+void gzochid_data_set_binding 
 (gzochid_application_context *context, char *name, 
- gzochid_io_serialization *serialization, void *data)
+ gzochid_io_serialization *serialization, void *data, GError **err)
 {
-  gzochid_data_managed_reference *reference = NULL;
   gzochid_data_transaction_context *tx_context = NULL;
  
   join_transaction (context);
   tx_context = gzochid_transaction_context (&data_participant);
+  gzochid_data_managed_reference *reference = 
+    get_reference_by_ptr (context, data, serialization);
 
-  reference = get_reference_by_ptr (context, data, serialization);
-  return set_binding (tx_context, name, reference->oid);
+  set_binding (tx_context, name, reference->oid, err);
 }
 
-int gzochid_data_remove_binding
-(gzochid_application_context *context, char *name)
+void gzochid_data_remove_binding
+(gzochid_application_context *context, char *name, GError **err)
 {
-  mpz_t oid;
-  char *oid_str = NULL;
   gzochid_data_transaction_context *tx_context = NULL;
-
-  mpz_init (oid);
 
   join_transaction (context);
   tx_context = gzochid_transaction_context (&data_participant);
 
-  get_binding (tx_context, name, oid);
-  oid_str = mpz_get_str (NULL, 16, oid);
-  mpz_clear (oid);
+  int ret = 0;
 
-  gzochid_storage_transaction_delete 
+  ret = gzochid_storage_transaction_delete 
     (tx_context->transaction, tx_context->context->names, name, 
      strlen (name) + 1);
 
-  free (oid_str);
-
-  if (tx_context->transaction->rollback)
+  if (ret == GZOCHID_STORAGE_ENOTFOUND)
+    g_set_error (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
+		 "No data found for binding '%s'.", name);
+  else if (ret == GZOCHID_STORAGE_ETXFAILURE)
     {
       gzochid_transaction_mark_for_rollback 
 	(&data_participant, tx_context->transaction->should_retry);
-      return 1;
+      g_set_error 
+	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	 "Transaction rolled back while removing binding '%s'.", name);
     }
-  else return 0;
 }
 
 gboolean gzochid_data_binding_exists
-(gzochid_application_context *context, char *name)
+(gzochid_application_context *context, char *name, GError **err)
 {
   mpz_t oid;
   gboolean ret = TRUE;
 
   gzochid_data_transaction_context *tx_context = NULL;
+  GError *local_err = NULL;
 
   mpz_init (oid);
 
+  get_binding (tx_context, name, oid, &local_err);
   join_transaction (context);
   tx_context = gzochid_transaction_context (&data_participant);
 
-  get_binding (tx_context, name, oid);
-  
-  if (mpz_cmp_si (oid, -1) == 0)
-    ret = FALSE;
+  if (local_err != NULL)
+    {
+      if (local_err->code != GZOCHID_DATA_ERROR_NOT_FOUND)       
+	g_propagate_error (err, local_err);
+      else g_error_free (local_err);
+
+      ret = FALSE;
+    }
 
   mpz_clear (oid);
   return ret;
@@ -800,23 +831,25 @@ gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
   return get_reference_by_oid (context, oid, serialization);
 }
 
-int gzochid_data_dereference (gzochid_data_managed_reference *reference)
+void gzochid_data_dereference 
+(gzochid_data_managed_reference *reference, GError **err)
 {
   join_transaction (reference->context);
-  return dereference 
-    (gzochid_transaction_context (&data_participant), reference);
+  dereference 
+    (gzochid_transaction_context (&data_participant), reference, err);
 }
 
-int gzochid_data_remove_object (gzochid_data_managed_reference *reference)
+void gzochid_data_remove_object 
+(gzochid_data_managed_reference *reference, GError **err)
 {
   join_transaction (reference->context);
-  return remove_reference 
-    (gzochid_transaction_context (&data_participant), reference);
+  remove_reference 
+    (gzochid_transaction_context (&data_participant), reference, err);
 }
 
-int gzochid_data_mark 
+void gzochid_data_mark 
 (gzochid_application_context *context, gzochid_io_serialization *serialization,
- void *ptr)
+ void *ptr, GError **err)
 {
   gzochid_data_managed_reference *reference = NULL;
   join_transaction (context);
@@ -837,19 +870,17 @@ int gzochid_data_mark
 	(tx_context->transaction, tx_context->context->oids, oid_str, 
 	 strlen (oid_str) + 1, NULL);
    
-      free (oid_str);
-
       if (tx_context->transaction->rollback)
 	{
 	  gzochid_transaction_mark_for_rollback 
 	    (&data_participant, tx_context->transaction->should_retry);
-	  return 1;
+	  g_set_error 
+	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	     "Transaction rolled back while removing reference '%s'.", 
+	     oid_str);
 	}
-      else 
-	{
-	  free (data);
-	  return 0;
-	}
+      else free (data);
+
+      free (oid_str);
     }
-  return 0;
 }

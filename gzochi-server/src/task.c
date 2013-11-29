@@ -275,8 +275,9 @@ static void durable_task_application_worker
 gzochid_task *wrap_durable_task 
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gzochid_durable_application_task *durable_task,
- gzochid_durable_application_task_handle *durable_task_handle)
+ gzochid_durable_application_task_handle *durable_task_handle, GError *err)
 {
+  GError *local_err = NULL;
   gzochid_game_context *game_context = (gzochid_game_context *) 
     ((gzochid_context *) context)->parent;
   gzochid_auth_identity *cloned_identity = 
@@ -296,20 +297,23 @@ gzochid_task *wrap_durable_task
 }
 
 static gzochid_task *rebuild_durable_task
-(gzochid_application_context *context, mpz_t oid)
+(gzochid_application_context *context, mpz_t oid, GError **err)
 {
+  GError *local_err = NULL;
   gzochid_durable_application_task *task = NULL;
   gzochid_durable_application_task_handle *handle = NULL;
   gzochid_data_managed_reference *handle_reference = 
     gzochid_data_create_reference_to_oid 
     (context, &gzochid_durable_application_task_handle_serialization, oid);
+  
+  gzochid_data_dereference (handle_reference, &local_err);
+  assert (local_err == NULL);
 
-  assert (gzochid_data_dereference (handle_reference) == 0);
   handle = (gzochid_durable_application_task_handle *) handle_reference->obj;
   task = gzochid_durable_application_task_new (oid);
 
   return wrap_durable_task
-    (context, handle->identity, task, handle);
+    (context, handle->identity, task, handle, err);
 }
 
 static void commit_scheduled_task (gpointer data, gpointer user_data)
@@ -363,6 +367,7 @@ static gzochid_task_transaction_context *join_transaction
 void gzochid_restart_tasks (gzochid_application_context *context)
 {
   mpz_t oid;
+  GError *err = NULL;
   char *next_binding = NULL;
   int prefix_len = strlen (PENDING_TASK_PREFIX);
   gzochid_task_transaction_context *tx_context = NULL;
@@ -371,7 +376,9 @@ void gzochid_restart_tasks (gzochid_application_context *context)
   mpz_init (oid);
   gzochid_tx_info (context, "Resubmitting durable tasks.");
   next_binding = gzochid_data_next_binding_oid 
-    (context, PENDING_TASK_PREFIX, oid);
+    (context, PENDING_TASK_PREFIX, oid, &err);
+
+  assert (err == NULL);
 
   tx_context = join_transaction (context);
 
@@ -379,11 +386,21 @@ void gzochid_restart_tasks (gzochid_application_context *context)
 	 && strncmp (PENDING_TASK_PREFIX, next_binding, prefix_len) == 0)
     {
       char *next_next_binding = 
-	gzochid_data_next_binding_oid (context, next_binding, oid);
-      gzochid_task *task = rebuild_durable_task (context, oid);
+	gzochid_data_next_binding_oid (context, next_binding, oid, &err);
+      gzochid_task *task = NULL;
+
+      assert (err == NULL);
+
+      task = rebuild_durable_task (context, oid, &err);
  
+      assert (err == NULL);
+
       tx_context->scheduled_tasks = g_list_append 
 	(tx_context->scheduled_tasks, task);
+      next_next_binding = 
+	gzochid_data_next_binding_oid (context, next_binding, oid, &err);
+
+      assert (err == NULL);
 
       free (next_binding);
       next_binding = next_next_binding;
@@ -402,8 +419,9 @@ void gzochid_restart_tasks (gzochid_application_context *context)
 gzochid_durable_application_task_handle *build_durable_task_handle
 (gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization, 
- struct timeval delay, struct timeval *period)
+ struct timeval delay, struct timeval *period, GError **err)
 {
+  GError *local_err = NULL;
   struct timeval target;
 
   gzochid_data_managed_reference *task_data_reference = NULL;
@@ -442,9 +460,12 @@ gzochid_durable_application_task_handle *build_durable_task_handle
   
   free (oid_str);
 
-  if (gzochid_data_set_binding_to_oid 
-      (task->context, binding_name, handle_reference->oid) != 0)
+  gzochid_data_set_binding_to_oid 
+    (task->context, binding_name, handle_reference->oid, &local_err);
+
+  if (local_err != NULL)
     {
+      g_propagate_error (err, local_err);
       free (binding_name);
       return NULL;
     }
@@ -459,6 +480,7 @@ static void durable_task_application_worker
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer data)
 {
+  GError *err = NULL;
   gzochid_durable_application_task *task = 
     (gzochid_durable_application_task *) data;
   gzochid_task_transaction_context *tx_context = NULL;
@@ -469,19 +491,23 @@ static void durable_task_application_worker
   gzochid_durable_application_task_handle *handle = NULL;
   gzochid_application_task *inner_task = NULL;
 
-  if (gzochid_data_dereference (handle_reference) != 0)
+  gzochid_data_dereference (handle_reference, &err);
 
-    /* Not safe to proceed if the dereference fails. */
-
-    return;
-
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return;
+    }
+      
   handle = (gzochid_durable_application_task_handle *) handle_reference->obj;
 
-  if (gzochid_data_dereference (handle->task_data_reference) != 0)
+  gzochid_data_dereference (handle->task_data_reference, &err);
 
-    /* ...nor if it fails here. */
-
-    return;
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return;
+    }
 
   inner_task = gzochid_application_task_new 
     (context, identity, handle->task_worker, handle->task_data_reference->obj);
@@ -508,15 +534,19 @@ static void durable_task_application_worker
 		&handle->target_execution_time, 
 		&handle->target_execution_time);
 
-      if (gzochid_data_mark 
-	  (context, &gzochid_durable_application_task_handle_serialization, 
-	   handle) == 0)
+      gzochid_data_mark 
+	(context, &gzochid_durable_application_task_handle_serialization, 
+	 handle, &err);
+
+      if (err == NULL)
 	{
 	  wrapped_task = wrap_durable_task (context, identity, task, handle);
 	  
 	  tx_context->scheduled_tasks = g_list_append 
 	    (tx_context->scheduled_tasks, wrapped_task);
 	}
+	  
+      else g_error_free (err);
     }
   else
     { 
@@ -525,13 +555,13 @@ static void durable_task_application_worker
       
       g_string_append (binding, oid_str);
       
-      if (gzochid_data_remove_binding (context, binding->str) != 0
-	  || gzochid_data_remove_object (handle_reference) != 0)
-	
-	/* Nothing to be done here. */
-      
-	;
+      gzochid_data_remove_binding (context, binding->str, &err);
 
+      if (err == NULL)
+	gzochid_data_remove_object (handle_reference, &err);
+      if (err != NULL)
+	g_error_free (&err);
+	
       g_string_free (binding, FALSE);
       free (oid_str);
     }
@@ -567,10 +597,11 @@ void gzochid_schedule_delayed_durable_task
  gzochid_application_task_serialization *serialization, 
  struct timeval delay)
 {
+  GError *err = NULL;
   gzochid_durable_application_task_handle *handle = 
-    build_durable_task_handle (task, serialization, delay, NULL);
+    build_durable_task_handle (task, serialization, delay, NULL, &err);
 
-  if (handle != NULL)
+  if (err == NULL)
     {
       gzochid_data_managed_reference *handle_reference = 
 	gzochid_data_create_reference 
@@ -578,10 +609,12 @@ void gzochid_schedule_delayed_durable_task
 	 handle);
       gzochid_task *wrapped_task = wrap_durable_task
 	(context, identity,
-	 gzochid_durable_application_task_new (handle_reference->oid), handle);
+	 gzochid_durable_application_task_new (handle_reference->oid), handle,
+	 NULL);
 
       schedule_durable_task (context, wrapped_task);     
     }
+  else g_error_free (err);
 }
 
 gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task 
@@ -590,21 +623,24 @@ gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task
  gzochid_application_task_serialization *serialization, 
  struct timeval delay, struct timeval period)
 {
+  GError *err = NULL;
   gzochid_durable_application_task_handle *handle = 
-    build_durable_task_handle (task, serialization, delay, &period);
+    build_durable_task_handle (task, serialization, delay, &period, &err);
 
-  if (handle != NULL)
+  if (err == NULL)
     {
       gzochid_data_managed_reference *handle_reference = 
 	gzochid_data_create_reference 
 	(context, &gzochid_durable_application_task_handle_serialization, 
 	 handle);
-      gzochid_task *wrapped_task = wrap_durable_task
-	(context, identity,
-	 gzochid_durable_application_task_new (handle_reference->oid), handle);
       
+      gzochid_task *wrapped_task = wrap_durable_task
+	(context, identity, 
+	 gzochid_durable_application_task_new (handle_reference->oid), handle,
+	 NULL);
       schedule_durable_task (context, wrapped_task);
     }
+  else g_error_free (err);
 
   return handle;
 }
@@ -614,11 +650,7 @@ void gzochid_cancel_periodic_task
 {
   handle->repeats = FALSE;
 
-  if (gzochid_data_mark 
-      (context, &gzochid_durable_application_task_handle_serialization, 
-       handle) != 0)
-    
-    /* Nothing to be done here. */
-
-    ;
+  gzochid_data_mark 
+    (context, &gzochid_durable_application_task_handle_serialization, 
+     handle, NULL);
 }

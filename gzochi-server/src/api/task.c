@@ -15,6 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <glib.h>
+#include <gmp.h>
 #include <libguile.h>
 
 #include "../app.h"
@@ -99,6 +101,7 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
 SCM_DEFINE (primitive_cancel_task, "primitive-cancel-task", 1, 0, 0, 
 	    (SCM scm_handle), "Cancel a previously scheduled periodic task.")
 {
+  GError *err = NULL;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();   
   gzochid_data_managed_reference *handle_reference = NULL;
@@ -113,11 +116,14 @@ SCM_DEFINE (primitive_cancel_task, "primitive-cancel-task", 1, 0, 0,
 
   mpz_clear (oid);
 
-  if (gzochid_data_dereference (handle_reference) == 0)
+  gzochid_data_dereference (handle_reference, &err);
+
+  if (err == NULL)
     {
       task_handle = (gzochid_periodic_task_handle *) handle_reference->obj;
       gzochid_cancel_periodic_task (context, task_handle);
     }
+  else g_error_free (err);
 
   gzochid_api_check_transaction ();
 

@@ -211,6 +211,7 @@ static void close_channel
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer data)
 {
+  GError *err = NULL;
   gzochid_channel_pending_operation *op = 
     (gzochid_channel_pending_operation *) data;
   gzochid_data_managed_reference *channel_reference =
@@ -223,12 +224,13 @@ static void close_channel
   GSequenceIter *iter = NULL;
   mpz_t session_oid;
 
-  if (gzochid_data_dereference (channel_reference) != 0)
-
-    /* The dereference may fail if there's a deadlock. It's safe to bail out; 
-       the transaction will be rolled back, anyway. */
-
-    return;
+  gzochid_data_dereference (channel_reference, &err);
+  
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return;
+    }
 
   channel = (gzochid_channel *) channel_reference->obj;
 
@@ -251,17 +253,30 @@ static void close_channel
       session_reference = gzochid_data_create_reference_to_oid 
 	(context, &gzochid_client_session_serialization, session_oid);
 
-      if (gzochid_data_dereference (session_reference) != 0)
-	
-	/* Likewise bail out of the iteration here if the session cannot be
-	   dereferenced. */
+      gzochid_data_dereference (session_reference, &err);
 
-	break;
+      if (err != NULL)
+	{
+	  if (err->code != GZOCHID_DATA_ERROR_NOT_FOUND)
+	    {
+	      g_error_free (err);
+	      return;
+	    }
+	  else 
+	    {
+	      g_error_free (err);
+	      err = NULL;
+
+	      iter = g_sequence_iter_next (iter);
+	      continue;
+	    }
+	}
 	
       session = (gzochid_client_session *) session_reference->obj;
       session_iter = g_sequence_lookup
 	(session->channels, channel_oid_str, gzochid_util_string_data_compare,
 	 NULL);
+
       if (session_iter != NULL)
 	{
 	  gzochid_protocol_client *client = g_hash_table_lookup
@@ -275,14 +290,20 @@ static void close_channel
 	       session_oid_str);
 	  else
 	    {
-	      if (gzochid_data_mark 
-		  (context, &gzochid_channel_serialization, session) != 0)
-		break;
-
-	      tx_context->messages = g_list_append
-		(tx_context->messages,
-		 gzochid_channel_message_new
-		 (GZOCHID_CHANNEL_MESSAGE_LEAVE, client));
+	      gzochid_data_mark 
+		(context, &gzochid_client_session_serialization, session, 
+		 &err);
+	      
+	      if (err == NULL)
+		tx_context->messages = g_list_append
+		  (tx_context->messages,
+		   gzochid_channel_message_new
+		   (GZOCHID_CHANNEL_MESSAGE_LEAVE, client));
+	      else
+		{
+		  g_error_free (err);
+		  break;
+		}
 	    }
 	}
       
@@ -298,6 +319,7 @@ static void send_channel_message
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gpointer data)
 {
+  GError *err = NULL;
   gzochid_channel_pending_send_operation *send_op =
     (gzochid_channel_pending_send_operation *) data;
   gzochid_channel_pending_operation *op = 
@@ -311,12 +333,13 @@ static void send_channel_message
   GSequenceIter *iter = NULL;
   gboolean channel_modified = FALSE;
 
-  if (gzochid_data_dereference (channel_reference) != 0)
+  gzochid_data_dereference (channel_reference, &err);
 
-    /* The dereference may fail if there's a deadlock. It's safe to bail out; 
-       the transaction will be rolled back, anyway. */
-    
-    return;
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return;
+    }
   
   channel = (gzochid_channel *) channel_reference->obj;
   tx_context = join_side_effects_transaction (context, channel);
@@ -349,12 +372,8 @@ static void send_channel_message
     }
 
   if (channel_modified)
-    if (gzochid_data_mark 
-	(context, &gzochid_channel_serialization, channel) != 0)
-
-      /* Nothing to be done in this case. */
-      
-      ;
+    gzochid_data_mark 
+      (context, &gzochid_channel_serialization, channel, NULL);
   
   g_mutex_unlock (context->client_mapping_lock);
 }
@@ -363,6 +382,7 @@ static void join_channel
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gpointer data)
 {
+  GError *err = NULL;
   gzochid_channel_pending_membership_operation *member_op =
     (gzochid_channel_pending_membership_operation *) data;
   gzochid_channel_pending_operation *op = 
@@ -382,13 +402,19 @@ static void join_channel
   char *session_oid_str = NULL;
   GSequenceIter *iter = NULL;
 
-  if (gzochid_data_dereference (channel_reference) != 0
-      || gzochid_data_dereference (session_reference) != 0)
+  gzochid_data_dereference (channel_reference, &err);
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return;
+    }
 
-    /* Either of these dereferences may fail if there's a deadlock. It's safe 
-       to bail out; the transaction will be rolled back, anyway. */
-
-    return;
+  gzochid_data_dereference (session_reference, &err);
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return;
+    }
 
   channel = (gzochid_channel *) channel_reference->obj;
   session = (gzochid_client_session *) session_reference->obj;
@@ -417,12 +443,16 @@ static void join_channel
 	    (tx_context->messages, gzochid_channel_message_new 
 	     (GZOCHID_CHANNEL_MESSAGE_JOIN, client));
 
-	  if (gzochid_data_mark 
-	      (context, &gzochid_channel_serialization, channel) != 0)
-	    return;
-	  if (gzochid_data_mark 
-	      (context, &gzochid_client_session_serialization, session) != 0)
-	    return;
+	  gzochid_data_mark 
+	    (context, &gzochid_channel_serialization, channel, &err);
+	  if (err != NULL)
+	    {
+	      g_error_free (err);
+	      return;
+	    }
+	  gzochid_data_mark 
+	    (context, &gzochid_client_session_serialization, session, NULL);
+	  return;
 	}
       else gzochid_warning 
 	     ("Client not found for joined channel session '%s'; skipping.", 
@@ -435,6 +465,7 @@ static void leave_channel
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gpointer data)
 {
+  GError *err = NULL;
   gzochid_channel_pending_membership_operation *member_op =
     (gzochid_channel_pending_membership_operation *) data;
   gzochid_channel_pending_operation *op = 
@@ -454,13 +485,19 @@ static void leave_channel
   char *session_oid_str = NULL;
   GSequenceIter *iter = NULL;
 
-  if (gzochid_data_dereference (channel_reference) != 0
-      || gzochid_data_dereference (session_reference) != 0)
-
-    /* Either of these dereferences may fail if there's a deadlock. It's safe 
-       to bail out; the transaction will be rolled back, anyway. */
-    
-    return;
+  gzochid_data_dereference (channel_reference, &err);
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return;
+    }
+ 
+  gzochid_data_dereference (session_reference, &err);
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return;
+    }
 
   channel = (gzochid_channel *) channel_reference->obj;
   session = (gzochid_client_session *) session_reference->obj;
@@ -492,12 +529,16 @@ static void leave_channel
 
 	  free (channel_oid_str);
 	  
-	  if (gzochid_data_mark 
-	      (context, &gzochid_channel_serialization, channel) != 0)
-	    return;
-	  if (gzochid_data_mark 
-	      (context, &gzochid_client_session_serialization, session) != 0)
-	    return;
+	  gzochid_data_mark 
+	    (context, &gzochid_channel_serialization, channel, &err);
+	  if (err != NULL)
+	    {
+	      g_error_free (err);
+	      return;
+	    }
+	  gzochid_data_mark 
+	    (context, &gzochid_client_session_serialization, session, NULL);
+	  return;
 	}
       else gzochid_warning 
 	     ("Client not found for parting channel session '%s'; skipping.", 
@@ -783,6 +824,7 @@ static char *make_channel_binding (char *name)
 gzochid_channel *gzochid_channel_create
 (gzochid_application_context *context, char *name)
 {
+  GError *err = NULL;
   char *binding = make_channel_binding (name);
   gzochid_channel *channel = gzochid_channel_new (name);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
@@ -799,7 +841,8 @@ gzochid_channel *gzochid_channel_create
   channel->id = (unsigned char *) mpz_get_str (NULL, 16, channel->oid);
   channel->id_len = strlen ((char *) channel->id);
 
-  if (gzochid_data_set_binding_to_oid (context, binding, reference->oid) != 0)
+  gzochid_data_set_binding_to_oid (context, binding, reference->oid, &err);
+  if (err != NULL)
     {
       free (binding);
       return NULL;
@@ -816,7 +859,7 @@ gzochid_channel *gzochid_channel_get
 {
   char *binding = make_channel_binding (name);
   gzochid_channel *channel = (gzochid_channel *) gzochid_data_get_binding
-    (context, binding, &gzochid_channel_serialization);
+    (context, binding, &gzochid_channel_serialization, NULL);
 
   free (binding);
 

@@ -32,6 +32,18 @@
 #define WARN_UNUSED_RESULT
 #endif /* __GNUC__ */
 
+#define GZOCHID_DATA_ERROR gzochid_data_error_quark ()
+
+GQuark gzochid_data_error_quark (void);
+
+typedef enum
+  {
+    GZOCHID_DATA_ERROR_NOT_FOUND,
+    GZOCHID_DATA_ERROR_TRANSACTION,
+    GZOCHID_DATA_ERROR_FAILED
+  }
+  GzochidDataError;
+
 typedef struct _gzochid_oid_holder
 {
   mpz_t oid;
@@ -92,35 +104,32 @@ gzochid_oid_holder *gzochid_oid_holder_new (void);
 void gzochid_oid_holder_free (gzochid_oid_holder *);
 
 void *gzochid_data_get_binding 
-(gzochid_application_context *, char *, gzochid_io_serialization *);
+(gzochid_application_context *, char *, gzochid_io_serialization *, GError **);
 
-int gzochid_data_set_binding
-(gzochid_application_context *, char *, gzochid_io_serialization *, void *)
-  WARN_UNUSED_RESULT;
+void gzochid_data_set_binding
+(gzochid_application_context *, char *, gzochid_io_serialization *, void *,
+ GError **);
 
-int gzochid_data_set_binding_to_oid
-(gzochid_application_context *, char *, mpz_t) WARN_UNUSED_RESULT;
+void gzochid_data_set_binding_to_oid
+(gzochid_application_context *, char *, mpz_t, GError **);
 
-int gzochid_data_remove_binding (gzochid_application_context *, char *)
-  WARN_UNUSED_RESULT;
+void gzochid_data_remove_binding 
+(gzochid_application_context *, char *, GError **);
 
-gboolean gzochid_data_binding_exists (gzochid_application_context *, char *);
+gboolean gzochid_data_binding_exists 
+(gzochid_application_context *, char *, GError **);
 char *gzochid_data_next_binding_oid 
-(gzochid_application_context *, char *, mpz_t);
+(gzochid_application_context *, char *, mpz_t, GError **);
 
 gzochid_data_managed_reference *gzochid_data_create_reference
 (gzochid_application_context *, gzochid_io_serialization *, void *);
 gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
 (gzochid_application_context *, gzochid_io_serialization *, mpz_t);
 
-int gzochid_data_dereference (gzochid_data_managed_reference *reference)
-  WARN_UNUSED_RESULT;
-
-int gzochid_data_remove_object (gzochid_data_managed_reference *reference)
-  WARN_UNUSED_RESULT;
-
-int gzochid_data_mark 
-(gzochid_application_context *, gzochid_io_serialization *, void *)
-  WARN_UNUSED_RESULT;
+void gzochid_data_dereference 
+(gzochid_data_managed_reference *reference, GError **);
+void gzochid_data_remove_object (gzochid_data_managed_reference *, GError **);
+void gzochid_data_mark 
+(gzochid_application_context *, gzochid_io_serialization *, void *, GError **);
 
 #endif /* GZOCHID_DATA_H */

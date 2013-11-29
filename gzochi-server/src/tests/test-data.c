@@ -67,7 +67,7 @@ static void fetch_reference (gpointer data)
   mpz_init (z);
 
   ref = gzochid_data_create_reference_to_oid (context, &test_serialization, z);
-  gzochid_data_dereference (ref);
+  gzochid_data_dereference (ref, NULL);
 
   mpz_clear (z);
 }

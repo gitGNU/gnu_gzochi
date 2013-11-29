@@ -15,7 +15,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <glib.h>
+#include <gmp.h>
 #include <libguile.h>
+#include <stddef.h>
 
 #include "../app.h"
 #include "../data.h"
@@ -28,6 +31,7 @@
 SCM_DEFINE (primitive_send_message, "primitive-send-message", 2, 0, 0,
 	    (SCM session, SCM msg), "Send a message to a client session.")
 {
+  GError *err = NULL;
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   gzochid_data_managed_reference *reference = NULL;
@@ -43,9 +47,12 @@ SCM_DEFINE (primitive_send_message, "primitive-send-message", 2, 0, 0,
 
   mpz_clear (c_oid);
 
-  if (gzochid_data_dereference (reference) == 0)
+  gzochid_data_dereference (reference, &err);
+
+  if (err == NULL)
     gzochid_client_session_send_message 
       (context, (gzochid_client_session *) reference->obj, payload, len);
+  else g_error_free (err);
 
   gzochid_api_check_transaction ();
 
@@ -55,6 +62,7 @@ SCM_DEFINE (primitive_send_message, "primitive-send-message", 2, 0, 0,
 SCM_DEFINE (primitive_disconnect, "primitive-disconnect", 1, 0, 0,
 	    (SCM session), "Disconnect a client session.")
 {
+  GError *err = NULL;
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   gzochid_data_managed_reference *reference = NULL;  
@@ -67,9 +75,12 @@ SCM_DEFINE (primitive_disconnect, "primitive-disconnect", 1, 0, 0,
 
   mpz_clear (c_oid);
 
-  if (gzochid_data_dereference (reference) == 0)
+  gzochid_data_dereference (reference, &err);
+
+  if (err == NULL)
     gzochid_client_session_disconnect 
       (context, (gzochid_client_session *) reference->obj);
+  else g_error_free (err);
 
   gzochid_api_check_transaction ();
 

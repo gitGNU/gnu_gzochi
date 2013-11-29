@@ -15,7 +15,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <glib.h>
+#include <gmp.h>
 #include <libguile.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -49,6 +52,7 @@ SCM_DEFINE (primitive_create_reference, "primitive-create-reference", 1, 0, 0,
 SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
 	    "Dereference a managed reference.")
 {
+  GError *err = NULL;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
   gzochid_data_managed_reference *reference = NULL;
@@ -62,7 +66,9 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
   reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_scm_location_aware_serialization, oid);
 
-  if (gzochid_data_dereference (reference) == 0)
+  gzochid_data_dereference (reference, &err);
+
+  if (err == NULL)
     {
       if (reference->obj == NULL
 	  || reference->state == 
@@ -76,6 +82,7 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
 	  ret = gzochid_scm_location_resolve (context, location);
 	}
     }
+  else g_error_free (err);
 
   gzochid_api_check_transaction ();
 
@@ -96,6 +103,7 @@ static char *prefix_name (char *name)
 SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
 	    "Retrieve a managed record bound to a name.")
 {
+  GError *err = NULL;
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   
@@ -103,42 +111,53 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
   char *prefixed_name = prefix_name (cname);
   
   SCM ret = SCM_BOOL_F;
-
-  if (!gzochid_data_binding_exists (context, prefixed_name))
+  SCM cond = SCM_BOOL_F;
+  
+  if (! gzochid_data_binding_exists (context, prefixed_name, &err))
     {
-      SCM cond = gzochid_scheme_make_name_not_bound_condition (cname);
+      if (err == NULL)	
+	cond = gzochid_scheme_make_name_not_bound_condition (cname);
+      else g_error_free (err);
 
       free (cname);
       free (prefixed_name);
-
-      gzochid_scheme_r6rs_raise (cond);
     }
   else 
     {
       gzochid_scm_location_info *location = 
 	(gzochid_scm_location_info *) gzochid_data_get_binding 
-	(context, prefixed_name, &gzochid_scm_location_aware_serialization);
+	(context, prefixed_name, &gzochid_scm_location_aware_serialization, 
+	 &err);
 
-      if (location != NULL)
-	ret = gzochid_scm_location_resolve (context, location);
+      if (err == NULL)
+	{
+	  if (location != NULL)
+	    ret = gzochid_scm_location_resolve (context, location);
+	}
+      else g_error_free (err);
 
       free (cname);
       free (prefixed_name);
     }
 
   gzochid_api_check_transaction ();
+
+  if (! scm_is_false (cond))    
+    gzochid_scheme_r6rs_raise (cond);
+
   return ret;
 }
 
 SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
 	    (SCM name, SCM obj), "Bind a managed record to a name.")
 {
+  GError *err = NULL;
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
   char *prefixed_name = prefix_name (cname);
   
-  if (gzochid_data_binding_exists (context, prefixed_name))
+  if (gzochid_data_binding_exists (context, prefixed_name, &err))
     {
       SCM cond = gzochid_scheme_make_name_exists_condition (cname);
 
@@ -147,21 +166,16 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
 
       gzochid_scheme_r6rs_raise (cond);
     }
-  else
+  else if (err == NULL)
     {
       gzochid_scm_location_info *obj_loc = 
 	gzochid_scm_location_get (context, obj);
 
       scm_gc_protect_object (obj);
       
-      if (gzochid_data_set_binding 
-	  (context, prefixed_name, &gzochid_scm_location_aware_serialization, 
-	   obj_loc) != 0)
-
-	/* No need to take action in this case, we'll be checking the 
-	   transaction in a moment. */
-       
-	;
+      gzochid_data_set_binding 
+	(context, prefixed_name, &gzochid_scm_location_aware_serialization, 
+	 obj_loc, NULL);
       
       free (cname);
       free (prefixed_name);
@@ -174,12 +188,13 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
 SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
 	    (SCM name), "Remove the binding for a name.")
 {
+  GError *err = NULL;
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
   char *prefixed_name = prefix_name (cname);
   
-  if (!gzochid_data_binding_exists (context, prefixed_name))
+  if (! gzochid_data_binding_exists (context, prefixed_name, &err))
     {
       SCM cond = gzochid_scheme_make_name_not_bound_condition (cname);
 
@@ -188,14 +203,9 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
 
       gzochid_scheme_r6rs_raise (cond);
     }
-  else
+  else if (err == NULL)
     {
-      if (gzochid_data_remove_binding (context, prefixed_name) != 0)
-
-	/* No need to take action in this case, we'll be checking the 
-	   transaction in a moment. */
-	
-	;
+      gzochid_data_remove_binding (context, prefixed_name, NULL);
 
       free (cname);
       free (prefixed_name);
@@ -216,12 +226,7 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
 
   scm_gc_protect_object (obj);    
 
-  if (gzochid_data_remove_object (reference) != 0)
-
-    /* No need to take action in this case, we'll be checking the 
-       transaction in a moment. */
-
-    ;
+  gzochid_data_remove_object (reference, NULL);
 
   gzochid_api_check_transaction ();
 
@@ -231,19 +236,15 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
 SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
 	    (SCM obj), "Mark a managed record that has been modified.")
 {
+  GError *err = NULL;
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   gzochid_scm_location_info *obj_loc = gzochid_scm_location_get (context, obj);
 
   scm_gc_protect_object (obj);    
 
-  if (gzochid_data_mark 
-      (context, &gzochid_scm_location_aware_serialization, obj_loc) != 0)
-
-    /* No need to take action in this case, we'll be checking the 
-       transaction in a moment. */
-
-    ;
+  gzochid_data_mark 
+    (context, &gzochid_scm_location_aware_serialization, obj_loc, &err);
 
   gzochid_api_check_transaction ();
 
