@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <glib.h>
 #include <gmp.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -572,7 +573,8 @@ gzochid_task *gzochid_data_prefix_binding_persistence_task_new
     gzochid_application_task_new 
     (context, identity, prefix_binding_persistence_task_worker, task_data);
   gzochid_transactional_application_task_execution *execution = 
-    gzochid_transactional_application_task_execution_new (transactional_task);
+    gzochid_transactional_application_task_execution_new 
+    (transactional_task, NULL);
   gzochid_application_task *application_task = gzochid_application_task_new 
     (context, identity, 
      gzochid_application_resubmitting_transactional_task_worker, execution);

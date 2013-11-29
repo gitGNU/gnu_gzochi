@@ -56,12 +56,14 @@ void gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
 }
 
 static gzochid_transactional_application_task_execution *execution_new
-(gzochid_application_task *task, struct timeval *timeout)
+(gzochid_application_task *task, gzochid_application_task *cleanup_task, 
+ struct timeval *timeout)
 {
   gzochid_transactional_application_task_execution *execution = 
     malloc (sizeof (gzochid_transactional_application_task_execution));
 
   execution->task = task;
+  execution->cleanup_task = cleanup_task;
 
   if (timeout != NULL)
     {
@@ -79,16 +81,17 @@ static gzochid_transactional_application_task_execution *execution_new
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_execution_new 
-(gzochid_application_task *task)
+(gzochid_application_task *task, gzochid_application_task *cleanup_task)
 {
-  return execution_new (task, NULL);
+  return execution_new (task, cleanup_task, NULL);
 }
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_timed_execution_new 
-(gzochid_application_task *task, struct timeval timeout)
+(gzochid_application_task *task, gzochid_application_task *cleanup_task, 
+ struct timeval timeout)
 {
-  return execution_new (task, &timeout);
+  return execution_new (task, cleanup_task, &timeout);
 }
 
 void gzochid_serialize_application_task 

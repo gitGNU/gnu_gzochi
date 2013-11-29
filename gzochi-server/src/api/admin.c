@@ -84,7 +84,8 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
 
   gzochid_application_task transactional_task;
   gzochid_transactional_application_task_execution *execution = 
-    gzochid_transactional_application_task_execution_new (&transactional_task);
+    gzochid_transactional_application_task_execution_new 
+    (&transactional_task, NULL);
   gzochid_application_task application_task;
 
   SCM ret = SCM_UNDEFINED;

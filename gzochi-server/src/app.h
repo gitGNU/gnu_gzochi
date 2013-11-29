@@ -118,6 +118,7 @@ typedef struct _gzochid_application_task_serialization
 typedef struct _gzochid_transactional_application_task_execution
 {
   gzochid_application_task *task;
+  gzochid_application_task *cleanup_task;
 
   struct timeval *timeout;
   unsigned int attempts;
@@ -140,11 +141,11 @@ gzochid_transaction_result gzochid_application_transaction_execute_timed
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_execution_new 
-(gzochid_application_task *);
+(gzochid_application_task *, gzochid_application_task *);
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_timed_execution_new 
-(gzochid_application_task *, struct timeval);
+(gzochid_application_task *, gzochid_application_task *, struct timeval);
 
 void gzochid_transactional_application_task_execution_free
 (gzochid_transactional_application_task_execution *);

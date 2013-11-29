@@ -107,7 +107,8 @@ gzochid_task *gzochid_task_make_transactional_application_task
   gzochid_application_task *transactional_task = 
     gzochid_application_task_new (context, identity, worker, data);
   gzochid_transactional_application_task_execution *execution = 
-    gzochid_transactional_application_task_execution_new (transactional_task);
+    gzochid_transactional_application_task_execution_new 
+    (transactional_task, NULL);
   gzochid_application_task *application_task = 
     gzochid_application_task_new 
     (context, identity, 
@@ -284,7 +285,7 @@ gzochid_task *wrap_durable_task
     (context, cloned_identity, durable_task_application_worker, durable_task);
   gzochid_transactional_application_task_execution *execution = 
     gzochid_transactional_application_task_timed_execution_new 
-    (transactional_task, game_context->tx_timeout);
+    (transactional_task, NULL, game_context->tx_timeout);
   gzochid_application_task *application_task = gzochid_application_task_new
     (context, cloned_identity,
      gzochid_application_resubmitting_transactional_task_worker, execution);
