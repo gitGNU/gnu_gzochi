@@ -100,7 +100,8 @@
       (gzochi:mark-for-write! record)
       (mutator record (if (gzochi:managed-record? val) 
 			  (gzochi:create-reference val)
-			  val))))
+			  val))
+      val))
 
   (define gzochi:managed-record-reference-mutator record-mutator)
   (define gzochi:managed-record-constructor record-constructor)
