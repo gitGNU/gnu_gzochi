@@ -431,7 +431,16 @@ void gzochid_application_resubmitting_transactional_task_worker
 	     gzochid_application_resubmitting_transactional_task_worker, 
 	     execution);	  
 	}
-      else application_task = execution->cleanup_task;
+      else if (execution->cleanup_task != NULL)
+	{
+	  gzochid_transactional_application_task_execution *cleanup_execution = 
+	    gzochid_transactional_application_task_execution_new
+	    (execution->cleanup_task, NULL);
+
+	  application_task = gzochid_application_task_new
+	    (app_context, identity,
+	     gzochid_application_transactional_task_worker, cleanup_execution);
+	}
 
       if (application_task != NULL)
 	{
