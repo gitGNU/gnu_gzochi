@@ -129,15 +129,15 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
 	(context, prefixed_name, &gzochid_scm_location_aware_serialization, 
 	 &err);
 
+      free (cname);
+      free (prefixed_name);
+
       if (err == NULL)
 	{
 	  if (location != NULL)
 	    ret = gzochid_scm_location_resolve (context, location);
 	}
       else gzochid_api_check_not_found (err);
-
-      free (cname);
-      free (prefixed_name);
     }
 
   gzochid_api_check_transaction ();
