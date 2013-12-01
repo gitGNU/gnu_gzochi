@@ -58,25 +58,10 @@
       (bind sock AF_INET addr port)
       sock))
 
-  (define call-with-sigint
-    (if (not (provided? 'posix))
-	(lambda (thunk) (thunk))
-	(lambda (thunk)
-	  (let ((handler #f))
-	    (dynamic-wind
-		(lambda ()
-		  (set! handler
-			(sigaction SIGINT (lambda (sig) (throw 'interrupt)))))
-		thunk
-		(lambda ()
-		  (if handler
-		      (sigaction SIGINT (car handler) (cdr handler))
-		      (sigaction SIGINT #f))))))))
-
   (define* (run-server #:optional (server-socket (make-tcp-server-socket)))
     (define (accept-new-client)
       (catch #t
-	(lambda () (call-with-sigint (lambda () (accept server-socket))))
+	(lambda () (accept server-socket))
 	(lambda (k . args)
 	  (cond
 	   ((port-closed? server-socket)  #f)

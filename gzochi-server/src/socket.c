@@ -20,6 +20,7 @@
 #include <libserveez.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "context.h"
 #include "fsm.h"
@@ -194,6 +195,12 @@ static void initialize_async (gpointer data, gpointer user_data)
   gzochid_fsm_to_state (context->fsm, GZOCHID_SOCKET_SERVER_STATE_RUNNING);
 }
 
+static void sigint_proxy (int s)
+{
+  signal (s, SIG_DFL);
+  raise (s);
+}
+
 static void initialize (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
@@ -204,7 +211,10 @@ static void initialize (int from_state, int to_state, gpointer user_data)
   svz_portcfg_t *portcfg = NULL;
   svz_server_t *server = NULL;
   
-  struct sigaction orig_act;
+  struct sigaction sigint_handler;
+
+  memset (&sigint_handler, 0, sizeof (struct sigaction));
+  sigint_handler.sa_handler = sigint_proxy;
 
   svz_boot ("gzochid");
 
@@ -229,7 +239,6 @@ static void initialize (int from_state, int to_state, gpointer user_data)
   server = svz_server_get ("game-default");
   server->data = server_context;
 
-  sigaction (SIGINT, NULL, &orig_act);
   svz_updn_all_coservers (-1);
 
   if (svz_updn_all_servers (1) < 0)
@@ -238,7 +247,7 @@ static void initialize (int from_state, int to_state, gpointer user_data)
   if (svz_server_bind (server, portcfg) != 0)
     gzochid_err ("Failed to bind server to port %d", game_context->port);
 
-  sigaction (SIGINT, &orig_act, NULL);
+  sigaction (SIGINT, &sigint_handler, NULL);
   gzochid_notice ("Game server listening on port %d", game_context->port);
 
   gzochid_thread_pool_push 
