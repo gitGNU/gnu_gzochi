@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <gmp.h>
 #include <stddef.h>
@@ -464,15 +465,18 @@ gboolean gzochid_application_should_retry
 
 static void run_async_transactional (gpointer data)
 {
+  GError *err = NULL;
   gzochid_application_context *context = (gzochid_application_context *) data;
-  SCM persisted_callback = (SCM) gzochid_data_get_binding 
-    (context, "s.initializer", &gzochid_scheme_data_serialization, NULL);
+  gboolean initialized = gzochid_data_binding_exists 
+    (context, "s.initializer", &err);
 
   gzochid_auth_identity *system_identity = calloc 
     (1, sizeof (gzochid_auth_identity));
   system_identity->name = "[SYSTEM]";
 
-  if (persisted_callback == NULL)
+  assert (err == NULL);
+
+  if (!initialized)
     {
       gzochid_application_task application_task;
       gzochid_task task;
