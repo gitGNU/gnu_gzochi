@@ -656,6 +656,12 @@ void gzochid_sweep_client_sessions (gzochid_application_context *context)
 
       assert (err == NULL || err->code == GZOCHID_DATA_ERROR_NOT_FOUND);
 
+      if (err != NULL)
+	{
+	  g_error_free (err);
+	  err = NULL;
+	}
+      
       next_next_binding = gzochid_data_next_binding_oid 
 	(context, next_binding, oid, &err);
 
