@@ -739,6 +739,10 @@ void gzochid_application_client_logged_in
 	      g_mutex_unlock (context->client_mapping_lock);
 
 	      gzochid_protocol_client_disconnect (client);
+	      
+	      transactional_task.worker = 
+		gzochid_client_session_disconnected_worker;
+	      gzochid_schedule_run_task (game_context->task_queue, &task);      
 	    }
 	    break;
 	}
