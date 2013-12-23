@@ -763,7 +763,8 @@ void gzochid_data_mark
 
   reference = get_reference_by_ptr (context, ptr, serialization);
 
-  if (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW)
+  if (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW
+      && reference->state != GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED)
     {
       char *data = NULL;
       char *oid_str = mpz_get_str (NULL, 16, reference->oid); 
