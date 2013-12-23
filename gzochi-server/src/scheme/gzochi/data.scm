@@ -62,6 +62,7 @@
 	  gzochi:managed-sequence?
 	  gzochi:managed-sequence->list
 	  gzochi:managed-sequence-add!
+	  gzochi:managed-sequence-delete!
 	  gzochi:managed-sequence-delete-at!
 	  gzochi:managed-sequence-fold-left
 	  gzochi:managed-sequence-fold-right
@@ -398,6 +399,18 @@
       (managed-vector-shift-left! content i 1)
       (managed-sequence-subsequence-size-set! subseq (- size 1))))
 
+  (define (managed-sequence-subsequence-delete! subseq obj pred)
+    (let ((content (managed-sequence-subsequence-contents subseq))
+	  (size (managed-sequence-subsequence-size subseq)))
+      
+      (let loop ((i 0))
+	(and (< i size)
+	     (let ((val (gzochi:managed-vector-ref content i))
+		   (pred (or pred eq?)))
+	       (if (pred val obj) 
+		   (managed-sequence-subsequence-delete-at! subseq i)
+		   (loop (+ i 1))))))))
+
   (gzochi:define-managed-record-type managed-sequence-node
     (fields (mutable parent) 
 	    (mutable next) 
@@ -445,6 +458,11 @@
 		  (gzochi:remove-object! subseq))))
 	  (managed-sequence-tree-node-decrement! 
 	   (managed-sequence-node-parent node)))))
+
+  (define (managed-sequence-list-node-delete! node obj pred)
+    (let ((subseq (managed-sequence-list-node-subsequence node)))
+      (and (managed-sequence-subsequence-delete! subseq obj pred)
+	   (begin (managed-sequence-list-node-decrement! node) #t))))
 
   (define (managed-sequence-list-node-delete-at! node i)
     (let ((subseq (managed-sequence-list-node-subsequence node)))
@@ -731,6 +749,13 @@
 	  size))
     (managed-sequence-size-inner 
      (managed-sequence-tree-node-child (managed-sequence-root seq)) 0))
+
+  (define* (gzochi:managed-sequence-delete! seq obj #:optional pred)
+    (let loop ((node (managed-sequence-connector-target 
+		      (managed-sequence-head seq))))
+      (and node
+	   (or (managed-sequence-list-node-delete! node obj pred)
+	       (loop (managed-sequence-node-next node))))))
 
   (define (gzochi:managed-sequence-delete-at! seq i)
     (or (>= i 0) (raise (make-assertion-violation)))
