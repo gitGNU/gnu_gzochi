@@ -51,5 +51,9 @@
 
     (variable-set!
      (module-variable gzochi-private-data 'primitive-mark-for-write!)
+     (lambda (record) (if #f #f)))
+
+    (variable-set!
+     (module-variable gzochi-private-data 'primitive-remove-object!)
      (lambda (record) (if #f #f))))
 )
