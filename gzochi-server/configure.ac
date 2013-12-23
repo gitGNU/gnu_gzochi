@@ -79,6 +79,7 @@ AC_CONFIG_FILES([Makefile
 		 src/auth/Makefile
 		 src/scheme/Makefile
 		 src/tests/Makefile
-		 src/tests/auth/Makefile])
+		 src/tests/auth/Makefile
+		 src/tests/scheme/Makefile])
 
 AC_OUTPUT

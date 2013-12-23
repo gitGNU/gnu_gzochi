@@ -18,7 +18,7 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = auth
+SUBDIRS = auth scheme
 
 check_PROGRAMS = $(test_programs)
 
