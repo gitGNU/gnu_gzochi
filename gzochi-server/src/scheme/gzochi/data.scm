@@ -58,6 +58,17 @@
 	  gzochi:managed-vector-length
 	  gzochi:managed-vector->list
 
+	  gzochi:make-managed-sequence
+	  gzochi:managed-sequence?
+	  gzochi:managed-sequence->list
+	  gzochi:managed-sequence-add!
+	  gzochi:managed-sequence-delete-at!
+	  gzochi:managed-sequence-fold-left
+	  gzochi:managed-sequence-fold-right
+	  gzochi:managed-sequence-insert!
+	  gzochi:managed-sequence-ref
+	  gzochi:managed-sequence-size
+
 	  gzochi:make-managed-hashtable
 	  gzochi:managed-hashtable?
 	  gzochi:managed-hashtable-size
@@ -90,6 +101,7 @@
 	  (rnrs)
 	  (only (guile) keyword? modulo)
 	  (only (srfi :1) split-at)
+	  (srfi :2)
 	  (srfi :8))
 
   (gzochi:define-managed-record-type 
@@ -306,6 +318,499 @@
 		   (cond ((keyword? cl) (loop (cdr l) filtered-l #t))
 			 (last-was-keyword? (loop (cdr l) filtered-l #f))
 			 (else (loop (cdr l) (cons cl filtered-l) #f))))))))))
+
+  (define (managed-vector-shift-right! mvec i count)
+    (or (eqv? count 1) 
+	(raise (condition 
+		(make-message-condition "Cannot shift by more than 1 position")
+		(make-assertion-violation))))
+
+    (let ((vec (gzochi:managed-vector-vector mvec)))
+      (let loop ((i i) (j (- (vector-length vec) 1)))      
+	(if (eqv? i j)
+	    (begin
+	      (vector-set! vec i #f)
+	      (gzochi:mark-for-write! mvec))
+	    (let ((jj (- j 1)))
+	      (vector-set! vec j (vector-ref vec jj))
+	      (loop i jj))))))
+
+  (define (managed-vector-shift-left! mvec i count)
+    (or (eqv? count 1) 
+	(raise (condition 
+		(make-message-condition "Cannot shift by more than 1 position")
+		(make-assertion-violation))))
+
+    (let ((vec (gzochi:managed-vector-vector mvec)))
+      (let loop ((i i) (j (- (vector-length vec) 1)))
+	(if (eqv? i j)
+	    (begin
+	      (vector-set! vec i #f)
+	      (gzochi:mark-for-write! mvec))
+	    (let ((ii (+ i 1)))
+	      (vector-set! vec i (vector-ref vec ii))
+	      (loop ii j))))))
+
+  (define (managed-vector-transfer! dst dst-from src src-from src-to)
+    (define (vector-transfer! dst-vec dst-idx src-vec src-idx)
+      (vector-set! dst-vec dst-idx (vector-ref src-vec src-idx))
+      (vector-set! src-vec src-idx #f))
+    
+    (let ((dst-vec (gzochi:managed-vector-vector dst))
+	  (src-vec (gzochi:managed-vector-vector src)))
+      (let loop ((src-from src-from)
+		 (dst-from dst-from))
+	(if (< src-from src-to)
+	    (begin
+	      (vector-transfer! dst-vec dst-from src-vec src-from)
+	      (loop (+ src-from 1) (+ dst-from 1)))
+	    (begin
+	      (gzochi:mark-for-write! dst)
+	      (gzochi:mark-for-write! src))))))
+
+  (gzochi:define-managed-record-type managed-sequence-subsequence
+    (fields (immutable contents
+		       managed-sequence-subsequence-contents
+		       (serialization (gzochi:make-serialization 
+				       serialize-managed-vector
+				       deserialize-managed-vector)))
+	    (immutable max-size (serialization gzochi:integer-serialization))
+	    (mutable size (serialization gzochi:integer-serialization)))
+    (protocol (lambda (p)
+		(lambda (max-size)
+		  (p (gzochi:make-managed-vector (+ max-size 1)) 
+		     max-size 
+		     0)))))
+
+  (define (managed-sequence-subsequence-insert! 
+	   subseq i obj serializer deserializer) 
+    (let ((content (managed-sequence-subsequence-contents subseq))
+	  (size (managed-sequence-subsequence-size subseq)))
+
+      (or (<= i (managed-sequence-subsequence-max-size subseq))
+	  (raise (make-assertion-violation)))
+
+      (managed-vector-shift-right! content i 1)
+      (gzochi:managed-vector-set! 
+       content i obj #:serializer serializer #:deserializer deserializer)
+      (managed-sequence-subsequence-size-set! subseq (+ size 1))))
+
+  (define (managed-sequence-subsequence-delete! subseq i)
+    (let ((content (managed-sequence-subsequence-contents subseq))
+	  (size (managed-sequence-subsequence-size subseq)))
+
+      (managed-vector-shift-left! content i 1)
+      (managed-sequence-subsequence-size-set! subseq (- size 1))))
+
+  (gzochi:define-managed-record-type managed-sequence-node
+    (fields (mutable parent) 
+	    (mutable next) 
+	    (mutable prev)
+	    (mutable size (serialization gzochi:integer-serialization))))
+
+  (gzochi:define-managed-record-type managed-sequence-list-node
+    (fields subsequence)
+    (parent managed-sequence-node)
+    (protocol (lambda (n) 
+		(lambda (parent max-size) 
+		  (let ((p (n parent #f #f 0)))
+		    (p (make-managed-sequence-subsequence max-size)))))))
+
+  (define (managed-sequence-list-node-insert! 
+	   node i obj serializer deserializer)
+
+    (let ((subseq (managed-sequence-list-node-subsequence node))
+	  (count (managed-sequence-node-size node)))      
+      (managed-sequence-subsequence-insert! 
+       subseq i obj serializer deserializer)
+      (managed-sequence-node-size-set! node (+ count 1))
+      (if (> count (managed-sequence-subsequence-max-size subseq))
+	  (managed-sequence-list-node-split! node)
+	  (managed-sequence-tree-node-increment! 
+	   (managed-sequence-node-parent node)))))
+
+  (define (managed-sequence-list-node-delete! node i)
+    (let ((subseq (managed-sequence-list-node-subsequence node))
+	  (count (managed-sequence-node-size node)))
+      (managed-sequence-subsequence-delete! subseq i)
+      (managed-sequence-node-size-set! node (- count 1))
+      (if (eqv? count 1)
+	  (let ((next (managed-sequence-node-next node))
+		(prev (managed-sequence-node-prev node)))
+	    (if next
+		(if prev
+		    (begin 
+		      (managed-sequence-node-next-set! prev next)
+		      (managed-sequence-node-prev-set! next prev))
+		    (managed-sequence-node-prev-set! next #f))
+		(if prev (managed-sequence-node-next-set! prev #f)))
+	    (if (or next prev)
+		(begin
+		  (gzochi:remove-object! node)
+		  (gzochi:remove-object! subseq))))
+	  (managed-sequence-tree-node-decrement! 
+	   (managed-sequence-node-parent node)))))
+
+  (define (managed-sequence-list-node-split! node)
+    (let* ((subseq (managed-sequence-list-node-subsequence node))
+	   (contents (managed-sequence-subsequence-contents subseq))
+	   (subseq2 (make-managed-sequence-subsequence
+		     (managed-sequence-subsequence-max-size subseq)))
+	   (contents2 (managed-sequence-subsequence-contents subseq2))
+	   (node2 (make-managed-sequence-list-node 
+		   (managed-sequence-node-parent node) 10))
+	   (size (managed-sequence-subsequence-size subseq))
+	   (half (/ size 2)))
+	   
+      (managed-vector-transfer! contents2 0 contents 0 half)
+
+      (managed-sequence-subsequence-size-set! subseq (- size half))
+      (managed-sequence-subsequence-size-set! subseq2 half)
+
+      (managed-sequence-node-next-set! node2 (managed-sequence-node-next node))
+      (managed-sequence-node-prev-set! node2 node)
+      (and-let* ((next (managed-sequence-node-next node)))
+	(managed-sequence-node-prev-set! next node2))
+      (managed-sequence-node-next-set! node node2)
+
+      (managed-sequence-tree-node-increment! 
+       (managed-sequence-node-parent node) #t)))
+  
+  (define (managed-sequence-list-node-append! node obj serializer deserializer)
+    (managed-sequence-list-node-insert! 
+     node (managed-sequence-node-size node) obj serializer deserializer))
+
+  (define (managed-sequence-list-node-prepend! 
+	   node obj serializer deserializer)
+    (managed-sequence-list-node-insert! node 0 obj serializer deserializer))
+
+  (gzochi:define-managed-record-type managed-sequence-tree-node 
+    (fields owner 
+	    (mutable child)
+	    (mutable child-count (serialization gzochi:integer-serialization)))
+    (parent managed-sequence-node)
+    (protocol (lambda (n) 
+		(lambda (owner)
+		  (let ((p (n #f #f #f 0)))
+		    (let* ((tn (p owner #f 1))
+			   (ln (make-managed-sequence-list-node tn 10)))
+		      (managed-sequence-tree-node-child-set! tn ln)
+		      tn))))))
+ 
+  (define (managed-sequence-tree-node-split! node)
+    (let ((child (managed-sequence-tree-node-child node)))
+      (or (managed-sequence-node-parent node)
+	  (let ((parent (make-managed-sequence-tree-node
+			 (managed-sequence-tree-node-owner node))))
+	    (managed-sequence-node-parent-set! node parent)
+	    (managed-sequence-root-set! 
+	     (managed-sequence-tree-node-owner node) parent)))
+	    
+      (let* ((new-node (make-managed-sequence-tree-node
+			(managed-sequence-tree-node-owner node)))
+	     (next (managed-sequence-node-next node))
+	     (child-count (managed-sequence-tree-node-child-count node))
+	     (half (/ child-count 2)))
+	
+	(let loop ((child child)
+		   (new-child child)
+		   (child-count child-count)
+		   (size 0)
+		   (i 0))
+
+	  (if (and child (< i child-count))
+	      (if (eqv? i half)
+		  (begin
+		    (if (managed-sequence-tree-node? child)
+			(begin
+			  (managed-sequence-node-next-set!
+			   (managed-sequence-node-prev child) #f)
+			  (managed-sequence-node-prev-set! child #f)))
+		    (loop child child child-count size (+ i 1)))
+		  (let ((ii (+ i 1)))
+		    (if (>= ii half)
+			(begin
+			  (managed-sequence-node-parent-set! child new-child)
+			  (loop (managed-sequence-node-next child) new-child
+				(+ child-count 1)
+				(+ size (managed-sequence-node-size child))
+				ii))
+			(loop (managed-sequence-node-next child) new-child
+			      child-count size ii))))
+	      (begin
+		(managed-sequence-tree-node-child-set! new-node)
+		(managed-sequence-tree-node-child-count-set! 
+		 node (- (managed-sequence-tree-node-child-count node) 
+			 child-count))
+		(managed-sequence-node-size-set!
+		 node (- (managed-sequence-node-size node) size)))))
+
+	(managed-sequence-node-prev-set! new-node node)
+	(managed-sequence-node-next-set! node new-node)
+	(if next 
+	    (begin
+	      (managed-sequence-node-next-set! new-node next)
+	      (managed-sequence-node-prev-set! next new-node))))))
+
+  (define (managed-sequence-tree-node-prune! node)
+    (let ((prev (managed-sequence-node-prev node))
+	  (next (managed-sequence-node-next node)))
+      (if prev
+	  (if next
+	      (begin
+		(managed-sequence-node-next-set! prev next)
+		(managed-sequence-node-prev-set! next prev))
+	      (managed-sequence-node-next-set! prev #f))
+	  (let ((parent (managed-sequence-node-parent node)))
+	    (if next
+		(begin
+		  (managed-sequence-node-prev-set! next #f)
+		  (managed-sequence-tree-node-child-set! 
+		   next (managed-sequence-node-size parent)
+		   (managed-sequence-tree-node-child-count parent)))
+		(managed-sequence-tree-node-child-set! parent #f)))))
+		
+    (gzochi:remove-object! node))
+
+  (define* (managed-sequence-tree-node-increment! node #:optional split?)
+    (define (count-children child)
+      (define (count-children-inner child count)
+	(if child 
+	    (count-children-inner 
+	     (managed-sequence-node-next child) (+ count 1)) 
+	    count))
+      (count-children-inner child 0))
+
+    (let ((parent (managed-sequence-node-parent node)))
+      (if parent
+	  (begin
+	    (managed-sequence-node-size-set! 
+	     node (+ (managed-sequence-node-size node) 1))
+	    (if split?
+		(let ((child-count
+		       (managed-sequence-tree-node-child-count node)))
+		  (managed-sequence-tree-node-child-count-set!
+		   node (+ child-count 1))
+		  (if (>= child-count 5)
+		      (begin 
+			(managed-sequence-tree-node-split! node)
+			(managed-sequence-tree-node-increment! parent #f))
+		      (managed-sequence-tree-node-increment! parent split?)))))
+		
+	  (if split?
+	      (let ((root-children (count-children node)))
+		(if (> root-children 5)
+		    (begin
+		      (managed-sequence-node-size-set! 
+		       (gzochi:managed-sequence-size 
+			(managed-sequence-tree-node-owner node))
+		      (managed-sequence-tree-node-child-count-set! 
+		       node root-children)
+		      (managed-sequence-tree-node-split! node)))))))))
+
+  (define* (managed-sequence-tree-node-decrement! node #:optional prune?)
+    (let ((parent (managed-sequence-node-parent node))
+	  (size (managed-sequence-node-size node)))
+      (and parent
+	   (begin 
+	     (managed-sequence-node-size-set! node (- size 1))
+	     (if prune?
+		 (let ((child-count 
+			(managed-sequence-tree-node-child-count node)))	
+		   (managed-sequence-node-size-set! node (- child-count 1))
+		   (if (and (eqv? child-count 1) (eqv? size 1))
+		       (begin
+			 (managed-sequence-tree-node-prune! node)
+			 (managed-sequence-tree-node-decrement! parent prune?))
+		       (managed-sequence-tree-node-decrement! parent #f))))))))
+
+  (gzochi:define-managed-record-type managed-sequence-connector 
+   (fields (mutable target)))
+
+  (gzochi:define-managed-record-type
+   (managed-sequence gzochi:make-managed-sequence gzochi:managed-sequence?)
+
+   (fields (mutable root) (mutable head) (mutable tail))
+
+   (protocol (lambda (p) 
+	       (lambda ()
+		 (let* ((seq (p #f #f #f))
+			(root (make-managed-sequence-tree-node seq))
+			(child (managed-sequence-tree-node-child root)))
+		   (managed-sequence-root-set! seq root)
+		   (managed-sequence-head-set! 
+		    seq (make-managed-sequence-connector child))
+		   (managed-sequence-tail-set! 
+		    seq (make-managed-sequence-connector child))
+		   seq))))
+   (sealed #t))
+
+  (define (search-managed-sequence node from to)
+    (cond
+     ((managed-sequence-tree-node? node)
+      (let ((offset (+ from (managed-sequence-node-size node))))
+	(if (< offset to)
+	    (search-managed-sequence 
+	     (or (managed-sequence-node-next node)
+		 (raise (condition
+			 (make-message-condition "Index out of bounds")
+			 (make-assertion-violation))))
+	     offset to)
+	    (search-managed-sequence
+	     (managed-sequence-tree-node-child node) from to))))
+     ((managed-sequence-list-node? node)
+      (let ((offset (+ from (managed-sequence-node-size node))))
+	(if (< offset to)
+	    (search-managed-sequence
+	     (or (managed-sequence-node-next node)
+		 (raise (condition 
+			 (make-message-condition "Index out of bounds")
+			 (make-assertion-violation))))
+	     offset to)
+	    (values node (- (- to from) 1)))))
+
+     (else (raise (make-assertion-violation)))))
+
+  (define* (gzochi:managed-sequence-insert! 
+	    seq i obj #:key serializer deserializer)
+    (or (>= i 0) (raise (make-assertion-violation)))
+    (let ((head (managed-sequence-connector-target 
+		 (managed-sequence-head seq)))
+	  (tail (managed-sequence-connector-target
+		 (managed-sequence-tail seq))))
+	  
+    (cond
+     ((and (eq? head tail) (zero? (managed-sequence-node-size head)))
+      (managed-sequence-list-node-append! tail obj serializer deserializer))
+     ((not head) (raise (make-assertion-violation)))
+     ((zero? i)
+      (managed-sequence-list-node-prepend! head obj serializer deserializer))
+     (else (receive (node index)
+	     (search-managed-sequence 
+	      (managed-sequence-tree-node-child (managed-sequence-root seq))
+	      0 (+ i 1))
+	     (managed-sequence-list-node-insert!
+	      node index obj serializer deserializer))))
+    (and-let* ((new-tail (managed-sequence-node-next tail)))
+      (managed-sequence-connector-target-set! 
+       (managed-sequence-tail seq) new-tail))))
+
+  (define (gzochi:managed-sequence-ref seq i)
+    (or (>= i 0) (raise (make-assertion-violation)))
+    
+    (receive (node index)
+      (search-managed-sequence 
+       (managed-sequence-tree-node-child (managed-sequence-root seq)) 
+       0 (+ i 1))
+      (and-let* ((subseq (managed-sequence-list-node-subsequence node)))
+	(gzochi:managed-vector-ref 
+	 (managed-sequence-subsequence-contents subseq) index))))
+
+  (define* (gzochi:managed-sequence-set! 
+	    seq i obj #:key serializer deserializer)
+    (or (>= i 0) (raise (make-assertion-violation)))
+    
+    (receive (node index)
+      (search-managed-sequence 
+       (managed-sequence-tree-node-child (managed-sequence-root seq)) 
+       0 (+ i 1))
+      (and-let* ((subseq (managed-sequence-list-node-subsequence node)))
+	(gzochi:managed-vector-set! 
+	 (managed-sequence-subsequence-contents subseq) index obj 
+	 #:serializer serializer 
+	 #:deserializer deserializer))))
+
+  (define (gzochi:managed-sequence-size seq)
+    (define (managed-sequence-size-inner node size)
+      (if node
+	  (managed-sequence-size-inner 
+	   (managed-sequence-node-next node) 
+	   (+ (managed-sequence-node-size node) size))
+	  size))
+    (managed-sequence-size-inner 
+     (managed-sequence-tree-node-child (managed-sequence-root seq)) 0))
+
+  (define (gzochi:managed-sequence-delete-at! seq i)
+    (or (>= i 0) (raise (make-assertion-violation)))
+    
+    (receive (node index)
+      (search-managed-sequence 
+       (managed-sequence-tree-node-child (managed-sequence-root seq)) 
+       0 (+ i 1))
+      (managed-sequence-list-node-delete! node index)))
+
+  (define* (gzochi:managed-sequence-add! seq obj #:key serializer deserializer)
+    (let ((tail (managed-sequence-connector-target 
+		 (managed-sequence-tail seq))))
+      (managed-sequence-list-node-append! tail obj serializer deserializer)
+      (and-let* ((new-tail (managed-sequence-node-next tail)))
+	(managed-sequence-connector-target-set! 
+	 (managed-sequence-tail seq) new-tail))))
+
+  (define (gzochi:managed-sequence-fold-left seq fold-fn . seeds)
+    (define seeds-length (length seeds))
+    (define (terminate? seeds) (and (eqv? (length seeds) 1) (not (car seeds))))
+    (define (managed-vector-fold-left mvec size . seeds)
+      (let loop ((i 0) (seeds seeds))
+	(if (< i size)
+	    (receive seeds 
+              (apply fold-fn (cons (gzochi:managed-vector-ref mvec i) seeds))
+	      (let ((num-seeds (length seeds)))
+		(cond ((terminate? seeds) #f)
+		      ((eqv? num-seeds seeds-length) (loop (+ i 1) seeds))
+		      (else (raise (make-assertion-violation))))))
+	    (apply values seeds))))
+	
+    (define (managed-sequence-list-node-fold-left node . seeds)
+      (let loop ((node node) (seeds seeds))
+	(if node
+	    (let* ((subseq (managed-sequence-list-node-subsequence node))
+		   (mvec (managed-sequence-subsequence-contents subseq))
+		   (size (managed-sequence-subsequence-size subseq)))
+	      (receive seeds
+	        (apply managed-vector-fold-left (cons* mvec size seeds))
+		(and (not (terminate? seeds))
+		     (loop (managed-sequence-node-next node) seeds))))
+	    (apply values seeds))))
+
+    (apply managed-sequence-list-node-fold-left
+	   (cons (managed-sequence-connector-target
+		  (managed-sequence-head seq)) 
+		 seeds)))
+  
+  (define (gzochi:managed-sequence-fold-right seq fold-fn . seeds)
+    (define seeds-length (length seeds))
+    (define (terminate? seeds) (and (eqv? (length seeds) 1) (not (car seeds))))
+    (define (managed-vector-fold-right mvec size . seeds)
+      (let loop ((i (- size 1)) (seeds seeds))
+	(if (>= i 0)
+	    (receive seeds 
+              (apply fold-fn (cons (gzochi:managed-vector-ref mvec i) seeds))
+	      (let ((num-seeds (length seeds)))
+		(cond ((terminate? seeds) #f)
+		      ((eqv? num-seeds seeds-length) (loop (- i 1) seeds))
+		      (else (raise (make-assertion-violation))))))
+	    (apply values seeds))))
+	
+    (define (managed-sequence-list-node-fold-right node . seeds)
+      (let loop ((node node) (seeds seeds))
+	(if node
+	    (let* ((subseq (managed-sequence-list-node-subsequence node))
+		   (mvec (managed-sequence-subsequence-contents subseq))
+		   (size (managed-sequence-subsequence-size subseq)))
+	      (receive seeds
+	        (apply managed-vector-fold-right (cons* mvec size seeds))
+		(and (not (terminate? seeds))
+		     (loop (managed-sequence-node-prev node) seeds))))
+	    (apply values seeds))))
+
+    (apply managed-sequence-list-node-fold-right
+	   (cons (managed-sequence-connector-target 
+		  (managed-sequence-tail seq))
+		 seeds)))
+  
+  (define (gzochi:managed-sequence->list seq)
+    (gzochi:managed-sequence-fold-right seq cons '()))
 
   (gzochi:define-managed-record-type managed-hashtable-entry
    (fields (immutable hash (serialization gzochi:integer-serialization))
