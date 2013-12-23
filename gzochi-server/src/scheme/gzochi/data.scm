@@ -369,11 +369,7 @@
 	      (gzochi:mark-for-write! src))))))
 
   (gzochi:define-managed-record-type managed-sequence-subsequence
-    (fields (immutable contents
-		       managed-sequence-subsequence-contents
-		       (serialization (gzochi:make-serialization 
-				       serialize-managed-vector
-				       deserialize-managed-vector)))
+    (fields contents
 	    (immutable max-size (serialization gzochi:integer-serialization))
 	    (mutable size (serialization gzochi:integer-serialization)))
     (protocol (lambda (p)
@@ -395,7 +391,7 @@
        content i obj #:serializer serializer #:deserializer deserializer)
       (managed-sequence-subsequence-size-set! subseq (+ size 1))))
 
-  (define (managed-sequence-subsequence-delete! subseq i)
+  (define (managed-sequence-subsequence-delete-at! subseq i)
     (let ((content (managed-sequence-subsequence-contents subseq))
 	  (size (managed-sequence-subsequence-size subseq)))
 
@@ -424,15 +420,14 @@
       (managed-sequence-subsequence-insert! 
        subseq i obj serializer deserializer)
       (managed-sequence-node-size-set! node (+ count 1))
-      (if (> count (managed-sequence-subsequence-max-size subseq))
+      (if (>= count (managed-sequence-subsequence-max-size subseq))
 	  (managed-sequence-list-node-split! node)
 	  (managed-sequence-tree-node-increment! 
 	   (managed-sequence-node-parent node)))))
 
-  (define (managed-sequence-list-node-delete! node i)
+  (define (managed-sequence-list-node-decrement! node)
     (let ((subseq (managed-sequence-list-node-subsequence node))
 	  (count (managed-sequence-node-size node)))
-      (managed-sequence-subsequence-delete! subseq i)
       (managed-sequence-node-size-set! node (- count 1))
       (if (eqv? count 1)
 	  (let ((next (managed-sequence-node-next node))
@@ -451,22 +446,29 @@
 	  (managed-sequence-tree-node-decrement! 
 	   (managed-sequence-node-parent node)))))
 
+  (define (managed-sequence-list-node-delete-at! node i)
+    (let ((subseq (managed-sequence-list-node-subsequence node)))
+      (managed-sequence-subsequence-delete-at! subseq i)
+      (managed-sequence-list-node-decrement! node)))
+
   (define (managed-sequence-list-node-split! node)
     (let* ((subseq (managed-sequence-list-node-subsequence node))
 	   (contents (managed-sequence-subsequence-contents subseq))
-	   (subseq2 (make-managed-sequence-subsequence
-		     (managed-sequence-subsequence-max-size subseq)))
-	   (contents2 (managed-sequence-subsequence-contents subseq2))
 	   (node2 (make-managed-sequence-list-node 
 		   (managed-sequence-node-parent node) 10))
+	   (subseq2 (managed-sequence-list-node-subsequence node2))
+	   (contents2 (managed-sequence-subsequence-contents subseq2))
 	   (size (managed-sequence-subsequence-size subseq))
-	   (half (/ size 2)))
-	   
-      (managed-vector-transfer! contents2 0 contents 0 half)
+	   (half (div size 2))
+	   (new-size (- size half)))
+	  
+      (managed-vector-transfer! contents2 0 contents half size)
 
-      (managed-sequence-subsequence-size-set! subseq (- size half))
-      (managed-sequence-subsequence-size-set! subseq2 half)
-
+      (managed-sequence-node-size-set! node half)
+      (managed-sequence-subsequence-size-set! subseq half)
+      (managed-sequence-node-size-set! node2 new-size)
+      (managed-sequence-subsequence-size-set! subseq2 new-size)
+      
       (managed-sequence-node-next-set! node2 (managed-sequence-node-next node))
       (managed-sequence-node-prev-set! node2 node)
       (and-let* ((next (managed-sequence-node-next node)))
@@ -510,7 +512,7 @@
 			(managed-sequence-tree-node-owner node)))
 	     (next (managed-sequence-node-next node))
 	     (child-count (managed-sequence-tree-node-child-count node))
-	     (half (/ child-count 2)))
+	     (half (div child-count 2)))
 	
 	(let loop ((child child)
 		   (new-child child)
@@ -737,7 +739,7 @@
       (search-managed-sequence 
        (managed-sequence-tree-node-child (managed-sequence-root seq)) 
        0 (+ i 1))
-      (managed-sequence-list-node-delete! node index)))
+      (managed-sequence-list-node-delete-at! node index)))
 
   (define* (gzochi:managed-sequence-add! seq obj #:key serializer deserializer)
     (let ((tail (managed-sequence-connector-target 
