@@ -122,6 +122,8 @@ static int connect_socket (svz_server_t *server, svz_socket_t *sock)
   sock->check_request = check_request;
   sock->handle_request = server->handle_request;
   sock->write_socket = write_socket;
+
+  svz_tcp_nodelay (sock->sock_desc, 1, NULL);
   
   gzochid_debug ("Received socket connection."); 
 
