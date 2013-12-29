@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -133,7 +134,8 @@ gzochi_glib_client_session *gzochi_glib_client_connect
   struct sockaddr_in name;
   struct hostent *hostinfo = NULL;
   gzochi_glib_client_session *session = NULL;
-  
+  int flag = 1;
+
   sock = socket (PF_INET, SOCK_STREAM, 0);
   if (sock < 0)
     return NULL;
@@ -150,6 +152,8 @@ gzochi_glib_client_session *gzochi_glib_client_connect
   if (connect (sock, (struct sockaddr *) &name, 
 	       sizeof (struct sockaddr_in)) < 0)
     return NULL;
+
+  setsockopt (sock, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof (int));
 
   session = gzochi_client_common_session_new ();
   session->connected = TRUE;
