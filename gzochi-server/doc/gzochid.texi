@@ -1759,7 +1759,12 @@ that support highly concurrent access to and modification of their
 contents is challenging. The following API describes ``managed''
 implementations of R6RS vectors and hash tables, which partition
 their elements such that conflicts between transactions accessing
-different elements of the same container are minimized.
+different elements of the same container are minimized. For
+applications that require access to sequentially-ordered elements
+and need the container to resize itself as elements are added or
+removed, a managed sequence type is provided which features an API
+based on the SRFI-44 collections proposal 
+(@url{http://srf.schemers.org/srfi-44/srfi-44.html}).
 
 @deffn {Scheme Procedure} gzochi:make-managed-vector len
 Returns a newly allocated managed vector of @var{len} elements. The
@@ -1890,6 +1895,100 @@ equivalence predicate used by @var{hashtable}.
 @deffn {Scheme Procedure} gzochi:managed-hashtable-equivalence-function hashtable
 Returns a @code{gzochi:callback} record that represents the hash
 function used by @var{hashtable}
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-managed-sequence
+Returns a newly allocated managed sequence.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence? obj
+Returns @code{#t} if @var{obj} is a managed sequence, @code{#f} 
+otherwise.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence->list seq
+Return a newly allocated list composed of the contents of @var{seq}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence-add! seq obj #:key serializer deserializer
+Appends @var{obj} to the end of @var{seq}. The value returned by 
+@code{gzochi:managed-sequence-add!} is unspecified. If @var{obj} is
+not a managed record, the keyword arguments @var{#:serializer} and 
+@var{#:deserializer} must be given (in the form of 
+@code{gzochi:callback} records), and a managed serializable wrapper
+will be generated to hold @var{obj}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence-contains? seq obj [pred]
+Returns @code{#t} if @var{seq} contains at least one element 
+equivalent to @var{obj} as determined by the equivalence procedure
+@var{pred}, @code{#f} otherwise. If @var{pred} is not specified, 
+@code{eq?} will be used to check equivalence.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence-delete! seq obj [pred]
+Removes the first element of @var{seq} equivalent to @var{obj}, as
+determined by the equivalence procedure @var{pred}. If @var{pred} is
+not specified @code{eq?} will be use to check equivalence. The 
+positions of all elements that come after the removed element are 
+decreased by one. The value returned by 
+@code{gzochi:managed-sequence-delete!} is unspecified.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence-delete-at! seq i
+Removes the element at position @var{i} of @var{seq}. The positions
+of all elements that come after @var{i} are decreased by one. The 
+value returned by @code{gzochi:managed-sequence-delete-at!} is 
+unspecified.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence-fold-left seq fold-fn . seeds
+@deffnx {Scheme Procedure} gzochi:managed-sequence-fold-right seq fold-fn . seeds
+Applies @var{fold-fn} to each element in @var{seq}. @var{fold-fn} 
+should accept a single element from the sequence as its first 
+argument, and the values passed as @var{seeds} as its remaining 
+arguments. The function must return either @code{#f}, indicating 
+that the folding iteration should halt; or the values to passed as
+seed values on the next invocation of @var{fold-fn}. The fold 
+completes when @var{fold-fn} has been applied to every element of 
+@var{seq}, or when @var{fold-fn} returns @code{#f}. 
+@code{gzochi:managed-sequence-fold-left} applies @var{fold-fn} to
+every element in @var{seq} starting with position 0; 
+@code{gzochi:managed-sequence-fold-right} begins with the element
+at the end of the sequence and works backwards to the first.
+These procedures return the final set of seed values returned by
+@var{fold-fn} as the values of the fold.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence-insert! seq i obj #:key serializer deserializer
+Inserts @var{obj} into @var{seq} at position @var{i}, which must be 
+between zero and the nunber of elements currently in the sequence,
+inclusive. The positions of all elements that come after @var{i} are
+increased by one. The value returned by 
+@code{gzochi:managed-sequence-insert!} is unspecified. If @var{obj} 
+is not a managed record, the keyword arguments @var{#:serializer} 
+and @var{#:deserializer} must be given (in the form of 
+@code{gzochi:callback} records), and a managed serializable wrapper 
+will be generated to hold @var{obj}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence-ref seq i
+Returns the element at position @var{i} in @var{seq}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence-set! seq i obj #:key serializer deserializer
+Replaces the element in @var{seq} at position @var{i}, which must be
+between zero and the number of elements currently in the sequence, 
+with @var{obj}. The value returned by 
+@code{gzochi:managed-sequence-set!} is unspecified. If @var{obj} 
+is not a managed record, the keyword arguments @var{#:serializer} 
+and @var{#:deserializer} must be given (in the form of 
+@code{gzochi:callback} records), and a managed serializable wrapper 
+will be generated to hold @var{obj}.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:managed-sequence-size seq
+Returns the number of entities currently in the managed sequence @var{seq}.
 @end deffn
 
 @node gzochi io
