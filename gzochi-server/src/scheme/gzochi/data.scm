@@ -62,6 +62,7 @@
 	  gzochi:managed-sequence?
 	  gzochi:managed-sequence->list
 	  gzochi:managed-sequence-add!
+	  gzochi:managed-sequence-contains?
 	  gzochi:managed-sequence-delete!
 	  gzochi:managed-sequence-delete-at!
 	  gzochi:managed-sequence-fold-left
@@ -835,7 +836,13 @@
 	   (cons (managed-sequence-connector-target 
 		  (managed-sequence-tail seq))
 		 seeds)))
-  
+
+  (define* (gzochi:managed-sequence-contains? seq obj #:optional (pred eq?))
+    (let ((ret #f))
+      (gzochi:managed-sequence-fold-left 
+       seq (lambda (obj2) (if (pred obj obj2) (begin (set! ret #t) #f))))
+      ret))
+
   (define (gzochi:managed-sequence->list seq)
     (gzochi:managed-sequence-fold-right seq cons '()))
 

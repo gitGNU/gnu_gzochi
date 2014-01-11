@@ -56,6 +56,13 @@
     (test-eqv 1 (gzochi:managed-sequence-size seq))
     (test-equal "foo" (gzochi:managed-sequence-ref seq 0))))
 
+(test-group "contains?"
+  (let ((seq (gzochi:make-managed-sequence)))
+    (gzochi:managed-sequence-add! 
+     seq 123 #:serializer write-int #:deserializer read-int)
+    (test-eqv #t (gzochi:managed-sequence-contains? seq 123 eqv?))
+    (test-eqv #f (gzochi:managed-sequence-contains? seq 456 eqv?))))
+
 (test-group "insert-at!"
   (let ((seq (gzochi:make-managed-sequence)))
     (gzochi:managed-sequence-insert! 

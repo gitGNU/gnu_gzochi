@@ -73,10 +73,10 @@
 
 	  gzochi:make-managed-sequence gzochi:managed-sequence?
           gzochi:managed-sequence->list gzochi:managed-sequence-add!
-          gzochi:managed-sequence-delete! gzochi:managed-sequence-delete-at! 
-	  gzochi:managed-sequence-fold-left gzochi:managed-sequence-fold-right 
-	  gzochi:managed-sequence-insert! gzochi:managed-sequence-ref 
-	  gzochi:managed-sequence-size
+	  gzochi:managed-sequence-contains? gzochi:managed-sequence-delete! 
+	  gzochi:managed-sequence-delete-at! gzochi:managed-sequence-fold-left 
+	  gzochi:managed-sequence-fold-right gzochi:managed-sequence-insert! 
+	  gzochi:managed-sequence-ref gzochi:managed-sequence-size
 
           gzochi:make-managed-hashtable gzochi:managed-hashtable?
           gzochi:managed-hashtable-size gzochi:managed-hashtable-ref
