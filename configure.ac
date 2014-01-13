@@ -1,6 +1,6 @@
 dnl configure.ac --- food for -*-autoconf-*- et al
 dnl
-dnl Copyright (C) 2013 Julian Graham
+dnl Copyright (C) 2014 Julian Graham
 dnl
 dnl This is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@ dnl You should have received a copy of the GNU General Public License
 dnl along with this package.  If not, see <http://www.gnu.org/licenses/>.
 dnl
 
-AC_INIT([gzochi], [0.4], [joolean@undecidable.net], [], 
+AC_INIT([gzochi], [0.5], [joolean@undecidable.net], [], 
         [http://www.nongnu.org/gzochi/])
 
 AM_INIT_AUTOMAKE(1.6)
