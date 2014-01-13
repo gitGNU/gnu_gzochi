@@ -1,9 +1,56 @@
 gzochid NEWS -- history of user-visible changes
-Copyright (C) 2013 Julian Graham
+Copyright (C) 2014 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.5 (since 0.4):
+
+* Notable changes
+
+** Remove GDBM-based storage engine
+
+The GDBM-based storage engine, which was deprecated in an earlier release, has
+been removed. As such, the only valid argument to the `--with-storage-engine'
+flag in `configure' is `bdb'.
+
+** &gzochi:object-removed is non-fatal
+
+Attempting to dereference a managed reference that has been removed (such as 
+the handle for a canceled periodic task, or a disconnected client session) is
+no longer fatal to the current transaction. Application code can thus recover
+from a `&gzochi:obect-removed' condition by preventing a non-local exit (by 
+using a `guard' expression, for example).
+
+** Performance improvements
+
+Several performance enhancements have been made. Among them: Nagle's algorithm 
+is now disabled for all game socket connections, and repeated mutation of the 
+same object in a single transaction no longer triggers a round trip to the 
+storage engine.
+
+** Additional application statistics
+
+The average transaction duration for running game applications is now computed
+and displayed on the embedded web console.
+
+* New interfaces
+
+** Managed sequences
+
+A new managed data structure has been added to the data module of the gzochi 
+Scheme library, to enable the storage of an unbounded number of 
+sequentially-ordered elements: `gzochi:managed-sequence'. Its implementation is
+based on the Java ScalableList data type from Project RedDward, and its API is 
+modeled on that of the SRFI-44 sequence type. See "(gzochi data)" in the manual
+for more information on the `gzochi:managed-sequence' type.
+
+* Bug fixes
+
+** Disconnected clients should be swept immediately
+** Resubmitted tasks don't resolve callback procedures properly
+
+
 Changes in 0.4 (since 0.3):
 
 * Notable changes
@@ -204,7 +251,7 @@ API counterparts) from the `(gzochi data)' and `(gzochi)' libraries:
 
 Copyright information:
 
-Copyright (C) 2013 Julian Graham
+Copyright (C) 2014 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the
