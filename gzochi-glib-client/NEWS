@@ -1,0 +1,41 @@
+libgzochi-glib NEWS -- history of user-visible changes
+Copyright (C) 2014 Julian Graham
+See the end of copying conditions.
+
+Send comments, questions, and bug reports to gzochi-devel@nongnu.org
+
+Changes in 0.5 (since 0.4):
+
+* Notable changes
+
+** Disable Nagle's algorithm on client socket connections
+
+Because messages sent by libgzochi-glib to the gzochi server will frequently be
+smaller than the MSS/MTU, and because the impact of latency on game
+interactions is severe, libgzochi-glib now preemptively disables Nagle's 
+algorithm for the connections it creates.
+
+* Bug fixes
+
+** gzochi reference clients should handle SIGPIPE
+
+
+Copyright information:
+
+Copyright (C) 2014 Julian Graham
+
+   Permission is granted to anyone to make or distribute verbatim copies
+   of this document as received, in any medium, provided that the
+   copyright notice and this permission notice are preserved,
+   thus giving the recipient permission to redistribute in turn.
+
+   Permission is granted to distribute modified versions
+   of this document, or of portions of it,
+   under the above conditions, provided also that they
+   carry prominent notices stating who last changed them.
+
+
+Local variables:
+mode: outline
+paragraph-separate: "[ 	]*$"
+end:
