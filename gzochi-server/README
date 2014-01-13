@@ -29,8 +29,6 @@ gzochid depends on the following external libraries.
 - libmicrohttpd
 - libserveez
 - libz
-The libgdbm library may be used in place of libdb if it is available and the
-`--with-storage-engine=gdbm' option has been specified.
 
 There is a corresponding `--with-XXX-prefix' option for libgdbm and libgmp that
 you can use when invoking ./configure, if you have these libraries installed in
@@ -63,16 +61,9 @@ gzochid requires the following external packages:
     GLib is used throughout gzochid for its general-purpose utility functions
     and data structures. It is available from http://www.gtk.org/ .
 
-  - GNU dbm, at least version 1.10
+  - Oracle BerkeleyDB, at least version 5.1
 
-    GDBM may be used for data persistence. It is available from 
-    http://www.gnu.org/software/gdbm/ .
-
-    OR
-
-    Oracle BerkeleyDB, at least version 5.1
-
-    BDB may be used for data persistence. It is available from
+    BDB is used for data persistence. It is available from
     http://www.oracle.com/technetwork/products/berkeleydb/downloads/ .
     
   - GNU MP, at least version 4.1
