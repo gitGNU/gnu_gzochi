@@ -1,5 +1,5 @@
 /* httpd.c: Embedded informational web server for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -140,7 +140,7 @@ static void next_line (struct data_state *state)
     }
 }
 
-static int write_data_line (void *cls, uint64_t pos, char *buf, int max)
+static int write_data_line (void *cls, uint64_t pos, char *buf, size_t max)
 {
   int n = 0;
   struct data_state *state = (struct data_state *) cls;
