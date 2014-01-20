@@ -1,5 +1,5 @@
 /* fsm.c: Routines for implementing a rudimentary finite-state machine
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -101,8 +101,8 @@ gzochid_fsm *gzochid_fsm_new (char *name, int state, char *description)
     (g_int_hash, g_int_equal, NULL, (GDestroyNotify) g_list_free);
   fsm->current_state = state;
 
-  fsm->mutex = g_mutex_new ();
-  fsm->cond = g_cond_new ();
+  g_mutex_init (&fsm->mutex);
+  g_cond_init (&fsm->cond);
 
   g_hash_table_insert (fsm->states, &s->state, s);
 
@@ -169,15 +169,15 @@ void gzochid_fsm_start (gzochid_fsm *fsm)
 
   assert (state != NULL);
 
-  g_mutex_lock (fsm->mutex);
+  g_mutex_lock (&fsm->mutex);
 
   assert (!fsm->started);
   fsm->started = TRUE;
   gzochid_debug ("[%s] entering state %s", fsm->name, state->description); 
   g_list_foreach (state->enter_functions, call_enter_function, transition);
 
-  g_cond_broadcast (fsm->cond);
-  g_mutex_unlock (fsm->mutex);
+  g_cond_broadcast (&fsm->cond);
+  g_mutex_unlock (&fsm->mutex);
 }
 
 void gzochid_fsm_to_state (gzochid_fsm *fsm, int state)
@@ -190,13 +190,13 @@ void gzochid_fsm_to_state (gzochid_fsm *fsm, int state)
   transition[0] = fsm->current_state;
   transition[1] = state;
 
-  g_mutex_lock (fsm->mutex);
+  g_mutex_lock (&fsm->mutex);
 
   assert (fsm->started);
 
   if (fsm->current_state == state)
     {
-      g_mutex_unlock (fsm->mutex);
+      g_mutex_unlock (&fsm->mutex);
       return;
     }
 
@@ -214,26 +214,23 @@ void gzochid_fsm_to_state (gzochid_fsm *fsm, int state)
 
   fsm->current_state = state;
 
-  g_cond_broadcast (fsm->cond);
-  g_mutex_unlock (fsm->mutex);
+  g_cond_broadcast (&fsm->cond);
+  g_mutex_unlock (&fsm->mutex);
 }
 
 void gzochid_fsm_until (gzochid_fsm *fsm, int state)
 {
-  g_mutex_lock (fsm->mutex);
+  g_mutex_lock (&fsm->mutex);
   assert (fsm->started);
 
   while (fsm->current_state != state)
-    g_cond_wait (fsm->cond, fsm->mutex);
+    g_cond_wait (&fsm->cond, &fsm->mutex);
 
-  g_mutex_unlock (fsm->mutex);
+  g_mutex_unlock (&fsm->mutex);
 }
 
 void gzochid_fsm_free (gzochid_fsm *fsm)
 {
-  g_cond_free (fsm->cond);
-  g_mutex_free (fsm->mutex);
-
   g_hash_table_destroy (fsm->states);
   g_hash_table_destroy (fsm->transitions);
   free (fsm);

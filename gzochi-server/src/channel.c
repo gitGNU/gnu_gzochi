@@ -1,5 +1,5 @@
 /* channel.c: Channel management routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -239,7 +239,7 @@ static void close_channel
   iter = g_sequence_get_begin_iter (channel->sessions);
   tx_context = join_side_effects_transaction (context, channel);
 
-  g_mutex_lock (context->client_mapping_lock);
+  g_mutex_lock (&context->client_mapping_lock);
 
   while (!g_sequence_iter_is_end (iter))
     {
@@ -310,7 +310,7 @@ static void close_channel
       iter = g_sequence_iter_next (iter);
     }
         
-  g_mutex_unlock (context->client_mapping_lock);
+  g_mutex_unlock (&context->client_mapping_lock);
   mpz_clear (session_oid);
   free (channel_oid_str);
 }
@@ -345,7 +345,7 @@ static void send_channel_message
   tx_context = join_side_effects_transaction (context, channel);
   iter = g_sequence_get_begin_iter (channel->sessions);
 
-  g_mutex_lock (context->client_mapping_lock);
+  g_mutex_lock (&context->client_mapping_lock);
 
   while (!g_sequence_iter_is_end (iter))
     {
@@ -375,7 +375,7 @@ static void send_channel_message
     gzochid_data_mark 
       (context, &gzochid_channel_serialization, channel, NULL);
   
-  g_mutex_unlock (context->client_mapping_lock);
+  g_mutex_unlock (&context->client_mapping_lock);
 }
 
 static void join_channel

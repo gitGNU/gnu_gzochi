@@ -1,5 +1,5 @@
 /* storage-bdb.c: Database storage routines for gzochid (Berkeley DB)
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -120,7 +120,7 @@ gzochid_storage_store *gzochid_storage_open
 
   store->database = db;
   store->context = context;
-  store->mutex = g_mutex_new ();
+  g_mutex_init (&store->mutex);
 
   free (filename);
 
@@ -131,20 +131,18 @@ void gzochid_storage_close (gzochid_storage_store *store)
 {
   DB *db = (DB *) store->database;
 
-  g_mutex_free (store->mutex);
-
   db->close (db, 0);
   free (store);
 }
 
 void gzochid_storage_lock (gzochid_storage_store *store)
 {
-  g_mutex_lock (store->mutex);
+  g_mutex_lock (&store->mutex);
 }
 
 void gzochid_storage_unlock (gzochid_storage_store *store)
 {
-  g_mutex_unlock (store->mutex);
+  g_mutex_unlock (&store->mutex);
 }
 
 char *gzochid_storage_get 

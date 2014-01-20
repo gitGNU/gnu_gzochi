@@ -1,5 +1,5 @@
 /* session.c: Client session management routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -161,7 +161,7 @@ static void session_commit_operation
   char *oid_str = mpz_get_str (NULL, 16, op->target_session);
   gzochid_protocol_client *client = NULL;
 
-  g_mutex_lock (context->client_mapping_lock);
+  g_mutex_lock (&context->client_mapping_lock);
   client = (gzochid_protocol_client *) g_hash_table_lookup 
     (context->oids_to_clients, oid_str);
 
@@ -169,7 +169,7 @@ static void session_commit_operation
     {
       gzochid_warning 
 	("Client not found for session '%s'; skipping operation.", oid_str);
-      g_mutex_unlock (context->client_mapping_lock);
+      g_mutex_unlock (&context->client_mapping_lock);
       free (oid_str);
       return;
     }
@@ -200,7 +200,7 @@ static void session_commit_operation
       break;
     }
 
-  g_mutex_unlock (context->client_mapping_lock);
+  g_mutex_unlock (&context->client_mapping_lock);
 }
 
 static void session_commit_operation_visitor (gpointer data, gpointer user_data)

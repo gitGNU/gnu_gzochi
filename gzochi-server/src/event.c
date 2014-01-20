@@ -1,5 +1,5 @@
 /* event.c: Application event bus implementation for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ struct _gzochid_application_event_source
   GSource base;
   GList *handlers;
   GQueue *events;
-  GMutex *mutex;
+  GMutex mutex;
 };
 
 static gboolean prepare (GSource *source, gint *timeout)
@@ -83,10 +83,10 @@ static gboolean dispatch (GSource *source, GSourceFunc cb, gpointer user_data)
   gzochid_application_event_source *event_source = 
     (gzochid_application_event_source *) source;
 
-  g_mutex_lock (event_source->mutex);
+  g_mutex_lock (&event_source->mutex);
   g_queue_foreach (event_source->events, dispatch_inner, event_source);
   g_queue_clear (event_source->events);
-  g_mutex_unlock (event_source->mutex);
+  g_mutex_unlock (&event_source->mutex);
 
   return TRUE;
 }
@@ -105,7 +105,7 @@ gzochid_application_event_source *gzochid_application_event_source_new ()
 
   source->events = g_queue_new ();
   source->handlers = NULL;
-  source->mutex = g_mutex_new ();
+  g_mutex_init (&source->mutex);
   
   return source;
 }
@@ -113,7 +113,6 @@ gzochid_application_event_source *gzochid_application_event_source_new ()
 void gzochid_application_event_source_free 
 (gzochid_application_event_source *source)
 {
-  g_mutex_free (source->mutex);
   g_list_free (source->handlers);
   g_queue_free (source->events);
   g_source_unref ((GSource *) source);
@@ -138,7 +137,7 @@ void gzochid_application_event_dispatch
   gzochid_application_event_source *event_source = 
     (gzochid_application_event_source *) source;
 
-  g_mutex_lock (event_source->mutex);
+  g_mutex_lock (&event_source->mutex);
   g_queue_push_tail (event_source->events, event);
-  g_mutex_unlock (event_source->mutex);
+  g_mutex_unlock (&event_source->mutex);
 }

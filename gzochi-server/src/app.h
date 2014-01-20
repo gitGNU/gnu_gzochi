@@ -1,5 +1,5 @@
 /* app.h: Prototypes and declarations for app.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -73,7 +73,7 @@ typedef struct _gzochid_application_context
   gpointer auth_data;
   
   GList *free_oid_blocks;
-  GMutex *free_oids_lock;
+  GMutex free_oids_lock;
 
   gzochid_storage_context *storage_context;
   gzochid_storage_store *meta;
@@ -82,7 +82,7 @@ typedef struct _gzochid_application_context
 
   GHashTable *oids_to_clients;
   GHashTable *clients_to_oids;
-  GMutex *client_mapping_lock;
+  GMutex client_mapping_lock;
   
   gzochid_application_event_source *event_source;
   gzochid_application_stats *stats;

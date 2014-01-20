@@ -1,5 +1,5 @@
 /* context.h: Prototypes and declarations for context.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ typedef struct _gzochid_context
 {
   gzochid_fsm *fsm;
   struct _gzochid_context *parent;
-  GMutex *mutex;
+  GMutex mutex;
   GList *children;
 } gzochid_context;
 

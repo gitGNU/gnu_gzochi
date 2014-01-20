@@ -1,5 +1,5 @@
 /* fsm.h: Prototypes and declarations for fsm.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -32,8 +32,8 @@ typedef struct _gzochid_fsm {
   int current_state;
   int started;
 
-  GMutex *mutex;
-  GCond *cond;
+  GMutex mutex;
+  GCond cond;
 } gzochid_fsm;
 
 void gzochid_fsm_on_enter 

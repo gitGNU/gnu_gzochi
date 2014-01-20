@@ -1,5 +1,5 @@
 /* data.c: Application data management routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -290,7 +290,7 @@ static gzochid_data_oid_block *reserve_oids
 {
   gzochid_data_oid_block *block = NULL;
   
-  g_mutex_lock (context->free_oids_lock);
+  g_mutex_lock (&context->free_oids_lock);
   
   if (g_list_length (context->free_oid_blocks) > 0)
     {
@@ -300,7 +300,7 @@ static gzochid_data_oid_block *reserve_oids
     }
   else block = create_oid_block (context);
 
-  g_mutex_unlock (context->free_oids_lock);
+  g_mutex_unlock (&context->free_oids_lock);
   return block;
 }
 

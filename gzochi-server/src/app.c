@@ -1,5 +1,5 @@
 /* app.c: Application context routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -42,8 +42,8 @@
 
 #define GZOCHID_APPLICATION_MAX_ATTEMPTS_DEFAULT 3
 
-static GStaticPrivate thread_application_context_key = G_STATIC_PRIVATE_INIT;
-static GStaticPrivate thread_identity_key = G_STATIC_PRIVATE_INIT;
+static GPrivate thread_application_context_key;
+static GPrivate thread_identity_key;
 
 G_LOCK_DEFINE_STATIC (load_path);
 
@@ -614,8 +614,8 @@ gzochid_application_context *gzochid_application_context_new (void)
   context->oids_to_clients = g_hash_table_new (g_str_hash, g_str_equal);
   context->clients_to_oids = g_hash_table_new (g_direct_hash, g_direct_equal);
 
-  context->free_oids_lock = g_mutex_new ();
-  context->client_mapping_lock = g_mutex_new ();
+  g_mutex_init (&context->free_oids_lock);
+  g_mutex_init (&context->client_mapping_lock);
 
   context->event_source = gzochid_application_event_source_new ();
   context->stats = calloc (1, sizeof (gzochid_application_stats));
@@ -627,7 +627,6 @@ void gzochid_application_context_free (gzochid_application_context *app_context)
   gzochid_context *context = (gzochid_context *) app_context;
   gzochid_context_free (context);
 
-  g_mutex_free (app_context->free_oids_lock);
   g_list_free (app_context->free_oid_blocks);
 
   gzochid_application_event_source_free (app_context->event_source);
@@ -712,10 +711,10 @@ void gzochid_application_client_logged_in
   gzochid_client_session_persist (context, session, session_oid);
   session_oid_str = mpz_get_str (NULL, 16, session_oid);
 
-  g_mutex_lock (context->client_mapping_lock);
+  g_mutex_lock (&context->client_mapping_lock);
   g_hash_table_insert (context->oids_to_clients, session_oid_str, client);
   g_hash_table_insert (context->clients_to_oids, client, session_oid_str);
-  g_mutex_unlock (context->client_mapping_lock);
+  g_mutex_unlock (&context->client_mapping_lock);
 
   transactional_task.worker = gzochid_scheme_application_logged_in_worker;
   transactional_task.context = context;
@@ -742,10 +741,10 @@ void gzochid_application_client_logged_in
 		("Disconnecting session '%s'; failed login transaction.", 
 		 session_oid_str);
 
-	      g_mutex_lock (context->client_mapping_lock);
+	      g_mutex_lock (&context->client_mapping_lock);
 	      g_hash_table_remove (context->oids_to_clients, session_oid_str);
 	      g_hash_table_remove (context->clients_to_oids, client);
-	      g_mutex_unlock (context->client_mapping_lock);
+	      g_mutex_unlock (&context->client_mapping_lock);
 
 	      gzochid_protocol_client_disconnect (client);
 	      
@@ -767,11 +766,11 @@ void gzochid_application_client_disconnected
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
   char *session_oid_str = NULL;
 
-  g_mutex_lock (context->client_mapping_lock);
+  g_mutex_lock (&context->client_mapping_lock);
   session_oid_str = g_hash_table_lookup (context->clients_to_oids, client);
   if (session_oid_str == NULL)
     {
-      g_mutex_unlock (context->client_mapping_lock);
+      g_mutex_unlock (&context->client_mapping_lock);
       return;
     }
   else 
@@ -796,7 +795,7 @@ void gzochid_application_client_disconnected
       gzochid_schedule_submit_task (game_context->task_queue, callback_task);
       gzochid_schedule_submit_task (game_context->task_queue, cleanup_task);
 
-      g_mutex_unlock (context->client_mapping_lock);
+      g_mutex_unlock (&context->client_mapping_lock);
     }
 }
 
@@ -824,9 +823,9 @@ void gzochid_application_session_received_message
   char *session_oid_str = NULL;
   void *data[3];
 
-  g_mutex_lock (context->client_mapping_lock);
+  g_mutex_lock (&context->client_mapping_lock);
   session_oid_str = g_hash_table_lookup (context->clients_to_oids, client);
-  g_mutex_unlock (context->client_mapping_lock);
+  g_mutex_unlock (&context->client_mapping_lock);
 
   if (session_oid_str == NULL)
     return;
@@ -881,7 +880,7 @@ void *gzochid_with_application_context
 {
   gpointer ret = NULL;
   gboolean private_needs_context = 
-    g_static_private_get (&thread_application_context_key) == NULL;
+    g_private_get (&thread_application_context_key) == NULL;
   SCM application_root_fluid = 
     scm_variable_ref
     (scm_c_module_lookup 
@@ -889,8 +888,8 @@ void *gzochid_with_application_context
 
   if (private_needs_context)
     {
-      g_static_private_set (&thread_application_context_key, context, NULL);
-      g_static_private_set (&thread_identity_key, identity, NULL);
+      g_private_set (&thread_application_context_key, context);
+      g_private_set (&thread_identity_key, identity);
       
       scm_fluid_set_x
 	(application_root_fluid, 
@@ -901,8 +900,8 @@ void *gzochid_with_application_context
 
   if (private_needs_context)
     {
-      g_static_private_set (&thread_application_context_key, NULL, NULL);
-      g_static_private_set (&thread_identity_key, NULL, NULL);
+      g_private_set (&thread_application_context_key, NULL);
+      g_private_set (&thread_identity_key, NULL);
 
       scm_fluid_set_x (application_root_fluid, SCM_UNSPECIFIED);
     }
@@ -912,13 +911,13 @@ void *gzochid_with_application_context
 
 gzochid_application_context *gzochid_get_current_application_context (void)
 {
-  return (gzochid_application_context *) 
-    g_static_private_get (&thread_application_context_key);
+  return (gzochid_application_context *)
+    g_private_get (&thread_application_context_key);
 }
 
 gzochid_auth_identity *gzochid_get_current_identity (void)
 {
-  return (gzochid_auth_identity *) g_static_private_get (&thread_identity_key);
+  return (gzochid_auth_identity *) g_private_get (&thread_identity_key);
 }
 
 void gzochid_register_client_received_message_task_serialization (void)

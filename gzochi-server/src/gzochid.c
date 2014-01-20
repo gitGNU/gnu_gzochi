@@ -1,5 +1,5 @@
 /* gzochid.c: Main server bootstrapping routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -230,8 +230,6 @@ int main (int argc, char *argv[])
       }
 
   context = gzochid_server_context_new ();
-
-  g_thread_init (NULL);
 
   gzochid_server_context_init (context);
   gzochid_fsm_until (((gzochid_context *) context)->fsm, GZOCHID_STATE_STOPPED);

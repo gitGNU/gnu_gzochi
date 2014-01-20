@@ -1,5 +1,5 @@
 /* storage.h: Prototypes and declarations for storage.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ typedef struct _gzochid_storage_context
 
 typedef struct _gzochid_storage_store
 {
-  GMutex *mutex;
+  GMutex mutex;
   gzochid_storage_context *context;
   gpointer database;
 } gzochid_storage_store;

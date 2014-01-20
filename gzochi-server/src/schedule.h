@@ -1,5 +1,5 @@
 /* schedule.h: Prototypes and declarations for schedule.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -30,8 +30,8 @@ enum gzochid_pending_task_state
 
 typedef struct _gzochid_task_queue
 {
-  GCond *cond;
-  GMutex *mutex;
+  GCond cond;
+  GMutex mutex;
   GThread *consumer_thread;
 
   GQueue *queue;
@@ -40,8 +40,8 @@ typedef struct _gzochid_task_queue
 
 typedef struct _gzochid_pending_task
 {
-  GCond *cond;
-  GMutex *mutex;
+  GCond cond;
+  GMutex mutex;
   
   struct timeval scheduled_execution_time;
   enum gzochid_pending_task_state state;

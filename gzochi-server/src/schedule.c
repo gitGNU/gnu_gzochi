@@ -1,5 +1,5 @@
 /* schedule.c: Task execution and task queue management routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -26,8 +26,8 @@ gzochid_task_queue *gzochid_schedule_task_queue_new (GThreadPool *pool)
 {
   gzochid_task_queue *task_queue = malloc (sizeof (gzochid_task_queue));
   
-  task_queue->cond = g_cond_new ();
-  task_queue->mutex = g_mutex_new ();
+  g_cond_init (&task_queue->cond);
+  g_mutex_init (&task_queue->mutex);
   task_queue->queue = g_queue_new ();
 
   task_queue->pool = pool;
@@ -40,22 +40,22 @@ static void pending_task_executor (gpointer data, gpointer user_data)
 {
   gzochid_pending_task *pending_task = (gzochid_pending_task *) data;
 
-  g_mutex_lock (pending_task->mutex);
+  g_mutex_lock (&pending_task->mutex);
   pending_task->task->worker (pending_task->task->data, user_data);
   pending_task->state = GZOCHID_PENDING_TASK_STATE_COMPLETED;
-  g_cond_broadcast (pending_task->cond);
-  g_mutex_unlock (pending_task->mutex);
+  g_cond_broadcast (&pending_task->cond);
+  g_mutex_unlock (&pending_task->mutex);
 }
 
 gpointer gzochid_schedule_task_executor (gpointer data)
 {
   gzochid_task_queue *task_queue = (gzochid_task_queue *) data;
 
-  g_mutex_lock (task_queue->mutex);
+  g_mutex_lock (&task_queue->mutex);
   while (TRUE)
     {
       if (g_queue_is_empty (task_queue->queue))
-	g_cond_wait (task_queue->cond, task_queue->mutex);
+	g_cond_wait (&task_queue->cond, &task_queue->mutex);
       else 
 	{
 	  struct timeval current_time;
@@ -83,11 +83,11 @@ gpointer gzochid_schedule_task_executor (gpointer data)
 		 &interval);
 
 	      until += interval.tv_sec * G_TIME_SPAN_SECOND + interval.tv_usec;
-	      g_cond_wait_until (task_queue->cond, task_queue->mutex, until);
+	      g_cond_wait_until (&task_queue->cond, &task_queue->mutex, until);
 	    }
 	}
     }
-  g_mutex_unlock (task_queue->mutex);
+  g_mutex_unlock (&task_queue->mutex);
 
   return NULL;
 }
@@ -95,8 +95,8 @@ gpointer gzochid_schedule_task_executor (gpointer data)
 void gzochid_schedule_task_queue_start (gzochid_task_queue *task_queue)
 {
   if (task_queue->consumer_thread == NULL)
-    task_queue->consumer_thread = g_thread_create 
-      (gzochid_schedule_task_executor, task_queue, FALSE, NULL);
+    task_queue->consumer_thread = g_thread_new
+      ("task-consumer", gzochid_schedule_task_executor, task_queue);
 }
 
 gzochid_pending_task *gzochid_pending_task_new (gzochid_task *task)
@@ -105,9 +105,9 @@ gzochid_pending_task *gzochid_pending_task_new (gzochid_task *task)
 
   pending_task->task = task;
   pending_task->state = GZOCHID_PENDING_TASK_STATE_PENDING;
-  pending_task->cond = g_cond_new ();
-  pending_task->mutex = g_mutex_new ();
-
+  g_cond_init (&pending_task->cond);
+  g_mutex_init (&pending_task->mutex);
+ 
   pending_task->scheduled_execution_time = task->target_execution_time;
   
   return pending_task;
@@ -163,11 +163,11 @@ gzochid_pending_task *gzochid_schedule_submit_task
 {
   gzochid_pending_task *pending_task = gzochid_pending_task_new (task);
   
-  g_mutex_lock (task_queue->mutex);
+  g_mutex_lock (&task_queue->mutex);
   g_queue_insert_sorted 
     (task_queue->queue, pending_task, pending_task_compare, NULL);
-  g_cond_signal (task_queue->cond);
-  g_mutex_unlock (task_queue->mutex);
+  g_cond_signal (&task_queue->cond);
+  g_mutex_unlock (&task_queue->mutex);
 
   return pending_task;
 }
@@ -178,10 +178,10 @@ void gzochid_schedule_run_task
   gzochid_pending_task *pending_task = 
     gzochid_schedule_submit_task (task_queue, task);
 
-  g_mutex_lock (pending_task->mutex);
+  g_mutex_lock (&pending_task->mutex);
   while (pending_task->state == GZOCHID_PENDING_TASK_STATE_PENDING)
-    g_cond_wait (pending_task->cond, pending_task->mutex);
-  g_mutex_unlock (pending_task->mutex);
+    g_cond_wait (&pending_task->cond, &pending_task->mutex);
+  g_mutex_unlock (&pending_task->mutex);
   free (pending_task);
 }
 

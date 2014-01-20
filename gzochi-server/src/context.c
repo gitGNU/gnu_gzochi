@@ -1,5 +1,5 @@
 /* context.c: Context lifecycle management routines for gzochid
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,22 +23,21 @@
 
 void gzochid_context_free (gzochid_context *context)
 {
-  g_mutex_free (context->mutex);
   g_list_free (context->children);
 }
 
 void gzochid_context_init 
 (gzochid_context *context, gzochid_context *parent, gzochid_fsm *fsm)
 {
-  context->mutex = g_mutex_new ();
+  g_mutex_init (&context->mutex);
   context->parent = parent;
   context->fsm = fsm;
 
   if (parent != NULL)
     {
-      g_mutex_lock (parent->mutex);
+      g_mutex_lock (&parent->mutex);
       parent->children = g_list_append (parent->children, context);
-      g_mutex_unlock (parent->mutex);
+      g_mutex_unlock (&parent->mutex);
     }
 
   gzochid_fsm_start (context->fsm);
