@@ -18,7 +18,7 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AM_CFLAGS = @CFLAGS@ @GZOCHI_CFLAGS@ -Wall -Werror -pthread
+AM_CFLAGS = @CFLAGS@ @GZOCHI_CFLAGS@ -Wall -Werror
 
 AM_LDFLAGS = @LDFLAGS@ @GZOCHI_LIBS@
 

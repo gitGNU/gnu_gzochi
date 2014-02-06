@@ -34,6 +34,8 @@ AC_SEARCH_LIBS([initscr], [ncurses], [],
                [AC_MSG_ERROR([libncurses is required.])])
 AC_CHECK_HEADERS([curses.h], [], AC_MSG_ERROR([curses.h is required.]))
 
+ACX_PTHREAD
+
 AC_CONFIG_FILES([Makefile
                  src/Makefile])
 
