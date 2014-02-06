@@ -18,7 +18,6 @@
 #ifndef GZOCHID_STORAGE_H
 #define GZOCHID_STORAGE_H
 
-#include <gdbm.h>
 #include <glib.h>
 #include <gmp.h>
 #include <sys/time.h>
