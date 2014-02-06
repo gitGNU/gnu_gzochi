@@ -64,7 +64,8 @@ long gzochid_config_to_long (char *str, long def)
 GHashTable *gzochid_config_keyfile_extract_config 
 (GKeyFile *key_file, char *group)
 {
-  unsigned int i = 0, num_keys = 0;
+  unsigned int i = 0;
+  gsize num_keys = 0;
   char **keys = g_key_file_get_keys (key_file, group, &num_keys, NULL);
   GHashTable *config = g_hash_table_new (g_str_hash, g_str_equal);
 
