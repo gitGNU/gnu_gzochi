@@ -30,6 +30,7 @@ static int max_priority = LOG_INFO;
 
 void gzochid_vlog (int priority, char *msg, va_list ap)
 {
+  va_list app;
   char *severity = NULL;
   struct timeval tv;
   struct tm ltm;
@@ -37,6 +38,7 @@ void gzochid_vlog (int priority, char *msg, va_list ap)
   if (priority > max_priority)
     return;
 
+  va_copy (app, ap);
   gettimeofday (&tv, NULL);
   localtime_r (&tv.tv_sec, &ltm);
 
@@ -50,14 +52,17 @@ void gzochid_vlog (int priority, char *msg, va_list ap)
     default: break;
     }
 
-  vsyslog (priority, msg, ap);
+  vsyslog (priority, msg, app);
+  va_end (app);
+  va_copy (app, ap);
 
   g_static_mutex_lock (&log_mutex);
   fprintf (stderr, "%d-%.2d-%.2dT%.2d:%.2d,%dZ ", 1900 + ltm.tm_year, 
 	   ltm.tm_mon + 1, ltm.tm_mday, ltm.tm_hour, ltm.tm_min, 
 	   (int) (tv.tv_usec / 1000));
   fprintf (stderr, "%s ", severity);
-  vfprintf (stderr, msg, ap);
+  vfprintf (stderr, msg, app);
+  va_end (app);
   fprintf (stderr, "\n");
   g_static_mutex_unlock (&log_mutex);
 }

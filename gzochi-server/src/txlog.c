@@ -117,11 +117,15 @@ static gzochid_log_transaction_context *join_transaction
 static void gzochid_tx_vlog 
 (gzochid_application_context *context, int priority, char *msg, va_list ap)
 {
+  va_list app;
+  va_copy (app, ap);
   gzochid_log_transaction_context *tx_context = join_transaction (context);
 
   tx_context->messages = g_list_append 
     (tx_context->messages, 
-     gzochid_log_message_new (priority, g_strdup_vprintf (msg, ap)));
+     gzochid_log_message_new (priority, g_strdup_vprintf (msg, app)));
+
+  va_end (app);
 }
 
 void gzochid_tx_log
