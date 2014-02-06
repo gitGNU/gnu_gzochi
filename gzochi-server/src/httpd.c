@@ -140,7 +140,7 @@ static void next_line (struct data_state *state)
     }
 }
 
-static int write_data_line (void *cls, uint64_t pos, char *buf, size_t max)
+static ssize_t write_data_line (void *cls, uint64_t pos, char *buf, size_t max)
 {
   int n = 0;
   struct data_state *state = (struct data_state *) cls;
