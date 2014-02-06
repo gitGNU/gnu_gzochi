@@ -154,6 +154,9 @@ gzochi_glib_client_session *gzochi_glib_client_connect
     return NULL;
 
   setsockopt (sock, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof (int));
+#if defined (__APPLE__) && defined (__MACH__)
+  setsockopt (sock, SOL_SOCKET, SO_NOSIGPIPE, (char *) &flag, sizeof (int));
+#endif
 
   session = gzochi_client_common_session_new ();
   session->connected = TRUE;

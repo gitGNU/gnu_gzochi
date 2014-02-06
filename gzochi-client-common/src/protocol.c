@@ -25,13 +25,19 @@
 
 #define CHUNK_SIZE 512
 
+#if defined (__APPLE__) && defined (__MACH__)
+#define SEND_FLAGS 0x00
+#else
+#define SEND_FLAGS MSG_NOSIGNAL
+#endif
+
 static int send_fully (int sock, unsigned char *data, int len)
 {
   int total_sent = 0;
   while (total_sent < len)
-    {
-      int bytes_sent = send 
-	(sock, (char *) data + total_sent, len - total_sent, MSG_NOSIGNAL);
+    {      
+      int bytes_sent = send
+	(sock, (char *) data + total_sent, len - total_sent, SEND_FLAGS);
       
       if (bytes_sent < 0)
 	return -1;
