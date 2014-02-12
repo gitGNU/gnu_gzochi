@@ -20,6 +20,7 @@
 #include <glib.h>
 #include <libgzochi.h>
 #include <pthread.h>
+#include <SDL/SDL.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -462,6 +463,8 @@ int main (int argc, char *argv[])
   hostname = argv[1];
   port = atoi (argv[2]); /* Parse the port number. */
   player = argv[3];
+
+  SDL_Init (SDL_INIT_VIDEO | SDL_INIT_EVENTTHREAD);
 
   /* Attempt to connect to the server. */
 
