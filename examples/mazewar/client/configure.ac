@@ -30,10 +30,9 @@ LT_INIT
 
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
 PKG_CHECK_MODULES([GZOCHI], [gzochi])
+PKG_CHECK_MODULES([SDL], [sdl])
 
 ACX_PTHREAD
-AC_SEARCH_LIBS([SDL_Init], [SDL], [], AC_MSG_ERROR([libSDL is required.]))
-AC_CHECK_HEADERS([SDL/SDL.h], [], AC_MSG_ERROR([SDL/SDL.h is required.]))
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile])

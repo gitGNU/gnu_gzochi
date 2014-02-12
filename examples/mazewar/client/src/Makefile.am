@@ -18,9 +18,9 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ @GZOCHI_CFLAGS@ -Wall -Werror
+AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ @GZOCHI_CFLAGS@ @SDL_CFLAGS@ -Wall -Werror
 
-AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@ @GZOCHI_LIBS@
+AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@ @GZOCHI_LIBS@ @SDL_LIBS@
 
 bin_PROGRAMS = mazewar
 
