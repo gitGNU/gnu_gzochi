@@ -21,7 +21,7 @@ AC_INIT([mazewar], [0.1], [joolean@undecidable.net], [],
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_SRCDIR([src/mazewar.c])
 
-AM_INIT_AUTOMAKE(1.6)
+AM_INIT_AUTOMAKE([subdir-objects 1.6])
 
 AC_LANG(C)
 AC_PROG_CC
