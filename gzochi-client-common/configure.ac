@@ -19,6 +19,7 @@ dnl
 AC_INIT([libgzochi-client-common], [0.5], [joolean@undecidable.net], [],
         [http://www.nongnu.org/gzochi])
 AC_CONFIG_AUX_DIR([.])
+AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/gzochi-client-common.h])
 AM_INIT_AUTOMAKE(1.6)
 
