@@ -26,7 +26,7 @@
 #include "tx.h"
 #include "util.h"
 
-static GStaticMutex transaction_mutex = G_STATIC_MUTEX_INIT;
+static GMutex transaction_mutex;
 static GPrivate thread_transaction_key;
 static GPrivate thread_transaction_timing_key;
 static mpz_t transaction_counter;
@@ -64,7 +64,7 @@ static gzochid_transaction *transaction_new (void)
   transaction->participants = g_hash_table_new_full 
     (g_str_hash, g_str_equal, NULL, free);
 
-  g_static_mutex_lock (&transaction_mutex);
+  g_mutex_lock (&transaction_mutex);
   if (!transactions_initialized)
     {
       mpz_init (transaction_counter);
@@ -72,7 +72,7 @@ static gzochid_transaction *transaction_new (void)
     }
   mpz_set (transaction->id, transaction_counter);
   mpz_add_ui (transaction_counter, transaction_counter, 1);
-  g_static_mutex_unlock (&transaction_mutex);
+  g_mutex_unlock (&transaction_mutex);
 
   transaction->name = mpz_get_str (NULL, 16, transaction->id);
   transaction->state = GZOCHID_TRANSACTION_STATE_ACTIVE;
