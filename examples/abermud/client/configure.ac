@@ -1,6 +1,6 @@
 dnl configure.ac --- food for -*-autoconf-*- et al
 dnl
-dnl Copyright (C) 2013 Julian Graham
+dnl Copyright (C) 2014 Julian Graham
 dnl
 dnl This is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -27,8 +27,6 @@ AC_LANG(C)
 AC_PROG_CC
 LT_PREREQ([2.4])
 LT_INIT
-
-PKG_CHECK_MODULES([GZOCHI], [gzochi])
 
 AC_SEARCH_LIBS([initscr], [ncurses], [], 
                [AC_MSG_ERROR([libncurses is required.])])
