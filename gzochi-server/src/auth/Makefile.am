@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2013 Julian Graham
+# Copyright (C) 2014 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,8 +21,11 @@
 plugindir = $(libdir)/gzochid
 
 plugin_LTLIBRARIES = \
-	password_file.la \
-	krb5.la
+	password_file.la
+
+if BUILD_KRB5_AUTH
+plugin_LTLIBRARIES += krb5.la
+endif
 
 password_file_la_SOURCES = password_file.c
 password_file_la_CFLAGS = @GLIB_CFLAGS@ -Wall -Werror
