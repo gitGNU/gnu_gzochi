@@ -2259,6 +2259,9 @@ message is received from a client session; in this case, the
 (@code{client-disconneted} in the example above) will be called when
 the session disconnects. 
 
+@node GNU Free Documentation License
+@appendix GNU Free Documentation License
+
 @include fdl.texi
 
 @node Concept index
