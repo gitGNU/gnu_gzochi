@@ -23,6 +23,29 @@ OLDDIR=$PWD
 
 cd $BASEDIR
 
+# Pre-create the 'm4' directory to house libtool scripts.
+
+if [ ! -d m4 ]; then 
+    mkdir m4
+    if [ $? != 0 ]; then
+        cd $OLDDIR
+        exit 1
+    fi
+fi
+
+# On Mac OS X, the native libtool does not include libtoolize; third-party
+# libtool packages typically prefix their binaries with 'g', so try 
+# 'glibtoolize' on that platform.
+
+case `uname` in 
+    Darwin*) glibtoolize -i ;;
+          *) libtoolize -i ;; 
+esac
+if [ $? != 0 ]; then
+    cd $OLDDIR
+    exit 1
+fi
+
 # Generate build files.
 
 aclocal
