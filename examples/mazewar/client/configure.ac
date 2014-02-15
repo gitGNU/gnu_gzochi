@@ -26,9 +26,15 @@ AM_INIT_AUTOMAKE([subdir-objects 1.6])
 
 AC_LANG(C)
 AC_PROG_CC
+
+dnl TODO: Remove once Automake 1.14 is in wide release.
+
+AM_PROG_CC_C_O
+
 LT_PREREQ([2.4])
 LT_INIT
 
+AC_CHECK_LIB([m], [cos])
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
 PKG_CHECK_MODULES([SDL], [sdl])
 
