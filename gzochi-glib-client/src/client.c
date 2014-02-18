@@ -117,6 +117,7 @@ read_and_dispatch (gzochi_glib_client_session *session, int connecting)
   
       if (gzochi_client_protocol_read (session) < 0)
 	{
+	  session->connected = FALSE;
 	  if (session->disconnected_callback != NULL)
 	    session->disconnected_callback 
 	      (session, session->disconnected_user_data);

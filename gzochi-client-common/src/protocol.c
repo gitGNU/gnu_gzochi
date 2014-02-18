@@ -1,5 +1,5 @@
 /* protocol.c: Client-side protocol I/O routines for libgzochi
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -106,6 +106,7 @@ static void dispatch_session_message
 static void dispatch_session_disconnected 
 (gzochi_client_common_session *session)
 {
+  session->connected = FALSE;
   if (session->disconnected_callback != NULL)
     session->disconnected_callback (session, session->disconnected_user_data);
 }
