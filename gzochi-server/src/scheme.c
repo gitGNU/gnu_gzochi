@@ -168,6 +168,8 @@ void gzochid_scheme_application_task_worker
  gpointer task)
 {
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
+  GList *args = g_list_append
+    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "task");
 
   gzochid_transaction_join (&scheme_participant, NULL);
 
@@ -175,11 +177,11 @@ void gzochid_scheme_application_task_worker
     (context, 
      identity,
      "gzochi:run-task", 
-     g_list_append
-     (g_list_append 
-      (g_list_append (NULL, "gzochi"), "private"), "task"), 
+     args,
      scm_list_1 ((SCM) task), 
      exception_var);
+
+  g_list_free (args);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     gzochid_transaction_mark_for_rollback 
@@ -213,6 +215,8 @@ void gzochid_scheme_application_initialized_worker
   SCM callback = gzochid_scheme_create_callback 
     (context->descriptor->initialized, NULL);
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
+  GList *args = g_list_append
+    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
 
   callback_reference = gzochid_data_create_reference 
     (context, &gzochid_scheme_data_serialization, callback);
@@ -223,9 +227,7 @@ void gzochid_scheme_application_initialized_worker
     (context,
      identity,
      "gzochi:execute-initialized",
-     g_list_append
-     (g_list_append
-      (g_list_append (NULL, "gzochi"), "private"), "app"),
+     args,
      scm_list_2 (callback,
 		 gzochid_scheme_ghashtable_to_hashtable 
 		 (properties, 
@@ -234,6 +236,8 @@ void gzochid_scheme_application_initialized_worker
 		  (SCM (*) (gpointer)) scm_from_locale_string,
 		  (SCM (*) (gpointer)) scm_from_locale_string)),
      exception_var);
+
+  g_list_free (args);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     gzochid_transaction_mark_for_rollback 
@@ -281,7 +285,8 @@ void gzochid_scheme_application_logged_in_worker
 
   SCM handler = SCM_BOOL_F;
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-
+  GList *args = NULL;
+    
   mpz_init (session_oid);
   mpz_set_str (session_oid, session_oid_str, 16);
   session_reference = gzochid_data_create_reference_to_oid
@@ -295,6 +300,9 @@ void gzochid_scheme_application_logged_in_worker
       g_error_free (err);
       return;
     }
+
+  args = g_list_append
+    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
 
   session = (gzochid_client_session *) session_reference->obj;
 
@@ -311,12 +319,12 @@ void gzochid_scheme_application_logged_in_worker
     (context,
      identity,
      "gzochi:execute-logged-in",
-     g_list_append
-     (g_list_append
-      (g_list_append (NULL, "gzochi"), "private"), "app"),
+     args,
      scm_list_2 ((SCM) callback_reference->obj, (SCM) scm_session), 
      exception_var);
   
+  g_list_free (args);
+
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     gzochid_transaction_mark_for_rollback 
       (&scheme_participant, 
@@ -432,10 +440,9 @@ void gzochid_scheme_application_disconnected_worker
   gzochid_data_managed_reference *callback_reference = NULL;
 
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *gpa = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
-
+  GList *gpa = NULL;
   mpz_t session_oid;
+
   mpz_init (session_oid);
   mpz_set_str (session_oid, (char *) ptr, 16);
 
@@ -479,7 +486,10 @@ void gzochid_scheme_application_disconnected_worker
       g_error_free (err);
       return;
     }
-  
+
+  gpa = g_list_append
+    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
+
   gzochid_scheme_invoke
     (context, 
      identity,
@@ -580,7 +590,9 @@ static void *scheme_managed_record_deserializer
   int vec_len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   SCM vec = SCM_EOL, port = SCM_EOL, record = SCM_EOL;
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  
+  GList *args = g_list_append 
+    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "data");
+     
   g_string_erase (in, 0, 4);
   vec = scm_take_u8vector ((unsigned char *) in->str, vec_len);
 
@@ -590,12 +602,11 @@ static void *scheme_managed_record_deserializer
     (context, 
      NULL,
      "gzochi:deserialize-managed-record", 
-     g_list_append 
-     (g_list_append 
-      (g_list_append (NULL, "gzochi"), "private"), "data"),
+     args,
      scm_list_1 (port),
      exception_var);
 
+  g_list_free (args);
   g_string_erase (in, 0, vec_len);
   
   /* Don't join the transaction here as the serializer should only be
