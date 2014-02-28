@@ -111,6 +111,10 @@ static void initialize_async (gpointer data, gpointer user_data)
   gzochid_context_until 
     (server_context->game_context, GZOCHID_GAME_STATE_RUNNING);
 
+  g_hash_table_unref (admin_config);
+  g_hash_table_unref (game_config);
+  g_hash_table_unref (log_config);
+
   gzochid_fsm_to_state (context->fsm, GZOCHID_STATE_RUNNING);
 }
 

@@ -1,5 +1,5 @@
 /* config.c: Configuration management routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -67,7 +67,8 @@ GHashTable *gzochid_config_keyfile_extract_config
   unsigned int i = 0;
   gsize num_keys = 0;
   char **keys = g_key_file_get_keys (key_file, group, &num_keys, NULL);
-  GHashTable *config = g_hash_table_new (g_str_hash, g_str_equal);
+  GHashTable *config = g_hash_table_new_full 
+    (g_str_hash, g_str_equal, free, free);
 
   for (; i < num_keys; i++) 
     g_hash_table_insert 

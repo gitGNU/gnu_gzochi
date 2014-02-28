@@ -1,5 +1,5 @@
 /* game.c: Game context management routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -211,8 +211,8 @@ void gzochid_game_context_init
 
   context->port = gzochid_config_to_int
     (g_hash_table_lookup (config, "server.port"), 0);
-  context->apps_dir = g_hash_table_lookup (config, "server.fs.apps");
-  context->work_dir = g_hash_table_lookup (config, "server.fs.data");
+  context->apps_dir = strdup (g_hash_table_lookup (config, "server.fs.apps"));
+  context->work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
 
   tx_timeout_ms = gzochid_config_to_long 
     (g_hash_table_lookup (config, "tx.timeout"), DEFAULT_TX_TIMEOUT_MS);

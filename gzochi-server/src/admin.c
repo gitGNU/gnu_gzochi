@@ -1,5 +1,5 @@
 /* Administrative context routines for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -100,7 +100,7 @@ void gzochid_admin_context_init
   gzochid_fsm_add_state (fsm, GZOCHID_ADMIN_STATE_RUNNING, "RUNNING");
   gzochid_fsm_add_state (fsm, GZOCHID_ADMIN_STATE_STOPPED, "STOPPED");
 
-  context->config = config;
+  context->config = g_hash_table_ref (config);
 
   gzochid_fsm_add_transition 
     (fsm, GZOCHID_ADMIN_STATE_INITIALIZING, GZOCHID_ADMIN_STATE_RUNNING);
