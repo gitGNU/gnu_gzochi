@@ -231,6 +231,8 @@ void gzochid_fsm_until (gzochid_fsm *fsm, int state)
 
 void gzochid_fsm_free (gzochid_fsm *fsm)
 {
+  g_cond_clear (&fsm->cond);
+  g_mutex_clear (&fsm->mutex);
   g_hash_table_destroy (fsm->states);
   g_hash_table_destroy (fsm->transitions);
   free (fsm);

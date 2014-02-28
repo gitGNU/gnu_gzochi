@@ -629,6 +629,9 @@ void gzochid_application_context_free (gzochid_application_context *app_context)
 
   g_list_free (app_context->free_oid_blocks);
 
+  g_mutex_clear (&app_context->free_oids_lock);
+  g_mutex_clear (&app_context->client_mapping_lock);
+
   gzochid_application_event_source_free (app_context->event_source);
   free (app_context->stats);
 

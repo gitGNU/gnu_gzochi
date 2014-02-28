@@ -131,6 +131,7 @@ void gzochid_storage_close (gzochid_storage_store *store)
 {
   DB *db = (DB *) store->database;
 
+  g_mutex_clear (&store->mutex);
   db->close (db, 0);
   free (store);
 }

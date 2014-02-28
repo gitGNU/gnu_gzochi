@@ -129,6 +129,7 @@ gzochid_protocol_client *gzochid_protocol_client_accept (svz_socket_t *sock)
 
 void gzochid_protocol_client_free (gzochid_protocol_client *client)
 {
+  g_mutex_clear (&client->sock_mutex);
   mpz_clear (client->oid);
   g_free (client->connection_description);
   free (client);

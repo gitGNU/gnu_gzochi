@@ -23,6 +23,7 @@
 
 void gzochid_context_free (gzochid_context *context)
 {
+  g_mutex_clear (&context->mutex);
   g_list_free (context->children);
 }
 

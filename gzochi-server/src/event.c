@@ -113,6 +113,7 @@ gzochid_application_event_source *gzochid_application_event_source_new ()
 void gzochid_application_event_source_free 
 (gzochid_application_event_source *source)
 {
+  g_mutex_clear (&source->mutex);
   g_list_free (source->handlers);
   g_queue_free (source->events);
   g_source_unref ((GSource *) source);
