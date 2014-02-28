@@ -66,6 +66,7 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
   reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_scm_location_aware_serialization, oid);
 
+  mpz_clear (oid);
   gzochid_data_dereference (reference, &err);
 
   if (err == NULL)

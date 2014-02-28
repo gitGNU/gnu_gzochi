@@ -710,6 +710,7 @@ void gzochid_application_client_logged_in
   mpz_init (session_oid);
   gzochid_client_session_persist (context, session, session_oid);
   session_oid_str = mpz_get_str (NULL, 16, session_oid);
+  mpz_clear (session_oid);
 
   g_mutex_lock (&context->client_mapping_lock);
   g_hash_table_insert (context->oids_to_clients, session_oid_str, client);

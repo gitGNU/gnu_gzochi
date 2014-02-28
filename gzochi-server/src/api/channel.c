@@ -1,5 +1,5 @@
 /* channel.c: Primitive functions for user-facing gzochid channel API
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -94,6 +94,9 @@ SCM_DEFINE (primitive_join_channel, "primitive-join-channel", 2, 0, 0,
   session_reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, session_oid);
 
+  mpz_clear (channel_oid);
+  mpz_clear (session_oid);
+
   gzochid_data_dereference (channel_reference, &err);
   if (err == NULL)
     {
@@ -174,6 +177,8 @@ SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message",
   
   channel_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, channel_oid);
+  mpz_clear (channel_oid);
+
   gzochid_data_dereference (channel_reference, &err);
 
   if (err == NULL)

@@ -1,5 +1,5 @@
 /* scheme.c: Supplementary Scheme routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -377,6 +377,8 @@ void gzochid_scheme_application_received_message_worker
 
   session_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_client_session_serialization, session_oid);
+
+  mpz_clear (session_oid);
 
   gzochid_data_dereference (session_reference, &err);
 
