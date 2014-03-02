@@ -1,5 +1,5 @@
 /* mock-storage.c: Test-time storage engine using GTrees.
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -60,7 +60,7 @@ gzochid_storage_store *gzochid_storage_open
 {
   gzochid_storage_store *store = calloc (1, sizeof (gzochid_storage_store));
 
-  store->mutex = g_mutex_new ();
+  g_mutex_init (&store->mutex);
   store->database = g_tree_new_full
     (g_string_compare, NULL, g_string_destroy, g_string_destroy);
 
@@ -69,7 +69,7 @@ gzochid_storage_store *gzochid_storage_open
 
 void gzochid_storage_close (gzochid_storage_store *store)
 {
-  g_mutex_free (store->mutex);
+  g_mutex_clear (&store->mutex);
   g_tree_destroy ((GTree *) store->database);
 
   free (store);
@@ -77,12 +77,12 @@ void gzochid_storage_close (gzochid_storage_store *store)
 
 void gzochid_storage_lock (gzochid_storage_store *store)
 {
-  g_mutex_lock (store->mutex);
+  g_mutex_lock (&store->mutex);
 }
 
 void gzochid_storage_unlock (gzochid_storage_store *store)
 {
-  g_mutex_unlock (store->mutex);
+  g_mutex_unlock (&store->mutex);
 }
 
 char *gzochid_storage_get 

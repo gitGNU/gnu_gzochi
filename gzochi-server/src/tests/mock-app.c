@@ -1,5 +1,5 @@
 /* mock-app.c: Test-time replacements for app.c routines.
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -30,8 +30,8 @@ gzochid_application_context *gzochid_application_context_new ()
   gzochid_application_context *context = 
     calloc (1, sizeof (gzochid_application_context));
 
-  context->free_oids_lock = g_mutex_new ();
-  context->client_mapping_lock = g_mutex_new ();
+  g_mutex_init (&context->free_oids_lock);
+  g_mutex_init (&context->client_mapping_lock);
 
   context->storage_context = gzochid_storage_initialize ("/dev/null?");
   context->meta = gzochid_storage_open (context->storage_context, "/dev/null");
