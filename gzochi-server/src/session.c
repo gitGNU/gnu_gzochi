@@ -304,6 +304,7 @@ static void finalize_handler
     (context, handler->received_message);
   gzochid_application_callback_serialization.finalizer 
     (context, handler->disconnected);
+  free (handler);
 }
 
 static void finalize_client_session

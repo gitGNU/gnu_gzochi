@@ -63,11 +63,13 @@ static void scan_app_dir (gzochid_game_context *context, char *dir)
     {
       gzochid_warning 
 	("%s does not exist or is not a regular file.", descriptor_file);
+      g_free (descriptor_file);
       return;
     }
 
   descriptor = gzochid_config_parse_application_descriptor (descriptor_file);
   initialize_application (context, descriptor);
+  g_free (descriptor_file);    
 }
 
 static void scan_apps_dir (gzochid_game_context *context)

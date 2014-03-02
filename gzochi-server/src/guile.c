@@ -1,5 +1,5 @@
 /* guile.c: GNU Guile interface routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -68,6 +68,8 @@ static SCM r6rs_exception_handler (SCM exception_var, SCM cond)
   str = scm_to_locale_string (output_string);
 
   fprintf (stderr, "%s", str);
+
+  free (str);
 
   if (scm_variable_p (exception_var) == SCM_BOOL_T)
     scm_variable_set_x (exception_var, cond);

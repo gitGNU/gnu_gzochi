@@ -329,6 +329,7 @@ void gzochid_storage_transaction_commit (gzochid_storage_transaction *tx)
   DB_TXN *txn = (DB_TXN *) tx->txn;
 
   assert (txn->commit (txn, 0) == 0);
+  free (tx);
 }
 
 void gzochid_storage_transaction_rollback (gzochid_storage_transaction *tx)
@@ -336,6 +337,7 @@ void gzochid_storage_transaction_rollback (gzochid_storage_transaction *tx)
   DB_TXN *txn = (DB_TXN *) tx->txn;
 
   txn->abort (txn);
+  free (tx);
 }
 
 void gzochid_storage_transaction_prepare (gzochid_storage_transaction *tx)

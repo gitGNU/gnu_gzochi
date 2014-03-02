@@ -115,6 +115,8 @@ static void initialize_async (gpointer data, gpointer user_data)
   g_hash_table_unref (game_config);
   g_hash_table_unref (log_config);
 
+  g_key_file_free (key_file);
+
   gzochid_fsm_to_state (context->fsm, GZOCHID_STATE_RUNNING);
 }
 

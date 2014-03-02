@@ -82,6 +82,8 @@ static void free_oid_block (void *ptr)
   mpz_clear (block->first);
   mpz_clear (block->next);
   mpz_clear (block->last);
+
+  free (block);
 } 
 
 static void transaction_context_free (gzochid_data_transaction_context *context)
@@ -134,6 +136,7 @@ static gboolean flush_reference
       gzochid_storage_transaction_put
 	(context->transaction, context->context->oids, oid_str, 
 	 strlen (oid_str) + 1, out->str, out->len);
+      free (oid_str);
 
       event = malloc (sizeof (gzochid_application_data_event));
       base_event = (gzochid_application_event *) event;
@@ -277,6 +280,7 @@ static gzochid_data_oid_block *create_oid_block
   next_oid_value_len = strlen (next_oid_value) + 1;
   gzochid_storage_put 
     (context->meta, next_oid_key, 1, next_oid_value, next_oid_value_len);
+  free (next_oid_value);
 
   mpz_sub_ui (block->last, block->last, 1);
   
@@ -509,6 +513,8 @@ static void dereference
 	(context->context->event_source, base_event);
 
       in = g_string_new_len (data, data_len);
+      free (data);
+
       reference->obj = reference->serialization->deserializer 
 	(context->context, in);
       reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED;

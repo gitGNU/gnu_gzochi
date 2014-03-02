@@ -74,6 +74,7 @@ GHashTable *gzochid_config_keyfile_extract_config
     g_hash_table_insert 
       (config, keys[i], g_key_file_get_value (key_file, group, keys[i], NULL));
   
+  free (keys);
   return config;
 }
 
