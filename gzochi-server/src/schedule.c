@@ -172,6 +172,13 @@ gzochid_pending_task *gzochid_schedule_submit_task
   return pending_task;
 }
 
+static void free_pending_task (gzochid_pending_task *pending_task)
+{
+  g_mutex_clear (&pending_task->mutex);
+  g_cond_clear (&pending_task->cond);
+  free (pending_task);
+}
+
 void gzochid_schedule_run_task 
 (gzochid_task_queue *task_queue, gzochid_task *task)
 {
@@ -182,7 +189,8 @@ void gzochid_schedule_run_task
   while (pending_task->state == GZOCHID_PENDING_TASK_STATE_PENDING)
     g_cond_wait (&pending_task->cond, &pending_task->mutex);
   g_mutex_unlock (&pending_task->mutex);
-  free (pending_task);
+  
+  free_pending_task (pending_task);
 }
 
 void gzochid_schedule_execute_task (gzochid_task *task)
