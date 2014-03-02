@@ -354,21 +354,26 @@ static void send_channel_message
 	g_hash_table_lookup (context->oids_to_clients, session_oid_str);
 
       if (client != NULL)
-	tx_context->messages = g_list_append 
-	  (tx_context->messages, 
-	   gzochid_channel_payload_message_new 
-	   (GZOCHID_CHANNEL_MESSAGE_SEND, client, send_op->message, 
-	    send_op->len));
+	{
+	  tx_context->messages = g_list_append 
+	    (tx_context->messages, 
+	     gzochid_channel_payload_message_new 
+	     (GZOCHID_CHANNEL_MESSAGE_SEND, client, send_op->message, 
+	      send_op->len));
+	  iter = g_sequence_iter_next (iter);
+	}
       else 
 	{
+	  GSequenceIter *old_iter = iter;
+
+	  iter = g_sequence_iter_next (iter);
+
 	  gzochid_warning 
 	    ("Client not found for messaged channel session '%s'; removing.", 
 	     session_oid_str);
-	  g_sequence_remove (iter);
+	  g_sequence_remove (old_iter);
 	  channel_modified = TRUE;
 	}
-
-      iter = g_sequence_iter_next (iter);
     }
 
   if (channel_modified)
@@ -778,7 +783,7 @@ gzochid_channel *gzochid_channel_new (char *name)
   gzochid_channel *channel = calloc (1, sizeof (gzochid_channel));
 
   channel->name = name;
-  channel->sessions = g_sequence_new (NULL);
+  channel->sessions = g_sequence_new (free);
   mpz_init (channel->oid);
   mpz_init (channel->scm_oid);
 
