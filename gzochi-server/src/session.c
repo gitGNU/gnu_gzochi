@@ -145,9 +145,20 @@ static int session_prepare (gpointer data)
   return TRUE;
 }
 
+static void free_operation (gpointer data)
+{
+  gzochid_client_session_pending_operation *op = 
+    (gzochid_client_session_pending_operation *) data;
+
+  mpz_clear (op->target_session);
+  free (op);
+}
+
 static void cleanup_transaction 
 (gzochid_client_session_transaction_context *tx_context)
 {
+  g_list_free_full (tx_context->operations, free_operation);
+  
   free (tx_context);
 }
 

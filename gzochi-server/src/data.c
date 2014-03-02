@@ -194,6 +194,15 @@ static int data_prepare (gpointer data)
   return TRUE;
 }
 
+static void free_reference (gpointer data)
+{
+  gzochid_data_managed_reference *reference = 
+    (gzochid_data_managed_reference *) data;
+
+  mpz_clear (reference->oid);
+  free (data);
+}
+
 static void finalize_references (gzochid_data_transaction_context *context)
 {
   GList *references = g_hash_table_get_values (context->oids_to_references);
@@ -212,7 +221,7 @@ static void finalize_references (gzochid_data_transaction_context *context)
 	}
       reference_ptr = reference_ptr->next;
     }
-  g_list_free (references);
+  g_list_free_full (references, free_reference);
 }
 
 static void data_commit (gpointer data)
