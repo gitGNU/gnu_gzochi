@@ -68,7 +68,8 @@ static gzochid_data_transaction_context *create_transaction_context
   else tx_context->transaction = gzochid_storage_transaction_begin 
 	 (app_context->storage_context);
 
-  tx_context->oids_to_references = g_hash_table_new (g_str_hash, g_str_equal);
+  tx_context->oids_to_references = g_hash_table_new_full 
+    (g_str_hash, g_str_equal, free, NULL);
   tx_context->ptrs_to_references = g_hash_table_new 
     (g_direct_hash, g_direct_equal);
 
