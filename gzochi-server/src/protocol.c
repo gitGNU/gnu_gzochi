@@ -168,7 +168,7 @@ void gzochid_protocol_client_dispatch
       gzochid_warning ("Unexpected opcode %d received from client", opcode);
     }
 
-  if (pfx == NULL)
+  if (pfx != NULL)
     free (pfx);
 
   return;
