@@ -731,7 +731,7 @@ static gpointer deserialize_channel
   channel->id = gzochid_util_deserialize_bytes (in, (int *) &channel->id_len);
 
   channel->sessions = gzochid_util_deserialize_sequence 
-    (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string);
+    (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string, free);
 
   gzochid_util_deserialize_mpz (in, channel->oid);
   gzochid_util_deserialize_mpz (in, channel->scm_oid);

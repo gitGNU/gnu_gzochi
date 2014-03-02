@@ -1,5 +1,5 @@
 /* util.h: Prototypes and declarations for util.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@ unsigned char *gzochid_util_deserialize_bytes (GString *, int *);
 char *gzochid_util_deserialize_string (GString *);
 GList *gzochid_util_deserialize_list (GString *, gpointer (*) (GString *));
 GSequence *gzochid_util_deserialize_sequence 
-(GString *, gpointer (*) (GString *));
+(GString *, gpointer (*) (GString *), GDestroyNotify);
 GHashTable *gzochid_util_deserialize_hash_table
 (GString *, 
  GHashFunc, 

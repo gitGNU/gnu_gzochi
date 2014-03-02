@@ -1,5 +1,5 @@
 /* test-util.c: Test routines for util.c in gzochid.
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -331,7 +331,7 @@ static void test_util_deserialize_sequence ()
      "\000\000\000\002\145\000"
      "\000\000\000\002\146\000", 22);
   GSequence *seq = gzochid_util_deserialize_sequence
-    (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string);
+    (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string, free);
   GSequenceIter *iter = g_sequence_get_begin_iter (seq);
   
   g_assert_cmpstr ((char *) g_sequence_get (iter), ==, "d");

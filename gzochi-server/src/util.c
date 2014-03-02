@@ -1,5 +1,5 @@
 /* util.c: Assorted utility routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -179,9 +179,9 @@ GList *gzochid_util_deserialize_list
 }
 
 GSequence *gzochid_util_deserialize_sequence
-(GString *in, gpointer (*deserializer) (GString *))
+(GString *in, gpointer (*deserializer) (GString *), GDestroyNotify destroy_fn)
 {
-  GSequence *ret = g_sequence_new (NULL);
+  GSequence *ret = g_sequence_new (destroy_fn);
   int len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   g_string_erase (in, 0, 4);
 

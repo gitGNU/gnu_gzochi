@@ -255,7 +255,7 @@ static gpointer deserialize_client_session
   gzochid_auth_identity *identity = 
     gzochid_auth_identity_deserializer (context, in);
   GSequence *channels = gzochid_util_deserialize_sequence 
-    (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string);
+    (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string, free);
   gzochid_client_session *session = gzochid_client_session_new (identity);
 
   g_sequence_free (session->channels);
