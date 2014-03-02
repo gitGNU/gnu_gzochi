@@ -394,7 +394,7 @@ static void remove_durable_task
     }
   else g_propagate_error (err, local_err);
 
-  g_string_free (binding, FALSE);
+  g_string_free (binding, TRUE);
   free (oid_str);
  }
 

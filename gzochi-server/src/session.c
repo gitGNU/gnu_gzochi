@@ -374,7 +374,7 @@ static void remove_session
     }
   else g_propagate_error (err, local_err);
    
-  g_string_free (binding, FALSE);
+  g_string_free (binding, TRUE);
 }
 
 void gzochid_client_session_disconnected_worker
@@ -569,7 +569,7 @@ static void prefix_binding_persistence_task_worker
   gzochid_data_set_binding_to_oid 
     (context, binding->str, persistence_task->holder->oid, NULL);
 
-  g_string_free (binding, FALSE);
+  g_string_free (binding, TRUE);
 }
 
 gzochid_task *gzochid_data_prefix_binding_persistence_task_new

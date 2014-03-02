@@ -129,7 +129,8 @@ static gboolean flush_reference
 
       if (gzochid_transaction_rollback_only ())
 	{
-	  g_string_free (out, FALSE);	  
+	  free (oid_str);
+	  g_string_free (out, TRUE);	  
 	  return FALSE;
 	}
 
@@ -148,7 +149,7 @@ static gboolean flush_reference
       gzochid_application_event_dispatch
 	(context->context->event_source, base_event);
 
-      g_string_free (out, FALSE);
+      g_string_free (out, TRUE);
 
       break;
     case GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED:
