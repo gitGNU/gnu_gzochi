@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2013 Julian Graham
+# Copyright (C) 2014 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -52,6 +52,9 @@ gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
 if STORAGE_ENGINE_BDB
 gzochid_SOURCES += storage-bdb.c
 endif
+if STORAGE_ENGINE_LMDB
+gzochid_SOURCES += storage-lmdb.c
+endif
 
 admin.c: admin.h
 app.c: app.h
@@ -76,6 +79,7 @@ session.c: session.h
 socket.c: socket.h
 stats.c: stats.h
 storage-bdb.c: storage.h
+storage-lmdb.c: storage.h
 task.c: task.h
 threads.c: threads.h
 tx.c: tx.h
