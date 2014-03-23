@@ -351,7 +351,7 @@ gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_execution_new 
 (gzochid_application_task *task, gzochid_application_task *cleanup_task)
 {
-  return execution_new (task, NULL, NULL);
+  return execution_new (task, cleanup_task, NULL);
 }
 
 gzochid_transactional_application_task_execution *
