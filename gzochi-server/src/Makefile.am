@@ -52,6 +52,9 @@ gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
 if STORAGE_ENGINE_BDB
 gzochid_SOURCES += storage-bdb.c
 endif
+if STORAGE_ENGINE_HDB
+gzochid_SOURCES += storage-hdb.c
+endif
 if STORAGE_ENGINE_LMDB
 gzochid_SOURCES += storage-lmdb.c
 endif
@@ -79,6 +82,7 @@ session.c: session.h
 socket.c: socket.h
 stats.c: stats.h
 storage-bdb.c: storage.h
+storage-hdb.c: storage.h
 storage-lmdb.c: storage.h
 task.c: task.h
 threads.c: threads.h

@@ -59,6 +59,10 @@ AS_CASE([$GZOCHI_STORAGE_ENGINE],
   [bdb], [AC_SEARCH_LIBS([db_create], [db], [], 
                          [AC_MSG_ERROR([libdb is required.])]) 
           AC_CHECK_HEADER([db.h], [], [AC_MSG_ERROR([db.h is required.])])],
+  [hdb], [AC_SEARCH_LIBS([ham_env_create], [hamsterdb], [],
+                         [AC_MSG_ERROR([libhamsterdb is required.])])
+          AC_CHECK_HEADER([ham/hamsterdb.h], [], 
+                          [AC_MSG_ERROR([ham/hamsterdb.h is required.])])],
   [lmdb], [AC_SEARCH_LIBS([mdb_env_create], [lmdb], [],
                           [AC_MSG_ERROR([liblmdb is required.])])
           AC_CHECK_HEADER([lmdb.h], [], [AC_MSG_ERROR([lmdb.h is required.])])],
@@ -66,6 +70,7 @@ AS_CASE([$GZOCHI_STORAGE_ENGINE],
 
 AC_SUBST(GZOCHI_STORAGE_ENGINE)
 AM_CONDITIONAL([STORAGE_ENGINE_BDB], [test x$GZOCHI_STORAGE_ENGINE = xbdb])
+AM_CONDITIONAL([STORAGE_ENGINE_HDB], [test x$GZOCHI_STORAGE_ENGINE = xhdb])
 AM_CONDITIONAL([STORAGE_ENGINE_LMDB], [test x$GZOCHI_STORAGE_ENGINE = xlmdb])
 
 AC_SEARCH_LIBS([__gmpz_init], [gmp], [], [AC_MSG_ERROR([libgmp is required.])])
