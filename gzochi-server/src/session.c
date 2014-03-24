@@ -374,7 +374,21 @@ static void remove_session
 	  
 	  gzochid_data_remove_object (scm_session_reference, &local_err);
 
-	  if (local_err == NULL)
+	  if (local_err != NULL)
+	    {
+	      /* This might happen if the disconnect callback (or some other
+		 piece of code) has already deleted the SCM representation of
+		 the session, or if the login handler never completed
+		 successfully. */
+
+	      if (local_err->message != NULL)
+		gzochid_info 
+		  ("Unable to remove Scheme object for session '%s': %s",
+		   local_err->message);
+
+	      g_clear_error (&local_err);
+	    }
+	    
 	    gzochid_data_remove_object (session_reference, &local_err);
 	  
 	  if (local_err != NULL)

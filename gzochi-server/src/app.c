@@ -780,25 +780,33 @@ void gzochid_application_client_disconnected
     }
   else 
     {
-      gzochid_task *callback_task = NULL;
-      gzochid_task *cleanup_task = NULL;
+      gzochid_application_task *callback_task = 
+	gzochid_application_task_new
+	(context, client->identity, 
+	 gzochid_scheme_application_disconnected_worker, session_oid_str);
+      gzochid_application_task *cleanup_task = 
+	gzochid_application_task_new
+	(context, client->identity, gzochid_client_session_disconnected_worker, 
+	 session_oid_str);
+      gzochid_transactional_application_task_execution *execution = 
+	gzochid_transactional_application_task_execution_new 
+	(callback_task, cleanup_task);
+      gzochid_application_task *application_task = gzochid_application_task_new 
+	(context, client->identity,
+	 gzochid_application_resubmitting_transactional_task_worker, execution);
 
+      gzochid_task *task = NULL;      
       struct timeval n;
 
       gettimeofday (&n, NULL);
       
-      callback_task = gzochid_task_make_transactional_application_task
-	(context, client->identity, 
-	 gzochid_scheme_application_disconnected_worker, session_oid_str, n);
-      cleanup_task = gzochid_task_make_transactional_application_task
-	(context, client->identity, gzochid_client_session_disconnected_worker,
-	 session_oid_str, n);
+      task = gzochid_task_new
+	(gzochid_application_task_thread_worker, application_task, n);
 
       g_hash_table_remove (context->clients_to_oids, client);
       g_hash_table_remove (context->oids_to_clients, session_oid_str);
       
-      gzochid_schedule_submit_task (game_context->task_queue, callback_task);
-      gzochid_schedule_submit_task (game_context->task_queue, cleanup_task);
+      gzochid_schedule_submit_task (game_context->task_queue, task);
 
       g_mutex_unlock (&context->client_mapping_lock);
     }

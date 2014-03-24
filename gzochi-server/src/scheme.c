@@ -29,6 +29,7 @@
 #include "data.h"
 #include "guile.h"
 #include "io.h"
+#include "log.h"
 #include "reloc.h"
 #include "scheme.h"
 #include "session.h"
@@ -441,10 +442,11 @@ void gzochid_scheme_application_disconnected_worker
 
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
   GList *gpa = NULL;
+  char *oid_str = (char *) ptr;
   mpz_t session_oid;
 
   mpz_init (session_oid);
-  mpz_set_str (session_oid, (char *) ptr, 16);
+  mpz_set_str (session_oid, oid_str, 16);
 
   session_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_client_session_serialization, session_oid);
@@ -454,6 +456,13 @@ void gzochid_scheme_application_disconnected_worker
 
   if (err != NULL)
     {
+      if (err->message != NULL)
+	gzochid_warning
+	  ("Failed to dereference disconnecting session '%s': %s", 
+	   oid_str, err->message);
+      else gzochid_warning 
+	     ("Failed to dereference disconnecting session '%s'.", oid_str);
+
       g_error_free (err);
       return;
     }
@@ -470,7 +479,7 @@ void gzochid_scheme_application_disconnected_worker
 
       g_list_free (gpa);
 
-      gzochid_data_remove_object (session_reference, NULL);
+      gzochid_client_session_disconnected_worker (context, identity, oid_str);
       return;
     }
 
@@ -483,7 +492,16 @@ void gzochid_scheme_application_disconnected_worker
   
   if (err != NULL)
     {
-      g_error_free (err);
+      if (err->message != NULL)
+	gzochid_warning
+	  ("Failed to retrieve disconnect callback for session '%s': %s", 
+	   oid_str, err->message);
+      else gzochid_warning 
+	     ("Failed to retrieve disconnect callback for session '%s'.", 
+	      oid_str);
+
+      g_error_free (err);      
+      gzochid_client_session_disconnected_worker (context, identity, oid_str);
       return;
     }
 
@@ -504,7 +522,8 @@ void gzochid_scheme_application_disconnected_worker
 	(&scheme_participant, 
 	 is_transaction_retry (scm_variable_ref (exception_var)));
     }
-  else gzochid_data_remove_object (session_reference, NULL);
+
+  gzochid_client_session_disconnected_worker (context, identity, oid_str);
   g_list_free (gpa);
 }
 
