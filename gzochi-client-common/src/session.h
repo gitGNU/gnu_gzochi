@@ -27,6 +27,7 @@ typedef struct _gzochi_client_common_session
   int port;
 
   int connected;
+  int disconnect_acknowledged;
 
   int socket;
   unsigned char buffer[GZOCHI_CLIENT_MAX_BUFFER_SIZE];

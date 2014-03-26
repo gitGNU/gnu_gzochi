@@ -1,5 +1,5 @@
 /* session.c: Session management routines for libgzochi
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -68,6 +68,8 @@ int gzochi_client_common_session_is_dispatchable
 {
   short message_len = 0;
 
+  if (! session->connected && ! session->disconnect_acknowledged)
+    return TRUE;
   if (session->buffer_length < 3)
     return FALSE;
 

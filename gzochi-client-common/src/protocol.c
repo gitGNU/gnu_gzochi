@@ -107,8 +107,13 @@ static void dispatch_session_disconnected
 (gzochi_client_common_session *session)
 {
   session->connected = FALSE;
-  if (session->disconnected_callback != NULL)
-    session->disconnected_callback (session, session->disconnected_user_data);
+  if (! session->disconnect_acknowledged)
+    {
+      session->disconnect_acknowledged = TRUE;
+      if (session->disconnected_callback != NULL)
+	session->disconnected_callback 
+	  (session, session->disconnected_user_data);
+    }
 }
 
 static void dispatch 
@@ -137,6 +142,12 @@ static int attempt_dispatch (gzochi_client_common_session *session, int limit)
     {
       short message_len = 0;
       char opcode = 0x00;
+
+      if (! session->connected)
+	{
+	  dispatch_session_disconnected (session);
+	  break;
+	}
 
       if (session->buffer_length - offset < 3)
 	break;
@@ -182,7 +193,7 @@ int gzochi_client_protocol_read (gzochi_client_common_session *session)
   int bytes_requested = MIN(CHUNK_SIZE, available_buffer);
   int bytes_read = recv (session->socket, chunk, bytes_requested, 0);
 
-  if (bytes_read < 0)
+  if (bytes_read <= 0)
     return -1;
       
   memcpy (session->buffer + session->buffer_length, chunk, bytes_read);

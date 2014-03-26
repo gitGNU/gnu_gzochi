@@ -18,21 +18,16 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+check_PROGRAMS = $(test_programs)
+
+test_programs = \
+	test-session
+
+TESTS = $(test_programs)
+
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
-SUBDIRS = tests
-
-AM_CFLAGS = @CFLAGS@ $(GZOCHI_COMMON_CFLAGS) -Wall -Werror
-
-noinst_LTLIBRARIES = libgzochi-client-common.la
-
-libgzochi_client_common_la_SOURCES = protocol.c session.c
-libgzochi_client_common_la_LIBADD = $(GZOCHI_COMMON_LIBS)
-
-includedir = $(prefix)/include
-dist_include_HEADERS = gzochi-client-common.h
-noinst_HEADERS = protocol.h session.h
-
-protocol.c: protocol.h
-session.c: session.h
+test_session_CFLAGS = $(GZOCHI_COMMON_CFLAGS)
+test_session_SOURCES = ../session.c test-session.c 
+test_session_LDFLAGS = $(GZOCHI_COMMON_LIBS)
