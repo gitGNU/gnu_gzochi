@@ -1,5 +1,5 @@
 /* client.c: GSource interface for libgzochi-glib
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -65,8 +65,9 @@ static gboolean check (GSource *source)
 
   if (poll_fd->revents & G_IO_IN)
     {
-      gzochi_client_protocol_read (gzochi_source->session);
-      return gzochi_client_common_session_is_dispatchable 
+      if (gzochi_client_protocol_read (gzochi_source->session) < 0)
+	gzochi_source->session->connected = FALSE;
+      return gzochi_client_common_session_is_dispatchable
 	(gzochi_source->session);
     }
   if (poll_fd->revents & G_IO_HUP || poll_fd->revents & G_IO_ERR)

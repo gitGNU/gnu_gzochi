@@ -26,6 +26,7 @@ AM_INIT_AUTOMAKE(1.6)
 
 AC_LANG(C)
 AC_PROG_CC
+AM_PROG_CC_C_O
 
 LT_PREREQ([2.4])
 LT_INIT
@@ -41,6 +42,7 @@ AC_CONFIG_FILES([meta/gzochi-glib.pc])
 AC_CONFIG_FILES([Makefile
                  doc/Makefile
                  meta/Makefile
-                 src/Makefile])
+                 src/Makefile
+		 src/tests/Makefile])
 
 AC_OUTPUT
