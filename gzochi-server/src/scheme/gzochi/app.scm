@@ -1,5 +1,5 @@
 ;; gzochi/app.scm: Public exports for general gzochi application support 
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2014 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -23,11 +23,23 @@
 	  gzochi:callback-procedure
 	  gzochi:callback-data
 
-	  %gzochi:application-root)
+	  %gzochi:application-root
+	  g:@)
 
   (import (only (guile) make-fluid)
 	  (gzochi private app)
-	  (rnrs base))
+	  (rnrs base)
+	  (rnrs syntax-case))
+
+  (define-syntax g:@
+    (lambda (stx)
+      (syntax-case stx ()
+	((_ (module ...) procedure)
+	 #'(gzochi:make-callback (quote (module ...)) (quote procedure)))
+	((_ (module ...) procedure data)
+	 #'(gzochi:make-callback 
+	    (quote (module ...)) 
+	    (quote procedure) data)))))
 
   (define %gzochi:application-root (make-fluid))
 )

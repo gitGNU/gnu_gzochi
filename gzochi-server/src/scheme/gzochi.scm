@@ -1,5 +1,5 @@
 ;; gzochi.scm: The gzochi composite library
-;; Copyright (C) 2013 Julian Graham
+;; Copyright (C) 2014 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 
           gzochi:make-callback gzochi:callback? gzochi:callback-module
 	  gzochi:callback-procedure gzochi:callback-data 
-	  %gzochi:application-root
+	  %gzochi:application-root g:@
    
           ;; (gzochi channel)
 
