@@ -1,6 +1,6 @@
 ;; data.scm --- Data structures for gzochi AberMUD example game
 
-;; Copyright (C) 2013 Julian Graham
+;; Copyright (C) 2014 Julian Graham
 ;;
 ;; This software is provided 'as-is', without any express or implied
 ;; warranty. In no event will the authors be held liable for any damages
@@ -174,8 +174,8 @@
   (define (wrap-word word)
     (gzochi:make-managed-serializable
      word 
-     (gzochi:make-callback 'abermud:write-word '(gzochi example abermud data))
-     (gzochi:make-callback 'abermud:read-word '(gzochi example abermud data))))
+     (g:@ (gzochi example abermud data) abermud:write-word)
+     (g:@ (gzochi example abermud data) abermud:read-word)))
 
   ;; Returns the table of known words (keyed by word text) as a 
   ;; `gzochi:managed-hashtable' record, lazily initializing it if it is not
@@ -185,9 +185,8 @@
     (guard (ex ((gzochi:name-not-bound-condition? ex)
 		(let ((words
 		       (gzochi:make-managed-hashtable
-			(gzochi:make-callback 
-			 'string-ci-hash '(rnrs hashtables))
-			(gzochi:make-callback 'string-ci=? '(rnrs unicode)))))
+			(g:@ (rnrs hashtables) string-ci-hash)
+			(g:@ (rnrs unicode) string-ci=?))))
 		  (gzochi:set-binding! "words" words)
 		  words)))
 
@@ -209,10 +208,8 @@
 
       (gzochi:managed-hashtable-set!
        words text word-list
-       #:key-serializer 
-       (gzochi:make-callback 'gzochi:write-string '(gzochi io)) 
-       #:key-deserializer
-       (gzochi:make-callback 'gzochi:read-string '(gzochi io)))))
+       #:key-serializer (g:@ (gzochi io) gzochi:write-string) 
+       #:key-deserializer (g:@ (gzochi io) gzochi:read-string))))
 
   (define (find-words words text)
     (gzochi:managed-hashtable-ref words text #f))
@@ -360,11 +357,9 @@
     (guard (ex ((gzochi:name-not-bound-condition? ex)
 		(let ((items 
 		       (gzochi:make-managed-hashtable
-			(gzochi:make-callback 
-			 'abermud:term-hash '(gzochi example abermud data))
-			(gzochi:make-callback 
-			 'abermud:term-equal? 
-			 '(gzochi example abermud data)))))
+			(g:@ (gzochi example abermud data) abermud:term-hash)
+			(g:@ (gzochi example abermud data) 
+			      abermud:term-equal?))))
 		  (gzochi:set-binding! "items" items)
 		  items)))
 
@@ -383,11 +378,9 @@
 	  (gzochi:managed-hashtable-set! 
 	   items term item 
 	   #:key-serializer 
-	   (gzochi:make-callback 'abermud:write-term 
-				 '(gzochi example abermud data)) 
+	   (g:@ (gzochi example abermud data) abermud:write-term)
 	   #:key-deserializer 
-	   (gzochi:make-callback 'abermud:read-term 
-				 '(gzochi example abermud data))))))
+	   (g:@ (gzochi example abermud data) abermud:read-term)))))
 
   ;; Returns the item identified by the specified words. If `word2' is given,
   ;; it must be a noun and `word1' must be an adjective; otherwise, `word1' 

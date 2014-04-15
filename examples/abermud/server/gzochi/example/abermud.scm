@@ -1,6 +1,6 @@
 ;; abermud.scm --- Server-side implementation of AberMUD for gzochi
 
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2014 Julian Graham
 ;;
 ;; This software is provided 'as-is', without any express or implied
 ;; warranty. In no event will the authors be held liable for any damages
@@ -118,13 +118,13 @@
     (gzochi:set-binding! 
      "motd" (gzochi:make-managed-serializable 
 	     motd 
-	     (gzochi:make-callback 'gzochi:write-string '(gzochi io)) 
-	     (gzochi:make-callback 'gzochi:read-string '(gzochi io))))
+	     (g:@ (gzochi io) gzochi:write-string) 
+	     (g:@ (gzochi io) gzochi:read-string)))
     (gzochi:set-binding!
      "help" (gzochi:make-managed-serializable
 	     help 
-	     (gzochi:make-callback 'gzochi:write-string '(gzochi io))
-	     (gzochi:make-callback 'gzochi:read-string '(gzochi io))))
+	     (g:@ (gzochi io) gzochi:write-string) 
+	     (g:@ (gzochi io) gzochi:read-string)))
 
     (gzochi:log-info "Creator Of Legends: Initialised"))
 
@@ -167,10 +167,8 @@
       (update-prompt abermud-session "What be thy name ? " #t)
 
       (gzochi:make-client-session-listener
-       (gzochi:make-callback
-	'received-message '(gzochi example abermud) abermud-session)
-       (gzochi:make-callback
-	'disconnected '(gzochi example abermud) abermud-session))))
+       (g:@ (gzochi example abermud) received-message abermud-session)
+       (g:@ (gzochi example abermud) disconnected abermud-session))))
 
   ;; A convenience function for creating a player: Creates a new game item and 
   ;; adds a "player" facet to it with the specified player name.

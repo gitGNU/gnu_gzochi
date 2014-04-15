@@ -1,6 +1,6 @@
 ;; mazewar.scm --- Server-side implementation of gzochi mazewar example game
 
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2014 Julian Graham
 ;;
 ;; This software is provided 'as-is', without any express or implied
 ;; warranty. In no event will the authors be held liable for any damages
@@ -265,9 +265,7 @@
 
        (else (mazewar:set-missile-space! missile next-tile)
 	     (gzochi:schedule-task 
-	      (gzochi:make-callback 'move-missile 
-				    '(gzochi example mazewar) 
-				    missile) 
+	      (g:@ (gzochi example mazewar) move-missile missile)
 	      200)))))
 
   ;; Send `player-hidden' messages to the specified player for each of the
@@ -433,9 +431,8 @@
      ((eqv? cmd mazewar:message-type-client-shoot)
       (let ((missile (mazewar:make-missile orientation p space)))
 	(mazewar:set-player-missile! p missile)
-	(gzochi:schedule-task (gzochi:make-callback 
-			       'move-missile '(gzochi example mazewar) missile)
-			      200)))))
+	(gzochi:schedule-task 
+	 (g:@ (gzochi example mazewar) move-missile missile) 200)))))
 
   ;; The `logged-in' callback. Called when a new player attempts to join the
   ;; game.
@@ -501,6 +498,6 @@
       ;; indicating a successful login.
       
       (gzochi:make-client-session-listener
-       (gzochi:make-callback 'received-message '(gzochi example mazewar) player)
-       (gzochi:make-callback 'disconnected '(gzochi example mazewar) player))))
+       (g:@ (gzochi example mazewar) received-message player)
+       (g:@ (gzochi example mazewar) disconnected player))))
 )
