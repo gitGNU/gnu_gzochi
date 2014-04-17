@@ -45,6 +45,10 @@
     (protocol 
      (lambda (p)
        (lambda (procedure module . args)
+	 (or (list? module)
+	     (raise (condition
+		     (make-assertion-violation)
+		     (make-message-condition "Invalid module name."))))
 	 (if (null? args)
 	     (p procedure module #f)
 	     (let ((arg (car args)))

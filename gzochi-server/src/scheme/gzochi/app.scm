@@ -35,11 +35,10 @@
     (lambda (stx)
       (syntax-case stx ()
 	((_ (module ...) procedure)
-	 #'(gzochi:make-callback (quote (module ...)) (quote procedure)))
+	 #'(gzochi:make-callback (quote procedure) (quote (module ...))))
 	((_ (module ...) procedure data)
 	 #'(gzochi:make-callback 
-	    (quote (module ...)) 
-	    (quote procedure) data)))))
+	    (quote procedure) (quote (module ...)) data)))))
 
   (define %gzochi:application-root (make-fluid))
 )
