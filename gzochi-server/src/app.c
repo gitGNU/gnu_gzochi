@@ -503,7 +503,7 @@ static void run_async_transactional (gpointer data)
     }
   else 
     {
-      gzochid_sweep_client_sessions (context);
+      gzochid_sweep_client_sessions (context, system_identity);
       gzochid_restart_tasks (context);
     }
 }

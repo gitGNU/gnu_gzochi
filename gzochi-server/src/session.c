@@ -656,7 +656,8 @@ void gzochid_client_session_persist
   gzochid_data_prefix_binding_persistence_task_free (task);
 }
 
-void gzochid_sweep_client_sessions (gzochid_application_context *context)
+void gzochid_sweep_client_sessions 
+(gzochid_application_context *context, gzochid_auth_identity *identity)
 {
   mpz_t oid;
   GError *err = NULL;
@@ -676,17 +677,10 @@ void gzochid_sweep_client_sessions (gzochid_application_context *context)
       char *oid_str = mpz_get_str (NULL, 16, oid);
       char *next_next_binding = NULL;
       
-      remove_session (context, oid_str, &err);
+      gzochid_scheme_application_disconnected_worker 
+	(context, identity, oid_str);      
 
-      free (oid_str);
-
-      assert (err == NULL || err->code == GZOCHID_DATA_ERROR_NOT_FOUND);
-
-      if (err != NULL)
-	{
-	  g_error_free (err);
-	  err = NULL;
-	}
+      assert (! gzochid_transaction_rollback_only ());
       
       next_next_binding = gzochid_data_next_binding_oid 
 	(context, next_binding, oid, &err);
