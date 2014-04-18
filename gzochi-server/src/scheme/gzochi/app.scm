@@ -29,7 +29,8 @@
   (import (only (guile) make-fluid)
 	  (gzochi private app)
 	  (rnrs base)
-	  (rnrs syntax-case))
+	  (rnrs syntax-case)
+	  (system syntax))
 
   (define-syntax g:@
     (lambda (stx)
@@ -38,7 +39,14 @@
 	 #'(gzochi:make-callback (quote procedure) (quote (module ...))))
 	((_ (module ...) procedure data)
 	 #'(gzochi:make-callback 
-	    (quote procedure) (quote (module ...)) data)))))
+	    (quote procedure) (quote (module ...)) data))
+	((_ procedure) 
+	 #`(gzochi:make-callback 
+	    (quote procedure) (syntax-module #'procedure)))
+	((_ procedure data)
+	 #`(gzochi:make-callback
+	    (quote procedure) (syntax-module #'procedure)
+	    data)))))
 
   (define %gzochi:application-root (make-fluid))
 )
