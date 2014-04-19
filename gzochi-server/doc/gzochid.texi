@@ -1276,6 +1276,14 @@ Constructs a new @code{gzochi:callback} with the specified
 procedure, module, and optional data.
 @end deffn
 
+@deffn {Scheme Syntax} g:@ (module ...) procedure [data]
+@deffnx {Scheme Syntax} g:@ procedure [data]
+Expands to an invocation of @code{gzochi:make-callback} with the
+specified procedure, module, and optional data. If @var{module}
+is omitted, the module in which @var{procedure} is defined will be
+used.
+@end deffn
+
 @deffn {Scheme Procedure} gzochi:callback? obj
 Returns @code{#t} if @var{obj} is a @code{gzochi:callback}, 
 @code{#f} otherwise.
