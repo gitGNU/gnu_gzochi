@@ -807,7 +807,7 @@ twice before committing:
 
 @example
 (display "A log message.") (newline)
-(gzochi:info "A transactional log message.")
+(gzochi:log-info "A transactional log message.")
 @end example
 
 ...the output might include:
