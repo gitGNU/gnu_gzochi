@@ -1,0 +1,16 @@
+gzochi Hacking Notes
+
+Bootstrapping ==================================================================
+
+When gzochi is obtained from Git, a few extra steps must be taken before the
+usual configure, make, make install cycle can be executed. First, ensure that
+you have installed recent versions of the tools listed below:
+
+* Autoconf (http://www.gnu.org/s/autoconf/)
+* Automake (http://www.gnu.org/s/automake/)
+* Libtool (http://www.gnu.org/s/libtool/)
+
+Then run the autogen.sh script located at the top-level directory of the gzochi
+source distribution to generate all the requisite configure and Makefile files.
+There is an autogen.sh script for each component of the gzochi framework; the
+top-level autogen.sh script will invoke all of them in the proper order.
