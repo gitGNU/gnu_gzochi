@@ -135,6 +135,12 @@ static void initialize_data (int from_state, int to_state, gpointer user_data)
 
   storage_context = gzochid_storage_initialize (data_dir);
 
+  if (storage_context == NULL)
+    {
+      gzochid_err ("Unable to initialize storage. Exiting.");
+      exit (EXIT_FAILURE);
+    }
+
   app_context->storage_context = storage_context;
   app_context->meta = gzochid_storage_open (storage_context, meta_db);
   app_context->oids = gzochid_storage_open (storage_context, oids_db);
