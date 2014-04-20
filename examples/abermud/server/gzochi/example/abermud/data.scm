@@ -173,9 +173,7 @@
 
   (define (wrap-word word)
     (gzochi:make-managed-serializable
-     word 
-     (g:@ (gzochi example abermud data) abermud:write-word)
-     (g:@ (gzochi example abermud data) abermud:read-word)))
+     word (g:@ abermud:write-word) (g:@ abermud:read-word)))
 
   ;; Returns the table of known words (keyed by word text) as a 
   ;; `gzochi:managed-hashtable' record, lazily initializing it if it is not
@@ -357,9 +355,7 @@
     (guard (ex ((gzochi:name-not-bound-condition? ex)
 		(let ((items 
 		       (gzochi:make-managed-hashtable
-			(g:@ (gzochi example abermud data) abermud:term-hash)
-			(g:@ (gzochi example abermud data) 
-			      abermud:term-equal?))))
+			(g:@ abermud:term-hash) (g:@ abermud:term-equal?))))
 		  (gzochi:set-binding! "items" items)
 		  items)))
 
@@ -377,10 +373,8 @@
 	  (raise (make-assertion-violation))
 	  (gzochi:managed-hashtable-set! 
 	   items term item 
-	   #:key-serializer 
-	   (g:@ (gzochi example abermud data) abermud:write-term)
-	   #:key-deserializer 
-	   (g:@ (gzochi example abermud data) abermud:read-term)))))
+	   #:key-serializer (g:@ abermud:write-term)
+	   #:key-deserializer (g:@ abermud:read-term)))))
 
   ;; Returns the item identified by the specified words. If `word2' is given,
   ;; it must be a noun and `word1' must be an adjective; otherwise, `word1' 

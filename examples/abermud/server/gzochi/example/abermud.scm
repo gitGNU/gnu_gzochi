@@ -167,8 +167,8 @@
       (update-prompt abermud-session "What be thy name ? " #t)
 
       (gzochi:make-client-session-listener
-       (g:@ (gzochi example abermud) received-message abermud-session)
-       (g:@ (gzochi example abermud) disconnected abermud-session))))
+       (g:@ received-message abermud-session)
+       (g:@ disconnected abermud-session))))
 
   ;; A convenience function for creating a player: Creates a new game item and 
   ;; adds a "player" facet to it with the specified player name.
