@@ -4,6 +4,48 @@ See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.6 (since 0.5):
+
+* Notable changes
+
+** New storage engines
+
+Experimental support for two new storage engines has been added: hamsterdb and
+Symas Lightning (LMDB). These databases provide the same transactional 
+guarantees as BerkeleyDB and may be an attractive alternative for users who wish
+to avoid linking with libdb. Support for these engines may be enabled by running
+`configure' with the arguments `--with-storage-engine=hdb' and 
+`--with-storage-engine=lmdb', respectively.
+
+** Swept connections are fully disconnected on startup
+
+In addition to freeing the resources related to severed client connections on a
+restart of the server, the gzochid container now also invokes the registered
+session disconnect handler (if any) for each swept client session. The hope is
+that this behavior will help preserve continuity of game state across restarts
+of the container.
+
+** Memory leak cleanup
+
+Twelve major sources of memory leaks have been identified and fixed in this 
+release, leading to a more stable server process with a lower overall memory 
+footprint.
+
+* New interfaces
+
+** Syntactic callback creation
+
+A more concise mechanism for constructing task and session lifecycle callbacks
+has been added. The `g:@' syntax (inspired by Guile's `@' form) expands to an
+invocaftion of `gzochi:make-callback' with the specified procedure and 
+optionally associated data. See "(gzochi app)" in the manual for more 
+information.
+
+* Bug fixes
+
+** Transactional logging functions incorrectly named in documentation
+
+
 Changes in 0.5 (since 0.4):
 
 * Notable changes

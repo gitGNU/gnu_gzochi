@@ -1,9 +1,18 @@
 gzochi NEWS -- history of user-visible changes
-Copyright (C) 2013 Julian Graham
+Copyright (C) 2014 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.6 (since 0.5)
+
+* Compatibility
+
+** Support for additional platforms
+
+gzochi now builds on Mac OS X and (likely) other BSD variants.
+
+
 Changes in 0.3 (since 0.2)
 
 * Changes to the distribution
@@ -46,7 +55,7 @@ in which state is shared between multiple players.
 
 Copyright information:
 
-Copyright (C) 2013 Julian Graham
+Copyright (C) 2014 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the

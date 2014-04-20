@@ -4,6 +4,18 @@ See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.6 (since 0.5):
+
+* Notable changes
+
+** Disconnect handling
+
+The prepare-check-dispatch cycle in libgzochi-glib now properly interprets I/O
+error conditions (such as broken pipes) as dispatchable events, and invokes the
+registered handler accordingly. One result of this change is that server 
+shutdown now properly triggers the client's disconnect handler.
+
+
 Changes in 0.5 (since 0.4):
 
 * Notable changes
