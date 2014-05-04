@@ -245,14 +245,21 @@ static void data_rollback (gpointer data)
   gzochid_data_transaction_context *context = 
     (gzochid_data_transaction_context *) data;
 
-  gzochid_storage_transaction_rollback (context->transaction);
+  /* The rollback may have been triggered by the data manager's failure to join
+     the transaction - because of a timeout, for example - in which case the
+     local transaction context will be NULL. */
 
-  finalize_references (context);
+  if (context != NULL)
+    {
+      gzochid_storage_transaction_rollback (context->transaction);
 
-  gzochid_storage_unlock (context->context->names);
-  gzochid_storage_unlock (context->context->oids);
+      finalize_references (context);
 
-  transaction_context_free (context);
+      gzochid_storage_unlock (context->context->names);
+      gzochid_storage_unlock (context->context->oids);
+
+      transaction_context_free (context);
+    }
 }
 
 static gzochid_transaction_participant data_participant = 
@@ -599,7 +606,7 @@ static void remove_reference
 }
 
 static gzochid_data_transaction_context *join_transaction 
-(gzochid_application_context *context)
+(gzochid_application_context *context, GError **err)
 {
   gzochid_data_transaction_context *tx_context = NULL;
 
@@ -609,10 +616,19 @@ static gzochid_data_transaction_context *join_transaction
       if (gzochid_transaction_timed ())
 	{
 	  struct timeval remaining = gzochid_transaction_time_remaining ();
-	  tx_context = create_transaction_context (context, &remaining);
+	  if (remaining.tv_sec > 0 || remaining.tv_usec > 0)
+	    tx_context = create_transaction_context (context, &remaining);
 	}
-      else tx_context = create_transaction_context (context, NULL); 
+      else tx_context = create_transaction_context (context, NULL);
       gzochid_transaction_join (&data_participant, tx_context);
+
+      if (tx_context == NULL)
+	{
+	  g_set_error 
+	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	     "Transaction timed out.");
+	  gzochid_transaction_mark_for_rollback (&data_participant, TRUE);
+	}
     }
 
   return tx_context;
@@ -624,9 +640,16 @@ void *gzochid_data_get_binding
 {
   mpz_t oid;
   gzochid_data_managed_reference *reference = NULL;
-  gzochid_data_transaction_context *tx_context = join_transaction (context);
   GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (context, &local_err);
   
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return NULL;
+    }
+
   mpz_init (oid);
   get_binding (tx_context, name, oid, &local_err);
 
@@ -647,15 +670,28 @@ void *gzochid_data_get_binding
 void gzochid_data_set_binding_to_oid
 (gzochid_application_context *context, char *name, mpz_t oid, GError **err)
 {
-  gzochid_data_transaction_context *tx_context = join_transaction (context);
-  set_binding (tx_context, name, oid, err);
+  GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (context, &local_err);
+
+  if (local_err != NULL)
+    g_propagate_error (err, local_err);
+  else set_binding (tx_context, name, oid, err);
 }
 
 char *gzochid_data_next_binding_oid
 (gzochid_application_context *context, char *key, mpz_t oid, GError **err)
 {
   char *next_key = NULL;
-  gzochid_data_transaction_context *tx_context = join_transaction (context);
+  GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (context, &local_err);
+
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return NULL;
+    }
 
   next_key = gzochid_storage_transaction_next_key 
     (tx_context->transaction, tx_context->context->names, key, 
@@ -688,18 +724,33 @@ void gzochid_data_set_binding
 (gzochid_application_context *context, char *name, 
  gzochid_io_serialization *serialization, void *data, GError **err)
 {
-  gzochid_data_transaction_context *tx_context = join_transaction (context);
-  gzochid_data_managed_reference *reference = 
-    get_reference_by_ptr (context, data, serialization);
+  GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (context, &local_err);
+  gzochid_data_managed_reference *reference = NULL;
 
-  set_binding (tx_context, name, reference->oid, err);
+  if (local_err != NULL)
+    g_propagate_error (err, local_err);
+  else 
+    {
+      reference = get_reference_by_ptr (context, data, serialization);
+      set_binding (tx_context, name, reference->oid, err);
+    }
 }
 
 void gzochid_data_remove_binding
 (gzochid_application_context *context, char *name, GError **err)
 {
   int ret = 0;
-  gzochid_data_transaction_context *tx_context = join_transaction (context);
+  GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (context, &local_err);
+
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return;
+    }
 
   ret = gzochid_storage_transaction_delete 
     (tx_context->transaction, tx_context->context->names, name, 
@@ -723,8 +774,15 @@ gboolean gzochid_data_binding_exists
 {
   mpz_t oid;
   gboolean ret = TRUE;
-  gzochid_data_transaction_context *tx_context = join_transaction (context);
   GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (context, &local_err);
+
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return FALSE;
+    }
 
   mpz_init (oid);
 
@@ -747,7 +805,22 @@ gzochid_data_managed_reference *gzochid_data_create_reference
 (gzochid_application_context *context, 
  gzochid_io_serialization *serialization, void *ptr)
 {
-  join_transaction (context);
+  GError *err = NULL;
+  join_transaction (context, &err);
+
+  if (err != NULL)
+    {
+      mpz_t oid;
+      gzochid_data_managed_reference *ret = NULL;
+
+      g_error_free (err);
+      mpz_init (oid);      
+      ret = create_empty_reference (context, oid, serialization);
+      mpz_clear (oid);
+
+      return ret;
+    }
+
   return get_reference_by_ptr (context, ptr, serialization);
 }
 
@@ -755,28 +828,56 @@ gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
 (gzochid_application_context *context, 
  gzochid_io_serialization *serialization, mpz_t oid)
 {
-  join_transaction (context);
-  return get_reference_by_oid (context, oid, serialization);
+  GError *err = NULL;
+
+  join_transaction (context, &err);
+
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return create_empty_reference (context, oid, serialization);
+    }
+  else return get_reference_by_oid (context, oid, serialization);
 }
 
 void gzochid_data_dereference 
 (gzochid_data_managed_reference *reference, GError **err)
 {
-  dereference (join_transaction (reference->context), reference, err);
+  GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (reference->context, &local_err);
+  
+  if (local_err != NULL)
+    g_propagate_error (err, local_err);
+  else dereference (tx_context, reference, err);
 }
 
 void gzochid_data_remove_object 
 (gzochid_data_managed_reference *reference, GError **err)
 {
-  remove_reference (join_transaction (reference->context), reference, err);
+  GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (reference->context, &local_err);
+
+  if (local_err != NULL)
+    g_propagate_error (err, local_err);
+  else remove_reference (tx_context, reference, err);
 }
 
 void gzochid_data_mark 
 (gzochid_application_context *context, gzochid_io_serialization *serialization,
  void *ptr, GError **err)
 {
-  gzochid_data_transaction_context *tx_context = join_transaction (context);
+  GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (context, &local_err);
   gzochid_data_managed_reference *reference = NULL;
+
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return;
+    }
 
   reference = get_reference_by_ptr (context, ptr, serialization);
 
