@@ -1,5 +1,5 @@
 /* auth.c: Authorization management routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -69,15 +69,17 @@ gzochid_auth_identity *gzochid_auth_identity_clone
   return gzochid_auth_identity_new (strdup (identity->name));
 }
 
-void gzochid_auth_identity_serializer 
-(gzochid_application_context *context, void *ptr, GString *out)
+void 
+gzochid_auth_identity_serializer 
+(gzochid_application_context *context, void *ptr, GString *out, GError **err)
 {
   gzochid_auth_identity *identity = (gzochid_auth_identity *) ptr;
   g_string_append_len (out, identity->name, strlen (identity->name) + 1);
 }
 
-void *gzochid_auth_identity_deserializer
-(gzochid_application_context *context, GString *in)
+void *
+gzochid_auth_identity_deserializer
+(gzochid_application_context *context, GString *in, GError **err)
 {
   char *name = strndup (in->str, in->len);
   gzochid_auth_identity *identity = gzochid_auth_identity_new (name);

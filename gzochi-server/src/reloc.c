@@ -1,5 +1,5 @@
 /* reloc.c: Support for assigning fixed native pointer locations to SCM ojects
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,20 +24,23 @@
 #include "scheme.h"
 #include "tx.h"
 
-static void location_aware_scheme_serializer 
-(gzochid_application_context *context, void *ptr, GString *out)
+static void 
+location_aware_scheme_serializer 
+(gzochid_application_context *context, void *ptr, GString *out, GError **err)
 {
   gzochid_scm_location_info *location = (gzochid_scm_location_info *) ptr;
   SCM obj = gzochid_scm_location_resolve (context, location);
 
-  gzochid_scheme_data_serialization.serializer (context, obj, out);
+  gzochid_scheme_data_serialization.serializer (context, obj, out, err);
 }
 
-static void *location_aware_scheme_deserializer
-(gzochid_application_context *context, GString *in)
+static void *
+location_aware_scheme_deserializer
+(gzochid_application_context *context, GString *in, GError **err)
 {
-  SCM obj = (SCM) gzochid_scheme_data_serialization.deserializer (context, in);
-  return gzochid_scm_location_get (context, obj);
+  GError *local_err = NULL;
+  SCM obj = (SCM) gzochid_scheme_data_serialization.deserializer 
+    (context, in, &local_err);
 }
 
 static void free_bits (gpointer ptr)

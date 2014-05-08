@@ -41,7 +41,7 @@ gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 	-Wall -Werror
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
-	debug.c event.c fsm.c game.c guile.c gzochid.c httpd.c log.c \
+	debug.c event.c fsm.c game.c guile.c gzochid.c httpd.c io.c log.c \
 	protocol.c reloc.c schedule.c scheme.c session.c socket.c stats.c \
 	task.c threads.c tx.c txlog.c util.c
 

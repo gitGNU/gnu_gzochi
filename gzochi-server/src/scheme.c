@@ -582,8 +582,9 @@ gboolean for_all (SCM lst, gboolean (*pred) (SCM))
   return TRUE;
 }
 
-static void scheme_managed_record_serializer
-(gzochid_application_context *context, SCM arg, GString *out)
+static void 
+scheme_managed_record_serializer
+(gzochid_application_context *context, SCM arg, GString *out, GError **err)
 {
   unsigned char vec_len_str[4];
   GList *gpd = g_list_append 
@@ -628,8 +629,9 @@ static void scheme_managed_record_serializer
   g_list_free (gpd);
 }
 
-static void *scheme_managed_record_deserializer
-(gzochid_application_context *context, GString *in)
+static void *
+scheme_managed_record_deserializer
+(gzochid_application_context *context, GString *in, GError **err)
 {
   int vec_len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   SCM vec = SCM_EOL, port = SCM_EOL, record = SCM_EOL;
@@ -674,20 +676,23 @@ static void *scheme_serializer_inner (void *data)
   gzochid_application_context *context = (gzochid_application_context *) ptr[0];
   SCM task = (SCM) ptr[1];
   GString *out = (GString *) ptr[2];
+  GError **err = (GError **) ptr[3];
 
-  scheme_managed_record_serializer (context, task, out);
+  scheme_managed_record_serializer (context, task, out, err);
 
   return NULL;
 }
 
-static void scheme_serializer
-(gzochid_application_context *context, void *ptr, GString *out)
+static void 
+scheme_serializer
+(gzochid_application_context *context, void *ptr, GString *out, GError **err)
 {
-  void *args[3];
+  void *args[4];
 
   args[0] = context;
   args[1] = ptr;
   args[2] = out;
+  args[3] = err;
 
   scm_with_guile (scheme_serializer_inner, args);
 }
@@ -697,17 +702,19 @@ static void *scheme_deserializer_inner (void *data)
   void **ptr = (void **) data;
   gzochid_application_context *context = (gzochid_application_context *) ptr[0];
   GString *in = (GString *) ptr[1];
+  GError **err = (GError **) ptr[2];
 
-  return scheme_managed_record_deserializer (context, in);
+  return scheme_managed_record_deserializer (context, in, err);
 }
 
 static void *scheme_deserializer
-(gzochid_application_context *context, GString *in)
+(gzochid_application_context *context, GString *in, GError **err)
 {
-  void *args[2];
+  void *args[3];
 
   args[0] = context;
   args[1] = in;
+  args[2] = err;
 
   return scm_with_guile (scheme_deserializer_inner, args);
 }

@@ -727,8 +727,9 @@ static void channel_rollback (gpointer data)
 static gzochid_transaction_participant channel_participant =
   { "channel", channel_prepare, channel_commit, channel_rollback };
 
-static gpointer deserialize_channel 
-(gzochid_application_context *context, GString *in)
+static gpointer 
+deserialize_channel 
+(gzochid_application_context *context, GString *in, GError **err)
 {
   gzochid_channel *channel = gzochid_channel_new 
     (gzochid_util_deserialize_string (in));
@@ -744,8 +745,9 @@ static gpointer deserialize_channel
   return channel;
 }
 
-static void serialize_channel 
-(gzochid_application_context *context, gpointer obj, GString *out)
+static void 
+serialize_channel 
+(gzochid_application_context *context, gpointer obj, GString *out, GError **err)
 {
   gzochid_channel *channel = (gzochid_channel *) obj;
   gzochid_util_serialize_string (channel->name, out);

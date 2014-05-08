@@ -1,5 +1,5 @@
 /* test-data.c: Test routines for data.c in gzochid.
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,27 +22,36 @@
 #include <string.h>
 
 #include "../data.h"
+#include "../io.h"
 #include "../tx.h"
 
 static gboolean serialized = FALSE;
 static gboolean deserialized = FALSE;
 static gboolean finalized = FALSE;
 
-static void test_serializer 
-(gzochid_application_context *context, void *ptr, GString *out)
+static void 
+test_serializer 
+(gzochid_application_context *context, void *ptr, GString *out, GError **err)
 {
   serialized = TRUE;
 }
 
+static void 
+test_failure_serializer
+(gzochid_application_context *context, void *ptr, GString *out, GError **err)
+{
+  g_set_error (err, GZOCHID_IO_ERROR, GZOCHID_IO_ERROR_SERIALIZATION,
+	       "Failed to serialize record.");
+}
+
 static void *test_deserializer 
-(gzochid_application_context *context, GString *in)
+(gzochid_application_context *context, GString *in, GError **err)
 {
   deserialized = TRUE;
   return g_string_new_len (in->str, in->len);
 }
 
-static void test_finalizer 
-(gzochid_application_context *context, void *ptr)
+static void test_finalizer (gzochid_application_context *context, void *ptr)
 {
   g_string_free ((GString *) ptr, TRUE);
   finalized = TRUE;
@@ -50,6 +59,9 @@ static void test_finalizer
 
 gzochid_io_serialization test_serialization = 
   { test_serializer, test_deserializer, test_finalizer };
+
+gzochid_io_serialization test_serialization_failure_serializer = 
+  { test_failure_serializer, test_deserializer, test_finalizer };
 
 static void reset_serialization_state ()
 {
@@ -96,11 +108,39 @@ static void test_data_reference_finalize ()
   g_assert (finalized);
 }
 
+static void
+flush_reference_failure (gpointer data)
+{
+  GString *str = g_string_new ("test-string");
+  gzochid_application_context *context = (gzochid_application_context *) data;
+
+  gzochid_data_create_reference
+    (context, &test_serialization_failure_serializer, str);
+}
+
+static void
+test_data_transaction_prepare_flush_reference_failure ()
+{
+  gzochid_application_context *context = gzochid_application_context_new ();
+  gzochid_transaction_result result;
+
+  reset_serialization_state ();
+  result = gzochid_transaction_execute (flush_reference_failure, context);
+
+  g_assert_cmpint (GZOCHID_TRANSACTION_SHOULD_RETRY, ==, result);
+
+  g_assert (!serialized);
+  g_assert (!deserialized);
+  g_assert (finalized);  
+}
+
 int main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/data/reference/finalize", test_data_reference_finalize);
+  g_test_add_func ("/data/transaction/prepare/flush-reference-failure",
+		   test_data_transaction_prepare_flush_reference_failure);
 
   return g_test_run ();
 }

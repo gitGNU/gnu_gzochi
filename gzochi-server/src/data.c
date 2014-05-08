@@ -109,6 +109,7 @@ static gboolean flush_reference
 
   char *oid_str = NULL;
   GString *out = NULL;
+  GError *err = NULL;
 
   switch (reference->state)
     {
@@ -126,12 +127,13 @@ static gboolean flush_reference
       gzochid_debug ("Flushing new/modified reference '%s'.", oid_str);
 
       reference->serialization->serializer
-	(context->context, reference->obj, out);
+	(context->context, reference->obj, out, &err);
 
-      if (gzochid_transaction_rollback_only ())
+      if (err != NULL || gzochid_transaction_rollback_only ())
 	{
 	  free (oid_str);
-	  g_string_free (out, TRUE);	  
+	  g_clear_error (&err);
+	  g_string_free (out, TRUE);
 	  return FALSE;
 	}
 
@@ -518,6 +520,7 @@ static void dereference
     }
   else 
     {
+      GError *local_err = NULL;
       gzochid_application_data_event *event = 
 	malloc (sizeof (gzochid_application_data_event));
       gzochid_application_event *base_event = 
@@ -534,8 +537,11 @@ static void dereference
       free (data);
 
       reference->obj = reference->serialization->deserializer 
-	(context->context, in);
-      reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED;
+	(context->context, in, &local_err);
+
+      if (local_err != NULL)
+	g_propagate_error (err, local_err);	  
+      else reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED;
       
       g_hash_table_insert (context->oids_to_references, oid_str, reference);
       g_hash_table_insert 

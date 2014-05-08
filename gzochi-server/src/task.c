@@ -1,5 +1,5 @@
 /* task.c: Application task management routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -172,8 +172,9 @@ void gzochid_durable_application_task_free
   free (task);
 }
 
-gpointer deserialize_durable_task_handle
-(gzochid_application_context *context, GString *in)
+gpointer 
+deserialize_durable_task_handle
+(gzochid_application_context *context, GString *in, GError **err)
 {
   gzochid_durable_application_task_handle *handle = 
     malloc (sizeof (gzochid_durable_application_task_handle));
@@ -197,7 +198,7 @@ gpointer deserialize_durable_task_handle
 
   mpz_clear (oid);
  
-  handle->identity = gzochid_auth_identity_deserializer (context, in);
+  handle->identity = gzochid_auth_identity_deserializer (context, in, NULL);
   handle->repeats = gzochid_util_deserialize_boolean (in);
 
   if (handle->repeats)
@@ -209,8 +210,10 @@ gpointer deserialize_durable_task_handle
   return handle;
 }
 
-void serialize_durable_task_handle
-(gzochid_application_context *context, gpointer data, GString *out)
+void 
+serialize_durable_task_handle
+(gzochid_application_context *context, gpointer data, GString *out, 
+ GError **err)
 {
   gzochid_durable_application_task_handle *handle = 
     (gzochid_durable_application_task_handle *) data;
@@ -220,7 +223,7 @@ void serialize_durable_task_handle
   handle->serialization->worker_serialization->serializer 
     (context, handle->task_worker, out);
 
-  gzochid_auth_identity_serializer (context, handle->identity, out);
+  gzochid_auth_identity_serializer (context, handle->identity, out, NULL);
 
   gzochid_util_serialize_boolean (handle->repeats, out);
   if (handle->repeats)

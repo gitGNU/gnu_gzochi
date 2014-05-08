@@ -247,24 +247,24 @@ static void session_rollback (gpointer data)
 }
 
 static gzochid_client_session_handler *deserialize_handler 
-(gzochid_application_context *context, GString *in)
+(gzochid_application_context *context, GString *in, GError **err)
 {
   gzochid_client_session_handler *handler = malloc 
     (sizeof (gzochid_client_session_handler)); 
 
   handler->received_message = 
-    gzochid_application_callback_serialization.deserializer (context, in);
+    gzochid_application_callback_serialization.deserializer (context, in, NULL);
   handler->disconnected = 
-    gzochid_application_callback_serialization.deserializer (context, in);
+    gzochid_application_callback_serialization.deserializer (context, in, NULL);
 
   return handler;
 }
 
 static gpointer deserialize_client_session
-(gzochid_application_context *context, GString *in)
+(gzochid_application_context *context, GString *in, GError **err)
 {
   gzochid_auth_identity *identity = 
-    gzochid_auth_identity_deserializer (context, in);
+    gzochid_auth_identity_deserializer (context, in, NULL);
   GSequence *channels = gzochid_util_deserialize_sequence 
     (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string, free);
   gzochid_client_session *session = gzochid_client_session_new (identity);
@@ -275,27 +275,27 @@ static gpointer deserialize_client_session
   gzochid_util_deserialize_mpz (in, session->scm_oid);
 
   if (gzochid_util_deserialize_boolean (in))
-    session->handler = deserialize_handler (context, in);
+    session->handler = deserialize_handler (context, in, NULL);
 
   return session;
 }
 
 static void serialize_handler 
 (gzochid_application_context *context, gzochid_client_session_handler *handler,
- GString *out)
+ GString *out, GError **err)
 {
   gzochid_application_callback_serialization.serializer 
-    (context, handler->received_message, out);
+    (context, handler->received_message, out, NULL);
   gzochid_application_callback_serialization.serializer 
-    (context, handler->disconnected, out);
+    (context, handler->disconnected, out, NULL);
 }
 
 static void serialize_client_session 
-(gzochid_application_context *context, gpointer obj, GString *out)
+(gzochid_application_context *context, gpointer obj, GString *out, GError **err)
 {
   gzochid_client_session *session = (gzochid_client_session *) obj;
 
-  gzochid_auth_identity_serializer (context, session->identity, out);
+  gzochid_auth_identity_serializer (context, session->identity, out, NULL);
   gzochid_util_serialize_sequence 
     (session->channels, 
      (void (*) (gpointer, GString *)) gzochid_util_serialize_string, out);
@@ -303,7 +303,7 @@ static void serialize_client_session
   if (session->handler != NULL)
     {
       gzochid_util_serialize_boolean (TRUE, out);
-      serialize_handler (context, session->handler, out);
+      serialize_handler (context, session->handler, out, NULL);
     }
   else gzochid_util_serialize_boolean (FALSE, out);
 }

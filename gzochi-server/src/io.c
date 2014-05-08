@@ -1,4 +1,4 @@
-/* io.h: Prototypes and declarations for io.c
+/* io.c: Helper functions for gzochid serialization routines
  * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -15,30 +15,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef GZOCHID_IO_H
-#define GZOCHID_IO_H
-
 #include <glib.h>
 
-#define GZOCHID_IO_ERROR gzochid_io_error_quark ()
-
-GQuark gzochid_io_error_quark (void);
-
-typedef enum
-  {
-    GZOCHID_IO_ERROR_SERIALIZATION
-  }
-  GzochidIoError;
-
-struct _gzochid_application_context;
-
-typedef struct _gzochid_io_serialization
+GQuark gzochid_io_error_quark (void)
 {
-  void (*serializer) 
-    (struct _gzochid_application_context *, void *, GString *, GError **);
-  void *(*deserializer) 
-    (struct _gzochid_application_context *, GString *, GError **);
-  void (*finalizer) (struct _gzochid_application_context *, void *);
-} gzochid_io_serialization;
-
-#endif /* GZOCHID_IO_H */
+  return g_quark_from_static_string ("gzochid-io-error-quark");
+}

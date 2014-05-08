@@ -192,26 +192,30 @@ static void initialize_complete
     (game_context->pool, initialize_async, user_data, NULL);
 }
 
-gzochid_application_task *gzochid_deserialize_application_task 
+gzochid_application_task *
+gzochid_deserialize_application_task 
 (gzochid_application_context *context, 
  gzochid_application_task_serialization *serialization, GString *in)
 {
   gzochid_auth_identity *identity = 
-    gzochid_auth_identity_deserializer (context, in);
+    gzochid_auth_identity_deserializer (context, in, NULL);
   gzochid_application_worker worker = 
     serialization->worker_serialization->deserializer (context, in);
-  gpointer data = serialization->data_serialization->deserializer (context, in);
+  gpointer data = serialization->data_serialization->deserializer 
+    (context, in, NULL);
   return gzochid_application_task_new (context, identity, worker, data);
 }
 
-void gzochid_serialize_application_task
+void 
+gzochid_serialize_application_task 
 (gzochid_application_context *context,
  gzochid_application_task_serialization *serialization, 
  gzochid_application_task *task, GString *out)
 {
-  gzochid_auth_identity_serializer (context, task->identity, out);
+  gzochid_auth_identity_serializer (context, task->identity, out, NULL);
   serialization->worker_serialization->serializer (context, task->worker, out);
-  serialization->data_serialization->serializer (context, task->data, out);
+  serialization->data_serialization->serializer 
+    (context, task->data, out, NULL);
 }
 
 static gzochid_event_transaction_context *create_transaction_context 
@@ -547,8 +551,10 @@ static void stop (int from_state, int to_state, gpointer user_data)
     gzochid_storage_close (context->names);  
 }
 
-static void serialize_callback 
-(gzochid_application_context *context, gpointer data, GString *out)
+static void 
+serialize_callback 
+(gzochid_application_context *context, gpointer data, GString *out, 
+ GError **err)
 {
   gzochid_application_callback *callback = 
     (gzochid_application_callback *) data;
@@ -560,8 +566,9 @@ static void serialize_callback
   gzochid_util_serialize_mpz (callback->scm_oid, out);
 }
 
-static gpointer deserialize_callback
-(gzochid_application_context *context, GString *in)
+static gpointer 
+deserialize_callback 
+(gzochid_application_context *context, GString *in, GError **err)
 {
   gzochid_application_callback *callback = 
     malloc (sizeof (gzochid_application_callback));
