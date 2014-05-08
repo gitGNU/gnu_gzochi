@@ -41,6 +41,13 @@ location_aware_scheme_deserializer
   GError *local_err = NULL;
   SCM obj = (SCM) gzochid_scheme_data_serialization.deserializer 
     (context, in, &local_err);
+
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return obj;
+    }
+  else return gzochid_scm_location_get (context, obj);
 }
 
 static void free_bits (gpointer ptr)

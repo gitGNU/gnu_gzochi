@@ -613,6 +613,8 @@ scheme_managed_record_serializer
       gzochid_transaction_mark_for_rollback 
 	(&scheme_participant, 
 	 is_transaction_retry (scm_variable_ref (exception_var)));
+      g_set_error (err, GZOCHID_IO_ERROR, GZOCHID_IO_ERROR_SERIALIZATION,
+		   "Failed to serialize managed record.");
       g_list_free (gpd);
       return;
     }
@@ -664,6 +666,9 @@ scheme_managed_record_deserializer
 	gzochid_transaction_mark_for_rollback 
 	  (&scheme_participant, 
 	   is_transaction_retry (scm_variable_ref (exception_var)));
+
+      g_set_error (err, GZOCHID_IO_ERROR, GZOCHID_IO_ERROR_SERIALIZATION,
+		   "Failed to deserialize managed record.");
     }
   else scm_gc_protect_object (record);
 
