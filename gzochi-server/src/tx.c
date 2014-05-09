@@ -365,7 +365,7 @@ static gzochid_transaction_result transaction_execute
       
       if (success)
 	gzochid_debug ("Transaction completed in %dms", ms);
-      else gzochid_warning ("Transaction timed out after %dms", ms);
+      else gzochid_warning ("Transaction failed after %dms", ms);
     }
 
   g_private_set (&thread_transaction_key, NULL);
