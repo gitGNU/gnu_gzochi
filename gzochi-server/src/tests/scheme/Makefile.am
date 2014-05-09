@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2013 Julian Graham
+# Copyright (C) 2014 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,8 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-test_programs = gzochi/test-data.scm
+test_programs = gzochi/test-data.scm \
+	gzochi/private/test-app.scm
 
 TEST_EXTENSIONS = .scm
 SCM_LOG_COMPILER = $(GUILE)

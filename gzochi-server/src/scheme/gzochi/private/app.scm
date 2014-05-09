@@ -1,5 +1,5 @@
 ;; gzochi/private/app.scm: Private infrastructure for application support
-;; Copyright (C) 2013 Julian Graham
+;; Copyright (C) 2014 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -80,7 +80,7 @@
 		       (gzochi:callback-procedure callback)
 		       (gzochi:callback-module callback)))
 	   (handler (procedure client-session)))
-      (cond ((not handler) #t)
+      (cond ((not handler) #f)
 	    ((gzochi:client-session-listener? handler) handler)
 	    (raise (condition
 		    (make-assertion-violation)
