@@ -1,4 +1,4 @@
-/* config.h: Prototypes and declarations for config.c
+/* descriptor.h: Prototypes and declarations for descriptor.c
  * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -15,15 +15,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef GZOCHID_CONFIG_H
-#define GZOCHID_CONFIG_H
+#ifndef GZOCHID_DESCRIPTOR_H
+#define GZOCHID_DESCRIPTOR_H
 
-#include <glib.h>
+#include "app.h"
 
-gboolean gzochid_config_to_boolean (char *, gboolean);
-int gzochid_config_to_int (char *, int);
-long gzochid_config_to_long (char *, long);
+gzochid_application_descriptor *gzochid_config_parse_application_descriptor 
+(char *);
 
-GHashTable *gzochid_config_keyfile_extract_config (GKeyFile *, char *);
-
-#endif /* GZOCHID_CONFIG_H */
+#endif /* GZOCHID_DESCRIPTOR_H */

@@ -29,6 +29,7 @@
 #include "auth_int.h"
 #include "config.h"
 #include "context.h"
+#include "descriptor.h"
 #include "fsm.h"
 #include "game.h"
 #include "log.h"
