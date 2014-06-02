@@ -1,5 +1,5 @@
 ;; gzochi/private/data.scm: Private infrastructure for gzochi data API
-;; Copyright (C) 2013 Julian Graham
+;; Copyright (C) 2014 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -24,7 +24,10 @@
 	  gzochi:managed-record-constructor
 	  gzochi:managed-record-predicate
 
-          gzochi:define-managed-record-type
+	  gzochi:make-managed-record-type-registry
+	  gzochi:managed-record-type-registry?
+
+	  gzochi:define-managed-record-type
 	  gzochi:managed-record-type-descriptor
 	  gzochi:managed-record-constructor-descriptor
 
@@ -144,7 +147,7 @@
 		 name managed-parent uid sealed? opaque? 
 		 (list->vector field-names))))
       
-      (gzochi:register-record-type! uid rtd)
+      (gzochi:register-record-type! default-type-registry uid rtd)
       (gzochi:register-serialization! 
        uid (list->vector field-serializations))
 
@@ -196,14 +199,14 @@
 		  (apply field-binder
 			 (map maybe-create-reference p-args))))))))))
 
-  (define managed-record-type-registry (make-eq-hashtable))
+  (define managed-record-name-registry (make-eq-hashtable))
 
-  (define (register-managed-record-type name rtd rcd)
-    (hashtable-set! managed-record-type-registry name (cons rtd rcd)))
+  (define (register-managed-record-name name rtd rcd)
+    (hashtable-set! managed-record-name-registry name (cons rtd rcd)))
   (define (lookup-managed-record-type-descriptor name)
-    (and=> (hashtable-ref managed-record-type-registry name #f) car))
+    (and=> (hashtable-ref managed-record-name-registry name #f) car))
   (define (lookup-managed-record-constructor-descriptor name)
-    (and=> (hashtable-ref managed-record-type-registry name #f) cdr))
+    (and=> (hashtable-ref managed-record-name-registry name #f) cdr))
 
   (define (guess-constructor-name record-name)
     (string->symbol (string-append "make-" (symbol->string record-name))))
@@ -390,7 +393,7 @@
 		       (list->vector #,field-names)))
 		    
 		    (let ()
-		      (register-managed-record-type 
+		      (register-managed-record-name 
 		       (quote record-name)
 		       record-name 
 		       (gzochi:make-managed-record-constructor-descriptor 
@@ -511,7 +514,7 @@
 			       (apply p (deserialize rtd))))))))
     
     (let* ((uid (gzochi:read-symbol port))
-	   (rtd (gzochi:uid->record-type uid)))
+	   (rtd (gzochi:uid->record-type default-type-registry uid)))
       (or rtd (raise (condition 
 		      (make-assertion-violation)
 		      (make-message-condition 
@@ -523,12 +526,20 @@
 	     (ctor (record-constructor rctd)))
 	(ctor))))
   
-  (define record-type-registry (make-eq-hashtable))
+  (define-record-type (gzochi:managed-record-type-registry 
+		       gzochi:make-managed-record-type-registry 
+		       gzochi:managed-record-type-registry?)
+    (fields table)
+    (protocol (lambda (p) (lambda () (p (make-eq-hashtable)))))
+    (sealed #t))
 
-  (define (gzochi:register-record-type! uid rtd)
-    (hashtable-set! record-type-registry uid rtd))
-  (define (gzochi:uid->record-type uid)
-    (hashtable-ref record-type-registry uid #f))
+  (define default-type-registry (gzochi:make-managed-record-type-registry))
+
+  (define (gzochi:register-record-type! registry uid rtd)
+    (hashtable-set! 
+     (gzochi:managed-record-type-registry-table registry) uid rtd))
+  (define (gzochi:uid->record-type registry uid)
+    (hashtable-ref (gzochi:managed-record-type-registry-table registry) uid #f))
 
   (define serializer-registry (make-eq-hashtable))
 
