@@ -63,6 +63,7 @@
 
   (import (gzochi io)
 	  (only (guile) and=> gensym macroexpand) 
+	  (ice-9 optargs)
 	  (rnrs)
 	  (only (srfi :1) last split-at take)
 	  (srfi :8))
@@ -124,15 +125,9 @@
      gzochi:serialize-managed-reference 
      gzochi:deserialize-managed-reference))
   
-  (define (gzochi:make-managed-record-type-descriptor 
-	   name parent uid sealed? opaque? fields)
+  (define* (gzochi:make-managed-record-type-descriptor 
+	    name parent uid sealed? opaque? fields #:key serial-uid)
     
-    (or uid 
-	(raise 
-	 (condition
-	  (make-assertion-violation)
-	  (make-message-condition "Managed records must be nongenerative"))))
-
     (let* ((fields (vector->list fields))
 	   (field-names (map (lambda (f) (take f 2)) fields))
 	   (field-serializations (map last fields))
@@ -143,15 +138,28 @@
 				(make-assertion-violation)
 				(make-message-condition
 				 "Parent types must be managed"))))))
+
+	   (serial-uid (or serial-uid uid name))
+  
 	   (rtd (make-record-type-descriptor
 		 name managed-parent uid sealed? opaque? 
 		 (list->vector field-names))))
-      
-      (gzochi:register-record-type! default-type-registry uid rtd)
-      (gzochi:register-serialization! 
-       uid (list->vector field-serializations))
 
-      rtd))
+      (let ((reg (gzochi:serial-uid->type-registration 
+		  default-type-registry serial-uid)))
+	(if reg
+	    (or (eq? (gzochi:managed-record-type-registration-rtd reg) rtd)
+		(raise (condition
+			(make-assertion-violation)
+			(make-message-condition 
+			 "Managed records must be nongenerative"))))
+
+	    (gzochi:register-type! 
+	     default-type-registry serial-uid 
+	     (gzochi:make-managed-record-type-registration 
+	      rtd (list->vector field-serializations))))
+	
+	rtd)))
 
   (define (gzochi:make-managed-record-constructor-descriptor 
 	   rtd parent-constructor-descriptor protocol)
@@ -333,13 +341,14 @@
                     (_sealed *unspecified*)
                     (_opaque *unspecified*)
                     (_nongenerative *unspecified*)
+		    (_serial-uid *unspecified*)
                     (_constructor *unspecified*)
                     (_parent-rtd *unspecified*)
                     (record-clauses #'(record-clause ...)))
 
            (syntax-case record-clauses
                (fields parent protocol sealed opaque nongenerative
-                       constructor parent-rtd serialization)
+                       serial-uid constructor parent-rtd serialization)
              [()
               (let* ((fields (if (unspecified? _fields) '() _fields))
                      (processed-fields (process-fields #'record-name fields))
@@ -378,10 +387,10 @@
 			    ((not (unspecified? _parent-rtd))
 			     (car _parent-rtd))
 			    (else #f)))
+
                      (protocol (if (unspecified? _protocol) #f _protocol))
-                     (uid (if (unspecified? _nongenerative) 
-			      #''record-name 
-			      _nongenerative))
+                     (uid (if (unspecified? _nongenerative) #f _nongenerative))
+		     (serial-uid (if (unspecified? _serial-uid) #f _serial-uid))
                      (sealed? (if (unspecified? _sealed) #f _sealed))
                      (opaque? (if (unspecified? _opaque) #f _opaque)))
 
@@ -390,7 +399,8 @@
                       (gzochi:make-managed-record-type-descriptor
                        (quote record-name)
                        #,parent-rtd #,uid #,sealed? #,opaque? 
-		       (list->vector #,field-names)))
+		       (list->vector #,field-names)
+		       #:serial-uid #,serial-uid))
 		    
 		    (let ()
 		      (register-managed-record-name 
@@ -409,46 +419,58 @@
              [((fields record-fields ...) . rest)
               (if (unspecified? _fields)
                   (loop #'(record-fields ...) _parent _protocol _sealed _opaque
-			_nongenerative _constructor _parent-rtd #'rest)
+			_nongenerative _serial-uid _constructor _parent-rtd 
+			#'rest)
                   (raise (make-assertion-violation)))]
              [((parent parent-name) . rest)
               (if (not (unspecified? _parent-rtd))
                   (raise (make-assertion-violation))
                   (if (unspecified? _parent)
                       (loop _fields #'parent-name _protocol _sealed _opaque
-                            _nongenerative _constructor _parent-rtd #'rest)
+                            _nongenerative _serial-uid _constructor _parent-rtd
+			    #'rest)
                       (raise (make-assertion-violation))))]
              [((protocol expression) . rest)
               (if (unspecified? _protocol)
                   (loop _fields _parent #'expression _sealed _opaque
-                        _nongenerative _constructor _parent-rtd #'rest)
+                        _nongenerative _serial-uid _constructor _parent-rtd 
+			#'rest)
                   (raise (make-assertion-violation)))]
              [((sealed sealed?) . rest)
               (if (unspecified? _sealed)
                   (loop _fields _parent _protocol #'sealed? _opaque
-                        _nongenerative _constructor _parent-rtd #'rest)
+                        _nongenerative _serial-uid _constructor _parent-rtd 
+			#'rest)
                   (raise (make-assertion-violation)))]
              [((opaque opaque?) . rest)
               (if (unspecified? _opaque)
                   (loop _fields _parent _protocol _sealed #'opaque?
-                        _nongenerative _constructor _parent-rtd #'rest)
+                        _nongenerative _serial-uid _constructor _parent-rtd 
+			#'rest)
                   (raise (make-assertion-violation)))]
              [((nongenerative) . rest)
               (if (unspecified? _nongenerative)
                   (loop _fields _parent _protocol _sealed _opaque 
-			#''record-name _constructor _parent-rtd #'rest)
+			#''record-name _serial-uid _constructor _parent-rtd 
+			#'rest)
                   (raise (make-assertion-violation)))]
              [((nongenerative uid) . rest)
               (if (unspecified? _nongenerative)
                   (loop _fields _parent _protocol _sealed _opaque #''uid 
-			_constructor _parent-rtd #'rest)
+			_serial-uid _constructor _parent-rtd #'rest)
                   (raise (make-assertion-violation)))]
+	     [((serial-uid uid) . rest)
+	      (if (unspecified? _serial-uid)
+		  (loop _fields _parent _protocol _sealed _opaque _nongenerative
+			#''uid _constructor _parent-rtd #'rest)
+		  (raise (make-assertion-violation)))]
              [((parent-rtd rtd cd) . rest)
               (if (not (unspecified? _parent))
                   (raise (make-assertion-violation))
                   (if (unspecified? _parent-rtd)
                       (loop _fields _parent _protocol _sealed _opaque
-                            _nongenerative _constructor #'(rtd cd) #'rest)
+                            _nongenerative _serial-uid _constructor #'(rtd cd) 
+			    #'rest)
                       (raise (make-assertion-violation))))]))))))
 
   (define-syntax gzochi:managed-record-type-descriptor
@@ -471,7 +493,7 @@
 	(if (and parent-rtd (not (eq? parent-rtd gzochi:managed-record)))
 	    (serialize parent-rtd))
 	(let ((serialization 
-	       (gzochi:uid->serialization (record-type-uid rtd)))
+	       (gzochi:rtd->type-registration default-type-registry rtd))
 	      (num-fields (vector-length (record-type-field-names rtd))))
 	  (let loop ((i 0))
 	    (and (< i num-fields)
@@ -488,11 +510,8 @@
       (serialize rtd)))
 
   (define (gzochi:deserialize-managed-record port)
-    (define (deserialize rtd)
-      (let ((serialization 
-	     (gzochi:uid->serialization (record-type-uid rtd)))
-	    (num-fields (vector-length (record-type-field-names rtd))))
-
+    (define (deserialize rtd serialization)
+      (let ((num-fields (vector-length (record-type-field-names rtd))))
 	(let loop ((i 0) (vals '()))
 	  (if (< i num-fields)
 	      (let ((deserializer (or (and=> (vector-ref serialization i)
@@ -501,7 +520,7 @@
 		(loop (+ i 1) (cons (deserializer port) vals)))
 	      (reverse vals)))))
 	
-    (define (constructor-descriptor rtd)
+    (define (constructor-descriptor rtd serialization)
       (let* ((parent-rtd (record-type-parent rtd))
 	     (parent-rctd 
 	      (and parent-rtd 
@@ -511,47 +530,66 @@
 	 rtd parent-rctd (lambda (n)
 			   (lambda ()
 			     (let ((p (n)))
-			       (apply p (deserialize rtd))))))))
+			       (apply p (deserialize rtd serialization))))))))
     
     (let* ((uid (gzochi:read-symbol port))
-	   (rtd (gzochi:uid->record-type default-type-registry uid)))
-      (or rtd (raise (condition 
-		      (make-assertion-violation)
-		      (make-message-condition 
-		       (string-append 
-			"Attempting to deserialize unknown type " 
-			(symbol->string uid))))))
+	   (registration (gzochi:serial-uid->type-registration 
+			  default-type-registry serial-uid)))
+      (or registration 
+	  (raise (condition 
+		  (make-assertion-violation)
+		  (make-message-condition 
+		   (string-append 
+		    "Attempting to deserialize unknown type " 
+		    (symbol->string uid))))))
 
-      (let* ((rctd (constructor-descriptor rtd))
-	     (ctor (record-constructor rctd)))
+      (let* 
+	  ((rctd 
+	    (constructor-descriptor 
+	     (gzochi:managed-record-type-registration-rtd registration)
+	     (gzochi:managed-record-type-registration-field-serialization
+	      registration)))
+	   (ctor (record-constructor rctd)))
+
 	(ctor))))
   
+  (define-record-type (gzochi:managed-record-type-registration
+		       gzochi:make-managed-record-type-registration
+		       gzochi:managed-record-type-registration?)
+    (fields rtd field-serializations))
+
   (define-record-type (gzochi:managed-record-type-registry 
 		       gzochi:make-managed-record-type-registry 
 		       gzochi:managed-record-type-registry?)
-    (fields table)
-    (protocol (lambda (p) (lambda () (p (make-eq-hashtable)))))
+
+    (fields rtds serial-uids)
+
+    (protocol (lambda (p) 
+		(lambda () 
+		  (p (make-eq-hashtable) 
+		     (make-eq-hashtable)))))
     (sealed #t))
 
   (define default-type-registry (gzochi:make-managed-record-type-registry))
 
-  (define (gzochi:register-record-type! registry uid rtd)
+  (define (gzochi:register-type! registry serial-uid reg)
     (hashtable-set! 
-     (gzochi:managed-record-type-registry-table registry) uid rtd))
-  (define (gzochi:uid->record-type registry uid)
-    (hashtable-ref (gzochi:managed-record-type-registry-table registry) uid #f))
+     (gzochi:managed-record-type-registry-rtds registry)
+     (gzochi:managed-record-type-registration-rtd reg) reg)
+    (hashtable-set!
+     (gzochi:managed-record-type-registry-serial-uids registry) serial-uid reg))
 
-  (define serializer-registry (make-eq-hashtable))
+  (define (gzochi:rtd->type-registration registry rtd) 
+    (hashtable-ref (gzochi:managed-record-type-registry-rtds registry) rtd #f))
 
-  (define (gzochi:register-serialization! uid serialization)
-    (hashtable-set! serializer-registry uid serialization))
-  (define (gzochi:uid->serialization uid) 
-    (hashtable-ref serializer-registry uid #f))
+  (define (gzochi:serial-uid->type-registration registry serial-uid) 
+    (hashtable-ref 
+     (gzochi:managed-record-type-registry-serial-uids registry) serial-uid #f))
 
   (define (gzochi:mark-for-write! managed-record)
     (or (gzochi:managed-record? managed-record)
 	(raise (condition (make-assertion-violation)
-			  (make-message-condition 
+			  (make-message-condition
 			   "Only managed records may be marked."))))
     (primitive-mark-for-write! managed-record))
     

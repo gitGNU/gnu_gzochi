@@ -19,11 +19,12 @@
 #
 
 test_programs = gzochi/test-data.scm \
-	gzochi/private/test-app.scm
+	gzochi/private/test-app.scm \
+	gzochi/private/test-data.scm
 
 TEST_EXTENSIONS = .scm
 SCM_LOG_COMPILER = $(GUILE)
 AM_SCM_LOG_FLAGS = -L . -L ../../scheme
 TESTS = $(test_programs)
 
-EXTRA_DIST = $(TESTS) gzochi/mock-data.scm
+EXTRA_DIST = $(TESTS) gzochi/mock-data.scm gzochi/srfi-64-support.scm
