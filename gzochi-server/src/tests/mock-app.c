@@ -34,10 +34,12 @@ gzochid_application_context *gzochid_application_context_new ()
   g_mutex_init (&context->client_mapping_lock);
 
   context->storage_context = gzochid_storage_initialize ("/dev/null?");
-  context->meta = gzochid_storage_open (context->storage_context, "/dev/null");
-  context->oids = gzochid_storage_open (context->storage_context, "/dev/null");
+  context->meta = gzochid_storage_open 
+    (context->storage_context, "/dev/null", 0);
+  context->oids = gzochid_storage_open 
+    (context->storage_context, "/dev/null", 0);
   context->names = gzochid_storage_open 
-    (context->storage_context, "/dev/null");
+    (context->storage_context, "/dev/null", 0);
 
   context->event_source = gzochid_application_event_source_new ();
 

@@ -26,6 +26,9 @@
 #define GZOCHID_STORAGE_ENOTFOUND -2
 #define GZOCHID_STORAGE_ETXFAILURE -3
 
+#define GZOCHID_STORAGE_CREATE 0x01
+#define GZOCHID_STORAGE_EXCL 0x02
+
 typedef struct _gzochid_storage_context
 {
   gpointer environment;
@@ -62,7 +65,7 @@ void
 gzochid_storage_context_destroy (char *);
 
 gzochid_storage_store *gzochid_storage_open 
-(gzochid_storage_context *, char *);
+(gzochid_storage_context *, char *, unsigned int);
 void gzochid_storage_close (gzochid_storage_store *);
 
 /**

@@ -142,9 +142,12 @@ static void initialize_data (int from_state, int to_state, gpointer user_data)
     }
 
   app_context->storage_context = storage_context;
-  app_context->meta = gzochid_storage_open (storage_context, meta_db);
-  app_context->oids = gzochid_storage_open (storage_context, oids_db);
-  app_context->names = gzochid_storage_open (storage_context, names_db);
+   app_context->meta = gzochid_storage_open 
+     (storage_context, meta_db, GZOCHID_STORAGE_CREATE);
+   app_context->oids = gzochid_storage_open 
+     (storage_context, oids_db, GZOCHID_STORAGE_CREATE);
+   app_context->names = gzochid_storage_open 
+     (storage_context, names_db, GZOCHID_STORAGE_CREATE);
 
   free (data_dir);
   free (meta_db);

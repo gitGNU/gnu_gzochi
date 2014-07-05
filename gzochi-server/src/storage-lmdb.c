@@ -109,24 +109,43 @@ gzochid_storage_context_destroy (char *path)
 }
 
 gzochid_storage_store *gzochid_storage_open 
-(gzochid_storage_context *context, char *path)
+(gzochid_storage_context *context, char *path, unsigned int flags)
 {
   MDB_txn *dbopen_tx = NULL;
   MDB_dbi *db = malloc (sizeof (MDB_dbi));
   MDB_env *db_env = (MDB_env *) context->environment;
 
-  gzochid_storage_store *store = calloc (1, sizeof (gzochid_storage_store));
+  gzochid_storage_store *store = NULL;
   int ret = 0;
 
+  if (flags & GZOCHID_STORAGE_EXCL)
+    {
+      assert (mdb_txn_begin (db_env, NULL, 0, &dbopen_tx) == 0);
+      ret = mdb_dbi_open (dbopen_tx, path, 0, db);
+      mdb_txn_abort (dbopen_tx);
+
+      if (ret != MDB_NOTFOUND)
+	{
+	  free (db);
+
+	  gzochid_err 
+	    ("Unable to open LMDB database in %s: Database exists.", path);
+	  return NULL;
+	}
+    }
+
   assert (mdb_txn_begin (db_env, NULL, 0, &dbopen_tx) == 0);
-  ret = mdb_dbi_open (dbopen_tx, path, MDB_CREATE, db);
+  ret = mdb_dbi_open 
+    (dbopen_tx, path, flags & GZOCHID_STORAGE_CREATE ? MDB_CREATE : 0, db);
   if (ret != 0)
     {
       gzochid_err
 	("Unable to open LMDB database in %s: %s", path, mdb_strerror (ret));
       mdb_txn_abort (dbopen_tx);
+      free (db);
       return NULL;
     }
+  else store = calloc (1, sizeof (gzochid_storage_store));
   assert (mdb_txn_commit (dbopen_tx) == 0);
 
   store->database = db;

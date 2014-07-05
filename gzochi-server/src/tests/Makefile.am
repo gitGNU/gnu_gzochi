@@ -20,8 +20,6 @@
 
 SUBDIRS = auth scheme
 
-check_PROGRAMS = $(test_programs)
-
 test_programs = \
 	test-data \
 	test-event \
@@ -29,6 +27,17 @@ test_programs = \
 	test-task \
 	test-util
 
+if STORAGE_ENGINE_BDB
+test_programs += test-storage-bdb
+endif
+if STORAGE_ENGINE_HDB
+test_programs += test-storage-hdb
+endif
+if STORAGE_ENGINE_LMDB
+test_programs += test-storage-lmdb
+endif
+
+check_PROGRAMS = $(test_programs)
 TESTS = $(test_programs)
 
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
@@ -50,6 +59,19 @@ test_reloc_SOURCES = test-reloc.c mock-app.c mock-storage.c
 test_reloc_LDADD = ../gzochid-event.o ../gzochid-io.o ../gzochid-reloc.o \
 	../gzochid-log.o ../gzochid-tx.o ../gzochid-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GUILE_LIBS@
+
+test_storage_bdb_CFLAGS = @GLIB_CFLAGS@
+test_storage_bdb_SOURCES = test-storage-bdb.c
+test_storage_bdb_LDADD =  ../gzochid-log.o ../gzochid-storage-bdb.o @GLIB_LIBS@
+
+test_storage_hdb_CFLAGS = @GLIB_CFLAGS@
+test_storage_hdb_SOURCES = test-storage-hdb.c
+test_storage_hdb_LDADD =  ../gzochid-log.o ../gzochid-storage-hdb.o @GLIB_LIBS@
+
+test_storage_lmdb_CFLAGS = @GLIB_CFLAGS@ -pthread
+test_storage_lmdb_SOURCES = test-storage-lmdb.c
+test_storage_lmdb_LDADD =  ../gzochid-log.o ../gzochid-storage-lmdb.o \
+	@GLIB_LIBS@
 
 test_task_CFLAGS = @GLIB_CFLAGS@ @GMODULE_CFLAGS@
 test_task_SOURCES = test-task.c mock-app.c mock-guile.c mock-storage.c 

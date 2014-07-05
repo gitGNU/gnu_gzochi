@@ -119,7 +119,7 @@ gzochid_storage_context_destroy (char *path)
 }
 
 gzochid_storage_store *gzochid_storage_open 
-(gzochid_storage_context *context, char *path)
+(gzochid_storage_context *context, char *path, unsigned int flags)
 {
   DB *db = NULL;
   DB_TXN *dbopen_tx = NULL;
@@ -136,14 +136,20 @@ gzochid_storage_store *gzochid_storage_open
   filename = strncat (filename, ".db", 3);
   
   assert (db_create (&db, db_env, 0) == 0);
-  db_flags = DB_CREATE
-    | DB_MULTIVERSION
+  db_flags = DB_MULTIVERSION
     | DB_THREAD;
+
+  if (flags & GZOCHID_STORAGE_CREATE)
+    db_flags |= DB_CREATE;
+  if (flags & GZOCHID_STORAGE_EXCL)
+    db_flags |= DB_EXCL;
 
   db_env->txn_begin (db_env, NULL, &dbopen_tx, 0);
   ret = db->open (db, dbopen_tx, filename, NULL, DB_BTREE, db_flags, 0);
   if (ret != 0)
     {
+      db->close (db, 0);
+
       gzochid_err
 	("Unable to open BDB database in %s: %s", filename, db_strerror (ret));
       dbopen_tx->abort (dbopen_tx);

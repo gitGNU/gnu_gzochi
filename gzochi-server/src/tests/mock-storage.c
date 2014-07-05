@@ -55,8 +55,9 @@ gzochid_storage_context *gzochid_storage_initialize (char *path)
   return NULL;
 }
 
-gzochid_storage_store *gzochid_storage_open 
-(gzochid_storage_context *context, char *path)
+gzochid_storage_store *
+gzochid_storage_open 
+(gzochid_storage_context *context, char *path, unsigned int flags)
 {
   gzochid_storage_store *store = calloc (1, sizeof (gzochid_storage_store));
 

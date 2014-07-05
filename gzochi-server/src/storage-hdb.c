@@ -32,7 +32,7 @@
 #define GZOCHID_STORAGE_HDB_NAMES 2
 #define GZOCHID_STORAGE_HDB_OIDS 3
 
-#define HDB_FILENAME "/gzochid.hdb"
+#define HDB_FILENAME "gzochid.hdb"
 
 static gzochid_storage_context *report_env_error 
 (ham_status_t code, GString *str)
@@ -51,7 +51,8 @@ gzochid_storage_context *gzochid_storage_initialize (char *path)
   GString *path_str = g_string_new (path);
   gzochid_storage_context *context = 
     calloc (1, sizeof (gzochid_storage_context));
-
+  
+  g_string_append (path_str, "/");
   g_string_append (path_str, HDB_FILENAME);
   
   if (g_file_test (path_str->str, G_FILE_TEST_EXISTS))
@@ -138,7 +139,7 @@ static ham_u16_t path_to_name (char *path)
 }
 
 gzochid_storage_store *gzochid_storage_open 
-(gzochid_storage_context *context, char *path)
+(gzochid_storage_context *context, char *path, unsigned int flags)
 {
   ham_db_t *db = NULL;
   ham_env_t *db_env = (ham_env_t *) context->environment;
@@ -152,10 +153,17 @@ gzochid_storage_store *gzochid_storage_open
       return NULL;
     }
 
-  store = calloc (1, sizeof (gzochid_storage_store));
-
   ret = ham_env_open_db (db_env, &db, db_name, 0, NULL);
-  if (ret == HAM_DATABASE_NOT_FOUND)
+  if (ret == HAM_SUCCESS)
+    {
+      if (flags & GZOCHID_STORAGE_CREATE && flags & GZOCHID_STORAGE_EXCL)
+	{
+	  gzochid_err ("Unable to create HDB database %s: File exists.", path);
+	  ham_db_close (db, 0);
+	  return NULL;
+	}
+    }
+  else if (ret == HAM_DATABASE_NOT_FOUND && flags & GZOCHID_STORAGE_CREATE)
     {
       ret = ham_env_create_db (db_env, &db, db_name, 0, NULL);
       if (ret != HAM_SUCCESS)
@@ -172,6 +180,8 @@ gzochid_storage_store *gzochid_storage_open
       return NULL;
     }
     
+  store = calloc (1, sizeof (gzochid_storage_store));
+
   store->database = db;
   store->context = context;
   g_mutex_init (&store->mutex);
