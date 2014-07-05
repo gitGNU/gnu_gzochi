@@ -25,6 +25,17 @@ SUBDIRS = api auth scheme tests
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
+if STORAGE_ENGINE_BDB
+GZOCHID_STORAGE_SOURCES = storage-bdb.c
+endif
+if STORAGE_ENGINE_HDB
+GZOCHID_STORAGE_SOURCES = storage-hdb.c
+endif
+if STORAGE_ENGINE_LMDB
+GZOCHID_STORAGE_CFLAGS = -lpthread
+GZOCHID_STORAGE_SOURCES = storage-lmdb.c
+endif
+
 bin_PROGRAMS = gzochid
 dist_noinst_DATA = dtd/game.dtd
 dist_sysconf_DATA = conf/gzochid.conf
@@ -38,26 +49,18 @@ gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 	-DGZOCHID_AUTH_PLUGIN_LOCATION=\"$(plugindir)\" @GUILE_CFLAGS@ \
 	@GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ @MICROHTTPD_CFLAGS@ \
 	@ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
+	$(GZOCHID_STORAGE_CFLAGS) \
 	-Wall -Werror
 
 gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
 	debug.c descriptor.c event.c fsm.c game.c guile.c gzochid.c httpd.c \
 	io.c log.c protocol.c reloc.c schedule.c scheme.c session.c socket.c \
-	stats.c task.c threads.c tx.c txlog.c util.c
+	stats.c task.c threads.c tx.c txlog.c util.c $(GZOCHID_STORAGE_SOURCES)
 
 gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
 	@GLIB_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ @MICROHTTPD_LIBS@ \
 	@ZLIB_LIBS@ @SERVEEZ_LDFLAGS@
 
-if STORAGE_ENGINE_BDB
-gzochid_SOURCES += storage-bdb.c
-endif
-if STORAGE_ENGINE_HDB
-gzochid_SOURCES += storage-hdb.c
-endif
-if STORAGE_ENGINE_LMDB
-gzochid_SOURCES += storage-lmdb.c
-endif
 
 admin.c: admin.h
 app.c: app.h
