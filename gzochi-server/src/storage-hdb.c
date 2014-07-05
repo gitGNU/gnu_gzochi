@@ -91,6 +91,35 @@ gzochid_storage_context *gzochid_storage_initialize (char *path)
   return context;
 }
 
+void 
+gzochid_storage_context_close (gzochid_storage_context *context)
+{
+  ham_env_t *db_env = (ham_env_t *) context->environment;
+
+  ham_env_close (db_env, 0);
+
+  free (context);
+}
+
+void
+gzochid_storage_context_destroy (char *path)
+{
+  GDir *dir = NULL;
+  const gchar *entry = NULL;
+
+  dir = g_dir_open (path, 0, NULL);
+  while ((entry = g_dir_read_name (dir)) != NULL)
+    if (strncmp (entry, HDB_FILENAME, 11) == 0)
+      {
+	gchar *filename = g_strconcat (path, "/", entry, NULL);
+	assert (g_remove (filename) == 0);
+	g_free (filename);
+      }
+
+  g_dir_close (dir);
+  assert (g_rmdir (path) == 0);
+}
+
 static gboolean ends_with (char *str, char *suffix)
 {
   char *start = strrchr (str, suffix[0]);
@@ -157,6 +186,15 @@ void gzochid_storage_close (gzochid_storage_store *store)
   g_mutex_clear (&store->mutex);
   ham_db_close (db, 0);
   free (store);
+}
+
+void
+gzochid_storage_destroy (gzochid_storage_context *context, char *path)
+{
+  ham_env_t *db_env = (ham_env_t *) context->environment;
+  u_int16_t db_name = path_to_name (path);
+
+  assert (ham_env_erase_db (db_env, db_name, 0) == HAM_SUCCESS);
 }
 
 void gzochid_storage_lock (gzochid_storage_store *store)

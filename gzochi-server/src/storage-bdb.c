@@ -85,6 +85,39 @@ gzochid_storage_context *gzochid_storage_initialize (char *path)
   return context;
 }
 
+void 
+gzochid_storage_context_close (gzochid_storage_context *context)
+{
+  DB_ENV *env = (DB_ENV *) context->environment;
+
+  env->close (env, DB_FORCESYNC);
+
+  free (context);
+}
+
+void
+gzochid_storage_context_destroy (char *path)
+{
+  GDir *dir = NULL;
+  const gchar *entry = NULL;
+  DB_ENV *env = NULL;
+
+  assert (db_env_create (&env, 0) == 0);
+  assert (env->remove (env, path, DB_FORCE) == 0);
+
+  dir = g_dir_open (path, 0, NULL);
+  while ((entry = g_dir_read_name (dir)) != NULL)
+    if (strncmp (entry, "log.", 4) == 0)
+      {
+	gchar *filename = g_strconcat (path, "/", entry, NULL);
+	assert (g_remove (filename) == 0);
+	g_free (filename);
+      }
+
+  g_dir_close (dir);
+  assert (g_rmdir (path) == 0);
+}
+
 gzochid_storage_store *gzochid_storage_open 
 (gzochid_storage_context *context, char *path)
 {
@@ -134,6 +167,16 @@ void gzochid_storage_close (gzochid_storage_store *store)
   g_mutex_clear (&store->mutex);
   db->close (db, 0);
   free (store);
+}
+
+void
+gzochid_storage_destroy (gzochid_storage_context *context, char *path)
+{
+  DB_ENV *env = (DB_ENV *) context->environment;  
+  gchar *filename = g_strconcat (path, ".db", NULL);
+
+  env->dbremove (env, NULL, filename, NULL, 0);
+  g_free (filename);
 }
 
 void gzochid_storage_lock (gzochid_storage_store *store)

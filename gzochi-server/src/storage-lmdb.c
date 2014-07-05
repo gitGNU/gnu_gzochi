@@ -84,6 +84,30 @@ gzochid_storage_context *gzochid_storage_initialize (char *path)
   return context;
 }
 
+void 
+gzochid_storage_context_close (gzochid_storage_context *context)
+{
+  MDB_env *db_env = (MDB_env *) context->environment;
+
+  mdb_env_close (db_env);
+
+  free (context);
+}
+
+void
+gzochid_storage_context_destroy (char *path)
+{
+  gchar *data = g_strconcat (path, "/data.mdb", NULL);
+  gchar *lock = g_strconcat (path, "/lock.mdb", NULL);
+
+  assert (g_remove (data) == 0);
+  assert (g_remove (lock) == 0);
+  assert (g_rmdir (path) == 0);
+
+  g_free (data);
+  g_free (lock);
+}
+
 gzochid_storage_store *gzochid_storage_open 
 (gzochid_storage_context *context, char *path)
 {
@@ -119,6 +143,21 @@ void gzochid_storage_close (gzochid_storage_store *store)
   g_mutex_clear (&store->mutex);
   mdb_dbi_close ((MDB_env *) store->context->environment, *db);
   free (store);
+}
+
+void
+gzochid_storage_destroy (gzochid_storage_context *context, char *path)
+{
+  MDB_env *db_env = (MDB_env *) context->environment;
+  MDB_dbi *db = malloc (sizeof (MDB_dbi));
+  MDB_txn *txn = NULL;
+
+  assert (mdb_txn_begin (db_env, NULL, 0, &txn) == 0);
+  assert (mdb_dbi_open (txn, path, 0, db) == 0);
+  assert (mdb_drop (txn, *db, 1) == 0);
+  assert (mdb_txn_commit (txn) == 0);
+
+  free (db);
 }
 
 void gzochid_storage_lock (gzochid_storage_store *store)

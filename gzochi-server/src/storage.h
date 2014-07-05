@@ -47,9 +47,31 @@ typedef struct _gzochid_storage_transaction
 } gzochid_storage_transaction;
 
 gzochid_storage_context *gzochid_storage_initialize (char *);
+
+/**
+   Close the specified storage context.
+ */
+void 
+gzochid_storage_context_close (gzochid_storage_context *);
+
+/**
+   Destroy the storage context rooted at the specified path by removing all
+   associated files, including the path itself.
+ */
+void 
+gzochid_storage_context_destroy (char *);
+
 gzochid_storage_store *gzochid_storage_open 
 (gzochid_storage_context *, char *);
 void gzochid_storage_close (gzochid_storage_store *);
+
+/**
+   Destroy the store rooted at the specified storage context and path by 
+   removing all associated files.
+ */
+void 
+gzochid_storage_destroy (gzochid_storage_context *, char *);
+
 void gzochid_storage_lock (gzochid_storage_store *);
 void gzochid_storage_unlock (gzochid_storage_store *);
 
