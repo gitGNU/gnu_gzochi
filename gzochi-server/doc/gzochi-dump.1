@@ -1,0 +1,58 @@
+.TH GZOCHI-DUMP 1 "July 8, 2014"
+.SH NAME
+gzochi-dump \- Write gzochi databases to flat-text format
+.SH SYNOPSIS
+.B gzochi-dump
+[-o <output_dir>] <app_name or data_dir>[:<db>]
+.br
+.B gzochi-dump
+[-h | -v]
+.SH DESCRIPTION
+The gzochi-dump utility reads gzochi game application database files and 
+writes them to standard output or a file using a portable flat-text format 
+understood by the gzochi-load utility. This format is very similar to the 
+format used by the dump and load tools for Berkeley DB, though the output of 
+gzochi-dump can be read by the other gzochid tools no matter what storage 
+engine the server is built against.
+.PP
+The argument to gzochi-dump is the name of an application or the path to a
+directory containing an application's databases. If gzochi-dump detects that the
+argument is not a directory, it assumes it must be an application name, and will
+consult the server's gzochid.conf file to obtain the root of the server's
+application data directory tree, which it uses to resolve the full path to the
+application's database files. gzochi-dump may be used to dump any of the three 
+gzochi game databases (\fBmeta\fR, \fBoids\fR, or \fBnames\fR) by specifying 
+the database name as a suffix of the target. For example, the command:
+
+.IP
+gzochi-dump /var/gzochid/data/mygame:meta
+.PP
+
+...will dump the contents of the \"meta\" database to standard output. More 
+usefully, however, gzochi-dump can dump all three databases to external files in
+a single, consistent transaction, enabling online backups of all game data. For
+example, the command:
+
+.IP
+gzochi-dump /var/gzochid/data/mygame
+.PP
+
+...will create the files \fBmeta.dump\fR, \fBoids.dump\fR, and \fBnames.dump\fR
+in the current directory.
+
+.SH OPTIONS
+.IP \fB\-o,\ \-\-output\fR
+Specifies an output location for the data to be dumped. If dumping a single 
+database, the argument names the complete path to a target output file, which
+will be created or overwritten if it exists; if dumping all three game 
+databases, the argument names the output directory, which must already exist,
+into which the files \fBmeta.dump\fR, \fBoids.dump\fR, and \fBnames.dump\fR will
+be written. If this argument is omitted, single databases will be dumped to 
+standard output; the complete set of game database dump files will be writtento the current directory.
+.IP \fB\-h,\ \-\-help\fR
+Write usage information to standard error, and exit.
+.IP \fB\-v,\ \-\-version\fR
+Write version information to standard error, and exit.
+
+.SH AUTHOR
+Julian Graham (joolean@undecidable.net)
