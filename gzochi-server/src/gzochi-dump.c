@@ -264,7 +264,7 @@ main (int argc, char *argv[])
   else 
     {
       char **targets = gzochid_tool_parse_targets (argv[optind]);
-      char *data_dir = gzochid_tool_probe_data_dir (targets[0]);
+      char *data_dir = gzochid_tool_probe_data_dir (targets[0], FALSE);
       char *db = targets[1];
 
       if (db == NULL)

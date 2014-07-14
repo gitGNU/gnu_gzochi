@@ -65,7 +65,7 @@ gzochid_tool_open_store (gzochid_storage_context *context, char *path)
 }
 
 char *
-gzochid_tool_probe_data_dir (char *app_or_dir)
+gzochid_tool_probe_data_dir (char *app_or_dir, gboolean create_data_dir)
 {
   if (g_file_test (app_or_dir, G_FILE_TEST_IS_DIR))
     {
@@ -90,7 +90,7 @@ gzochid_tool_probe_data_dir (char *app_or_dir)
       data_dir = g_strconcat (work_dir, "/", app_or_dir, NULL);
       g_hash_table_destroy (config);
 
-      if (g_file_test (data_dir, G_FILE_TEST_IS_DIR))
+      if (create_data_dir || g_file_test (data_dir, G_FILE_TEST_IS_DIR))
 	return data_dir;
       else
 	{

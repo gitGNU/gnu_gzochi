@@ -36,13 +36,15 @@ gzochid_tool_open_store (gzochid_storage_context *, char *);
    of an application or the directory itself. If the specified string names an
    existing directory, that directory is returned; otherwise, the "gzochid.conf"
    file is consulted to find the server's data directory, which is scanned for
-   a matching application name. If neither of these strategies produces a
-   directory, this function logs an error and causes the process to exit.
+   a matching application name. The `create_data_dir' flag indicates that the 
+   data directory for the resolved application need not exist yet; otherwise, if
+   neither of these strategies produces a directory, this function logs an error
+   and causes the process to exit.
 
    The returned string should be freed by the caller.
  */
 char *
-gzochid_tool_probe_data_dir (char *);
+gzochid_tool_probe_data_dir (char *, gboolean);
 
 /**
    Attempts to parse a string of the form
