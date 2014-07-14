@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <config.h>
 #include <errno.h>
 #include <getopt.h>
@@ -45,6 +46,9 @@ dump_key_value (char *k, size_t k_len, char *v, size_t v_len, FILE *to)
 {
   int i = 0;
 
+  assert (k != NULL);
+  assert (v != NULL);
+  
   fprintf (to, " ");
   for (; i < k_len; i++)
     fprintf (to, "%.2hhx", k[i]);
@@ -67,6 +71,8 @@ dump_store
   while (key != NULL)
     {
       char *old_key = key;
+      size_t old_key_len = key_len;
+
       size_t value_len = 0;
       char *value = gzochid_storage_transaction_get 
 	(tx, store, key, key_len, &value_len);
@@ -76,7 +82,8 @@ dump_store
       free (value);
       
       key = gzochid_storage_transaction_next_key 
-	(tx, store, key, key_len, &value_len);
+	(tx, store, key, old_key_len, &key_len);
+
       free (old_key);
     }
   
