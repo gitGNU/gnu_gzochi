@@ -36,7 +36,7 @@ GZOCHID_STORAGE_CFLAGS = -lpthread
 GZOCHID_STORAGE_SOURCES = storage-lmdb.c
 endif
 
-bin_PROGRAMS = gzochid gzochid-dump 
+bin_PROGRAMS = gzochid gzochi-dump gzochi-load 
 dist_noinst_DATA = dtd/game.dtd
 dist_sysconf_DATA = conf/gzochid.conf
 
@@ -69,6 +69,14 @@ gzochi_dump_CFLAGS = @CFLAGS@ \
 gzochi_dump_SOURCES = config.c gzochi-dump.c log.c toollib.c \
 	$(GZOCHID_STORAGE_SOURCES)
 gzochi_dump_LDADD = @GLIB_LIBS@
+
+gzochi_load_CFLAGS = @CFLAGS@ \
+	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf @GLIB_CFLAGS@ \
+	$(GZOCHID_STORAGE_CFLAGS) \
+	-Wall -Werror
+gzochi_load_SOURCES = config.c gzochi-load.c log.c toollib.c \
+	$(GZOCHID_STORAGE_SOURCES)
+gzochi_load_LDADD = @GLIB_LIBS@
 
 
 admin.c: admin.h

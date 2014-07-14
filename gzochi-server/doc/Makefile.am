@@ -21,6 +21,7 @@
 info_TEXINFOS = gzochid.texi
 gzochid_TEXINFOS = fdl.texi
 man_MANS = gzochid.8 \
-	gzochi-dump.1
+	gzochi-dump.1 \
+	gzochi-load.1
 
 EXTRA_DIST = ${man_MANS}

@@ -1,0 +1,62 @@
+.TH GZOCHI-LOAD 1 "July 12, 2014"
+.SH NAME
+gzochi-load \- Load exported gzochi databases
+.SH SYNOPSIS
+.B gzochi-load
+[-f] <app_name or data_dir>:<db>
+.br
+.B gzochi-load
+[-h | -v]
+.SH DESCRIPTION
+The gzochi-load utility reads rows of data from standard input and loads them 
+into the specified gzochi game application database. 
+.PP
+The input to gzochi-load must be in the input format specified by the 
+\fBgzochi-dump\fR utility. This format is very similar to the format used by the
+dump and load tools for Berkeley DB, though gzochi-load can read the output of 
+the other gzochid tools no matter what storage engine the server is built 
+against.
+.PP
+The argument to gzochi-load is the name of a gzochi game application database 
+(i.e., \fBmeta\fR, \fBoids\fR, or \fBnames\fR) into which the data should be
+loaded, qualified by an application name or the path to a directory containing 
+an application's databases. If gzochi-load detects that the first part of the
+argument is not a directory, it assumes it must be an application name, and will
+consult the server's gzochid.conf file to obtain the root of the server's
+application data directory tree, which it uses to resolve the full path to the
+application's database files. Whether specified as a path or an application 
+name, the target directory need not already exist; gzochi-load will create it. 
+The command:
+
+.IP
+gzochi-load /var/gzochid/data/mygame2:meta < meta.dump
+.PP
+
+...will load the contents of the file \"meta.dump\" into the \"meta\" database
+in the specified directory. All three databases are necessary to fully 
+reconstitute the state of a gzochi game application. For example, the commands:
+
+.IP
+gzochi-load mygame2:meta < meta.dump
+.br
+gzochi-load mygame2:names < names.dump
+.br
+gzochi-load mygame2:oids < oids.dump
+.PP
+
+...will load each of the required databases from its constituent dump file. Note
+that by default gzochi-load will refuse to load data into a database that 
+already exists.
+
+.SH OPTIONS
+.IP \fB\-f,\ \-\-force\fR
+Disable the safeguards that prevent pre-existing database files from being
+written to. If this flag is specified, gzochi-load will add the contents of
+the dump file to the target database without truncating it. Use with care!
+.IP \fB\-h,\ \-\-help\fR
+Write usage information to standard error, and exit.
+.IP \fB\-v,\ \-\-version\fR
+Write version information to standard error, and exit.
+
+.SH AUTHOR
+Julian Graham (joolean@undecidable.net)
