@@ -46,66 +46,44 @@ noinst_HEADERS = admin.h app.h auth.h auth_int.h channel.h config.h context.h \
 	socket.h stats.h storage.h task.h threads.h toollib.h tx.h txlog.h \
 	util.h
 
-gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
+noinst_LTLIBRARIES = libgzochid.la
+
+libgzochid_la_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_AUTH_PLUGIN_LOCATION=\"$(plugindir)\" @GUILE_CFLAGS@ \
 	@GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ @MICROHTTPD_CFLAGS@ \
 	@ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
 	$(GZOCHID_STORAGE_CFLAGS) \
 	-Wall -Werror
 
-gzochid_SOURCES = admin.c app.c auth.c channel.c config.c context.c data.c \
-	debug.c descriptor.c event.c fsm.c game.c guile.c gzochid.c httpd.c \
-	io.c log.c protocol.c reloc.c schedule.c scheme.c session.c socket.c \
+libgzochid_la_SOURCES = admin.c app.c auth.c channel.c config.c context.c \
+	data.c debug.c descriptor.c event.c fsm.c game.c guile.c httpd.c io.c \
+	log.c protocol.c reloc.c schedule.c scheme.c session.c socket.c \
 	stats.c task.c threads.c tx.c txlog.c util.c $(GZOCHID_STORAGE_SOURCES)
 
-gzochid_LDADD = api/libgzochid-server-api.a $(GZOCHI_COMMON_LIBS) @GUILE_LIBS@ \
-	@GLIB_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ @MICROHTTPD_LIBS@ \
-	@ZLIB_LIBS@ @SERVEEZ_LDFLAGS@
+libgzochid_la_LIBADD = api/libgzochid-api.la $(GZOCHI_COMMON_LIBS) \
+	@GUILE_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ \
+	@MICROHTTPD_LIBS@ @ZLIB_LIBS@ @SERVEEZ_LDFLAGS@
+
+gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
+	@GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ \
+	@MICROHTTPD_CFLAGS@ @ZLIB_CFLAGS@ @SERVEEZ_CFLAGS@ \
+	$(GZOCHI_COMMON_CFLAGS) $(GZOCHID_STORAGE_CFLAGS) \
+	-Wall -Werror
+
+gzochid_SOURCES = gzochid.c
+gzochid_LDADD = libgzochid.la
 
 gzochi_dump_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf @GLIB_CFLAGS@ \
 	$(GZOCHID_STORAGE_CFLAGS) \
 	-Wall -Werror
-gzochi_dump_SOURCES = config.c gzochi-dump.c log.c toollib.c \
-	$(GZOCHID_STORAGE_SOURCES)
-gzochi_dump_LDADD = @GLIB_LIBS@
+gzochi_dump_SOURCES = gzochi-dump.c toollib.c
+gzochi_dump_LDADD = libgzochid.la
 
 gzochi_load_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf @GLIB_CFLAGS@ \
 	$(GZOCHID_STORAGE_CFLAGS) \
 	-Wall -Werror
-gzochi_load_SOURCES = config.c gzochi-load.c log.c toollib.c \
-	$(GZOCHID_STORAGE_SOURCES)
-gzochi_load_LDADD = @GLIB_LIBS@
+gzochi_load_SOURCES = gzochi-load.c toollib.c
+gzochi_load_LDADD = libgzochid.la
 
-
-admin.c: admin.h
-app.c: app.h
-auth.c: auth.h auth_int.h
-channel.c: channel.h
-config.c: config.h
-context.c: context.h
-data.c: data.h
-debug.c: debug.h
-event.c: event.h
-fsm.c: fsm.h
-game.c: game.h
-guile.c: guile.h
-gzochid.c: gzochid.h
-httpd.c: httpd.h
-log.c: log.h
-protocol.c: protocol.h
-reloc.c: reloc.h
-schedule.c: schedule.h
-scheme.c: scheme.h
-session.c: session.h
-socket.c: socket.h
-stats.c: stats.h
-storage-bdb.c: storage.h
-storage-hdb.c: storage.h
-storage-lmdb.c: storage.h
-task.c: task.h
-threads.c: threads.h
-tx.c: tx.h
-txlog.c: txlog.h
-util.c: util.h

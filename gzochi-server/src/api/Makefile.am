@@ -21,10 +21,10 @@
 AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ \
 	@SERVEEZ_CFLAGS@ -Wall -Werror
 
-noinst_LIBRARIES = libgzochid-server-api.a
+noinst_LTLIBRARIES = libgzochid-api.la
 noinst_HEADERS = admin.h channel.h data.h log.h session.h task.h util.h
 
-libgzochid_server_api_a_SOURCES = admin.c channel.c data.c log.c session.c \
+libgzochid_api_la_SOURCES = admin.c channel.c data.c log.c session.c \
 	task.c util.c
 
 SUFFIXES = .x
@@ -33,18 +33,3 @@ SUFFIXES = .x
 		@SERVEEZ_CFLAGS@
 
 BUILT_SOURCES = admin.x channel.x data.x log.x session.x task.x
-
-admin.c: admin.h
-channel.c: channel.h
-data.c: data.h
-log.c: log.h
-session.c: session.h
-task.c: task.h
-util.c: util.h
-
-admin.x: admin.c
-channel.x: channel.c
-data.x: data.c
-log.x: log.c
-session.x: session.c
-task.x: task.c
