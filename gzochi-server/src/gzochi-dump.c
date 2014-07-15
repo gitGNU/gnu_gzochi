@@ -1,4 +1,4 @@
-/* gzochid-dump.c: Utility for exporting data from game application databases
+/* gzochi-dump.c: Utility for exporting data from game application databases
  * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -185,7 +185,7 @@ static const struct option longopts[] =
 static void
 print_version (void)
 {
-  fprintf (stderr, "gzochid-dump (gzochi) %s\n", VERSION);
+  fprintf (stderr, "gzochi-dump (gzochi) %s\n", VERSION);
 
   fputs ("", stderr);
   fprintf (stderr, _("\

@@ -1,4 +1,4 @@
-/* gzochid-load.c: Utility for importing data from game application databases
+/* gzochi-load.c: Utility for importing data from game application databases
  * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -189,7 +189,7 @@ static const struct option longopts[] =
 static void
 print_version (void)
 {
-  fprintf (stderr, "gzochid-load (gzochi) %s\n", VERSION);
+  fprintf (stderr, "gzochi-load (gzochi) %s\n", VERSION);
 
   fputs ("", stderr);
   fprintf (stderr, _("\

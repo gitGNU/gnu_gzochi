@@ -27,9 +27,9 @@
 #define Q(x) #x
 #define QUOTE(x) Q(x)
 
-#ifndef GZOCHI_CONF_LOCATION
-#define GZOCHI_CONF_LOCATION "/etc/gzochid.conf"
-#endif /* GZOCHI_CONF_LOCATION */
+#ifndef GZOCHID_CONF_LOCATION
+#define GZOCHID_CONF_LOCATION "/etc/gzochid.conf"
+#endif /* GZOCHID_CONF_LOCATION */
 
 static GHashTable *
 load_game_config (const char *path)
