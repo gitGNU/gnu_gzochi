@@ -273,7 +273,11 @@ gzochid_application_descriptor *gzochid_config_parse_application_descriptor
   char *deployment_root = dirname (filename_copy);
 
   if (xml_fd < 0)
-    return NULL;
+    {
+      g_warning ("Failed to open game descriptor '%s'.", filename);
+      free (filename_copy);
+      return NULL;
+    }
 
   descriptor = calloc (1, sizeof (gzochid_application_descriptor));
   descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);
