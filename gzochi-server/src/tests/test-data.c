@@ -134,6 +134,24 @@ test_data_transaction_prepare_flush_reference_failure ()
   g_assert (finalized);  
 }
 
+static void binding_exists_timed_out (gpointer data)
+{
+  GError *error = NULL;
+  gzochid_application_context *context = (gzochid_application_context *) data;
+  gboolean exists = gzochid_data_binding_exists (context, "test", &error);
+
+  g_assert (! exists);
+  g_assert_error (error, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION);
+}
+
+static void test_data_transaction_timeout ()
+{
+  struct timeval tm = { 0, 0 };
+  gzochid_application_context *context = gzochid_application_context_new ();
+
+  gzochid_transaction_execute_timed (binding_exists_timed_out, context, tm);
+}
+
 int main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
@@ -141,6 +159,7 @@ int main (int argc, char *argv[])
   g_test_add_func ("/data/reference/finalize", test_data_reference_finalize);
   g_test_add_func ("/data/transaction/prepare/flush-reference-failure",
 		   test_data_transaction_prepare_flush_reference_failure);
+  g_test_add_func ("/data/transaction/timeout", test_data_transaction_timeout);
 
   return g_test_run ();
 }
