@@ -318,7 +318,9 @@ char *gzochid_storage_next_key
   db_key.flags = DB_DBT_MALLOC;
 
   ret = cursor->get (cursor, &db_key, &db_value, DB_SET_RANGE);
-  if (ret == 0 && memcmp (db_key.data, key, key_len) == 0)
+  if (ret == 0 
+      && db_key.size == key_len 
+      && memcmp (db_key.data, key, key_len) == 0)
     {
       free (db_key.data);
       ret = cursor->get (cursor, &db_key, &db_value, DB_NEXT);
@@ -561,7 +563,9 @@ char *gzochid_storage_transaction_next_key
   db_key.flags = DB_DBT_MALLOC;
 
   ret = cursor->get (cursor, &db_key, &db_value, DB_SET_RANGE);
-  if (ret == 0 && memcmp (db_key.data, key, key_len) == 0)
+  if (ret == 0 
+      && db_key.size == key_len 
+      && memcmp (db_key.data, key, key_len) == 0)
     {
       free (db_key.data);
       ret = cursor->get (cursor, &db_key, &db_value, DB_NEXT);

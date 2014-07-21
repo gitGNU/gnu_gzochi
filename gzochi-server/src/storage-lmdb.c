@@ -479,7 +479,9 @@ char *gzochid_storage_transaction_next_key
 
   ret = mdb_cursor_get (cursor, &db_key, &db_value, MDB_SET_RANGE);
 
-  if (ret == 0 && memcmp (db_key.mv_data, key, key_len) == 0)
+  if (ret == 0 
+      && db_key.mv_size == key_len
+      && memcmp (db_key.mv_data, key, key_len) == 0)
     ret = mdb_cursor_get (cursor, &db_key, &db_value, MDB_NEXT);
 
   mdb_cursor_close (cursor);
