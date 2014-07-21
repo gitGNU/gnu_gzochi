@@ -44,44 +44,52 @@ GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
 test_data_CFLAGS = @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_data_SOURCES = mock-app.c mock-schedule.c mock-storage.c test-data.c
-test_data_LDADD = ../gzochid-auth.o ../gzochid-data.o ../gzochid-event.o \
-	../gzochid-io.o ../gzochid-log.o ../gzochid-task.o ../gzochid-tx.o \
-	../gzochid-txlog.o ../gzochid-util.o \
+test_data_LDADD = ../libgzochid_la-auth.o ../libgzochid_la-data.o \
+	../libgzochid_la-event.o ../libgzochid_la-io.o ../libgzochid_la-log.o \
+	../libgzochid_la-task.o ../libgzochid_la-tx.o ../libgzochid_la-txlog.o \
+	../libgzochid_la-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@
 
 test_event_CFLAGS = @GLIB_CFLAGS@
 test_event_SOURCES = mock-app.c mock-storage.c test-event.c
-test_event_LDADD = ../gzochid-event.o ../gzochid-log.o ../gzochid-tx.o \
+test_event_LDADD = ../libgzochid_la-event.o ../libgzochid_la-log.o \
+	../libgzochid_la-tx.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
 
 test_reloc_CFLAGS = @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_reloc_SOURCES = test-reloc.c mock-app.c mock-storage.c
-test_reloc_LDADD = ../gzochid-event.o ../gzochid-io.o ../gzochid-reloc.o \
-	../gzochid-log.o ../gzochid-tx.o ../gzochid-util.o \
+test_reloc_LDADD = ../libgzochid_la-event.o ../libgzochid_la-io.o \
+	../libgzochid_la-reloc.o ../libgzochid_la-log.o ../libgzochid_la-tx.o \
+	../libgzochid_la-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GUILE_LIBS@
 
 test_storage_bdb_CFLAGS = @GLIB_CFLAGS@
 test_storage_bdb_SOURCES = test-storage-bdb.c
-test_storage_bdb_LDADD =  ../gzochid-log.o ../gzochid-storage-bdb.o @GLIB_LIBS@
+test_storage_bdb_LDADD =  ../libgzochid_la-log.o \
+	../libgzochid_la-storage-bdb.o \
+	@GLIB_LIBS@
 
 test_storage_hdb_CFLAGS = @GLIB_CFLAGS@
 test_storage_hdb_SOURCES = test-storage-hdb.c
-test_storage_hdb_LDADD =  ../gzochid-log.o ../gzochid-storage-hdb.o @GLIB_LIBS@
+test_storage_hdb_LDADD =  ../libgzochid_la-log.o \
+	../libgzochid_la-storage-hdb.o \
+	@GLIB_LIBS@
 
 test_storage_lmdb_CFLAGS = @GLIB_CFLAGS@ -pthread
 test_storage_lmdb_SOURCES = test-storage-lmdb.c
-test_storage_lmdb_LDADD =  ../gzochid-log.o ../gzochid-storage-lmdb.o \
+test_storage_lmdb_LDADD =  ../libgzochid_la-log.o \
+	../libgzochid_la-storage-lmdb.o \
 	@GLIB_LIBS@
 
 test_task_CFLAGS = @GLIB_CFLAGS@ @GMODULE_CFLAGS@
 test_task_SOURCES = test-task.c mock-app.c mock-guile.c mock-storage.c 
-test_task_LDADD = ../gzochid-auth.o ../gzochid-data.o ../gzochid-event.o \
-	../gzochid-task.o ../gzochid-log.o ../gzochid-schedule.o \
-	../gzochid-threads.o ../gzochid-tx.o ../gzochid-txlog.o \
-	../gzochid-util.o \
+test_task_LDADD = ../libgzochid_la-auth.o ../libgzochid_la-data.o \
+	../libgzochid_la-event.o ../libgzochid_la-task.o \
+	../libgzochid_la-log.o ../libgzochid_la-schedule.o \
+	../libgzochid_la-threads.o ../libgzochid_la-tx.o \
+	../libgzochid_la-txlog.o ../libgzochid_la-util.o \
 	$(GZOCHI_COMMON_LIBS) @GMODULE_LIBS@ @GLIB_LIBS@
 
 test_util_CFLAGS = @GLIB_CFLAGS@
 test_util_SOURCES = test-util.c
-test_util_LDADD = ../gzochid-util.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
+test_util_LDADD = ../libgzochid_la-util.o $(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
