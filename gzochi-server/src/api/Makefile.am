@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2012 Julian Graham
+# Copyright (C) 2014 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,3 +33,4 @@ SUFFIXES = .x
 		@SERVEEZ_CFLAGS@
 
 BUILT_SOURCES = admin.x channel.x data.x log.x session.x task.x
+CLEANFILES = $(BUILT_SOURCES)
