@@ -34,6 +34,7 @@
 
 	  gzochi:make-managed-record
 
+	  gzochi:managed-record
 	  gzochi:managed-record?
 	  gzochi:managed-record-rtd 
 	  gzochi:managed-record-type-name
