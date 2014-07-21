@@ -24,6 +24,7 @@ test_programs = \
 	test-data \
 	test-event \
 	test-reloc \
+	test-scheme \
 	test-task \
 	test-util
 
@@ -64,6 +65,15 @@ test_reloc_LDADD = ../libgzochid_la-event.o ../libgzochid_la-io.o \
 	../libgzochid_la-reloc.o ../libgzochid_la-log.o ../libgzochid_la-tx.o \
 	../libgzochid_la-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GUILE_LIBS@
+
+test_scheme_CFLAGS = @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_scheme_SOURCES = test-scheme.c mock-app.c mock-data.c mock-reloc.c \
+	mock-session.c mock-storage.c mock-task.c mock-tx.c mock-txlog.c
+test_scheme_LDADD = ../libgzochid_la-auth.o ../libgzochid_la-event.o \
+	../libgzochid_la-guile.o ../libgzochid_la-io.o ../libgzochid_la-log.o \
+	../libgzochid_la-scheme.o ../libgzochid_la-threads.o \
+	../libgzochid_la-util.o \
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_storage_bdb_CFLAGS = @GLIB_CFLAGS@
 test_storage_bdb_SOURCES = test-storage-bdb.c

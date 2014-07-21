@@ -25,6 +25,8 @@
 #include "../storage.h"
 #include "../tx.h"
 
+static GPrivate thread_application_context_key;
+
 gzochid_application_context *gzochid_application_context_new ()
 {
   gzochid_application_context *context = 
@@ -170,4 +172,34 @@ gzochid_transaction_result gzochid_application_transaction_execute_timed
  struct timeval timeout)
 {
   gzochid_transaction_execute_timed (fn, data, timeout);
+}
+
+gzochid_application_callback *gzochid_application_callback_new
+(char *procedure, GList *module, mpz_t scm_oid)
+{
+  gzochid_application_callback *callback = calloc
+    (1, sizeof (gzochid_application_callback));
+
+  callback->module = module;
+  callback->procedure = procedure;
+
+  mpz_init (callback->scm_oid);
+  mpz_set (callback->scm_oid, scm_oid);
+
+  return callback;
+}
+
+gzochid_application_context *
+gzochid_get_current_application_context ()
+{
+  return (gzochid_application_context *)
+    g_private_get (&thread_application_context_key);
+}
+
+void *
+gzochid_with_application_context
+(gzochid_application_context *context, gzochid_auth_identity *auth,
+ void *(*worker) (gpointer), gpointer data)
+{
+  worker (data);
 }
