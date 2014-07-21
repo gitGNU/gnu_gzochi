@@ -25,6 +25,9 @@
 	  gzochi:managed-record-constructor
 	  gzochi:managed-record-predicate
 
+          gzochi:make-managed-record-type-registry
+          gzochi:managed-record-type-registry?
+
 	  gzochi:managed-record?
 	  gzochi:managed-record-rtd
 	  gzochi:managed-record-type-name
