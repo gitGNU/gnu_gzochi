@@ -37,6 +37,8 @@ if STORAGE_ENGINE_LMDB
 test_programs += test-storage-lmdb
 endif
 
+noinst_HEADERS = mock-data.h
+
 check_PROGRAMS = $(test_programs)
 TESTS = $(test_programs)
 
