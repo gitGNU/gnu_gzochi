@@ -657,15 +657,15 @@ scheme_managed_record_deserializer
   g_list_free (args);
   g_string_erase (in, 0, vec_len);
   
-  /* Don't join the transaction here as the serializer should only be
-     called during the PREPARING phase, which is too late to join. */
-  
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
       if (! triggered_by_rollback (scm_variable_ref (exception_var))) 
-	gzochid_transaction_mark_for_rollback 
-	  (&scheme_participant, 
-	   is_transaction_retry (scm_variable_ref (exception_var)));
+	{
+	  gzochid_transaction_join (&scheme_participant, NULL);
+	  gzochid_transaction_mark_for_rollback 
+	    (&scheme_participant, 
+	     is_transaction_retry (scm_variable_ref (exception_var)));
+	}
 
       g_set_error (err, GZOCHID_IO_ERROR, GZOCHID_IO_ERROR_SERIALIZATION,
 		   "Failed to deserialize managed record.");
