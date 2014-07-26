@@ -149,6 +149,13 @@ static void initialize_serialization_registry
   gzochid_task_initialize_serialization_registry ();
 }
 
+static void 
+initialize_scheme_task_serialization 
+(int from_state, int to_staet, gpointer user_data)
+{
+  gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
+}
+
 static void initialize_client_received_message_task_serialization
 (int from_state, int to_state, gpointer user_data)
 {
@@ -239,6 +246,9 @@ void gzochid_game_context_init
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, 
      initialize_client_received_message_task_serialization, context);
+  gzochid_fsm_on_enter 
+    (fsm, GZOCHID_GAME_STATE_INITIALIZING, 
+     initialize_scheme_task_serialization, context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_auth, context);
   gzochid_fsm_on_enter 

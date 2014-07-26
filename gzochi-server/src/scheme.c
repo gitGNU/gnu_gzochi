@@ -1136,6 +1136,4 @@ void gzochid_scheme_task_handle_oid (SCM handle, mpz_t oid)
 void gzochid_scheme_initialize_bindings (void)
 {
   scm_with_guile (initialize_bindings, NULL);
-
-  gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
 }
