@@ -106,10 +106,10 @@
 		     (gzochi:serialize-managed-record port record)
 		     #f))
       (test-assert
-       (with-fluids ((%gzochi:type-registry test-type-registry))
-	 (display record) (newline)
-	 (gzochi:serialize-managed-record port record)
-	 #t)))))
+       (dynamic-wind
+	   (lambda () (gzochi:push-type-registry! test-type-registry))
+	   (lambda () (gzochi:serialize-managed-record port record) #t)
+	   (lambda () (gzochi:pop-type-registry!)))))))
 (test-end "gzochi:serialize-managed-record")
 
 (test-begin "gzochi:deserialize-managed-record")
@@ -122,15 +122,20 @@
 	  ((record-constructor 
 	    (gzochi:make-managed-record-constructor-descriptor rtd #f #f)))))
     (let-values (((port func) (open-bytevector-output-port)))
-       (with-fluids ((%gzochi:type-registry test-type-registry))
-	 (gzochi:serialize-managed-record port record))
+       (dynamic-wind
+	   (lambda () (gzochi:push-type-registry! test-type-registry))
+	   (lambda () (gzochi:serialize-managed-record port record))
+	   (lambda () (gzochi:pop-type-registry!)))
        (let ((bv (func)))
 	 (test-assert 
 	  (guard (ex ((assertion-violation? ex) #t))
 	    (gzochi:deserialize-managed-record (open-bytevector-input-port bv))
 	    #f))
 	 (test-assert
-	  (with-fluids ((%gzochi:type-registry test-type-registry))
-	    (gzochi:deserialize-managed-record 
-	     (open-bytevector-input-port bv))))))))
+	  (dynamic-wind
+	      (lambda () (gzochi:push-type-registry! test-type-registry))
+	      (lambda () 
+		(gzochi:deserialize-managed-record 
+		 (open-bytevector-input-port bv)))
+	      (lambda () (gzochi:pop-type-registry!))))))))
 (test-end "gzochi:deserialize-managed-record")

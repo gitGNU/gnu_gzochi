@@ -26,7 +26,8 @@
 
 	  gzochi:make-managed-record-type-registry
 	  gzochi:managed-record-type-registry?
-	  %gzochi:type-registry
+	  gzochi:push-type-registry!
+	  gzochi:pop-type-registry!
 
 	  gzochi:define-managed-record-type
 	  gzochi:managed-record-type-descriptor
@@ -64,7 +65,9 @@
 	  gzochi:mark-for-read!)
 
   (import (gzochi io)
-	  (only (guile) and=> fluid-ref gensym macroexpand make-fluid) 
+	  (gzochi log)
+	  (only (guile) and=> fluid-ref fluid-set! gensym macroexpand 
+		        make-fluid simple-format) 
 	  (ice-9 optargs)
 	  (rnrs)
 	  (only (srfi :1) last split-at take)
@@ -143,14 +146,14 @@
 				 "Parent types must be managed"))))))
 
 	   (serial-uid (or serial-uid uid name))
-	   (type-registry (or type-registry (fluid-ref %gzochi:type-registry)))
+	   (type-registry (or type-registry default-type-registry))
 
 	   (rtd (make-record-type-descriptor
 		 name managed-parent uid sealed? opaque? 
 		 (list->vector field-names))))
 
       (let ((reg (gzochi:serial-uid->type-registration 
-		  type-registry serial-uid)))
+		  serial-uid type-registry)))
 	(if reg
 	    (or (eq? (gzochi:managed-record-type-registration-rtd reg) rtd)
 		(raise (condition
@@ -505,11 +508,12 @@
 
   (define (gzochi:serialize-managed-record port record)
     (define (lookup-registration rtd)
-      (or (gzochi:rtd->type-registration (fluid-ref %gzochi:type-registry) rtd)
+      (or (gzochi:rtd->type-registration rtd)
 	  (raise (condition 
 		  (make-assertion-violation)
 		  (make-message-condition 
-		   (string-append "Attempting to serialize unknown type " 
+		   (simple-format #f 
+				  "Attempting to serialize unknown type ~A" 
 				  (record-type-name rtd)))))))
 
     (define (serialize rtd serialization)
@@ -558,8 +562,7 @@
 	   (parent-registration 
 	    (and parent-rtd 
 		 (not (eq? parent-rtd gzochi:managed-record))
-		 (or (gzochi:rtd->type-registration 
-		      (fluid-ref %gzochi:type-registry) parent-rtd)
+		 (or (gzochi:rtd->type-registration parent-rtd)
 		     (raise (condition 
 			     (make-assertion-violation)
 			     (make-message-condition 
@@ -579,10 +582,10 @@
 			   (lambda ()
 			     (let ((p (n)))
 			       (apply p (deserialize rtd serialization))))))))
+	
     
     (let* ((serial-uid (gzochi:read-symbol port))
-	   (registration (gzochi:serial-uid->type-registration 
-			  (fluid-ref %gzochi:type-registry) serial-uid)))
+	   (registration (gzochi:serial-uid->type-registration serial-uid)))
       (or registration 
 	  (raise (condition 
 		  (make-assertion-violation)
@@ -619,7 +622,22 @@
     (sealed #t))
 
   (define default-type-registry (gzochi:make-managed-record-type-registry))
-  (define %gzochi:type-registry (make-fluid default-type-registry))
+  (define type-registry-stack (make-fluid '()))
+
+  (define (gzochi:push-type-registry! registry)
+    (fluid-set! type-registry-stack 
+		(cons registry (fluid-ref type-registry-stack))))
+
+  (define (gzochi:pop-type-registry!)
+    (let ((stack (fluid-ref type-registry-stack)))
+      (if (null? stack)
+	  (raise (condition 
+		  (make-assertion-violation)
+		  (make-message-condition "Type registry stack is empty")))
+	  (let ((registry (car stack))
+		(stack (cdr stack)))
+	    (fluid-set! type-registry-stack stack)
+	    registry))))
 
   (define (gzochi:register-type! registry reg)
     (hashtable-set! 
@@ -629,12 +647,34 @@
      (gzochi:managed-record-type-registry-serial-uids registry) 
      (gzochi:managed-record-type-registration-serial-uid reg) reg))
 
-  (define (gzochi:rtd->type-registration registry rtd) 
-    (hashtable-ref (gzochi:managed-record-type-registry-rtds registry) rtd #f))
+  (define (gzochi:rtd->type-registration rtd . registry)
+    (define (rtd->type-registration-inner registry)
+      (hashtable-ref
+       (gzochi:managed-record-type-registry-rtds registry) rtd #f))
+    (define (rtd->type-registration-recursive registry-stack) 
+      (cond ((null? registry-stack)
+	     (rtd->type-registration-inner default-type-registry))
+	    ((rtd->type-registration-inner (car registry-stack)))
+	    (else (rtd->type-registration-recursive (cdr registry-stack)))))
+    (if (null? registry)
+	(rtd->type-registration-recursive (fluid-ref type-registry-stack))
+	(rtd->type-registration-inner (car registry))))
 
-  (define (gzochi:serial-uid->type-registration registry serial-uid) 
-    (hashtable-ref 
-     (gzochi:managed-record-type-registry-serial-uids registry) serial-uid #f))
+  (define (gzochi:serial-uid->type-registration serial-uid . registry)
+    (define (serial-uid->type-registration-inner registry)
+      (hashtable-ref
+       (gzochi:managed-record-type-registry-serial-uids registry) serial-uid 
+       #f))
+    (define (serial-uid->type-registration-recursive registry-stack)
+      (cond ((null? registry-stack)
+	     (serial-uid->type-registration-inner default-type-registry))
+	    ((serial-uid->type-registration-inner (car registry-stack)))
+	    (else (serial-uid->type-registration-recursive
+		   (cdr registry-stack)))))
+    (if (null? registry)
+	(serial-uid->type-registration-recursive 
+	 (fluid-ref type-registry-stack))
+	(serial-uid->type-registration-inner (car registry))))
 
   (define (gzochi:mark-for-write! managed-record)
     (or (gzochi:managed-record? managed-record)
