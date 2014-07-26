@@ -20,11 +20,36 @@
 #include <syslog.h>
 
 #include "../app.h"
+#include "../log.h"
 #include "../scheme.h"
 #include "../txlog.h"
 
 #include "log.h"
 #include "util.h"
+
+SCM_DEFINE (primitive_log_internal, "primitive-log-internal", 2, 0, 0,
+	    (SCM priority, SCM msg), 
+	    "Non-transactionally log a message for the current application")
+{
+  char *cpriority = scm_to_locale_string (scm_symbol_to_string (priority));
+  char *cmsg = scm_to_locale_string (msg);
+
+  if (strcmp (cpriority, "err") == 0)
+    gzochid_log (LOG_ERR, cmsg);
+  else if (strcmp (cpriority, "warning") == 0)
+    gzochid_log (LOG_WARNING, cmsg);
+  else if (strcmp (cpriority, "notice") == 0)
+    gzochid_log (LOG_NOTICE, cmsg);
+  else if (strcmp (cpriority, "info") == 0)
+    gzochid_log (LOG_INFO, cmsg);
+  else if (strcmp (cpriority, "debug") == 0)
+    gzochid_log (LOG_DEBUG, cmsg);
+
+  free (cpriority);
+  free (cmsg);
+
+  return SCM_UNSPECIFIED;
+}
 
 SCM_DEFINE (primitive_log, "primitive-log", 2, 0, 0, (SCM priority, SCM msg), 
 	    "Log a message for the current application")

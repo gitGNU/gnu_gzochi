@@ -1,5 +1,5 @@
 ;; gzochi/private/log.scm: Private infrastructure for transactional log support
-;; Copyright (C) 2011 Julian Graham
+;; Copyright (C) 2014 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -17,7 +17,14 @@
 #!r6rs
 
 (library (gzochi private log)
-  (export gzochi:log
+  (export gzochi:log-internal
+	  gzochi:log-err-internal
+	  gzochi:log-warning-internal
+	  gzochi:log-notice-internal
+	  gzochi:log-info-internal
+	  gzochi:log-debug-internal
+
+	  gzochi:log
 	  gzochi:log-err
 	  gzochi:log-warning
 	  gzochi:log-notice
@@ -33,6 +40,32 @@
   (define-enumeration gzochi:log-priority
     (err warning info notice debug) 
     gzochi:make-log-priority-set)
+
+  (define (gzochi:log-internal priority msg . args)
+    (let ((formatted-msg (apply simple-format (cons* #f msg args))))
+      (case priority
+	((err) (primitive-log-internal 'err formatted-msg))
+	((warning) (primitive-log-internal 'warning formatted-msg))
+	((notice) (primitive-log-internal 'notice formatted-msg))
+	((info) (primitive-log-internal 'info formatted-msg))
+	((debug) (primitive-log-internal 'debug formatted-msg))
+	(else (raise (condition (make-assertion-violation)
+				(make-irritants-condition priority)))))))
+
+  (define (gzochi:log-err-internal msg . args)
+    (apply gzochi:log-internal (cons* (gzochi:log-priority err) msg args)))
+  
+  (define (gzochi:log-warning-internal msg . args)
+    (apply gzochi:log-internal (cons* (gzochi:log-priority warning) msg args)))
+
+  (define (gzochi:log-notice-internal msg . args)
+    (apply gzochi:log-internal (cons* (gzochi:log-priority notice) msg args)))
+
+  (define (gzochi:log-info-internal msg . args)
+    (apply gzochi:log-internal (cons* (gzochi:log-priority info) msg args)))
+
+  (define (gzochi:log-debug-internal msg . args)
+    (apply gzochi:log-internal (cons* (gzochi:log-priority debug) msg args)))
 
   (define (gzochi:log priority msg . args)
     (let ((formatted-msg (apply simple-format (cons* #f msg args))))
@@ -61,4 +94,5 @@
     (apply gzochi:log (cons* (gzochi:log-priority debug) msg args)))
 
   (define primitive-log #f)
+  (define primitive-log-internal #f)
 )
