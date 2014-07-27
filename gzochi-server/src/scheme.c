@@ -670,7 +670,16 @@ scheme_managed_record_deserializer
       g_set_error (err, GZOCHID_IO_ERROR, GZOCHID_IO_ERROR_SERIALIZATION,
 		   "Failed to deserialize managed record.");
     }
-  else scm_gc_protect_object (record);
+  else 
+    {
+      /* If the bytevector port hasn't been fully consumed, it could mean the 
+	 serializer and deserializer aren't idempotent. */
+
+      if (scm_eof_object_p (scm_lookahead_u8 (port)) == SCM_BOOL_F)
+	gzochid_warning ("Deserialization failed to consume all bytes.");
+
+      scm_gc_protect_object (record);
+    }
 
   return record;
 }
