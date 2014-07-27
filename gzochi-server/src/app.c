@@ -627,6 +627,9 @@ gzochid_application_context *gzochid_application_context_new (void)
   gzochid_application_context *context = calloc 
     (1, sizeof (gzochid_application_context));
 
+  gzochid_context_init 
+    ((gzochid_context *) context, NULL, gzochid_fsm_new (NULL, 0, "started"));
+
   context->oids_to_clients = g_hash_table_new (g_str_hash, g_str_equal);
   context->clients_to_oids = g_hash_table_new (g_direct_hash, g_direct_equal);
 
