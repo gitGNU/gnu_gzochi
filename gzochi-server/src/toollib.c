@@ -31,8 +31,8 @@
 #define GZOCHID_CONF_LOCATION "/etc/gzochid.conf"
 #endif /* GZOCHID_CONF_LOCATION */
 
-static GHashTable *
-load_game_config (const char *path)
+GHashTable *
+gzochid_tool_load_game_config (const char *path)
 {
   GKeyFile *key_file = g_key_file_new ();
   GHashTable *game_config = NULL;
@@ -78,7 +78,7 @@ gzochid_tool_probe_data_dir (char *app_or_dir, gboolean create_data_dir)
       char *work_dir = NULL, *data_dir = NULL;
       
       g_debug ("Probing for an application with name %s.", app_or_dir);
-      config = load_game_config (QUOTE (GZOCHID_CONF_LOCATION));
+      config = gzochid_tool_load_game_config (QUOTE (GZOCHID_CONF_LOCATION));
 
       if (! g_hash_table_contains (config, "server.fs.data"))
 	{

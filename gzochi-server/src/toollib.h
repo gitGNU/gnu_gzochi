@@ -23,6 +23,15 @@
 #include "storage.h"
 
 /**
+   Return a GHashTable containing the "game" section of the .INI file located at
+   the specified path (which is often '/etc/gzochid.conf'). If the file cannot
+   be opened for reading (because, e.g., it does not exist), this function logs
+   an error and causes the process to exit.
+ */
+GHashTable *
+gzochid_tool_load_game_config (const char *);
+
+/**
    Open the store with the specified filename template in the specified storage
    context. (The actual name of the file backing the returned store is dependent
    on the implementation of the storage engine.) If the store cannot be opened,
