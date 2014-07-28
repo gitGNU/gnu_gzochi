@@ -1,0 +1,22 @@
+<!-- DTD for gzochi game database migration descriptors -->
+<!DOCTYPE MIGRATION [
+
+<!ELEMENT migration (load-paths?, input-registry?, output-registry?, callback)>
+<!ATTLIST migration target CDATA #REQUIRED>
+
+<!ELEMENT load-paths (load-path+)>
+<!ELEMENT load-path (#PCDATA)>
+
+<!ELEMENT input-registry EMPTY>
+<!ATTLIST input-registry name CDATA #REQUIRED>
+<!ATTLIST input-registry module CDATA #REQUIRED>
+
+<!ELEMENT output-registry EMPTY>
+<!ATTLIST output-registry name CDATA #REQUIRED>
+<!ATTLIST output-registry module CDATA #REQUIRED>
+
+<!ELEMENT callback EMPTY> 
+<!ATTLIST callback procedure CDATA #REQUIRED>
+<!ATTLIST callback module CDATA #REQUIRED>
+
+]>

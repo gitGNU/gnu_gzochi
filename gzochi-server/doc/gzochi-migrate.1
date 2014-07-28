@@ -1,0 +1,65 @@
+.TH GZOCHI-MIGRATE 1 "July 27, 2014"
+.SH NAME
+gzochi-migrate \- Transform the contents of a gzochi database
+.SH SYNOPSIS
+.B gzochi-migrate
+[-n] [-q] <migration_descriptor>
+.br
+.B gzochi-migrate
+[-h | -v]
+.SH DESCRIPTION
+The gzochi-migrate utility executes a schema migration against a gzochi game
+database, allowing managed records to be transformed, removed, or created 
+outside the scope of a running game application.
+.PP
+The migration process is driven by the migration descriptor, an XML file whose
+path is given by \fBmigration_descriptor\fR. This file specifies the game data 
+store to be migrated and provides a reference to a "visitor" procedure that is 
+called on every reachable object in the data store. The complete semantics of 
+the XML migration descriptor and a description of the migration algorithm are 
+described in the "Tools" section of the gzochid reference manual; a brief 
+description of the migration process follows:
+.PP
+An graph of game objects is created and traversed by dereferencing each binding
+in the "names" database to an object identifier, executing the migration visitor
+procedure on the corresponding object retrieved from the "oids" database, and
+enqueuing any references to other objects for subsequent visit in breadth-first
+order. When an object is visited, gzochid-migrate takes one of three actions, 
+depending on the value returned by the visitor function. If the visitor returns:
+.IP \[bu]
+\fB#f\fR, the object is removed from the object graph
+.IP \[bu]
+\fBa managed record\fR, the object is replaced by this value
+.IP \[bu]
+\fBan unspecified value\fR, the object is left unmodified
+.IP \[bu]
+\fBany other value\fR, an error is signaled
+.PP
+Each object that is reachable from a named binding is visited exactly once, no
+matter how many other bindings or objects hold references to it.
+.PP
+Note that because gzochi-migrate modifies the contents of gzochi game databases,
+\fBany gzochid processes accessing the target game data should be stopped before
+running gzochi-migrate.\fR gzochi-migrate creates transactions that even in 
+"dry run" mode (see below) establish read locks on the underlying game data 
+store, which can interfere with the performance of a gzochid server processing 
+transactions against the same store.
+.PP
+When all reachable objects have been visited, the migration is complete.
+gzochid-migrate prints to standard error the results of the migration, including
+the counts of objects visited, modified, and removed.
+.SH OPTIONS
+.IP \fB\-h,\ \-\-help\fR
+Write usage information to standard error, and exit.
+.IP \fB\-n,\ \-\-dry\-run\fR
+Execute a dry run of the migration, such that any modifications performed by the
+migration transformer are rolled back instead of committed to the data store. 
+Use this flag to verify that a migration behaves as expected before allowing it
+to make permanent changes to data.
+.IP \fB\-q,\ \-\-quiet\fR
+Suppress the display of log messages and post-migration stats reporting.
+.IP \fB\-v,\ \-\-version\fR
+Write version information to standard error, and exit.
+
+.SH AUTHOR
+Julian Graham (joolean@undecidable.net)

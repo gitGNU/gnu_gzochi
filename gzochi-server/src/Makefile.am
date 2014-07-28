@@ -36,8 +36,8 @@ GZOCHID_STORAGE_CFLAGS = -lpthread
 GZOCHID_STORAGE_SOURCES = storage-lmdb.c
 endif
 
-bin_PROGRAMS = gzochid gzochi-dump gzochi-load 
-dist_noinst_DATA = dtd/game.dtd
+bin_PROGRAMS = gzochid gzochi-dump gzochi-load gzochi-migrate
+dist_noinst_DATA = dtd/game.dtd dtd/migration.dtd
 dist_sysconf_DATA = conf/gzochid.conf
 
 noinst_HEADERS = admin.h app.h auth.h auth_int.h channel.h config.h context.h \
@@ -87,3 +87,10 @@ gzochi_load_CFLAGS = @CFLAGS@ \
 gzochi_load_SOURCES = gzochi-load.c toollib.c
 gzochi_load_LDADD = libgzochid.la
 
+gzochi_migrate_CFLAGS = @CFLAGS@ \
+	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
+	@GLIB_CFLAGS@ @GUILE_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
+	$(GZOCHID_STORAGE_CFLAGS) \
+	-Wall -Werror
+gzochi_migrate_SOURCES = gzochi-migrate.c toollib.c
+gzochi_migrate_LDADD = libgzochid.la

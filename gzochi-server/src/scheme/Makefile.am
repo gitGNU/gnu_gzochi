@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2012 Julian Graham
+# Copyright (C) 2014 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,6 +26,6 @@ nobase_dist_pkgguile_site_DATA = gzochi.scm \
 	gzochi/task.scm \
 	gzochi/private/app.scm gzochi/private/channel.scm \
 	gzochi/private/client.scm gzochi/private/data.scm \
-	gzochi/private/debug.scm gzochi/private/guile.scm \
-	gzochi/private/log.scm gzochi/private/reflect.scm \
-	gzochi/private/task.scm
+	gzochi/private/data/migration.scm gzochi/private/debug.scm \
+	gzochi/private/guile.scm gzochi/private/log.scm \
+	gzochi/private/reflect.scm gzochi/private/task.scm

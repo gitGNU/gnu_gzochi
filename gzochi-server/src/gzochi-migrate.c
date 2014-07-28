@@ -1,0 +1,953 @@
+/* gzochid-migrate.c: Utility for migrating game data schema
+ * Copyright (C) 2014 Julian Graham
+ *
+ * gzochi is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include <assert.h>
+#include <errno.h>
+#include <getopt.h>
+#include <glib.h>
+#include <gmp.h>
+#include <libguile.h>
+#include <libintl.h>
+#include <locale.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+
+#include "app.h"
+#include "config.h"
+#include "data.h"
+#include "descriptor.h"
+#include "guile.h"
+#include "reloc.h"
+#include "scheme.h"
+#include "storage.h"
+#include "toollib.h"
+#include "tx.h"
+
+#define _(String) gettext (String)
+
+#define Q(x) #x
+#define QUOTE(x) Q(x)
+
+#ifndef GZOCHID_CONF_LOCATION
+#define GZOCHID_CONF_LOCATION "/etc/gzochid.conf"
+#endif /* GZOCHID_CONF_LOCATION */
+
+#define GAME_DESCRIPTOR_XML "game.xml"
+
+/*
+  Redundant prototype for gmp_fprintf, which does not seem to be consistently
+  defined by the preprocessor magic in gmp.h.
+*/
+int 
+gmp_fprintf (FILE *, const char *, ...);
+
+static SCM 
+scm_gzochi_visit_object = SCM_BOOL_F;
+static SCM 
+scm_push_type_registry_x = SCM_BOOL_F;
+static SCM 
+scm_pop_type_registry_x = SCM_BOOL_F;
+
+struct migration 
+{
+  gzochid_application_context *context;
+  struct migration_descriptor *descriptor;
+  gboolean dry_run;
+  gboolean explicit_rollback;
+  gboolean quiet;
+
+  GQueue *pending_oids;
+  char *visited_oids_path;
+  gzochid_storage_store *visited_oids;
+
+  SCM callback;
+  SCM input_registry;
+  SCM output_registry;
+  gboolean pushed_registry;
+
+  struct timeval start_time;
+  struct timeval end_time;
+  mpz_t num_visited;
+  mpz_t num_transformed;
+  mpz_t num_removed;
+};
+
+struct migration_descriptor
+{
+  char *target;
+  GList *load_paths;
+
+  char *input_registry_name;
+  char *input_registry_module;
+
+  char *output_registry_name;
+  char *output_registry_module;
+
+  char *callback_name;
+  char *callback_module;
+};
+
+/*
+  Helper functions and parser callbacks for GLib's XML subset parser.
+ */
+
+static const gchar *
+attribute_value 
+(const gchar **attribute_names, const gchar **attribute_values,
+ const gchar *attribute_name)
+{
+  int i = 0;
+  while (attribute_names[i] != NULL)
+    {
+      if (strcmp (attribute_names[i], attribute_name) == 0)
+        return attribute_values[i];
+      i++;
+    }
+
+  return NULL;
+}
+
+static void
+start_element 
+(GMarkupParseContext *context, const gchar *element_name,
+ const gchar **attribute_names, const gchar **attribute_values,
+ gpointer user_data, GError **error)
+{
+  struct migration_descriptor *md = (struct migration_descriptor *) user_data;
+  const GSList *stack = g_markup_parse_context_get_element_stack (context);
+  char *parent = stack == NULL || stack->next == NULL 
+    ? NULL : (char *) stack->next->data;
+
+  if (strcmp (element_name, "migration") == 0)
+    {
+      const gchar *target_attr = 
+	attribute_value (attribute_names, attribute_values, "target");
+
+      if (target_attr == NULL || strlen (target_attr) == 0)
+	g_set_error 
+	  (error, G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+	   "migration@target is required");
+      else md->target = strdup (target_attr);
+    }
+  else if (strcmp (element_name, "load-paths") == 0)
+    {
+      if (parent == NULL || strcmp (parent, "migration") != 0)
+	g_set_error
+	  (error, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
+	   "invalid load-paths location");
+    }
+  else if (strcmp (element_name, "load-path") == 0)
+    {
+      if (parent == NULL || strcmp (parent, "load-paths") != 0)
+	g_set_error
+	  (error, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
+	   "invalid load-path location");
+    }
+  else if (strcmp (element_name, "input-registry") == 0)
+    {
+      if (parent == NULL || strcmp (parent, "migration") != 0)
+	g_set_error
+	  (error, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
+	   "invalid input-registry location");
+      else
+	{
+	  const gchar *module_attr = 
+	    attribute_value (attribute_names, attribute_values, "module");
+	  const gchar *name_attr = 
+	    attribute_value (attribute_names, attribute_values, "name");
+
+	  if (module_attr == NULL || strlen (module_attr) == 0)
+	    g_set_error
+	      (error, G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+	       "input-registry@module is required");
+	  else if (name_attr == NULL || strlen (name_attr) == 0)
+	    g_set_error
+	      (error, G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+	       "input-registry@name is required");
+	  else
+	    {
+	      md->input_registry_module = strdup (module_attr);
+	      md->input_registry_name = strdup (name_attr);
+	    }
+	}
+    }
+  else if (strcmp (element_name, "output-registry") == 0)
+    {
+      if (parent == NULL || strcmp (parent, "migration") != 0)
+	g_set_error
+	  (error, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
+	   "invalid output-registry location");
+      else
+	{
+	  const gchar *module_attr = 
+	    attribute_value (attribute_names, attribute_values, "module");
+	  const gchar *name_attr = 
+	    attribute_value (attribute_names, attribute_values, "name");
+
+	  if (module_attr == NULL || strlen (module_attr) == 0)
+	    g_set_error
+	      (error, G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+	       "output-registry@module is required");
+	  else if (name_attr == NULL || strlen (name_attr) == 0)
+	    g_set_error
+	      (error, G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+	       "output-registry@name is required");
+	  else
+	    {
+	      md->output_registry_module = strdup (module_attr);
+	      md->output_registry_name = strdup (name_attr);
+	    }
+	}
+    }
+  else if (strcmp (element_name, "callback") == 0)
+    {
+      if (parent == NULL || strcmp (parent, "migration") != 0)
+	g_set_error
+	  (error, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
+	   "invalid callback location");
+      else
+	{
+	  const gchar *module_attr = 
+	    attribute_value (attribute_names, attribute_values, "module");
+	  const gchar *procedure_attr = 
+	    attribute_value (attribute_names, attribute_values, "procedure");
+
+	  if (module_attr == NULL || strlen (module_attr) == 0)
+	    g_set_error
+	      (error, G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+	       "callback@module is required");
+	  else if (procedure_attr == NULL || strlen (procedure_attr) == 0)
+	    g_set_error
+	      (error, G_MARKUP_ERROR, G_MARKUP_ERROR_MISSING_ATTRIBUTE,
+	       "callback@procedure is required");
+	  else
+	    {
+	      md->callback_module = strdup (module_attr);
+	      md->callback_name = strdup (procedure_attr);
+	    }
+	}
+    }
+  else g_set_error 
+	 (error, G_MARKUP_ERROR, G_MARKUP_ERROR_UNKNOWN_ELEMENT,
+	  "unknown element %s", element_name);
+}
+
+static void
+text 
+(GMarkupParseContext *context, const gchar *text, gsize text_len,
+ gpointer user_data, GError **error)
+{
+  struct migration_descriptor *md = (struct migration_descriptor *) user_data;
+  const GSList *stack = g_markup_parse_context_get_element_stack (context);
+  char *parent = stack == NULL ? NULL : (char *) stack->data;
+ 
+  gchar *text_clone = g_strdup (text);
+  text_clone = g_strstrip (text_clone);
+
+  if (strlen (text_clone) > 0)
+    {
+      if (parent != NULL && strcmp (parent, "load-path") == 0)
+	md->load_paths = g_list_append 
+	  (md->load_paths, strndup (text, text_len));
+      else g_set_error 
+	     (error, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
+	      "unexpected text content");
+    }
+
+  free (text_clone);
+}
+
+static void
+error
+(GMarkupParseContext *context, GError *err, gpointer user_data)
+{
+  g_critical ("Failed to parse migration descriptor: %s", err->message);
+  exit (EXIT_FAILURE);
+}
+
+static GMarkupParser 
+migration_parser = { start_element, NULL, text, NULL, error };
+
+static struct migration_descriptor *
+parse_descriptor (FILE *descriptor)
+{
+  struct migration_descriptor *md = 
+    calloc (1, sizeof (struct migration_descriptor));
+
+  GMarkupParseContext *context = g_markup_parse_context_new
+    (&migration_parser, 0, md, NULL);
+
+  char buf[1024];
+  int len = 0;
+  
+  while ((len = fread (buf, sizeof (char), 1024, descriptor)) > 0)
+    g_markup_parse_context_parse (context, buf, len, NULL);
+  g_markup_parse_context_end_parse (context, NULL);
+
+  return md;
+}
+
+static SCM
+enqueue_oids (SCM migration_ptr, SCM oids)
+{
+  mpz_t oid;
+  struct migration *m = (struct migration *) scm_to_pointer (migration_ptr);
+
+  mpz_init (oid);
+
+  while (oids != SCM_EOL)
+    {
+      scm_to_mpz (SCM_CAR (oids), oid);
+      g_queue_push_tail (m->pending_oids, mpz_get_str (NULL, 16, oid));
+      oids = SCM_CDR (oids);
+    }
+
+  mpz_clear (oid);
+  return SCM_UNSPECIFIED;
+}
+
+static void
+initialize_scheme_bindings ()
+{
+  SCM gpd = scm_c_resolve_module ("gzochi private data");
+  SCM gpdm = scm_c_resolve_module ("gzochi private data migration");
+  SCM scm_enqueue_oids = scm_c_make_gsubr 
+    ("enqueue-oids!", 2, 0, 0, enqueue_oids);
+
+  gzochid_guile_init ();
+  gzochid_scheme_initialize_bindings ();
+
+  scm_push_type_registry_x = 
+    scm_variable_ref (scm_c_module_lookup (gpd, "gzochi:push-type-registry!"));
+  scm_pop_type_registry_x =
+    scm_variable_ref (scm_c_module_lookup (gpd, "gzochi:pop-type-registry!"));
+  scm_gzochi_visit_object = 
+    scm_variable_ref (scm_c_module_lookup (gpdm, "gzochi:visit-object"));
+
+  scm_variable_set_x 
+    (scm_c_module_lookup (gpdm, "enqueue-oids!"), scm_enqueue_oids);
+
+  scm_gc_protect_object (scm_push_type_registry_x);
+  scm_gc_protect_object (scm_pop_type_registry_x);
+  scm_gc_protect_object (scm_gzochi_visit_object);
+  scm_gc_protect_object (scm_enqueue_oids);
+}
+
+static gzochid_storage_store *
+create_store (gzochid_storage_context *context, char *path)
+{
+  gzochid_storage_store *store = gzochid_storage_open 
+    (context, path, GZOCHID_STORAGE_CREATE | GZOCHID_STORAGE_EXCL);
+
+  if (store == NULL)
+    {
+      g_critical ("Failed to open store in %s", path);
+      exit (EXIT_FAILURE);
+    }
+  else return store;
+}
+
+static gzochid_storage_store *
+create_oid_scratch_storage (char *scratch_dir)
+{
+  gchar *filename = g_strconcat (scratch_dir, "/oids", NULL);
+  gzochid_storage_context *context = gzochid_storage_initialize (scratch_dir);
+  gzochid_storage_store *store = create_store (context, filename);
+
+  g_free (filename);
+  return store;
+}
+
+static void
+cleanup_oids_scratch_storage (gzochid_storage_store *s, char *scratch_dir)
+{
+  gzochid_storage_context *context = s->context;
+
+  gzochid_storage_close (s);
+  gzochid_storage_destroy (context, scratch_dir);
+}
+
+static SCM 
+resolve_or_die (char *module_name, char *symbol)
+{
+  SCM module = scm_c_resolve_module (module_name);
+  SCM variable = scm_module_variable (module, scm_from_locale_symbol (symbol));
+
+  if (variable == SCM_BOOL_F)
+    {
+      g_critical ("Failed to resolve (@ %s (%s)).", symbol, module_name);
+      exit (EXIT_FAILURE);
+    }
+  else return scm_variable_ref (variable);
+}
+
+static void
+append_load_paths (GList *load_paths)
+{
+  GList *load_path_ptr = load_paths;
+  while (load_path_ptr != NULL)
+    {
+      gzochid_guile_add_to_load_path ((char *) load_path_ptr->data);
+      load_path_ptr = load_path_ptr->next;
+    }
+}
+
+static struct migration *
+create_migration 
+(gzochid_application_context *context, struct migration_descriptor *md, 
+ gboolean dry_run, gboolean quiet)
+{ 
+  struct migration *m = malloc (sizeof (struct migration));
+  char *scratch_dir_template = strdup ("gzochid-migrate-XXXXXXX");
+  char *scratch_dir = g_dir_make_tmp (scratch_dir_template, NULL);
+  
+  if (scratch_dir == NULL)
+    {
+      g_critical ("Unable to create scratch storage: %s", strerror (errno));
+      exit (EXIT_FAILURE);
+      return NULL; /* Never reached. */
+    }
+
+  assert (md->callback_name != NULL && strlen (md->callback_name) > 0);
+  assert (md->callback_module != NULL && strlen (md->callback_module) > 0);
+
+  append_load_paths (context->descriptor->load_paths);
+  append_load_paths (md->load_paths);
+
+  m->context = context;
+  m->descriptor = md;
+  m->dry_run = dry_run;
+  m->explicit_rollback = FALSE;
+  m->quiet = quiet;
+  m->pending_oids = g_queue_new ();
+  
+  m->visited_oids = create_oid_scratch_storage (scratch_dir);
+  m->visited_oids_path = scratch_dir;
+
+  m->callback = resolve_or_die (md->callback_module, md->callback_name);
+
+  if (md->input_registry_name != NULL)
+    {
+      assert (md->input_registry_module != NULL);
+      m->input_registry = resolve_or_die 
+	(md->input_registry_module, md->input_registry_name);
+    }
+  else m->input_registry = SCM_BOOL_F;
+
+  if (md->output_registry_name != NULL)
+    {
+      assert (md->output_registry_module != NULL);
+      m->output_registry = resolve_or_die
+	(md->output_registry_module, md->output_registry_name);
+    }
+  else m->output_registry = SCM_BOOL_F;
+
+  m->pushed_registry = FALSE;
+
+  scm_gc_protect_object (m->input_registry);
+  scm_gc_protect_object (m->output_registry);
+  scm_gc_protect_object (m->callback);
+
+  mpz_init (m->num_visited);
+  mpz_init (m->num_transformed);
+  mpz_init (m->num_removed);
+
+  return m;
+}
+
+static void 
+cleanup_application_context (gzochid_application_context *context)
+{
+  gzochid_storage_close (context->meta);
+  gzochid_storage_close (context->names);
+  gzochid_storage_close (context->oids);
+
+  gzochid_application_context_free (context);
+}
+
+static void
+cleanup_migration (struct migration *m)
+{
+  cleanup_application_context (m->context);
+
+  cleanup_oids_scratch_storage (m->visited_oids, m->visited_oids_path);
+  free (m->visited_oids_path);
+
+  g_queue_free (m->pending_oids);
+
+  if (m->input_registry != SCM_BOOL_F)
+    scm_gc_unprotect_object (m->input_registry);
+  if (m->output_registry != SCM_BOOL_F)
+    scm_gc_unprotect_object (m->output_registry);
+  scm_gc_unprotect_object (m->callback);
+
+  mpz_clear (m->num_visited);
+  mpz_clear (m->num_transformed);
+  mpz_clear (m->num_removed);
+  
+  free (m);
+}
+
+static gzochid_storage_store *
+open_store 
+(gzochid_storage_context *context, char *path, char *db)
+{
+  gchar *filename = g_strconcat (path, "/", db, NULL);
+  gzochid_storage_store *store = gzochid_tool_open_store (context, filename);
+
+  g_free (filename);
+  return store;
+}
+
+static gzochid_application_context *
+create_application_context (char *app)
+{
+  GHashTable *config = 
+    gzochid_tool_load_game_config (QUOTE (GZOCHID_CONF_LOCATION));
+  gzochid_application_context *context = gzochid_application_context_new ();
+  char *work_dir = NULL, *data_dir = NULL, *deploy_dir = NULL, *app_dir = NULL;
+
+  if (! g_hash_table_contains (config, "server.fs.data"))
+    {
+      g_critical ("server.fs.data must be set.");
+      exit (EXIT_FAILURE);
+    }
+
+  work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
+  data_dir = g_strconcat (work_dir, "/", app, NULL);
+  deploy_dir = strdup (g_hash_table_lookup (config, "server.fs.apps"));
+  app_dir = g_strconcat (deploy_dir, "/", app, "/", GAME_DESCRIPTOR_XML, NULL);
+
+  context->descriptor = gzochid_config_parse_application_descriptor (app_dir);
+
+  if (context->descriptor == NULL)
+    {
+      g_critical ("Failed to parse application descriptor in %s", app_dir);
+      exit (EXIT_FAILURE);
+    }
+
+  context->storage_context = gzochid_storage_initialize (data_dir);
+
+  if (context->storage_context == NULL)
+    {
+      fprintf (stderr, "Failed to initialize store in %s", data_dir);
+      exit (EXIT_FAILURE);
+    }
+
+  context->meta = open_store (context->storage_context, data_dir, "meta");
+  context->names = open_store (context->storage_context, data_dir, "names");
+  context->oids = open_store (context->storage_context, data_dir, "oids");
+
+  free (work_dir);
+  free (data_dir);
+  free (deploy_dir);
+  free (app_dir);
+
+  return context;
+}
+
+static SCM
+invoke_callback (struct migration *m, gzochid_data_managed_reference *obj_ref)
+{
+  SCM migration_ptr = scm_from_pointer (m, NULL);
+  SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
+  SCM obj = gzochid_scm_location_resolve 
+    (m->context, (gzochid_scm_location_info *) obj_ref->obj);
+  SCM ret = SCM_BOOL_F;
+
+  gpointer args[4];
+
+  args[0] = scm_gzochi_visit_object;
+  args[1] = scm_list_3 (migration_ptr, obj, m->callback);
+  args[2] = exception_var;
+  args[3] = &ret;
+
+  gzochid_scheme_application_worker (m->context, NULL, args);
+
+  scm_remember_upto_here_1 (migration_ptr);
+  scm_remember_upto_here_1 (exception_var);
+  scm_remember_upto_here_1 (obj);
+
+  return ret;
+}
+
+/*
+  A no-op transaction participant, so that the migration process can join and
+  possibly roll back the transaction (if performing a dry run).
+ */
+
+static int
+prepare (gpointer user_data) { return TRUE; }
+
+static void
+commit (gpointer user_data) { }
+
+static void
+rollback (gpointer user_data) { }
+
+static gzochid_transaction_participant 
+migration_participant = { "migration", prepare, commit, rollback };
+
+
+static void
+migrate_object_tx (gpointer data)
+{
+  gpointer *args = (gpointer *) data;
+  struct migration *m = (struct migration *) args[0];
+  char *oid_str = (char *) args[1];
+
+  mpz_t oid;
+
+  GError *err = NULL;
+  gzochid_data_managed_reference *obj_ref = NULL;
+
+  mpz_init (oid);
+  mpz_set_str (oid, oid_str, 16);
+
+  m->explicit_rollback = FALSE;
+  if (m->pushed_registry)
+    {
+      scm_call_0 (scm_pop_type_registry_x);
+      m->pushed_registry = FALSE;
+    }
+  if (m->input_registry != SCM_BOOL_F)
+    {
+      scm_call_1 (scm_push_type_registry_x, m->input_registry);
+      m->pushed_registry = TRUE;
+    }
+
+  obj_ref = gzochid_data_create_reference_to_oid 
+    (m->context, &gzochid_scm_location_aware_serialization, oid);
+  gzochid_data_dereference (obj_ref, &err);
+
+  mpz_add_ui (m->num_visited, m->num_visited, 1);
+
+  if (err != NULL)
+    {
+      if (g_error_matches 
+	  (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND))
+	g_warning ("No data found for oid %s.", oid_str);
+      else 
+	{
+	  g_critical 
+	    ("Failed to deserialize data for oid %s: %s", 
+	     oid_str, err->message);
+	  exit (EXIT_FAILURE);
+	}
+    }
+  else
+    {
+      SCM ret = invoke_callback (m, obj_ref);
+
+      if (ret == SCM_BOOL_F)
+	{
+	  gzochid_data_remove_object (obj_ref, &err);
+	  if (err != NULL)
+	    {
+	      g_critical ("Failed to remove data for oid %s", oid_str);
+	      exit (EXIT_FAILURE);
+	    }
+	  
+	  mpz_add_ui (m->num_removed, m->num_removed, 1);
+	}
+      else if (ret != SCM_UNSPECIFIED)
+	{
+	  /* gzochid_scm_location_get does not protect objects (though it does
+	     unprotect them during finalization) so do it here explicitly. */
+
+	  scm_gc_protect_object (ret);
+
+	  obj_ref->obj = gzochid_scm_location_get (m->context, ret);
+	  obj_ref->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
+
+	  mpz_add_ui (m->num_transformed, m->num_transformed, 1);
+	}
+    }
+
+  if (m->pushed_registry)
+    {
+      scm_call_0 (scm_pop_type_registry_x);
+      m->pushed_registry = FALSE;
+    }
+  if (m->output_registry != SCM_BOOL_F)
+    {
+      scm_call_1 (scm_push_type_registry_x, m->output_registry);
+      m->pushed_registry = TRUE;
+    }
+
+  mpz_clear (oid);
+
+  if (m->dry_run && !m->explicit_rollback)
+    {
+      gzochid_transaction_join (&migration_participant, NULL);
+      gzochid_transaction_mark_for_rollback (&migration_participant, TRUE);
+      m->explicit_rollback = TRUE;
+    }
+}
+
+static void 
+migrate_object (struct migration *m, char *oid_str)
+{
+  gpointer args[2];
+
+  args[0] = m;
+  args[1] = oid_str;
+
+  size_t oid_len = strlen (oid_str);
+  char *val = gzochid_storage_get 
+    (m->visited_oids, oid_str, oid_len, NULL);
+      
+  if (val == NULL)
+    {
+      gzochid_storage_put (m->visited_oids, oid_str, oid_len, "", 1);
+      if (gzochid_transaction_execute (migrate_object_tx, args) 
+	  != GZOCHID_TRANSACTION_SUCCESS && !m->explicit_rollback)
+	{
+	  g_critical ("Migration transaction failed.");
+	  exit (EXIT_FAILURE);
+	}
+      else free (oid_str);
+    }
+  else free (val);
+}
+
+struct datum
+{
+  char *data;
+  size_t data_len;
+};
+
+static struct datum
+next_key (struct migration *m, struct datum last_key)
+{
+  struct datum key = { NULL, 0 };
+
+  if (last_key.data == NULL)
+    key.data = gzochid_storage_next_key 
+      (m->context->names, "o.", 2, &key.data_len);
+  else key.data = gzochid_storage_next_key 
+	 (m->context->names, last_key.data, last_key.data_len, &key.data_len);
+
+  if (key.data != NULL && strncmp ("o.", key.data, 2) != 0)
+    {
+      free (key.data);
+      memset (&key, 0, sizeof (struct datum));
+    }
+  
+  return key;
+}
+
+static void
+run_migration (struct migration *m)
+{
+  struct datum key = { NULL, 0 }, last_key = { NULL, 0 };
+
+  while (TRUE)
+    {
+      char *oid_str = NULL;
+
+      if (! g_queue_is_empty (m->pending_oids))
+	oid_str = g_queue_pop_head (m->pending_oids);
+      else
+	{
+	  last_key = key;
+	  key = next_key (m, last_key);
+	  
+	  free (last_key.data);
+
+	  if (key.data == NULL)
+	    break;
+	  else oid_str = gzochid_storage_get 
+		 (m->context->names, key.data, key.data_len, NULL);
+	}
+
+      migrate_object (m, oid_str);
+    }
+}
+
+static void
+report_stats (struct migration *m)
+{
+  struct timeval ret;
+
+  timersub (&m->end_time, &m->start_time, &ret);
+  fprintf (stderr, "Migration complete in %lu ms.\n", 
+	   ret.tv_sec * 1000 + ret.tv_usec / 1000);
+
+  gmp_fprintf (stderr, "Objects visited: %Zu\n", m->num_visited);
+  gmp_fprintf (stderr, "Objects transformed: %Zu\n", m->num_transformed);
+  gmp_fprintf (stderr, "Objects removed: %Zu\n", m->num_removed);
+}
+
+static struct migration_descriptor *
+create_migration_descriptor (const char *path)
+{
+  FILE *f = fopen (path, "r");
+  struct migration_descriptor *md = NULL;
+
+  if (f == NULL)
+    {
+      g_critical 
+	("Failed to open migration descriptor %s: %s", path, strerror (errno));
+      exit (EXIT_FAILURE);
+    }
+  
+  md = parse_descriptor (f);
+  fclose (f);
+
+  return md;
+}
+
+static void
+migrate (const char *path, gboolean dry_run, gboolean quiet)
+{
+  struct migration *m = NULL;
+  struct migration_descriptor *md = create_migration_descriptor (path);
+
+  m = create_migration 
+    (create_application_context (md->target), md, dry_run, quiet);
+
+  gettimeofday (&m->start_time,  NULL);
+  run_migration (m);
+  gettimeofday (&m->end_time,  NULL);
+  
+  if (!m->quiet)
+    report_stats (m);
+
+  cleanup_migration (m);
+}
+
+/*
+  A dummy GLib log handler to use for suppressing log messages when the 
+  migrator is in "quiet" mode.
+*/
+static void 
+null_log_handler 
+(const gchar *domain, GLogLevelFlags level, const gchar *msg, gpointer data)
+{
+}
+
+static const struct option longopts[] =
+  {
+    { "help", no_argument, NULL, 'h' },
+    { "version", no_argument, NULL, 'v' },
+    { "dry-run", no_argument, NULL, 'n' },
+    { "quiet", no_argument, NULL, 'q' },
+    { NULL, 0, NULL, 0 }
+  };
+
+static void
+print_version (void)
+{
+  fprintf (stderr, "gzochi-migrate (gzochi) %s\n", VERSION);
+
+  fputs ("", stderr);
+  fprintf (stderr, _("\
+Copyright (C) %s Julian Graham\n\
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\
+This is free software: you are free to change and redistribute it.\n\
+There is NO WARRANTY, to the extent permitted by law.\n"),
+          "2014");
+}
+
+static void
+print_help (const char *program_name)
+{
+  fprintf (stderr, _("\
+Usage: %s [-n] [-q] <MIGRATION_DESCRIPTOR>\n\
+       %s [-h | -v]\n"), program_name, program_name);
+  
+  fputs ("", stderr);
+  fputs (_("\
+  -n, --dry-run       run the migration without committing changes\n\
+  -q, --quiet         run without logging messages or stats\n\
+  -h, --help          display this help and exit\n\
+  -v, --version       display version information and exit\n"), stderr);
+
+  fputs ("", stderr);
+  fprintf (stderr, _("\
+Report bugs to: %s\n"), PACKAGE_BUGREPORT);
+#ifdef PACKAGE_PACKAGER_BUG_REPORTS
+  fprintf (stderr, _("Report %s bugs to: %s\n"), PACKAGE_PACKAGER,
+          PACKAGE_PACKAGER_BUG_REPORTS);
+#endif /* PACKAGE_PACKAGER_BUG_REPORTS */
+
+#ifdef PACKAGE_URL
+  fprintf (stderr, _("%s home page: <%s>\n"), PACKAGE_NAME, PACKAGE_URL);
+#else
+  fprintf (stderr, _("%s home page: <http://www.nongnu.org/%s/>\n"),
+	   PACKAGE_NAME, PACKAGE);
+#endif /* PACKAGE_URL */
+}
+
+static void
+inner_main (void *data, int argc, char *argv[])
+{
+  int optc = 0;
+  const char *program_name = argv[0];
+  gboolean dry_run = FALSE;
+  gboolean quiet = FALSE;
+  
+  setlocale (LC_ALL, "");
+  
+  while ((optc = getopt_long (argc, argv, "+nqhv", longopts, NULL)) != -1)
+    switch (optc)
+      {
+      case 'n': 
+	dry_run = TRUE;
+	break;
+      case 'q':
+	quiet = TRUE;
+	g_log_set_handler 
+	  (NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION, 
+	   null_log_handler, NULL);
+	break;
+
+      case 'v':
+	print_version ();
+	exit (EXIT_SUCCESS);
+	break;
+      case 'h':
+	print_help (program_name);
+	exit (EXIT_SUCCESS);
+	break;
+      }
+
+  if (optind != argc - 1)
+    {
+      print_help (program_name);
+      exit (EXIT_FAILURE);
+    }
+  else 
+    {
+      initialize_scheme_bindings ();
+      migrate (argv[optind], dry_run, quiet);
+    }
+}
+
+/*
+  Bootstrap Guile and call the "real" main.
+ */
+int
+main (int argc, char *argv[])
+{
+  scm_boot_guile (argc, argv, inner_main, 0);
+  return 0;
+}
