@@ -1,0 +1,11 @@
+*.log
+*.trs
+test-data
+test-event
+test-reloc
+test-scheme
+test-storage-bdb
+test-storage-hdb
+test-storage-lmdb
+test-task
+test-util
