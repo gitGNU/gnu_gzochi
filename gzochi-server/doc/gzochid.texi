@@ -1701,6 +1701,11 @@ These procedures return the same values as their counterparts in the
 @code{(rnrs records procedural)} library.
 @end deffn
 
+@deffn {Scheme Procedure} gzochi:managed-record? obj
+Returns @code{#t} if @var{obj} is a managed record, @code{#f} 
+otherwise.
+@end deffn
+
 @deffn {Scheme Procedure} gzochi:managed-record-rtd mr
 Returns the record-type descriptor for @var{mr}. This procedure
 returns the same value as the @code{record-rtd} procedure in the
