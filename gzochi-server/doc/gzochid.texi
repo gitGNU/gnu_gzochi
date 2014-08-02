@@ -77,6 +77,10 @@ Writing applications for gzochid
 * Scheme API reference::
 * An example application::
 
+Administration
+
+* Database tools::
+
 Appendices
 
 * GNU Free Documentation License::
@@ -654,17 +658,12 @@ flexible, user-defined data structures called ``managed records.''
 A managed record is just like an R6RS record---in fact, a managed
 record @emph{is} an R6RS record that has the record-type
 @code{gzochi:managed-record} as its parent---with a few additional
-rules. First of all, managed record-type definitions must be unique
-according to the R6RS record specification, and so a 
-@code{nongenerative} clause will be automatically created if it is
-not specified as part of a syntactic record type definition form; 
-when defining a type procedurally, the record's name will be used if
-the @var{uid} argument is @code{#f}.
+rules. 
 
-Second, the fields of a managed record must be annotated to assist 
-the container in persisting them to the data store. This is done via
-a serialization clause added to every field sub-clause in the 
-managed record definition. The serialization clause gives a 
+First of all, the fields of a managed record must be annotated to 
+assist the container in persisting them to the data store. This is 
+done via a serialization clause added to every field sub-clause in 
+the managed record definition. The serialization clause gives a 
 reference to the serialization to use to convert the field value to 
 and from a stream of bytes as it is written to and read from the 
 data store. A serialization is a record that provides serializer and
@@ -674,6 +673,28 @@ a transaction. The serialization clause may be omitted for fields
 whose value will always be a managed record. In this case, a 
 built-in managed record serialization will be used.
 @xref{gzochi io}, for more information on serialization.
+
+Second, managed record-type definitions must be nongenerative 
+(unique) with respect to their serialized type. Every managed record
+type is associated with a symbol (called a ``serial UID'') that 
+identifies it to the serialization system, and no two managed record
+types may share the same serial UID. A record type's serial UID may 
+be given explicitly, via the @var{serial-uid} keyword argument or 
+clause, or one will be selected automatically: By taking the record 
+type's R6RS @code{uid} (if the type is nongenerative) or by taking 
+the record type name.
+
+All managed record types definitions are added to a type registry,
+from which they are looked up by their serial UIDs during 
+serialization and deserialization. Record types that do not specify
+a target type registry via the @code{type-registry} keyword argument
+or clause will be added to a default type registry. The 
+@code{(gzochi data)} data module exports procedures that allow 
+developers to create new type registries, but this is not typically
+useful outside the scope of a database migration, since during 
+normal operation of the gzochid container, only the default type
+registry is used. @xref{Migrating data}, for more information on 
+data migration.
 
 For parity with the R6RS record libraries, the gzochid Scheme API 
 provides both syntactic and procedural facilities for working with
@@ -1636,13 +1657,7 @@ The structure of @var{name-spec} and the @var{record-clause}
 sub-forms are the same as in the R6RS @code{define-record-type},
 with the following exceptions:
 
-First, as all managed records are nongenerative, if a 
-@code{nongenerative} clause is not present as one of the 
-@var{record-clause} sub-forms---or if the @code{uid} component of
-this clause is not specified---then the record name will be used as
-the record type's uid.
-
-Second, each field definition that appears in a @code{fields} 
+First, each field definition that appears in a @code{fields} 
 declaration of a @code{record-clause} sub-form of a managed record
 definition may include a serialization specification that 
 provides the serialization to use for the field when it is 
@@ -1652,6 +1667,15 @@ form @code{(serialization s)}, where s is a
 specification is omitted, the container will use a default 
 serialization that requires all field values to be managed records 
 themselves or @code{#f}.
+
+A custom serial UID may be specified by adding a @code{serial-uid}
+clause as one of the @var{record-clause} sub-forms. This UID will
+be used to register the record type definition in the default type
+registry, or in the registry specified by the @code{type-registry}
+clause, if one is provided. Custom serial UIDs and non-default type
+registries are mainly useful when implementing migration processes.
+@xref{Migrating data}, for more information.
+
 @end deffn
 
 @deffn {Scheme Syntax} gzochi:managed-record-type-descriptor record-name
@@ -1664,14 +1688,14 @@ Evaluates to the managed record-constructor descriptor associated
 with the type specified by @var{record-name}.
 @end deffn
 
-@deffn {Scheme Procedure} gzochi:make-managed-record-type-descriptor name parent uid sealed? opaque? fields
+@deffn {Scheme Procedure} gzochi:make-managed-record-type-descriptor name parent uid sealed? opaque? fields #:serial-uid serial-uid #:type-registry type-registry
 Returns a new record-type descriptor for the managed record with the
 specified properties, which have the same semantics as they do when
 passed to R6RS's @code{make-record-type-descriptor}, with the 
-following exceptons that if @var{uid} may not be @code{#f}, an 
-@code{&assertion} condition will be raised; and the field 
-descriptors in @var{fields} may contain serialization specifiers as
-described above.
+exceptions that the field descriptors in @var{fields} may contain 
+serialization specifiers as described above, and that the optional 
+keyword arguments @code{#:serial-uid} and @code{#:type-registry} may
+be present and have the effect described above.
 @end deffn
 
 @deffn {Scheme Procedure} gzochi:managed-record-accessor mrtd k
@@ -1699,6 +1723,18 @@ descriptor @var{mrcd}. This procedure returns the same value as the
 @deffnx {Scheme Procedure} gzochi:managed-record-type-uid mrtd
 These procedures return the same values as their counterparts in the
 @code{(rnrs records procedural)} library.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:make-managed-record-type-registry
+@deffnx {Scheme Procedure} gzochi:managed-record-type-registry?
+A constructor and type predicate for managed record type registries,
+which can be used to control the visibility of managed record types 
+in different contexts; in particular, across different schemas 
+during a database migration.
+@code{gzochi:make-managed-record-type-registry} constructs a new
+type registry object. @code{gzochi:managed-record-type-registry?}
+returns @code{#t} if @var{obj} is a managed record type registry,
+@code{#f} otherwise.
 @end deffn
 
 @deffn {Scheme Procedure} gzochi:managed-record? obj
@@ -2271,6 +2307,219 @@ message is received from a client session; in this case, the
 @code{client-message} procedure is used. The other callback 
 (@code{client-disconneted} in the example above) will be called when
 the session disconnects. 
+
+@node Database tools
+@chapter Database tools
+
+The data for a gzochi game application is stored in three separate 
+databases: Names, which binds names to object identifiers; oids, 
+which stores the serialized objects that encode the state of the 
+game; and meta, which tracks necessary metadata about the object 
+identifier key space. Tools for manipulating these databases are
+described in the following sections.
+
+@menu
+* Migrating data::
+@end menu
+
+@node Migrating data
+@section Migrating data
+
+It is unusual that a single version of a piece of software serves
+its users for the duration of their experience of it. Game 
+application software is no different; delivering bug-fixes, 
+performance enhancements, and new features may require that you 
+deploy updates to the game application code running in the gzochid
+container. Sometimes, this new code may depend on additions or 
+modifications to the structure of the records that describe the 
+persistent state of the game; and these modifications will usually
+need to be applied to instances of these records that have already
+been stored in the database.
+
+The gzochi-migrate utility allows you to transform the contents of a
+gzochi game application database by visiting and optionally 
+re-writing (or removing parts of) the persisted game object graph. A
+migration to be executed by gzochi-migrate is described in an XML 
+migration descriptor file; the logic for processing the objects in 
+the database being migrated is defined by the migration visitor, a 
+procedure written in Guile Scheme.
+
+gzochi-migrate reads the descriptor, resolves the type registries 
+and visitor procedure, and then traverses the application-visible 
+keyspace of the @code{names} database (that is, the set of keys that
+begin with ``o.'') to identify the roots of the game object graph 
+and enqueue them for visiting. For each object identifier in the 
+migrator's queue, the corresponding record is deserialized from the
+@code{oids} database and passed as an argument to the visitor 
+procedure. Any references to other managed records held by the 
+record being migrated are enqueued for subsequent visit. In this 
+way, every managed record that is reachable from a named binding is 
+visited exactly once.
+
+@menu
+* The migration visitor procedure::
+* The migration descriptor::
+* A sample migration::
+@end menu
+
+@node The migration visitor procedure
+@subsection The migration visitor procedure
+
+The migration visitor is a Scheme procedure invoked by 
+gzochi-migrate on each reachable object in the game database. It is
+the responsibility of the migration visitor procedure to provide a
+disposition for each object it is given, and it does so via the
+value it returns. If the visitor returns:
+
+@table @code
+@item #f
+the object is removed from the object graph.
+
+@item a managed record
+the object is replaced by this value.
+
+@item an unspecified value
+the object is left unmodified.
+
+@item any other value
+an error is signaled.
+
+@end table
+
+The simplest implementation of a migration visitor is a bijective
+function over managed records: A procedure that accepts a managed 
+record and returns one of the values listed above. Visitor 
+procedures may have side effects, too, though, and may achieve them
+through interactions with the object graph or explicit calls to the
+data management functions. A visitor procedure may call 
+@code{gzochi:remove-object!} on its argument or on a record to which
+its argument has a field reference. However, named bindings should 
+not be modified while a migration is in progress; in particular, the
+effect of @code{gzochi:set-binding!} is undefined. gzochi API
+functionality related to network communication and task scheduling 
+is not supported during migrations, and the effects of calling 
+procedures in those modules is also undefined.
+
+@node The migration descriptor
+@subsection The migration descriptor
+
+The XML migration descriptor has the schema described in the 
+following paragraphs. A DTD that can be used to validate the 
+structure of your migration descriptors is included in the gzochid
+source distribution.
+
+The migration descriptor's document element is @code{migration}, and
+it must include a @code{target} attribute giving the name of the 
+deployed game application to be migrated. (The directories 
+containing the game database files are computed using the 
+gzochid.conf file and the conventions of the storage engine against 
+which the server and database toolchain were built.)
+
+The @code{input-registry} and @code{output-registry} elements 
+specify managed record type registries to push onto the type
+resolution stack when an object in the graph is deserialized and 
+when it is serialized, respectively. Controlling the behavior of 
+type resolution during these lifecycle phases is crucial to 
+implementing a migration that mutates the structure of a declared
+type while preserving its name. Both of these migration descriptor
+elements require a @code{module} attribute, which gives the name (as
+a whitespace-delimited list of symbols) of the module exporting the
+type registry; and the @code{name} attribute, which gives the name 
+of the type registry within that module. Type registries may be 
+defined using the @code{gzochi:make-managed-record-type-registry}
+procedure in the @code{(gzochi data)} API.
+
+The @code{callback} element gives the procedure name and module (via
+the @code{procedure} and @code{module} attributes, respectively) of 
+the migration visitor procedure.
+
+The @code{load-paths} element is a wrapper element for zero or more
+@code{load-path} element, each of which specifies as its content an
+absolute or relative path to be added to the default Guile 
+@code{%load-path} variable when the input and output type registries
+are resolved, and when the visitor procedure is resolved. Note that 
+the game application root directory is added to the load path by 
+default.
+
+@node A sample migration
+@subsection A sample migration
+
+The following migration adds a new mutable field named 
+``experience-points'' to the managed record with the serial UID
+@code{player}. The version of the player structure persisted to the
+database without the new field is captured by the managed record 
+type definition for @code{from-player} below, which registers the
+type in the @code{input-registry} type registry. The version of the
+player structure that includes the new field and will be serialized
+back to the database is declared as @code{to-player} and is 
+registered in the @code{output-registry} type registry.
+
+After running this migration, the server administrator would need to
+deploy a new version of the ``my-game'' application that includes a
+type definition for the player structure that includes the field 
+added by @code{to-player}. 
+
+Note that while the re-use of the @code{player} UID allows this 
+migration to modify the structure of a record without changing its 
+type this migration is not strictly idempotent. Re-executing the 
+migration on an already-migrated database will cause serialized form
+of the version of the player structure that includes the 
+``experience-points'' field to be deserialized ``into'' a version of
+the player structure that does not contain that field. The gzochi 
+object system cannot natively detect this kind of serialization 
+mismatch; its outcome depends on the behavior of the serializer and
+deserializer procedures.
+
+Here is the Scheme module containing the type registries and visitor
+procedure:
+
+@example
+#!r6rs
+
+(library (my-game migration player)
+  (export input-registry output-registry migrate-player)
+  (import (gzochi) (rnrs))
+
+  (define input-registry (gzochi:make-managed-record-type-registry))
+  (define output-registry (gzochi:make-managed-record-type-registry))
+
+  (gzochi:define-managed-record-type from-player
+    (fields (immutable name (serialization gzochi:string-serialization))
+            (mutable hit-points (serialization gzochi:integer-serialization)))
+    (serial-uid player)
+    (type-registry input-registry)
+    (protocol (lambda (p)
+                (lambda (name)
+                  (p name 0)))))
+
+  (gzochi:define-managed-record-type to-player
+    (fields (immutable name (serialization gzochi:string-serialization))
+            (mutable hit-points (serialization gzochi:integer-serialization))
+            (mutable experience-points
+                     (serialization gzochi:integer-serialization)))
+    (serial-uid player)
+    (type-registry output-registry)
+    (protocol (lambda (p)
+                (lambda (name hit-points)
+                  (p name hit-points 0)))))
+
+  (define (migrate-player obj)
+    (if (from-player? obj)
+        (make-to-player (from-player-name obj) 
+                        (from-player-hit-points obj))))
+)
+@end example
+
+The migration descriptor for this migration:
+
+@example
+<?xml version="1.0"?>
+<migration target="my-game">
+  <input-registry module="my-game migration player" name="input-registry" />
+  <output-registry module="my-game migration player" name="output-registry" />
+  <callback module="my-game migration player" procedure="migrate-player" />
+</migration>
+@end example
 
 @node GNU Free Documentation License
 @appendix GNU Free Documentation License
