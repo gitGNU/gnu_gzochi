@@ -69,8 +69,14 @@ static void scan_app_dir (gzochid_game_context *context, char *dir)
     }
 
   descriptor = gzochid_config_parse_application_descriptor (descriptor_file);
-  initialize_application (context, descriptor);
-  g_free (descriptor_file);    
+
+  if (g_hash_table_contains (context->applications, descriptor->name))
+    gzochid_warning
+      ("Application in %s with name '%s' already exists; skipping.", 
+       descriptor_file, descriptor->name);
+  else initialize_application (context, descriptor);
+
+  g_free (descriptor_file);
 }
 
 static void scan_apps_dir (gzochid_game_context *context)
