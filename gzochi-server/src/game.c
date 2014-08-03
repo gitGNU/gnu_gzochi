@@ -42,6 +42,9 @@
 
 #define DEFAULT_TX_TIMEOUT_MS 100
 
+#define SERVER_FS_APPS_DEFAULT "/var/gzochid/deploy"
+#define SERVER_FS_DATA_DEFAULT "/var/gzochid/data"
+
 static void initialize_application 
 (gzochid_game_context *context, gzochid_application_descriptor *descriptor)
 {
@@ -226,9 +229,15 @@ void gzochid_game_context_init
   gzochid_schedule_task_queue_start (context->task_queue);
 
   context->port = gzochid_config_to_int
-    (g_hash_table_lookup (config, "server.port"), 0);
-  context->apps_dir = strdup (g_hash_table_lookup (config, "server.fs.apps"));
-  context->work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
+    (g_hash_table_lookup (config, "server.port"), 8001);
+
+  if (g_hash_table_contains (config, "server.fs.apps"))
+    context->apps_dir = strdup (g_hash_table_lookup (config, "server.fs.apps"));
+  else context->apps_dir = strdup (SERVER_FS_APPS_DEFAULT);
+
+  if (g_hash_table_contains (config, "server.fs.data"))
+    context->work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
+  else context->work_dir = strdup (SERVER_FS_DATA_DEFAULT);
 
   tx_timeout_ms = gzochid_config_to_long 
     (g_hash_table_lookup (config, "tx.timeout"), DEFAULT_TX_TIMEOUT_MS);

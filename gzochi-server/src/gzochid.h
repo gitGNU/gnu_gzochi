@@ -1,5 +1,5 @@
 /* gzochid.h: Prototypes and declarations for gzochid.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 typedef struct _gzochid_server_context
 {
   gzochid_context base;
+  const char *gzochid_conf_path;
   GThreadPool *pool;
 
   gzochid_context *admin_context;

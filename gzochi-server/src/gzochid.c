@@ -64,13 +64,28 @@ static void initialize_async (gpointer data, gpointer user_data)
   GHashTable *game_config = NULL;  
   GHashTable *log_config = NULL;
 
+  GError *err = NULL;
+
   server_context->admin_context = 
     (gzochid_context *) gzochid_admin_context_new ();
   server_context->game_context = 
     (gzochid_context *) gzochid_game_context_new ();
 
   g_key_file_load_from_file 
-    (key_file, QUOTE(GZOCHID_CONF_LOCATION), G_KEY_FILE_NONE, NULL);
+    (key_file, server_context->gzochid_conf_path, G_KEY_FILE_NONE, &err);
+
+  if (err != NULL)
+    {
+      /* 
+	 The server has reasonable defaults for everything in gzochid.conf, so
+	 this condition is not fatal.
+      */
+
+      g_warning 
+	("Failed to load server configuration file %s: %s", 
+	 server_context->gzochid_conf_path, err->message);
+      g_error_free (err);
+    }
 
   admin_config = gzochid_config_keyfile_extract_config (key_file, "admin");
   game_config = gzochid_config_keyfile_extract_config (key_file, "game");
@@ -236,6 +251,7 @@ int main (int argc, char *argv[])
       }
 
   context = gzochid_server_context_new ();
+  context->gzochid_conf_path = QUOTE(GZOCHID_CONF_LOCATION);
 
   gzochid_server_context_init (context);
   gzochid_fsm_until (((gzochid_context *) context)->fsm, GZOCHID_STATE_STOPPED);
