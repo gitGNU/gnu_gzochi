@@ -2319,8 +2319,95 @@ identifier key space. Tools for manipulating these databases are
 described in the following sections.
 
 @menu
+* Exporting data::
 * Migrating data::
 @end menu
+
+@node Exporting data
+@section Exporting data
+
+Making a copy of a gzochi game application database is a wise thing
+to do. Although the transactional storage layer of the server works
+to prevent inconsistent writes and catastrophic loss of data, it is
+unable to guard against ``application-level'' corruption of data 
+resulting from software bugs. Creating a backup at strategic 
+intervals lets you create rollback points before major releases, and
+also gives you access to ``scratch'' versions of real game state 
+that you can use to test new or experimental code. Copying the 
+contents of the game databases is not as simple as copying the 
+game's data directory. The files and formats used to store game data
+are not compatible across storage engine implementations, and so a
+game database created by an instance of gzochid compiled against one
+storage engine is not readable by an instance of gzochid compiled
+against another. And depending on the capabilities of the storage 
+engine, the contents of the files on disk may not fully capture the
+transactional state of a database being modified by a running 
+gzochid server, nor provide enough context for an independent server
+instance to successfully reconstruct it.
+
+The gzochi-dump utility allows you to perform a transactional export 
+of the contents of any (or all) of the gzochi game databases in a 
+portable, storage engine-independent format. 
+
+To export all of the three databases for a game application 
+(``names,'' ``oids,'' and ``meta''), run the @file{gzochi-dump}
+command on the data directory of the target game application, or
+just give it the name of the application, and it will ``guess'' its
+data directory based on the server's storage configuration.
+
+@example
+gzochi-dump /var/gzochid/data/mygame
+@end example
+
+The files @file{names.dump}, @file{oids.dump}, and @file{meta.dump}
+will be created in the current directory. To export a single game
+database, qualify the target (path or application name) with the 
+name of the database.
+
+@example
+gzochi-dump /var/gzochid/data/mygame:names
+@end example 
+
+The contents of the specified database will be written to standard
+output. See the @file{gzochi-dump} man page for more information on
+the flags understood by the tool.
+
+The gzochi-dump utility produces output in a portable flat-text
+format very similar to the format used by the db_dump tool 
+distributed with Berkeley DB---though the output of gzochi-dump is
+the same no matter what storage engine the server is built against.
+The format is as follows:
+
+First, a header section is written, as a series of name=value pairs.
+The first line is always the version specifier, ``VERSION=N'', where
+@var{N} is the version of the dump output format. The header section
+ends with the line ``HEADER=END''.
+
+Next, a data section is written, as a series of pairs of keys and 
+values, with each key and each value on its own line. Each line
+begins with one character of whitespace, followed by the hexadecimal
+representation of the bytes of the key or value in a two-character, 
+zero-padded format---effectively the output of @code{printf} with
+the @code{%.2hhx} conversion specifier. The data section ends with
+the line ``DATA=END''.
+
+Here is some example output written as the result of dumping the
+``names'' database of one of the example games included in the 
+gzochi source distribution:
+
+@example
+VERSION=3
+format=bytevalue
+type=btree
+HEADER=END
+ 6f2e6d617a6500
+ 33643000
+ 732e6368616e6e656c2e6d61696e00
+ 33643100
+ 732e696e697469616c697a657200
+ 3000
+DATA=END
+@end example
 
 @node Migrating data
 @section Migrating data
