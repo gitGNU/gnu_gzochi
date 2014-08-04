@@ -2320,6 +2320,7 @@ described in the following sections.
 
 @menu
 * Exporting data::
+* Importing data::
 * Migrating data::
 @end menu
 
@@ -2407,6 +2408,54 @@ HEADER=END
  732e696e697469616c697a657200
  3000
 DATA=END
+@end example
+
+@node Importing data
+@section Importing data
+
+The gzochi-load utility rebuilds a game database from the contents 
+of a database dumped by gzochi-dump in the format described in the
+previous section, read from standard input.
+
+As with gzochi-dump, you may specify the target of the 
+@file{gzochi-load} command as either a path to an application's data
+directory, or as the name of an application hosted by the gzochid
+container. The target database must also be given; gzochi-load can 
+only load data into a single database at a time. The database will
+be created if it does not already exist---gzochi-load will complain
+and halt if the target database @emph{does} exist, since its 
+majority use case is rebuilding a complete database from scratch.
+This behavior can be overridden by running @file{gzochi-load} with 
+the @code{--force} argument, but note that doing so runs the risk of
+corrupting existing game state, and so this option should be used
+with care.
+
+The following example shows how to use the @file{gzochi-load} 
+command to rebuild the ``oids'' database for the application 
+``mygame2.'' (gzochi-load will resolve the data directory for this
+application by reading the server configuration file and scanning
+the application deployment directory.)
+
+@example
+cat oids.dump | gzochi-load mygame2:oids
+@end example
+
+To make a complete clone of a game application's databases, dump all 
+three databases transactionally with gzochi-dump, then load each 
+dump file into the corresponding database in the target application
+data directory as per the shell script included below.
+
+@example
+#!/bin/sh
+
+DUMPDIR=`mktemp -d`
+
+gzochi-dump -o $DUMPDIR $1
+gzochi-load $2:meta < $DUMPDIR/meta.dump \
+    && gzochi-load $2:oids < $DUMPDIR/oids.dump \
+    && gzochi-load $2:names < $DUMPDIR/names.dump
+
+rm -rf $DUMPDIR
 @end example
 
 @node Migrating data
