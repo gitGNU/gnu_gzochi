@@ -505,7 +505,7 @@
   ;; vector.
 
   (define (facet-type->index facet-type)
-    (let ((uid (gzochi:managed-record-type-uid facet-type)))
+    (let ((uid (gzochi:managed-record-type-name facet-type)))
       (case uid
 	((abermud:room) 0)
 	((abermud:object) 1)
