@@ -350,13 +350,14 @@ make
 make install
 @end example
 
-This will install the gzochid executable @file{gzochid} to a 
-standard location, depending on the installation prefix---on most
-Unix-like systems, this will be @file{/usr/local}, with executable
-files being copied to @file{/usr/local/bin}. A server configuration
-file with the default settings will be installed to the @file{/etc}
-directory under the installation prefix---by default, 
-@file{/usr/local/etc}.
+This will install the gzochid executable @file{gzochid} (as well as
+the database tools @file{gzochi-dump}, @file{gzochi-load}, and 
+@file{gzochi-migrate}) to a standard location, depending on the 
+installation prefix---on most Unix-like systems, this will be 
+@file{/usr/local}, with executable files being copied to 
+@file{/usr/local/bin}. A server configuration file with the default
+settings will be installed to the @file{/etc} directory under the 
+installation prefix---by default, @file{/usr/local/etc}.
 
 This configuration file will be processed prior to installation to 
 set references to the gzochid deployment and data 
