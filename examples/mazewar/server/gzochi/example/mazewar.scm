@@ -20,10 +20,10 @@
 
 	  (gzochi app)
 	  (gzochi channel)
-	  (gzochi client)
 	  (gzochi data)
 	  (gzochi io)
 	  (gzochi log)
+	  (gzochi session)
 	  (gzochi task)
 
 	  (gzochi example mazewar data)

@@ -30,7 +30,7 @@
 	  gzochi:close-channel
 	  gzochi:send-channel-message)
 
-  (import (gzochi client)
+  (import (gzochi session)
 	  (gzochi conditions)
 	  (gzochi private data)
 	  (gzochi io)

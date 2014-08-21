@@ -1,5 +1,5 @@
-;; gzochi/private/client.scm: Private infrastructure for gzochi client API 
-;; Copyright (C) 2013 Julian Graham
+;; gzochi/private/session.scm: Private infrastructure for gzochi client API 
+;; Copyright (C) 2014 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
 
 #!r6rs
 
-(library (gzochi private client)
+(library (gzochi private session)
   (export gzochi:make-client-session
 	  gzochi:client-session?
 	  gzochi:client-session-name

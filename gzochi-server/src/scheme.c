@@ -1059,9 +1059,9 @@ static void *initialize_bindings (void *ptr)
 	    "gzochi:make-channel");
   bind_scm ("gzochi private channel", &scm_channel_oid, "gzochi:channel-oid");
 
-  bind_scm ("gzochi client", &scm_handler_received_message,
+  bind_scm ("gzochi session", &scm_handler_received_message,
 	    "gzochi:client-session-listener-received-message");
-  bind_scm ("gzochi client", &scm_handler_disconnected,
+  bind_scm ("gzochi session", &scm_handler_disconnected,
 	    "gzochi:client-session-listener-disconnected");
 
   bind_scm ("gzochi conditions", &scm_make_name_exists_condition,
@@ -1086,9 +1086,9 @@ static void *initialize_bindings (void *ptr)
   bind_scm ("gzochi private data", &scm_managed_reference_oid, 
 	    "gzochi:managed-reference-oid");
 
-  bind_scm ("gzochi private client", &scm_make_client_session, 
+  bind_scm ("gzochi private session", &scm_make_client_session, 
 	    "gzochi:make-client-session");
-  bind_scm ("gzochi private client", &scm_client_session_oid, 
+  bind_scm ("gzochi private session", &scm_client_session_oid, 
 	    "gzochi:client-session-oid");
 
   bind_scm ("gzochi private data", &scm_make_managed_reference, 

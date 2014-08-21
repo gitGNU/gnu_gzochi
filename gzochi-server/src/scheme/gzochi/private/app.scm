@@ -30,9 +30,9 @@
 
   (import (rnrs)
 	  (gzochi io)
-	  (gzochi private client)
 	  (gzochi private data)
-	  (gzochi private reflect))
+	  (gzochi private reflect)
+	  (gzochi private session))
 
   (gzochi:define-managed-record-type 
     (gzochi:callback gzochi:make-callback gzochi:callback?)

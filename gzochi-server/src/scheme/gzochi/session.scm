@@ -1,4 +1,4 @@
-;; gzochi/client.scm: Public exports for gzochi client session API
+;; gzochi/session.scm: Public exports for gzochi client session API
 ;; Copyright (C) 2011 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
@@ -16,7 +16,7 @@
 
 #!r6rs
 
-(library (gzochi client)
+(library (gzochi session)
   (export gzochi:client-session?
 	  gzochi:client-session-name
 
@@ -29,5 +29,5 @@
 	  gzochi:send-message
 	  gzochi:disconnect)
 
-  (import (gzochi private client))
+  (import (gzochi private session))
 )

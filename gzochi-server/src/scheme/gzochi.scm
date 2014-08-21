@@ -30,14 +30,6 @@
 	  gzochi:join-channel gzochi:leave-channel gzochi:send-channel-message
 	  gzochi:close-channel
 	  
-          ;; (gzochi client)
-
-	  gzochi:client-session? gzochi:client-session-name 
-	  gzochi:client-session-listener gzochi:make-client-session-listener
-	  gzochi:client-session-listener-received-message
-	  gzochi:client-session-listener-disconnected gzochi:send-message
-	  gzochi:disconnect
-
           ;; (gzochi conditions)
 
 	  &gzochi:name-exists gzochi:make-name-exists-condition
@@ -106,6 +98,14 @@
 	  gzochi:log gzochi:log-err gzochi:log-warning gzochi:log-notice
 	  gzochi:log-info gzochi:log-debug
 	  
+          ;; (gzochi session)
+
+	  gzochi:client-session? gzochi:client-session-name 
+	  gzochi:client-session-listener gzochi:make-client-session-listener
+	  gzochi:client-session-listener-received-message
+	  gzochi:client-session-listener-disconnected gzochi:send-message
+	  gzochi:disconnect
+
           ;; (gzochi task)
 
 	  gzochi:make-task gzochi:task? gzochi:task-module 
@@ -113,10 +113,10 @@
 
   (import (gzochi app)
 	  (gzochi channel)
-	  (gzochi client)
 	  (gzochi conditions)
 	  (gzochi data)
 	  (gzochi io)
 	  (gzochi log)
+	  (gzochi session)
 	  (gzochi task))
 )
