@@ -65,7 +65,8 @@ gzochid_tool_open_store (gzochid_storage_context *context, char *path)
 }
 
 char *
-gzochid_tool_probe_data_dir (char *app_or_dir, gboolean create_data_dir)
+gzochid_tool_probe_data_dir 
+(char *gzochid_conf_path, char *app_or_dir, gboolean create_data_dir)
 {
   if (g_file_test (app_or_dir, G_FILE_TEST_IS_DIR))
     {
@@ -76,9 +77,11 @@ gzochid_tool_probe_data_dir (char *app_or_dir, gboolean create_data_dir)
     {
       GHashTable *config = NULL;
       char *work_dir = NULL, *data_dir = NULL;
+      char *conf_path = gzochid_conf_path 
+	? gzochid_conf_path : QUOTE (GZOCHID_CONF_LOCATION);
       
-      g_debug ("Probing for an application with name %s.", app_or_dir);
-      config = gzochid_tool_load_game_config (QUOTE (GZOCHID_CONF_LOCATION));
+      g_info ("Reading configuration from %s", conf_path);
+      config = gzochid_tool_load_game_config (conf_path);
 
       if (! g_hash_table_contains (config, "server.fs.data"))
 	{
@@ -86,6 +89,8 @@ gzochid_tool_probe_data_dir (char *app_or_dir, gboolean create_data_dir)
 	  exit (EXIT_FAILURE);
 	}
       
+      g_debug ("Probing for an application with name %s.", app_or_dir);      
+
       work_dir = g_hash_table_lookup (config, "server.fs.data");
       data_dir = g_strconcat (work_dir, "/", app_or_dir, NULL);
       g_hash_table_destroy (config);

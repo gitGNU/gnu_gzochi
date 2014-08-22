@@ -176,6 +176,7 @@ dump_all (char *data_dir, char *output_dir)
 
 static const struct option longopts[] =
   {
+    { "config", required_argument, NULL, 'c' },
     { "output", required_argument, NULL, 'o' },
     { "help", no_argument, NULL, 'h' },
     { "version", no_argument, NULL, 'v' },
@@ -200,11 +201,12 @@ static void
 print_help (const char *program_name)
 {
   fprintf (stderr, _("\
-Usage: %s [-o <OUTPUT_DIR>] <APP_NAME or DATA_DIR>[:<DB>]\n\
+Usage: %s [-c <CONF>] [-o <OUTPUT_DIR>] <APP_NAME or DATA_DIR>[:<DB>]\n\
        %s [-h | -v]\n"), program_name, program_name);
   
   fputs ("", stderr);
   fputs (_("\
+  -c, --config        full path to gzochid.conf\n\
   -o, --output        the output directory, if dumping all databases; or\n\
                       the output file, if dumping a single database\n\
   -h, --help          display this help and exit\n\
@@ -230,14 +232,18 @@ int
 main (int argc, char *argv[])
 {
   const char *program_name = argv[0];
+  char *gzochid_conf_path = NULL;
   char *output = NULL;
   int optc = 0;
   
   setlocale (LC_ALL, "");
   
-  while ((optc = getopt_long (argc, argv, "+o:hv", longopts, NULL)) != -1)
+  while ((optc = getopt_long (argc, argv, "+c:o:hv", longopts, NULL)) != -1)
     switch (optc)
       {
+      case 'c':
+	gzochid_conf_path = strdup (optarg);
+	break;
       case 'o':
 	output = strdup (optarg);
 	break;
@@ -264,7 +270,8 @@ main (int argc, char *argv[])
   else 
     {
       char **targets = gzochid_tool_parse_targets (argv[optind]);
-      char *data_dir = gzochid_tool_probe_data_dir (targets[0], FALSE);
+      char *data_dir = gzochid_tool_probe_data_dir 
+	(gzochid_conf_path, targets[0], FALSE);
       char *db = targets[1];
 
       if (db == NULL)

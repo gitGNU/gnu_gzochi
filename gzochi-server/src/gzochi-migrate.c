@@ -517,10 +517,10 @@ open_store
 }
 
 static gzochid_application_context *
-create_application_context (char *app)
+create_application_context (char *gzochid_conf_path, char *app)
 {
-  GHashTable *config = 
-    gzochid_tool_load_game_config (QUOTE (GZOCHID_CONF_LOCATION));
+  GHashTable *config = gzochid_tool_load_game_config 
+    (gzochid_conf_path ? gzochid_conf_path : QUOTE (GZOCHID_CONF_LOCATION));
   gzochid_application_context *context = gzochid_application_context_new ();
   char *work_dir = NULL, *data_dir = NULL, *deploy_dir = NULL, *app_dir = NULL;
 
@@ -816,13 +816,15 @@ create_migration_descriptor (const char *path)
 }
 
 static void
-migrate (const char *path, gboolean dry_run, gboolean quiet)
+migrate 
+(char *gzochid_conf_path, const char *path, gboolean dry_run, gboolean quiet)
 {
   struct migration *m = NULL;
   struct migration_descriptor *md = create_migration_descriptor (path);
 
   m = create_migration 
-    (create_application_context (md->target), md, dry_run, quiet);
+    (create_application_context (gzochid_conf_path, md->target), md, dry_run, 
+     quiet);
 
   gettimeofday (&m->start_time,  NULL);
   run_migration (m);
@@ -846,6 +848,7 @@ null_log_handler
 
 static const struct option longopts[] =
   {
+    { "config", required_argument, NULL, 'c' },
     { "help", no_argument, NULL, 'h' },
     { "version", no_argument, NULL, 'v' },
     { "dry-run", no_argument, NULL, 'n' },
@@ -871,11 +874,12 @@ static void
 print_help (const char *program_name)
 {
   fprintf (stderr, _("\
-Usage: %s [-n] [-q] <MIGRATION_DESCRIPTOR>\n\
+Usage: %s [-c <CONF>] [-n] [-q] <MIGRATION_DESCRIPTOR>\n\
        %s [-h | -v]\n"), program_name, program_name);
   
   fputs ("", stderr);
   fputs (_("\
+  -c, --config        full path to gzochid.conf\n\
   -n, --dry-run       run the migration without committing changes\n\
   -q, --quiet         run without logging messages or stats\n\
   -h, --help          display this help and exit\n\
@@ -902,14 +906,18 @@ inner_main (void *data, int argc, char *argv[])
 {
   int optc = 0;
   const char *program_name = argv[0];
+  char *gzochid_conf_path = NULL;
   gboolean dry_run = FALSE;
   gboolean quiet = FALSE;
   
   setlocale (LC_ALL, "");
   
-  while ((optc = getopt_long (argc, argv, "+nqhv", longopts, NULL)) != -1)
+  while ((optc = getopt_long (argc, argv, "+c:nqhv", longopts, NULL)) != -1)
     switch (optc)
       {
+      case 'c':
+	gzochid_conf_path = strdup (optarg);
+	break;
       case 'n': 
 	dry_run = TRUE;
 	break;
@@ -938,7 +946,7 @@ inner_main (void *data, int argc, char *argv[])
   else 
     {
       initialize_scheme_bindings ();
-      migrate (argv[optind], dry_run, quiet);
+      migrate (gzochid_conf_path, argv[optind], dry_run, quiet);
     }
 }
 

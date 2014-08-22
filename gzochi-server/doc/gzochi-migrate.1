@@ -3,7 +3,7 @@
 gzochi-migrate \- Transform the contents of a gzochi database
 .SH SYNOPSIS
 .B gzochi-migrate
-[-n] [-q] <migration_descriptor>
+[-c <conf>] [-n] [-q] <migration_descriptor>
 .br
 .B gzochi-migrate
 [-h | -v]
@@ -49,6 +49,8 @@ When all reachable objects have been visited, the migration is complete.
 gzochid-migrate prints to standard error the results of the migration, including
 the counts of objects visited, modified, and removed.
 .SH OPTIONS
+.IP \fB\-c,\ \-\-config\fR
+Specify an alternate path to the gzochid.conf file.
 .IP \fB\-h,\ \-\-help\fR
 Write usage information to standard error, and exit.
 .IP \fB\-n,\ \-\-dry\-run\fR

@@ -180,6 +180,7 @@ load_data (char *data_dir, char *db, gboolean force)
 
 static const struct option longopts[] =
   {
+    { "config", required_argument, NULL, 'c' },
     { "force", no_argument, NULL, 'f' },
     { "help", no_argument, NULL, 'h' },
     { "version", no_argument, NULL, 'v' },
@@ -204,11 +205,12 @@ static void
 print_help (const char *program_name)
 {
   fprintf (stderr, _("\
-Usage: %s [-f] <APP_NAME or DATA_DIRECTORY>:<DB>\n\
+Usage: %s [-c <CONF>] [-f] <APP_NAME or DATA_DIRECTORY>:<DB>\n\
        %s [-h | -v]\n"), program_name, program_name);
 
   fputs ("", stderr);
   fputs (_("\
+  -c, --config        full path to gzochid.conf\n\
   -f, --force         force an import, even when the target already exists\n\
   -h, --help          display this help and exit\n\
   -v, --version       display version information and exit\n"), stderr);
@@ -233,14 +235,18 @@ int
 main (int argc, char *argv[])
 {
   const char *program_name = argv[0];
+  char *gzochid_conf_path = NULL;
   gboolean force = FALSE;
   int optc = 0;
   
   setlocale (LC_ALL, "");
   
-  while ((optc = getopt_long (argc, argv, "+fhv", longopts, NULL)) != -1)
+  while ((optc = getopt_long (argc, argv, "+c:fhv", longopts, NULL)) != -1)
     switch (optc)
       {
+      case 'c':
+	gzochid_conf_path = strdup (optarg);
+	break;
       case 'f':
 	force = TRUE;
 	break;
@@ -267,7 +273,8 @@ main (int argc, char *argv[])
   else
     {
       char **targets = gzochid_tool_parse_targets (argv[optind]);
-      char *data_dir = gzochid_tool_probe_data_dir (targets[0], TRUE);
+      char *data_dir = gzochid_tool_probe_data_dir 
+	(gzochid_conf_path, targets[0], TRUE);
       char *db = targets[1];
 
       if (db == NULL)

@@ -388,6 +388,13 @@ their behavior, are modifiable via a configuration file (see below).
 @command{gzochid} supports the following options:
 
 @table @option
+
+@item --config
+@itemx -c
+@opindex --config
+@opindex -c
+Specify an alternate location for the server configuration file.
+
 @item --help
 @itemx -h
 @opindex --help

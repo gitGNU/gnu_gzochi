@@ -3,7 +3,7 @@
 gzochi-dump \- Write gzochi databases to flat-text format
 .SH SYNOPSIS
 .B gzochi-dump
-[-o <output_dir>] <app_name or data_dir>[:<db>]
+[-c <conf>] [-o <output_dir>] <app_name or data_dir>[:<db>]
 .br
 .B gzochi-dump
 [-h | -v]
@@ -41,6 +41,8 @@ gzochi-dump /var/gzochid/data/mygame
 in the current directory.
 
 .SH OPTIONS
+.IP \fB\-c,\ \-\-config\fR
+Specify an alternate path to the gzochid.conf file.
 .IP \fB\-o,\ \-\-output\fR
 Specifies an output location for the data to be dumped. If dumping a single 
 database, the argument names the complete path to a target output file, which

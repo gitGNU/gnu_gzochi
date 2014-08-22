@@ -3,7 +3,7 @@
 gzochi-load \- Load exported gzochi databases
 .SH SYNOPSIS
 .B gzochi-load
-[-f] <app_name or data_dir>:<db>
+[-c <conf>] [-f] <app_name or data_dir>:<db>
 .br
 .B gzochi-load
 [-h | -v]
@@ -49,6 +49,8 @@ that by default gzochi-load will refuse to load data into a database that
 already exists.
 
 .SH OPTIONS
+.IP \fB\-c,\ \-\-config\fR
+Specify an alternate path to the gzochid.conf file.
 .IP \fB\-f,\ \-\-force\fR
 Disable the safeguards that prevent pre-existing database files from being
 written to. If this flag is specified, gzochi-load will add the contents of

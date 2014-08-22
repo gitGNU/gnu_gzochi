@@ -22,6 +22,7 @@
 #include <libintl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "admin.h"
 #include "config.h"
@@ -49,6 +50,7 @@
 
 static const struct option longopts[] =
   {
+    { "config", required_argument, NULL, 'c' },
     { "help", no_argument, NULL, 'h' },
     { "version", no_argument, NULL, 'v' },
     { NULL, 0, NULL, 0 }
@@ -196,6 +198,7 @@ Usage: %s [OPTION]...\n"), program_name);
   
   puts ("");
   fputs (_("\
+  -c, --config        full path to gzochid.conf\n\
   -h, --help          display this help and exit\n\
   -v, --version       display version information and exit\n"), stdout);
 
@@ -237,9 +240,14 @@ int main (int argc, char *argv[])
 
   setlocale (LC_ALL, "");
 
-  while ((optc = getopt_long (argc, argv, "hv", longopts, NULL)) != -1)
+  context = gzochid_server_context_new ();
+
+  while ((optc = getopt_long (argc, argv, "c:hv", longopts, NULL)) != -1)
     switch (optc)
       {
+      case 'c':
+	context->gzochid_conf_path = strdup (optarg);
+	break;
       case 'v':
 	print_version ();
 	exit (EXIT_SUCCESS);
@@ -248,11 +256,14 @@ int main (int argc, char *argv[])
 	print_help (program_name);
 	exit (EXIT_SUCCESS);
 	break;
+      case '?': exit (EXIT_FAILURE);
       }
 
-  context = gzochid_server_context_new ();
-  context->gzochid_conf_path = QUOTE(GZOCHID_CONF_LOCATION);
+  if (context->gzochid_conf_path == NULL)
+    context->gzochid_conf_path = QUOTE(GZOCHID_CONF_LOCATION);
 
+  g_info ("Reading configuration from %s", context->gzochid_conf_path);
+  
   gzochid_server_context_init (context);
   gzochid_fsm_until (((gzochid_context *) context)->fsm, GZOCHID_STATE_STOPPED);
   gzochid_server_context_free (context);
