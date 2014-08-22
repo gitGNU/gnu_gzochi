@@ -55,6 +55,12 @@ if [ $? != 0 ]; then
     exit 1
 fi
 
+./gzochi-guile-client/autogen.sh
+if [ $? != 0 ]; then
+    cd $OLDDIR
+    exit 1
+fi
+
 ./examples/abermud/autogen.sh
 if [ $? != 0 ]; then
     cd $OLDDIR

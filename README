@@ -19,6 +19,8 @@ component of the distribution:
 * gzochi-client/ - libgzochi, the reference client library implementation
 * gzochi-glib-client/ - libgzochi-glib, the GLib reference client library 
   implementation
+* gzochi-guile-client/ - (gzochi client), the GNU Guile reference client library
+  implementation
 * examples/ - some example games with client and server component 
   implementations intended to help new developers understand the gzochi
   framework

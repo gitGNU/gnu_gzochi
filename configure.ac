@@ -28,6 +28,7 @@ AC_CONFIG_SUBDIRS([gzochi-server])
 AC_CONFIG_SUBDIRS([gzochi-client-common])
 AC_CONFIG_SUBDIRS([gzochi-client])
 AC_CONFIG_SUBDIRS([gzochi-glib-client])
+AC_CONFIG_SUBDIRS([gzochi-guile-client])
 AC_CONFIG_SUBDIRS([examples/abermud])
 AC_CONFIG_SUBDIRS([examples/mazewar])
 
