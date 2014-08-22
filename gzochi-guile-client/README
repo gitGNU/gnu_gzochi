@@ -1,0 +1,50 @@
+This is version 0.6 of (gzochi client), a GNU Guile client library for the
+gzochi game development framework.
+
+gzochi is a framework for developing massively multiplayer online games. A
+server container provides services to deployed games, which are written in GNU
+Guile Scheme, that abstract and simplify some of the most challenging and
+error-prone aspects of online game development: Concurrency, data persistence, 
+and network communications. A very thin client library can be embedded to 
+provide connectivity for client applications written in any language.
+
+(gzochi client) is a reference client library implementation that provides an
+API for authentication and communication with a gzochi application endpoint. It
+is intended for use in the implementation of gzochi game client applications.
+
+Complete documentation for the reference client API can be found in the source
+code for the reference client itself. 
+
+Additional INSTALL instructions ===============================================
+
+Instructions for configuring and installing (gzochi client) can be found in the 
+INSTALL file.
+
+Special Instructions For Some Systems =========================================
+
+We would like (gzochi client) to install and run on all systems using the 
+simple instructions above, but a few systems may need special treatment. If you
+can send us fixes for system-specific problems, we'd be grateful.
+
+   <none yet listed>
+
+
+About This Distribution =======================================================
+
+Interesting files include:
+
+- COPYING, which contains the terms of GNU General Public License.
+- INSTALL, which contains instructions for installing (gzochi client).
+- NEWS, which describes user-visible changes since the last release of 
+  (gzochi client).
+
+Files are usually installed according to GNU Guile's library path,
+${prefix}/share/guile/site/${guile-version} by default, where ${prefix} is the
+installation prefix Guile was given when it was built - usually /usr or 
+/usr/local by default. Installing gives you:
+
+Libraries, in Guile's library directory:
+
+ gzochi/client.scm --- The client library itself, (gzochi client)
+ gzochi/client/protocol.scm --- gzochi communication protocol constants
+ gzochi/main-loop.scm --- A simple main loop implementation, inspired by GLib
