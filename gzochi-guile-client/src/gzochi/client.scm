@@ -94,8 +94,7 @@
 	    (mutable disconnect-acknowledged)
 	    buffer
 	    (mutable buffer-offset)
-	    send-mutex 
-	    recv-mutex)
+	    send-mutex)
 
     (protocol (lambda (n)
 		(lambda (socket)
@@ -106,10 +105,7 @@
 			      #:prepare prepare
 			      #:check check
 			      #:dispatch dispatch-all)))
-		    (p #f #f #t #f
-		       (make-bytevector max-buffer-size)
-		       0
-		       (make-mutex)
+		    (p #f #f #t #f (make-bytevector max-buffer-size) 0
 		       (make-mutex)))))))
   
   (define (read-short bv off) (bytevector-u16-ref bv off (endianness big)))
