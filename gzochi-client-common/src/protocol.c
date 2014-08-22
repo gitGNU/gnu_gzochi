@@ -198,7 +198,6 @@ int gzochi_client_protocol_read (gzochi_client_common_session *session)
       
   memcpy (session->buffer + session->buffer_length, chunk, bytes_read);
   session->buffer_length += bytes_read;
-  available_buffer -= bytes_read;
   
   return 0;
 }
