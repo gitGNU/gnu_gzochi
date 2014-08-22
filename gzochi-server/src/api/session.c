@@ -90,8 +90,8 @@ SCM_DEFINE (primitive_disconnect, "primitive-disconnect", 1, 0, 0,
 void gzochid_api_session_init (void)
 {
   SCM current_module = scm_current_module ();
-  SCM gzochi_private_client = scm_c_resolve_module ("gzochi private client");
-  scm_set_current_module (gzochi_private_client);
+  SCM gzochi_private_session = scm_c_resolve_module ("gzochi private session");
+  scm_set_current_module (gzochi_private_session);
 
   #include "session.x"
 
