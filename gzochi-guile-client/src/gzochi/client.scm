@@ -206,6 +206,7 @@
 
       (let ((sock (gzochi:selector-port/fd (gzochi:source-selector client))))
 	(let send-fully ((bv bv) (len bv-len))
+	  (select '() (list sock) (list sock))
 	  (let ((bytes-sent (send sock bv)))
 	    (cond ((< bytes-sent 0))
 		  ((not (eqv? bytes-sent len))

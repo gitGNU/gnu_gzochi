@@ -16,9 +16,13 @@
  */
 
 #include <gzochi-common.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 #include "protocol.h"
 #include "session.h"
@@ -34,9 +38,19 @@
 static int send_fully (int sock, unsigned char *data, int len)
 {
   int total_sent = 0;
+  fd_set wfds;
+
   while (total_sent < len)
-    {      
-      int bytes_sent = send
+    {
+      int bytes_sent = 0;
+
+      FD_ZERO (&wfds);
+      FD_SET (sock, &wfds);
+      
+      if (select (sock + 1, NULL, &wfds, &wfds, NULL) < 0)
+	return -1;
+
+      bytes_sent = send
 	(sock, (char *) data + total_sent, len - total_sent, SEND_FLAGS);
       
       if (bytes_sent < 0)
