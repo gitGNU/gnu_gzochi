@@ -4,6 +4,19 @@ See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.7 (since 0.6)
+
+* Changes to the distribution
+
+** New reference client library implementation: (gzochi client)
+
+Game developers who want to keep their entire application stack in Guile Scheme
+(C server container notwithstanding) are in luck! The new (gzochi client)
+library is a Scheme reference client implementation with an execution model that
+can be integrated into a main loop or used stand-alone. The source distribution
+for (gzochi client) is under the "gzochi-guile-client/" tree.
+
+
 Changes in 0.6 (since 0.5)
 
 * Compatibility
@@ -31,7 +44,7 @@ libgzochi-client-common already has a consumer in the distribution:
 libgzochi-glib, a new reference client implementation that integrates easily 
 with the "main loop" functionality in the popular GNU GLib library to support
 the development of single-threaded client applications. The source distribution
-for libgzochi-glibis under the "gzochi-glib-client/" tree.
+for libgzochi-glib is under the "gzochi-glib-client/" tree.
 
 ** Removed deprecated debugging client
 

@@ -4,6 +4,58 @@ See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.7 (since 0.6):
+
+* Incompatible changes
+
+** Client session library renamed
+
+To avoid conflicts with the new `(gzochi client)' reference client library, the
+client session library in the gzochi server API has been renamed to 
+`(gzochi session)'. Any direct imports of this library in game application code
+should be updated to reflect this change. Application code that imports the
+`(gzochi)' aggregation library is unaffected.
+
+** Managed records no longer automatically nongenerative
+
+The server's type management system has been rewritten to allow greater
+flexibility in type resolution. One consequence of this change is that managed 
+records are no longer automatically nongenerative in the R^RS sense; the 
+gzochid type system has alternate means of uniquely distinguishing managed 
+record types. Any application code that relies on the implicit nongenerativity
+of managed record types should be updated (or at least recompiled). See
+"Managed records" in the manual for more information on type resolution.
+
+* Notable changes
+
+** New data management tools
+
+The build process for the gzochid server now produces three additional binaries:
+`gzochi-dump', `gzochi-load', and `gzochi-migrate'. These tools allow you to 
+portably export, import, and transform the data in your game application 
+databases, across server installations and storage engines. See "Database tools"
+in the manual for more information.
+
+** Use an alternate server configuration file at runtime
+
+An alternate path to gzochid.conf, the server configuration file, may now be
+specified on the command line for gzochid and the database tools mentioned above
+via the `-c' or `--config' arguments.
+
+** Warnings for possible serialization problems
+
+The server now logs a warning when the deserialization process for a managed
+record fails to consume all of the data persisted for that record in the 
+database, as this may be a sign of data corruption or a problem with with
+serialization.
+
+* Bug fixes
+
+** Server crash on missing gzochid.conf file
+** Deserialization failures can cause an assertion failure and core dump
+** Assertion failure from BDB on transaction timeout
+
+
 Changes in 0.6 (since 0.5):
 
 * Notable changes

@@ -4,6 +4,13 @@ See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.7 (since 0.6):
+
+* Bug fixes
+
+** Reference clients will spin wait on send buffer full
+
+
 Changes in 0.5 (since 0.4):
 
 * Bug fixes
