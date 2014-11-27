@@ -18,6 +18,8 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
+AUTOMAKE_OPTIONS = subdir-objects
+
 check_PROGRAMS = $(test_programs)
 
 test_programs = \
