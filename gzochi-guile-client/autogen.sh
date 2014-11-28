@@ -23,7 +23,23 @@ OLDDIR=$PWD
 
 cd $BASEDIR
 
+# Pre-create the 'm4' directory to make aclocal happy.
+
+if [ ! -d m4 ]; then
+    mkdir m4
+    if [ $? != 0 ]; then
+	cd $OLDDIR
+	exit 1
+    fi
+fi
+
 # Generate build files.
+
+aclocal
+if [ $? != 0 ]; then
+    cd $OLDDIR
+    exit 1
+fi
 
 automake -a
 if [ $? != 0 ]; then
