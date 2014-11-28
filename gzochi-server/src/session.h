@@ -43,7 +43,7 @@ typedef struct _gzochid_client_session
   mpz_t scm_oid;
 } gzochid_client_session;
 
-gzochid_io_serialization gzochid_client_session_serialization;
+extern gzochid_io_serialization gzochid_client_session_serialization;
 
 void gzochid_client_session_disconnected_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);

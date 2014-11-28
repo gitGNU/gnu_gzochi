@@ -24,7 +24,7 @@
 #include "app.h"
 #include "io.h"
 
-gzochid_io_serialization gzochid_scm_location_aware_serialization;
+extern gzochid_io_serialization gzochid_scm_location_aware_serialization;
 
 typedef struct _gzochid_scm_location_info
 {

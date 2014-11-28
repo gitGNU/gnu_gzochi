@@ -39,7 +39,7 @@ typedef struct _gzochid_channel
   mpz_t scm_oid;
 } gzochid_channel;
 
-gzochid_io_serialization gzochid_channel_serialization;
+extern gzochid_io_serialization gzochid_channel_serialization;
 
 gzochid_channel *gzochid_channel_create 
 (gzochid_application_context *, char *name);

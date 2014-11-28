@@ -220,6 +220,9 @@ static gzochid_application_callback *scm_to_callback
   return gzochid_application_callback_new (procedure, module, oid);
 }
 
+static SCM gzochid_scheme_string_hash;
+static SCM gzochid_scheme_string_equiv;
+
 void gzochid_scheme_application_initialized_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer data)
@@ -815,9 +818,6 @@ GList *gzochid_scheme_list_to_glist (SCM lst, gpointer (*transformer) (SCM))
 
   return ret;
 }
-
-SCM gzochid_scheme_string_hash;
-SCM gzochid_scheme_string_equiv;
 
 SCM gzochid_scheme_ghashtable_to_hashtable 
 (GHashTable *ht, SCM hash_func, SCM key_equal_func,

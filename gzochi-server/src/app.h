@@ -161,7 +161,7 @@ void gzochid_application_task_thread_worker (gpointer, gpointer);
 gboolean gzochid_application_should_retry 
 (gzochid_transactional_application_task_execution *);
 
-gzochid_io_serialization gzochid_application_callback_serialization;
+extern gzochid_io_serialization gzochid_application_callback_serialization;
 
 gzochid_application_callback *gzochid_application_callback_new 
 (char *, GList *, mpz_t);

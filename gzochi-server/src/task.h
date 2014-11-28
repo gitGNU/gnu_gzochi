@@ -44,7 +44,7 @@ typedef struct _gzochid_durable_application_task_handle
 
 typedef gzochid_durable_application_task_handle gzochid_periodic_task_handle;
 
-gzochid_io_serialization 
+extern gzochid_io_serialization 
 gzochid_durable_application_task_handle_serialization;
 
 typedef struct _gzochid_task

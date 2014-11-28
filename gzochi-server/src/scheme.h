@@ -30,8 +30,6 @@
 #include "session.h"
 #include "task.h"
 
-SCM gzochid_scheme_scm_module_gzochi_private_app;
-
 void gzochid_scheme_application_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 void gzochid_scheme_application_task_worker
@@ -44,8 +42,9 @@ void gzochid_scheme_application_received_message_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 void gzochid_scheme_application_disconnected_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
-gzochid_io_serialization gzochid_scheme_data_serialization;
-gzochid_application_task_serialization gzochid_scheme_task_serialization;
+extern gzochid_io_serialization gzochid_scheme_data_serialization;
+extern gzochid_application_task_serialization
+gzochid_scheme_task_serialization;
 
 SCM gzochid_scheme_invoke 
 (gzochid_application_context *, gzochid_auth_identity *, char *, GList *, SCM, 
@@ -57,8 +56,6 @@ gzochid_application_task *gzochid_scheme_task_new
 SCM gzochid_scheme_glist_to_list (GList *, SCM (*) (gpointer));
 GList *gzochid_scheme_list_to_glist (SCM, gpointer (*) (SCM));
 
-SCM gzochid_scheme_string_hash;
-SCM gzochid_scheme_string_equiv;
 SCM gzochid_scheme_ghashtable_to_hashtable 
 (GHashTable *, SCM, SCM, SCM (*) (gpointer), SCM (*) (gpointer));
 GHashTable *gzochid_scheme_hashtable_to_ghashtable 
