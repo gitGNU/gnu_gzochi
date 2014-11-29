@@ -1,6 +1,6 @@
 /* mazewar: A client-server implementation of mazewar for gzochi
  * mazewar.c: Main loop implementation for gzochi mazewar example game
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * This is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,10 +18,10 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <libgzochi.h>
-#include <pthread.h>
+#include <libgzochi-glib.h>
 #include <SDL/SDL.h>
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +31,8 @@
 #include "input.h"
 #include "mazewar.h"
 #include "message.h"
+
+#define INPUT_POLL_INTERVAL_MS 50 /* The delay between polls for input. */
 
 #define MAZE_HEIGHT 16
 #define MAZE_WIDTH 32
@@ -43,7 +45,7 @@ static void handle_event (mazewar_context *context, int input)
 {
   short len = 0; /* The length of the outgoing message. */
   unsigned char *msg = NULL; /* The message bytes. */
-  gzochi_client_session *session = context->session;
+  gzochi_glib_client_session *session = context->session;
 
   switch (input)
     {
@@ -68,25 +70,20 @@ static void handle_event (mazewar_context *context, int input)
     {
       /* Send the generated message to the server. */
 
-      gzochi_client_send (session, msg, len);
+      gzochi_glib_client_send (session, msg, len);
       free (msg);
     }
 }
 
-/* This is the primary input handling thread for the game. It initializes the
-   input system and then loops forever, passing events to the handle_event 
-   procedure. The context object is passed as the void pointer arg. */
+/* This function will be called every INPUT_POLL_INTERVAL_MS, and adapts our
+   `handle_event' and `mazewar_input_next_event' functions to GLib's 
+   `GSourceFunc' type. The context object is passed as the void pointer arg. */
 
-static void *play (void *arg)
+static gboolean input_timeout_function (gpointer data)
 {
-  mazewar_context *context = (mazewar_context *) arg;
+  handle_event ((mazewar_context *) data, mazewar_input_next_event ());
 
-  mazewar_input_init ();
-
-  while (1)
-    handle_event (context, mazewar_input_next_event ());
-
-  return NULL;
+  return TRUE;
 }
 
 /* The client `disconnected' callback. Called when the client is disconnected
@@ -94,7 +91,7 @@ static void *play (void *arg)
    user_data pointer is the one specified at registration time (see below),
    although it is ignored here. */
 
-static void disconnected (gzochi_client_session *session, void *user_data)
+static void disconnected (gzochi_glib_client_session *session, void *user_data)
 {
   printf ("Disconnected.\n");
   exit (0);
@@ -325,7 +322,6 @@ static void hide_position
 static void bootstrap_maze 
 (mazewar_context *context, unsigned char *msg, short len)
 {
-  pthread_t play_thread; /* The input event handler thread. */
   int i = 0, num_players = 0, maze_bytes_len = MAZE_WIDTH * MAZE_HEIGHT / 8;
 
   /* Allocate space for the maze bitmap. */
@@ -376,10 +372,10 @@ static void bootstrap_maze
   mazewar_display_draw_scorecard (context); /* Draw the scorecard. */
   mazewar_display_refresh (context); /* Refresh the view. */
 
-  /* Launch the input handling thread, passing the game context as the user 
-     data argument. */
+  /* Initialize the input handling code and plug it into the main loop. */
 
-  pthread_create (&play_thread, NULL, play, context);
+  mazewar_input_init ();
+  g_timeout_add (INPUT_POLL_INTERVAL_MS, input_timeout_function, context);
 
   return;
 }
@@ -391,7 +387,8 @@ static void bootstrap_maze
    registration time (see below) and is cast to the game context object. */
 
 static void received_message
-(gzochi_client_session *session, unsigned char *msg, short len, void *user_data)
+(gzochi_glib_client_session *session, unsigned char *msg, short len, 
+ void *user_data)
 {
   mazewar_context *context = (mazewar_context *) user_data;
   mazewar_server_message *message = NULL;
@@ -450,7 +447,12 @@ static mazewar_context *make_mazewar_context ()
 
 int main (int argc, char *argv[])
 {
-  gzochi_client_session *session = NULL; /* The client session. */
+  /* Create the GLib main loop and main context. */
+  
+  GMainLoop *main_loop = g_main_loop_new (NULL, FALSE);
+  GMainContext *main_context = g_main_loop_get_context (main_loop); 
+
+  gzochi_glib_client_session *session = NULL; /* The client session. */
   char *hostname = NULL, *player = NULL; /* The hostname and player name. */
   int port = 0; /* The port number. */
 
@@ -464,11 +466,11 @@ int main (int argc, char *argv[])
   port = atoi (argv[2]); /* Parse the port number. */
   player = argv[3];
 
-  SDL_Init (SDL_INIT_VIDEO | SDL_INIT_EVENTTHREAD);
+  SDL_Init (SDL_INIT_VIDEO);
 
   /* Attempt to connect to the server. */
 
-  session = gzochi_client_connect 
+  session = gzochi_glib_client_connect 
     (argv[1], port, "mazewar", (unsigned char *) player, strlen (player));
 
   if (session != NULL)
@@ -479,21 +481,23 @@ int main (int argc, char *argv[])
       mazewar_context *context = make_mazewar_context ();
 
       context->self = add_player (context, player, 0, 0, 0, TRUE, 0);
+      context->main_context = main_context;
       context->session = session;
 
       /* Register the `disconnected' and `received_message' callbacks for the
 	 new client session, passing the game context as "user data." */
 
-      gzochi_client_session_set_disconnected_callback 
+      gzochi_glib_client_session_set_disconnected_callback 
 	(session, disconnected, context);
-      gzochi_client_session_set_received_message_callback 
+      gzochi_glib_client_session_set_received_message_callback 
 	(session, received_message, context);
 
-      /* Start the gzochi client event loop. This function will synchronously 
-	 read and dispatch events to the appropriate callbacks until the client
-	 is disconnected. */
+      /* Attach the context session to the main context and start the GLib main
+	 loop. This function will synchronously read and dispatch events to the
+	 appropriate callbacks until the client is disconnected. */
 
-      gzochi_client_run (session);
+      g_source_attach ((GSource *) gzochi_source_new (session), main_context);
+      g_main_loop_run (main_loop);
     }
 
   /* Otherwise log the failure and exit. */

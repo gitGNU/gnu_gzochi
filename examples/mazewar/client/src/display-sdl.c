@@ -1,5 +1,5 @@
 /* display-sdl.c: SDL-based rendering layer for gzochi mazewar example game
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * This is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,12 +16,10 @@
  */
 
 #include <math.h>
-#include <sys/types.h>
-#include <sys/time.h>
-
-#include <pthread.h>
 #include <stdio.h>
 #include <strings.h>
+#include <sys/types.h>
+#include <sys/time.h>
 
 #include <SDL/SDL.h>
 

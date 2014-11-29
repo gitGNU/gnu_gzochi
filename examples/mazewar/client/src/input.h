@@ -1,5 +1,5 @@
 /* input.h: Prototypes and declarations for input-[driver].c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * This is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -35,11 +35,12 @@
 #define MAZEWAR_INPUT_KEY_RCTRL 305 /* The right ctrl key was pressed. */
 #define MAZEWAR_INPUT_KEY_LCTRL 306 /* The left ctrl key was pressed. */
 
-#define MAZEWAR_INPUT_EVENT_QUIT 0 /* The user signaled a quit event. */
+#define MAZEWAR_INPUT_EVENT_QUIT -1 /* The user signaled a quit event. */
 
 void mazewar_input_init (void); /* Initializes the input sub-system. */
 
-/* Waits for and returns the next input event from the user. */
+/* Check for and return the next input event from the user, or 0 if none are
+   ready. */
 
 int mazewar_input_next_event (void);
 

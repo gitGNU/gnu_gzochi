@@ -38,8 +38,6 @@ AC_CHECK_LIB([m], [cos])
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
 PKG_CHECK_MODULES([SDL], [sdl])
 
-ACX_PTHREAD
-
 AC_CONFIG_FILES([Makefile
                  src/Makefile])
 

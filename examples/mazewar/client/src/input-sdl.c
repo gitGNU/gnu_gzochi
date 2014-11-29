@@ -1,5 +1,5 @@
 /* input-sdl.c: SDL-based input implementation for gzochi mazewar example game
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * This is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -25,25 +25,22 @@ void mazewar_input_init ()
 {
 }
 
-/* Waits for and returns the next input event from the user. */
+/* Check for and return the next input event from the user, or 0 if none are
+   ready. */
 
 int mazewar_input_next_event ()
 {
   SDL_Event event;
   
-  while (1)
+  /* Poll for a new event fired by SDL's input library. */
+  
+  if (SDL_PollEvent (&event))
     {
-      /* Wait unil a new event has been fired by SDL's input library. If it can
-	 be handled and return, do so; otherwise wait for another event, and so
-	 on. */
-      
-      SDL_WaitEvent (&event);
-
-      if (event.type == SDL_KEYDOWN) /* Was it keyboard event? */
+      if (event.type == SDL_KEYDOWN) /* Was it a keyboard event? */
 	{
 	  /* Translate from the set of possible SDL keyboard events to the
 	     implementation-agnostic set of Mazewar keyboard event types. */
-
+	  
 	  switch (event.key.keysym.sym)
 	    {
 	    case SDLK_s: return MAZEWAR_INPUT_KEY_S;

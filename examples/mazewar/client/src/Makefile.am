@@ -18,12 +18,12 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ @PTHREAD_CFLAGS@ @SDL_CFLAGS@ \
-	-I ../../../../gzochi-client/src \
+AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ @SDL_CFLAGS@ \
+	-I ../../../../gzochi-glib-client/src \
 	-Wall -Werror
 
-AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@ @PTHREAD_LIBS@ @SDL_LIBS@ \
-	-L../../../../gzochi-client/src/ -lgzochi
+AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@ @SDL_LIBS@ \
+	-L../../../../gzochi-glib-client/src/ -lgzochi-glib
 
 bin_PROGRAMS = mazewar
 

@@ -1,5 +1,5 @@
 /* mazewar.h: Global declarations for gzochi mazewar example game
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * This is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #define MAZEWAR_H
 
 #include <glib.h>
-#include <libgzochi.h>
+#include <libgzochi-glib.h>
 
 /* Constant definitions for the four cardinal directions. */
 
@@ -70,7 +70,8 @@ typedef struct _mazewar_context {
 
   gpointer display_context;
 
-  gzochi_client_session *session; /* The gzochi client session. */
+  GMainContext *main_context; /* The GLib main context. */
+  gzochi_glib_client_session *session; /* The gzochi client session. */
   mazewar_player *self; /* A pointer to the local player structure. */
   GList *players; /* The list of all players (including the local player). */
 } mazewar_context;
