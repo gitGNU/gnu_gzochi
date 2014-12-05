@@ -1,3 +1,3 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = doc meta src
+SUBDIRS = doc meta src tests

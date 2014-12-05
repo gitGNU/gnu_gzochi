@@ -18,4 +18,21 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = src tests
+AUTOMAKE_OPTIONS = subdir-objects
+
+check_PROGRAMS = $(test_programs)
+
+test_programs = \
+	test-client
+
+TESTS = $(test_programs)
+
+GZOCHI_CLIENT_COMMON_CFLAGS = -I@GZOCHI_CLIENT_COMMON@/src
+GZOCHI_CLIENT_COMMON_LIBS = \
+	@GZOCHI_CLIENT_COMMON@/src/libgzochi-client-common.la
+
+test_client_CFLAGS = -I$(top_builddir)/src \
+	$(GLIB_CFLAGS) $(GZOCHI_CLIENT_COMMON_CFLAGS)
+test_client_SOURCES = test-client.c 
+test_client_LDADD = $(top_builddir)/src/client.o \
+	$(GLIB_LIBS) $(GZOCHI_CLIENT_COMMON_LIBS)

@@ -18,4 +18,12 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = src tests
+test_programs = gzochi/test-main-loop.scm \
+	gzochi/test-client.scm
+
+TEST_EXTENSIONS = .scm
+SCM_LOG_COMPILER = $(GUILE)
+AM_SCM_LOG_FLAGS = -L . -L $(top_builddir)/src
+TESTS = $(test_programs)
+
+EXTRA_DIST = $(TESTS) gzochi/srfi-64-support.scm

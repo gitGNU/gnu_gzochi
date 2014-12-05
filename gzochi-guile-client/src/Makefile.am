@@ -18,8 +18,6 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = tests
-
 pkgguile_sitedir = ${GUILE_SITE}/${PACKAGENAME}
 
 nobase_dist_pkgguile_site_DATA = gzochi/client.scm gzochi/client/protocol.scm \

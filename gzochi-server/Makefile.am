@@ -1,5 +1,5 @@
 ACLOCAL_AMFLAGS = -I m4
 
-SUBDIRS = src doc
+SUBDIRS = src doc tests
 
 AM_LDFLAGS = @GUILE_LIBS@ @GLIB_LIBS@

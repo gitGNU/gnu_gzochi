@@ -29,6 +29,6 @@ PKG_CHECK_MODULES([GUILE], [guile-2.0])
 GUILE_PROGS
 GUILE_SITE_DIR
 
-AC_CONFIG_FILES([Makefile src/Makefile src/tests/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile])
 
 AC_OUTPUT

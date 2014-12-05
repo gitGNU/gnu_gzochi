@@ -90,8 +90,8 @@ AC_CONFIG_FILES([Makefile
 		 src/api/Makefile
 		 src/auth/Makefile
 		 src/scheme/Makefile
-		 src/tests/Makefile
-		 src/tests/auth/Makefile
-		 src/tests/scheme/Makefile])
+		 tests/Makefile
+		 tests/auth/Makefile
+		 tests/scheme/Makefile])
 
 AC_OUTPUT

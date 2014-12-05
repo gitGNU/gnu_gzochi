@@ -1,5 +1,3 @@
-SUBDIRS = tests
-
 noinst_LTLIBRARIES = libgzochi-common.la
 
 AM_CFLAGS = @CFLAGS@ -Wall -pedantic

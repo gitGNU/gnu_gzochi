@@ -34,6 +34,6 @@ AC_SUBST(GZOCHI_COMMON)
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
-		 src/tests/Makefile])
+		 tests/Makefile])
 
 AC_OUTPUT

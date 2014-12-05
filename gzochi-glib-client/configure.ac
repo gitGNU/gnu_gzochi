@@ -43,6 +43,6 @@ AC_CONFIG_FILES([Makefile
                  doc/Makefile
                  meta/Makefile
                  src/Makefile
-		 src/tests/Makefile])
+		 tests/Makefile])
 
 AC_OUTPUT

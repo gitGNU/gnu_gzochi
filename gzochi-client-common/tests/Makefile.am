@@ -18,4 +18,19 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = src tests
+AUTOMAKE_OPTIONS = subdir-objects
+
+check_PROGRAMS = $(test_programs)
+
+test_programs = \
+	test-session
+
+TESTS = $(test_programs)
+
+GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src -I$(top_builddir)/src
+GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
+
+test_session_CFLAGS = $(GZOCHI_COMMON_CFLAGS)
+test_session_SOURCES = test-session.c 
+test_session_LDADD = $(top_builddir)/src/session.o
+test_session_LDFLAGS = $(GZOCHI_COMMON_LIBS)
