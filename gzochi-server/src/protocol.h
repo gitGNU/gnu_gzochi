@@ -43,6 +43,9 @@ gzochid_protocol_client *gzochid_protocol_client_accept (svz_socket_t *);
 void gzochid_protocol_client_disconnected (gzochid_protocol_client *);
 void gzochid_protocol_client_free (gzochid_protocol_client *);
 void gzochid_protocol_client_dispatch 
+gzochid_auth_identity *
+gzochid_protocol_client_get_identity (gzochid_protocol_client *);
+
 (gzochid_protocol_client *, unsigned char *, short);
 
 void gzochid_protocol_client_disconnect (gzochid_protocol_client *);

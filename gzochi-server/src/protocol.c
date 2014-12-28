@@ -29,7 +29,14 @@
 #include "log.h"
 #include "protocol.h"
 
-static void dispatch_login_request 
+gzochid_auth_identity *
+gzochid_protocol_client_get_identity (gzochid_protocol_client *client)
+{
+  return client->identity;
+}
+
+static void 
+dispatch_login_request 
 (gzochid_protocol_client *client, char *endpoint, unsigned char *cred, 
  short cred_len)
 {
