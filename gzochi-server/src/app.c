@@ -716,7 +716,7 @@ void gzochid_application_client_logged_in
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
   gzochid_client_session *session = 
-    gzochid_client_session_new (client->identity);
+    gzochid_client_session_new (gzochid_protocol_client_get_identity (client));
 
   gzochid_application_task transactional_task;
   gzochid_application_task application_task;
@@ -741,12 +741,12 @@ void gzochid_application_client_logged_in
 
   transactional_task.worker = gzochid_scheme_application_logged_in_worker;
   transactional_task.context = context;
-  transactional_task.identity = client->identity;
+  transactional_task.identity = gzochid_protocol_client_get_identity (client);
   transactional_task.data = session_oid_str;
 
   application_task.worker = gzochid_application_transactional_task_worker;
   application_task.context = context;
-  application_task.identity = client->identity;
+  application_task.identity = gzochid_protocol_client_get_identity (client);
   application_task.data = execution;
 
   task.worker = gzochid_application_task_thread_worker;
@@ -801,17 +801,17 @@ void gzochid_application_client_disconnected
     {
       gzochid_application_task *callback_task = 
 	gzochid_application_task_new
-	(context, client->identity, 
+	(context, gzochid_protocol_client_get_identity (client),
 	 gzochid_scheme_application_disconnected_worker, session_oid_str);
       gzochid_application_task *cleanup_task = 
 	gzochid_application_task_new
-	(context, client->identity, gzochid_client_session_disconnected_worker, 
-	 session_oid_str);
+	(context, gzochid_protocol_client_get_identity (client), 
+	 gzochid_client_session_disconnected_worker, session_oid_str);
       gzochid_transactional_application_task_execution *execution = 
 	gzochid_transactional_application_task_execution_new 
 	(callback_task, cleanup_task);
       gzochid_application_task *application_task = gzochid_application_task_new 
-	(context, client->identity,
+	(context, gzochid_protocol_client_get_identity (client),
 	 gzochid_application_resubmitting_transactional_task_worker, execution);
 
       gzochid_task *task = NULL;      
@@ -877,12 +877,13 @@ void gzochid_application_session_received_message
       transactional_task.worker = 
 	gzochid_scheme_application_received_message_worker;
       transactional_task.context = context;
-      transactional_task.identity = client->identity;
+      transactional_task.identity = 
+	gzochid_protocol_client_get_identity (client);
       transactional_task.data = data;
       
       application_task.worker = gzochid_application_transactional_task_worker;
       application_task.context = context;
-      application_task.identity = client->identity;
+      application_task.identity = gzochid_protocol_client_get_identity (client);
       application_task.data = execution;
       
       task.worker = gzochid_application_task_thread_worker;
