@@ -1,5 +1,5 @@
 /* protocol.c: Application communication protocol routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@
 #include <assert.h>
 #include <glib.h>
 #include <gzochi-common.h>
-#include <libserveez.h>
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
@@ -29,10 +28,52 @@
 #include "log.h"
 #include "protocol.h"
 
+struct _gzochid_protocol_client
+{
+  gzochid_application_context *context;
+  gzochid_auth_identity *identity;
+  mpz_t oid;
+  
+  gboolean disconnected;
+  gzochid_client_socket *sock;
+};
+
 gzochid_auth_identity *
 gzochid_protocol_client_get_identity (gzochid_protocol_client *client)
 {
   return client->identity;
+}
+
+gzochid_protocol_client *
+gzochid_protocol_client_accept (gzochid_client_socket *sock)
+{
+  gzochid_protocol_client *client = 
+    calloc (1, sizeof (gzochid_protocol_client));
+
+  mpz_init (client->oid);
+  mpz_set_si (client->oid, -1);
+
+  client->sock = sock;
+  
+  return client;
+}
+
+void 
+gzochid_protocol_client_disconnected (gzochid_protocol_client *client)
+{
+  if (client->identity != NULL && !client->disconnected)
+    {
+      gzochid_application_client_disconnected (client->context, client);
+      client->disconnected = TRUE;
+    }
+}
+
+void 
+gzochid_protocol_client_free (gzochid_protocol_client *client)
+{
+  gzochid_client_socket_free (client->sock);
+  mpz_clear (client->oid);
+  free (client);
 }
 
 static void 
@@ -41,7 +82,8 @@ dispatch_login_request
  short cred_len)
 {
   GError *error = NULL;
-  gzochid_context *context = (gzochid_context *) client->sock->data;
+  gzochid_context *context = (gzochid_context *)
+    gzochid_socket_get_server_context (client->sock);
   gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
 
   if (client->identity != NULL)
@@ -58,7 +100,7 @@ dispatch_login_request
     {
       gzochid_warning
 	("Client at %s attempted to authenticate to unknown endpoint %s", 
-	 client->connection_description, endpoint);
+	 gzochid_socket_get_connection_description (client->sock), endpoint);
       return;
     }
 
@@ -73,7 +115,8 @@ dispatch_login_request
 	  ("Error from authenticator for endpoint '%s': %s", error->message);
       else gzochid_warning 
 	     ("Client at %s failed to authenticate to endpoint %s", 
-	      client->connection_description, endpoint);
+	      gzochid_socket_get_connection_description (client->sock),
+	      endpoint);
 
       g_clear_error (&error);
     }
@@ -81,68 +124,38 @@ dispatch_login_request
     {
       gzochid_info
 	("Client at %s authenticated to endpoint %s as %s",
-	 client->connection_description, endpoint, client->identity->name);
+	 gzochid_socket_get_connection_description (client->sock), endpoint, 
+	 client->identity->name);
       gzochid_application_client_logged_in (client->context, client);
     }
 }
 
-static void dispatch_logout_request (gzochid_protocol_client *client)
+static void 
+dispatch_logout_request (gzochid_protocol_client *client)
 {
   if (client->identity == NULL)
     gzochid_warning
       ("Received logout request from unauthenticated client at %s",
-       client->connection_description);
+       gzochid_socket_get_connection_description (client->sock));
   else gzochid_application_client_disconnected (client->context, client);
 
   client->disconnected = TRUE;
 }
 
-static void dispatch_session_message 
+static void 
+dispatch_session_message 
 (gzochid_protocol_client *client, unsigned char *msg, short len)
 {
   if (client->identity == NULL)
       gzochid_warning 
 	("Received session message from unauthenticated client at %s",
-	 client->connection_description);
+	 gzochid_socket_get_connection_description (client->sock));
   else gzochid_application_session_received_message 
 	 (client->context, client, msg, len);
 }
 
-void gzochid_protocol_client_disconnected (gzochid_protocol_client *client)
-{
-  if (client->identity != NULL && !client->disconnected)
-    {
-      gzochid_application_client_disconnected (client->context, client);
-      client->disconnected = TRUE;
-    }
-}
-
-gzochid_protocol_client *gzochid_protocol_client_accept (svz_socket_t *sock)
-{
-  gzochid_protocol_client *client = 
-    calloc (1, sizeof (gzochid_protocol_client));
-
-  mpz_init (client->oid);
-  mpz_set_si (client->oid, -1);
-
-  g_mutex_init (&client->sock_mutex);
-  client->write_socket = sock->write_socket;
-  client->sock = sock;
-  client->connection_description = g_strdup_printf 
-    ("%s:%d", "addr", sock->remote_port);
-  
-  return client;
-}
-
-void gzochid_protocol_client_free (gzochid_protocol_client *client)
-{
-  g_mutex_clear (&client->sock_mutex);
-  mpz_clear (client->oid);
-  g_free (client->connection_description);
-  free (client);
-}
-
-void gzochid_protocol_client_dispatch 
+void 
+gzochid_protocol_client_dispatch 
 (gzochid_protocol_client *client, unsigned char *message, short len)
 {
   int opcode = message[0];
@@ -181,25 +194,30 @@ void gzochid_protocol_client_dispatch
   return;
 }
 
-void gzochid_protocol_client_disconnect (gzochid_protocol_client *client)
+void 
+gzochid_protocol_client_disconnect (gzochid_protocol_client *client)
 {
-  char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECTED };
-  svz_sock_write (client->sock, buf, 3);
+  unsigned char buf[3] = 
+    { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_SESSION_DISCONNECTED };
+  gzochid_client_socket_write (client->sock, buf, 3);
 }
 
-void gzochid_protocol_client_login_success (gzochid_protocol_client *client)
+void 
+gzochid_protocol_client_login_success (gzochid_protocol_client *client)
 {
-  char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_LOGIN_SUCCESS };
-  svz_sock_write (client->sock, buf, 3);
+  unsigned char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_LOGIN_SUCCESS };
+  gzochid_client_socket_write (client->sock, buf, 3);
 }
 
-void gzochid_protocol_client_login_failure (gzochid_protocol_client *client)
+void 
+gzochid_protocol_client_login_failure (gzochid_protocol_client *client)
 {
-  char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_LOGIN_FAILURE };
-  svz_sock_write (client->sock, buf, 3);
+  unsigned char buf[3] = { 0x0, 0x0, GZOCHI_COMMON_PROTOCOL_LOGIN_FAILURE };
+  gzochid_client_socket_write (client->sock, buf, 3);
 }
 
-void gzochid_protocol_client_send 
+void 
+gzochid_protocol_client_send 
 (gzochid_protocol_client *client, unsigned char *msg, short len)
 {
   unsigned char *buf = malloc (sizeof (unsigned char) * (len + 3));
@@ -208,6 +226,6 @@ void gzochid_protocol_client_send
   buf[2] = GZOCHI_COMMON_PROTOCOL_SESSION_MESSAGE;
   memcpy (buf + 3, msg, len);
 
-  svz_sock_write (client->sock, (char *) buf, len + 3);
+  gzochid_client_socket_write (client->sock, buf, len + 3);
   free (buf);
 }

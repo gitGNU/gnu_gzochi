@@ -1,5 +1,5 @@
 /* socket.h: Prototypes and declarations for socket.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 #define GZOCHID_SOCKET_H
 
 #include <glib.h>
-#include <libserveez.h>
 
 #include "context.h"
 
@@ -34,13 +33,32 @@ typedef struct _gzochid_socket_server_context
 {
   gzochid_context base;
 
-  svz_socket_t *server;
-  GHashTable *clients;
+  GMainContext *main_context;
+  GMainLoop *main_loop;
 } gzochid_socket_server_context;
 
-gzochid_socket_server_context *gzochid_socket_server_context_new (void);
-void gzochid_socket_server_context_free (gzochid_socket_server_context *);
-void gzochid_socket_server_context_init 
+typedef struct _gzochid_client_socket gzochid_client_socket;
+
+gzochid_socket_server_context *
+gzochid_socket_server_context_new (void);
+
+void 
+gzochid_socket_server_context_free (gzochid_socket_server_context *);
+
+void 
+gzochid_socket_server_context_init 
 (gzochid_socket_server_context *, gzochid_context *, int);
+
+gzochid_socket_server_context *
+gzochid_socket_get_server_context (gzochid_client_socket *);
+
+char *
+gzochid_socket_get_connection_description (gzochid_client_socket *);
+
+void
+gzochid_client_socket_write (gzochid_client_socket *, unsigned char *, size_t);
+
+void
+gzochid_client_socket_free (gzochid_client_socket *);
 
 #endif /* GZOCHID_SOCKET_H */
