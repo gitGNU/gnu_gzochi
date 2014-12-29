@@ -18,8 +18,7 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ \
-	@SERVEEZ_CFLAGS@ -Wall -Werror
+AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ -Wall -Werror
 
 noinst_LTLIBRARIES = libgzochid-api.la
 noinst_HEADERS = admin.h channel.h data.h log.h session.h task.h util.h
@@ -29,8 +28,7 @@ libgzochid_api_la_SOURCES = admin.c channel.c data.c log.c session.c \
 
 SUFFIXES = .x
 .c.x:
-	guile-snarf -o $@ $< @DEFS@ @CFLAGS@ @GLIB_CFLAGS@ @GUILE_CFLAGS@ \
-		@SERVEEZ_CFLAGS@
+	guile-snarf -o $@ $< @DEFS@ @CFLAGS@ @GLIB_CFLAGS@ @GUILE_CFLAGS@
 
 BUILT_SOURCES = admin.x channel.x data.x log.x session.x task.x
 CLEANFILES = $(BUILT_SOURCES)

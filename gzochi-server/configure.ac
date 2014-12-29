@@ -79,11 +79,6 @@ AC_CHECK_HEADER([gmp.h], [], [AC_MSG_ERROR([gmp.h is required.])])
 GZOCHI_COMMON="$PWD/../gzochi-common"
 AC_SUBST(GZOCHI_COMMON)
 
-AC_SERVEEZ([yes])
-if test "x$SERVEEZ_CFLAGS" = "x" ; then
-   AC_MSG_ERROR([libserveez is required.])
-fi
-
 AC_CONFIG_FILES([Makefile
 		 doc/Makefile
                  src/Makefile

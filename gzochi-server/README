@@ -27,7 +27,6 @@ gzochid depends on the following external libraries.
 - libguile
 - libgzochi-common
 - libmicrohttpd
-- libserveez
 - libz
 
 There is a corresponding `--with-XXX-prefix' option for libgdbm and libgmp that
@@ -36,9 +35,6 @@ a location other than the standard places (/usr and /usr/local).
 
 The dependencies on libg, libguile, libmicrohttpd, and libz are configured 
 using `pkg-config'.
-
-The dependency on libserveez is configured using the AC_SERVEEZ m4 macro 
-provided by the GNU Serveez distribution.
 
 libgzochi-common is provided as part of the gzochi distribution and is assumed
 to have been built in a directory adjacent to the directory in which gzochid is
@@ -83,11 +79,6 @@ gzochid requires the following external packages:
     libmicrohttpd is used to serve pages that provide statistical information
     about the running gzochid instance and its hosted applications. It is
     available from http://www.gnu.org/software/libmicrohttpd/ .
-
-  - GNU Serveez, at least version 0.2
-
-    GNU Serveez is used to manage the embedded socket server and for I/O
-    dispatching. It is available from http://www.gnu.org/software/serveez/ .
 
   - zlib, at least version 1.2.5
 
