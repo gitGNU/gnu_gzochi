@@ -1,7 +1,7 @@
 #!/bin/sh
 # autogen.sh
 #
-# Copyright (C) 2014 Julian Graham
+# Copyright (C) 2015 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -38,12 +38,6 @@ if [ $? != 0 ]; then
 fi
 
 ./gzochi-client-common/autogen.sh
-if [ $? != 0 ]; then
-    cd $OLDDIR
-    exit 1
-fi
-
-./gzochi-client/autogen.sh
 if [ $? != 0 ]; then
     cd $OLDDIR
     exit 1

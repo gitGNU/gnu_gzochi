@@ -18,6 +18,5 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = gzochi-common gzochi-server gzochi-client-common gzochi-client \
-	gzochi-glib-client gzochi-guile-client \
-	examples/abermud examples/mazewar
+SUBDIRS = gzochi-common gzochi-server gzochi-client-common gzochi-glib-client \
+	gzochi-guile-client examples/abermud examples/mazewar
