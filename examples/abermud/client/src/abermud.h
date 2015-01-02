@@ -1,5 +1,5 @@
 /* abermud.h: Global declarations for gzochi abermud example game
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * This is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #ifndef ABERMUD_H
 #define ABERMUD_H
 
-#include <libgzochi.h>
+#include <libgzochi-glib.h>
 
 #include "console.h"
 
@@ -29,7 +29,7 @@ typedef struct _abermud_context
   int allow_input; /* 1 if input is currently allowed; otherwise 0. */
   int echo; /* 1 if typed characters are echoed to the screen; otherwise 0. */
 
-  gzochi_client_session *session; /* The gzochi client session. */
+  gzochi_glib_client_session *session; /* The gzochi client session. */
 
   /* This input buffer is shared between this context object and its embedded
      console state to make information about the state of the input area

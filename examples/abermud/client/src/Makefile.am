@@ -18,17 +18,17 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AM_CFLAGS = @CFLAGS@ @PTHREAD_CFLAGS@ \
-	-I ../../../../gzochi-client/src \
+AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ \
+	-I ../../../../gzochi-glib-client/src \
 	-Wall -Werror
 
-AM_LDFLAGS = @LDFLAGS@ @PTHREAD_LIBS@ \
-	-L../../../../gzochi-client/src/ -lgzochi
+AM_LDFLAGS = @LDFLAGS@ -L../../../../gzochi-glib-client/src/
 
 bin_PROGRAMS = abermud
 
-noinst_HEADERS = abermud.h console.h
-
 abermud_SOURCES = abermud.c console-curses.c
+abermud_LDADD = @GLIB_LIBS@ -lgzochi-glib
+
+noinst_HEADERS = abermud.h console.h
 
 console-curses.c: console.h

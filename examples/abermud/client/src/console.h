@@ -1,5 +1,5 @@
 /* console.h: Prototypes and declarations for console-curses.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * This is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #define ABERMUD_KEY_LEFT KEY_LEFT
 #define ABERMUD_KEY_RIGHT KEY_RIGHT
 #define ABERMUD_KEY_BACKSPACE KEY_BACKSPACE
+#define ABERMUD_KEY_NONE ERR
 
 #define ABERMUD_INPUT_BUFFER_SIZE 100
 

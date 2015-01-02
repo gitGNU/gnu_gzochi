@@ -1,6 +1,6 @@
 /* abermud: An example implementation of AberMUD for gzochi
  * abermud.c: Main loop implementation for gzochi abermud example game
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2014 Julian Graham
  *
  * This is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,14 +16,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <libgzochi.h>
-#include <pthread.h>
+#include <glib.h>
+#include <libgzochi-glib.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "abermud.h"
 #include "console.h"
+
+#define INPUT_POLL_INTERVAL_MS 10 /* The delay between polls for input. */
 
 /* Opcode constants for packets originating on the server. */
 
@@ -41,7 +44,8 @@
 /* Creates and returns a new abermud game context. A new shared input buffer
    will be created and used to construct a new console state object. */ 
 
-static abermud_context *make_abermud_context ()
+static abermud_context *
+make_abermud_context ()
 {
   abermud_context *context = malloc (sizeof (abermud_context));
   abermud_input_buffer *input_buffer = 
@@ -59,7 +63,8 @@ static abermud_context *make_abermud_context ()
    current cursor position. The portion of the input buffer that comes after
    the cursor will be shifted over to accomodate the new character. */
 
-static void char_insert (abermud_context *context, char c)
+static void 
+char_insert (abermud_context *context, char c)
 {
   char *x = context->input_buffer->data + context->input_buffer->pos;
   int ct = strlen (x);
@@ -76,7 +81,8 @@ static void char_insert (abermud_context *context, char c)
 /* Shuts down the game context, including the console, and exits with the
    code given by EXIT_CODE. */
 
-static void shutdown (abermud_context *context, int exit_code)
+static void 
+shutdown (abermud_context *context, int exit_code)
 {
   abermud_console_shutdown (context->console_state);
   free (context->input_buffer);
@@ -86,9 +92,10 @@ static void shutdown (abermud_context *context, int exit_code)
 
 /* Sends the contents of MESSAGE to the game server. */
 
-static void send_message (abermud_context *context, char *message)
+static void 
+send_message (abermud_context *context, char *message)
 {
-  gzochi_client_send 
+  gzochi_glib_client_send 
     (context->session, (unsigned char *) message, strlen (message));
 }
 
@@ -101,7 +108,8 @@ static void send_message (abermud_context *context, char *message)
    and RIGHT keys will move the cursor left and right within the input area,
    and the BACKSPACE key will delete the preceding character. */
 
-static void handle_input (abermud_context *context)
+static void 
+handle_input (abermud_context *context)
 {
   int ch = abermud_console_getch (context->console_state);
 
@@ -167,6 +175,8 @@ static void handle_input (abermud_context *context)
 	}
       break;
 
+    case ABERMUD_KEY_NONE: break;
+
     default:
       
       /* If the buffer's at capacity or the typed character isn't valid, don't
@@ -192,29 +202,29 @@ static void handle_input (abermud_context *context)
    input system and then loops forever, passing events to the handle_input 
    procedure. The context object is passed as the void pointer arg. */
 
-static void *play (void *arg)
+static gboolean
+input_timeout_function (gpointer data)
 {
-  abermud_context *context = (abermud_context *) arg;
-
-  while (1)
-    handle_input (context);
-
-  return NULL;
+  abermud_context *context = data;
+  handle_input (context);
+  return TRUE;
 }
 
 /* The client `disconnected' callback. Called when the client is disconnected
    by the server, either explicitly or as the result of a network error. The
    user_data pointer is the one specified at registration time (see below). */
 
-static void disconnected (gzochi_client_session *session, void *user_data)
+static void 
+disconnected (gzochi_glib_client_session *session, void *user_data)
 {
-  abermud_context *context = (abermud_context *) user_data;
+  abermud_context *context = user_data;
   shutdown (context, 0);
 }
 
 /* Updates the game state to allow characters to be typed in the input area. */
 
-static void allow_input (abermud_context *context)
+static void 
+allow_input (abermud_context *context)
 {
   context->allow_input = TRUE;
 }
@@ -222,7 +232,8 @@ static void allow_input (abermud_context *context)
 /* Updates the game state to either show or hide characters that are typed in
    the input area, depending on the boolean value FLAG. */
 
-static void set_echo (abermud_context *context, int flag)
+static void 
+set_echo (abermud_context *context, int flag)
 {
   context->echo = flag;
 }
@@ -233,10 +244,12 @@ static void set_echo (abermud_context *context, int flag)
    first byte of MSG. The user_data pointer is the one specified at
    registration time (see below) and is cast to the game context object. */
 
-static void received_message
-(gzochi_client_session *session, unsigned char *msg, short len, void *user_data)
+static void 
+received_message
+(gzochi_glib_client_session *session, unsigned char *msg, short len, 
+ void *user_data)
 {
-  abermud_context *context = (abermud_context *) user_data;
+  abermud_context *context = user_data;
   char *body = NULL;
 
   /* Packets from the server that include text content beyond the opcode in
@@ -287,15 +300,20 @@ static void received_message
    the `abermud' user; authentication is handled by the game's server 
    component. */
 
-int main (int argc, char *argv[])
+int 
+main (int argc, char *argv[])
 {
+  /* Create the GLib main loop and main context. */
+  
+  GMainLoop *main_loop = g_main_loop_new (NULL, FALSE);
+  GMainContext *main_context = g_main_loop_get_context (main_loop); 
+
   int port = 0;
 
   char *hostname = NULL;
   char *player = "abermud";
 
-  pthread_t play_thread; /* The input event handler thread. */
-  gzochi_client_session *session = NULL; /* The client session. */
+  gzochi_glib_client_session *session = NULL; /* The client session. */
 
   if (argc != 3)
     {
@@ -310,7 +328,7 @@ int main (int argc, char *argv[])
   
   /* Attempt to connect to the server. */
 
-  session = gzochi_client_connect 
+  session = gzochi_glib_client_connect 
     (hostname, port, "abermud", (unsigned char *) player, strlen (player));
 
   if (session != NULL)
@@ -324,21 +342,22 @@ int main (int argc, char *argv[])
       /* Register the `disconnected' and `received_message' callbacks for the
 	 new client session, passing the game context as "user data." */
 
-      gzochi_client_session_set_disconnected_callback 
+      gzochi_glib_client_session_set_disconnected_callback 
 	(session, disconnected, context);
-      gzochi_client_session_set_received_message_callback 
+      gzochi_glib_client_session_set_received_message_callback 
 	(session, received_message, context);
 
-      /* Launch the input handling thread, passing the game context as the user 
-	 data argument. */
+      /* Attach the context session to the main context and start the GLib main
+	 loop. This function will synchronously read and dispatch events to the
+	 appropriate callbacks until the client is disconnected. */
 
-      pthread_create (&play_thread, NULL, play, context);
+      g_source_attach ((GSource *) gzochi_source_new (session), main_context);
 
-      /* Start the gzochi client event loop. This function will synchronously 
-	 read and dispatch events to the appropriate callbacks until the client
-	 is disconnected. */
+      /* Plug some input handling into the main loop. */
+      
+      g_timeout_add (INPUT_POLL_INTERVAL_MS, input_timeout_function, context);
 
-      gzochi_client_run (session);
+      g_main_loop_run (main_loop);
     }
 
   /* Otherwise log the failure and exit. */
