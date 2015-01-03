@@ -1,5 +1,5 @@
 /* socket.c: Application socket server implementation for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -104,6 +104,16 @@ dispatch_client_write (GIOChannel *channel, GIOCondition cond, gpointer data)
 }
 
 static gboolean
+dispatch_client_error (gzochid_client_socket *sock)
+{
+  gzochid_debug ("Socket disconnected.");
+  gzochid_protocol_client_disconnected (sock->client);
+  gzochid_protocol_client_free (sock->client);
+
+  return FALSE;
+}
+
+static gboolean
 fill_recv_buffer (gzochid_client_socket *sock)
 {
   GIOStatus status;
@@ -127,8 +137,7 @@ fill_recv_buffer (gzochid_client_socket *sock)
 	}
     }
   while (status == G_IO_STATUS_NORMAL);
-
-  return TRUE;
+  return status == G_IO_STATUS_EOF ? dispatch_client_error (sock) : TRUE;
 }
 
 static gboolean
@@ -168,17 +177,6 @@ dispatch_client_read (gzochid_client_socket *sock)
 }
 
 static gboolean
-dispatch_client_error (gzochid_client_socket *sock)
-{
-  gzochid_debug ("Socket disconnected.");
-  gzochid_protocol_client_disconnected (sock->client);
-  gzochid_protocol_client_free (sock->client);
-  gzochid_client_socket_free (sock);
-
-  return FALSE;
-}
-
-static gboolean
 dispatch_client (GIOChannel *channel, GIOCondition condition, gpointer data)
 {
   gzochid_client_socket *sock = data;
@@ -214,7 +212,7 @@ dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
   gzochid_socket_server_context *server_context = data;
   gint client_fd, server_fd = g_io_channel_unix_get_fd (channel);
   struct sockaddr_in client_addr;
-  socklen_t client_addr_len;
+  socklen_t client_addr_len = sizeof (struct sockaddr_in);
   int one = 1;
 
   while ((client_fd = accept
