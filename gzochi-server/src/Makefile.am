@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2014 Julian Graham
+# Copyright (C) 2015 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -34,6 +34,9 @@ endif
 if STORAGE_ENGINE_LMDB
 GZOCHID_STORAGE_CFLAGS = -lpthread
 GZOCHID_STORAGE_SOURCES = storage-lmdb.c
+endif
+if STORAGE_ENGINE_MEM
+GZOCHID_STORAGE_SOURCES = storage-mem.c
 endif
 
 bin_PROGRAMS = gzochid gzochi-dump gzochi-load gzochi-migrate

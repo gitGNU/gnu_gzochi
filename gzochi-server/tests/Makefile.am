@@ -37,6 +37,9 @@ endif
 if STORAGE_ENGINE_LMDB
 test_programs += test-storage-lmdb
 endif
+if STORAGE_ENGINE_MEM
+test_programs += test-storage-mem
+endif
 
 noinst_HEADERS = mock-data.h
 
@@ -104,6 +107,11 @@ test_storage_lmdb_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ -pthread
 test_storage_lmdb_SOURCES = test-storage-lmdb.c
 test_storage_lmdb_LDADD =  $(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-storage-lmdb.o \
+	@GLIB_LIBS@
+
+test_storage_mem_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
+test_storage_mem_SOURCES = test-storage-mem.c
+test_storage_mem_LDADD = $(top_builddir)/src/libgzochid_la-storage-mem.o \
 	@GLIB_LIBS@
 
 test_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
