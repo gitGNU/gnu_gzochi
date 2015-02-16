@@ -431,6 +431,22 @@ static int app_info
     {
       g_string_append (response_str, "      <tr>\n");
       g_string_append
+	(response_str, "        <td>Maximum transaction duration</td>\n");
+      g_string_append_printf 
+	(response_str, "        <td>%ld</td>\n", 
+	 app_context->stats->max_transaction_duration);
+      g_string_append (response_str, "      </tr>\n");
+
+      g_string_append (response_str, "      <tr>\n");
+      g_string_append
+	(response_str, "        <td>Minimum transaction duration</td>\n");
+      g_string_append_printf 
+	(response_str, "        <td>%ld</td>\n", 
+	 app_context->stats->min_transaction_duration);
+      g_string_append (response_str, "      </tr>\n");
+
+      g_string_append (response_str, "      <tr>\n");
+      g_string_append
 	(response_str, "        <td>Average transaction duration</td>\n");
       g_string_append_printf 
 	(response_str, "        <td>%.2f</td>\n", 

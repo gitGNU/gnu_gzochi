@@ -41,21 +41,31 @@ static void update_from_transaction_event
 (gzochid_application_stats *stats, gzochid_application_event_type type,
  gzochid_application_transaction_event *event)
 {
+  long transaction_ms = 0;
+
   switch (type)
     {
     case TRANSACTION_START: stats->num_transactions_started++; break;
     case TRANSACTION_COMMIT: 
       stats->num_transactions_committed++;
       
-      if (stats->num_transactions_committed == 1)
-	stats->average_transaction_duration = 
-	  timeval_to_milliseconds (event->duration);
-      else stats->average_transaction_duration = 
-	     (timeval_to_milliseconds (event->duration) 
-	      + ((stats->num_transactions_committed - 1) 
-		 * stats->average_transaction_duration))
-	     / stats->num_transactions_committed;
+      transaction_ms = timeval_to_milliseconds (event->duration);
 
+      if (stats->num_transactions_committed == 1
+	  || transaction_ms > stats->max_transaction_duration)
+	stats->max_transaction_duration = transaction_ms;
+      if (stats->num_transactions_committed == 1
+	  || transaction_ms < stats->min_transaction_duration)
+	stats->min_transaction_duration = transaction_ms;
+
+      if (stats->num_transactions_committed == 1)
+	stats->average_transaction_duration = transaction_ms;
+      else stats->average_transaction_duration = 
+	     (transaction_ms + 
+	      ((stats->num_transactions_committed - 1)
+	       * stats->average_transaction_duration))
+	     / stats->num_transactions_committed;
+      
       break;
     case TRANSACTION_ROLLBACK: stats->num_transactions_rolled_back++; break;
     default: assert (1 == 0);

@@ -26,6 +26,8 @@ typedef struct _gzochid_application_stats
   unsigned int num_transactions_committed;
   unsigned int num_transactions_rolled_back;
 
+  unsigned long max_transaction_duration;
+  unsigned long min_transaction_duration;
   double average_transaction_duration;
 
   unsigned long bytes_read;
