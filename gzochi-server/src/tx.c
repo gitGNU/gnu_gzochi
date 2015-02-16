@@ -1,5 +1,5 @@
 /* tx.c: Application-level transactions implementation for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -42,13 +42,7 @@ enum gzochid_transaction_state
     GZOCHID_TRANSACTION_STATE_ROLLED_BACK
   };
 
-typedef struct _gzochid_transaction_timing
-{
-  struct timeval start_time;
-  struct timeval *timeout;
-} gzochid_transaction_timing;
-
-typedef struct _gzochid_transaction 
+struct _gzochid_transaction 
 {
   mpz_t id;
   char *name;
@@ -56,9 +50,12 @@ typedef struct _gzochid_transaction
   enum gzochid_transaction_state state;
 
   gzochid_transaction_timing *timing;
-} gzochid_transaction;
+};
 
-static gzochid_transaction *transaction_new (void)
+typedef struct _gzochid_transaction gzochid_transaction;
+
+static 
+gzochid_transaction *transaction_new (void)
 {
   gzochid_transaction *transaction = calloc (1, sizeof (gzochid_transaction));
   transaction->participants = g_hash_table_new_full 
@@ -80,7 +77,8 @@ static gzochid_transaction *transaction_new (void)
   return transaction;
 }
 
-static void transaction_free (gzochid_transaction *transaction)
+static void 
+transaction_free (gzochid_transaction *transaction)
 {
   mpz_clear (transaction->id);
   free (transaction->name);
@@ -88,18 +86,23 @@ static void transaction_free (gzochid_transaction *transaction)
   free (transaction);
 }
 
-typedef struct _gzochid_transaction_participant_registration
+struct _gzochid_transaction_participant_registration
 {
   gzochid_transaction_participant *participant;
 
   gpointer data;
   gboolean rollback;
   gboolean retryable;
-} gzochid_transaction_participant_registration;
+};
 
-gzochid_transaction_participant *gzochid_transaction_participant_new 
-(char *name, gzochid_transaction_prepare prepare, 
- gzochid_transaction_commit commit, gzochid_transaction_rollback rollback)
+typedef struct _gzochid_transaction_participant_registration
+gzochid_transaction_participant_registration;
+
+gzochid_transaction_participant *
+gzochid_transaction_participant_new (char *name, 
+				     gzochid_transaction_prepare prepare, 
+				     gzochid_transaction_commit commit, 
+				     gzochid_transaction_rollback rollback)
 {
   gzochid_transaction_participant *participant = calloc 
     (1, sizeof (gzochid_transaction_participant));
@@ -111,14 +114,16 @@ gzochid_transaction_participant *gzochid_transaction_participant_new
   return participant;
 }
 
-void gzochid_transaction_participant_free
+void 
+gzochid_transaction_participant_free
 (gzochid_transaction_participant *participant)
 {
   free (participant);
 }
 
-void gzochid_transaction_join 
-(gzochid_transaction_participant *participant, gpointer user_data)
+void 
+gzochid_transaction_join (gzochid_transaction_participant *participant, 
+			  gpointer user_data)
 {
   gzochid_transaction *transaction = (gzochid_transaction *) 
     g_private_get (&thread_transaction_key);
@@ -147,8 +152,8 @@ void gzochid_transaction_join
     }
 }
 
-gpointer gzochid_transaction_context 
-(gzochid_transaction_participant *participant)
+gpointer 
+gzochid_transaction_context (gzochid_transaction_participant *participant)
 {
   gzochid_transaction *transaction = (gzochid_transaction *) 
     g_private_get (&thread_transaction_key);
@@ -161,7 +166,8 @@ gpointer gzochid_transaction_context
   return registration == NULL ? NULL : registration->data;
 }
 
-static int prepare (gzochid_transaction *transaction)
+static int 
+prepare (gzochid_transaction *transaction)
 {
   GList *participants = g_hash_table_get_values (transaction->participants);
   GList *participant_ptr = participants;
@@ -190,7 +196,8 @@ static int prepare (gzochid_transaction *transaction)
   return TRUE;
 }
 
-static void commit (gzochid_transaction *transaction)
+static void 
+commit (gzochid_transaction *transaction)
 {
   GList *participants = g_hash_table_get_values (transaction->participants);
   GList *participant_ptr = participants;
@@ -211,7 +218,8 @@ static void commit (gzochid_transaction *transaction)
   g_list_free (participants);
 }
 
-static gboolean rollback_only (gzochid_transaction *transaction)
+static gboolean 
+rollback_only (gzochid_transaction *transaction)
 {
   GHashTableIter iter;
   gpointer key, value;
@@ -228,7 +236,8 @@ static gboolean rollback_only (gzochid_transaction *transaction)
   return FALSE;
 }
 
-static gboolean retryable (gzochid_transaction *transaction)
+static gboolean 
+retryable (gzochid_transaction *transaction)
 {
   GHashTableIter iter;
   gpointer key, value;
@@ -245,7 +254,8 @@ static gboolean retryable (gzochid_transaction *transaction)
   return TRUE;
 }
 
-static void rollback (gzochid_transaction *transaction)
+static void 
+rollback (gzochid_transaction *transaction)
 {
   GList *participants = g_hash_table_get_values (transaction->participants);
   GList *participant_ptr = participants;
@@ -266,7 +276,8 @@ static void rollback (gzochid_transaction *transaction)
   g_list_free (participants);
 }
 
-void gzochid_transaction_mark_for_rollback 
+void 
+gzochid_transaction_mark_for_rollback 
 (gzochid_transaction_participant *participant, gboolean retryable)
 {
   gzochid_transaction *transaction = (gzochid_transaction *) 
@@ -281,7 +292,8 @@ void gzochid_transaction_mark_for_rollback
   registration->retryable = retryable;
 }
 
-static struct timeval time_remaining (gzochid_transaction_timing *timing)
+static struct timeval 
+time_remaining (gzochid_transaction_timing *timing)
 {
   struct timeval now, ret, zero = { 0, 0 };
 
@@ -302,7 +314,8 @@ static struct timeval time_remaining (gzochid_transaction_timing *timing)
   return ret; 
 }
 
-struct timeval gzochid_transaction_time_remaining ()
+struct timeval 
+gzochid_transaction_time_remaining ()
 {
   gzochid_transaction_timing *timing = g_private_get 
     (&thread_transaction_timing_key);
@@ -312,26 +325,28 @@ struct timeval gzochid_transaction_time_remaining ()
   return time_remaining (timing);  
 }
 
-static gzochid_transaction_result transaction_execute
-(void (*func) (gpointer), gpointer data, struct timeval *timeout)
+void 
+gzochid_transaction_begin (gzochid_transaction_timing *timing)
+{  
+ /* Set up the transaction timing information here, even before any
+     participants have joined - the idea being that if a transaction does end
+     up getting created because a participant requiring transactional semantics
+     joins, then this we should consider it as having begun now. */
+ 
+  gettimeofday (&timing->start_time, NULL);
+  g_private_set (&thread_transaction_timing_key, timing);
+}
+
+gzochid_transaction_result
+gzochid_transaction_end ()
 {
-  gzochid_transaction *transaction = NULL;
-  gzochid_transaction_timing timing;
   gboolean success = TRUE;
   gboolean should_retry = FALSE;
   int ms = 0;
 
-  /* Set up the transaction timing information here, even before any
-     participants have joined - the idea being that if a transaction does end
-     up getting created because a participant requiring transactional semantics
-     joins, then this we should consider it as having begun now. */
-
-  gettimeofday (&timing.start_time, NULL);
-  timing.timeout = timeout;
-
-  g_private_set (&thread_transaction_timing_key, &timing);
-
-  func (data);
+  gzochid_transaction *transaction = NULL;
+  gzochid_transaction_timing *timing = g_private_get 
+    (&thread_transaction_timing_key);
 
   g_private_set (&thread_transaction_timing_key, NULL);
 
@@ -347,9 +362,9 @@ static gzochid_transaction_result transaction_execute
   else 
     {
       struct timeval tx_finish;
-      struct timeval remaining = time_remaining (&timing);
+      struct timeval remaining = time_remaining (timing);
 
-      if (timing.timeout != NULL 
+      if (timing->timeout != NULL 
 	  && remaining.tv_sec <= 0 
 	  && remaining.tv_usec <= 0)
 	{
@@ -360,8 +375,8 @@ static gzochid_transaction_result transaction_execute
       else commit (transaction);
 	  
       gettimeofday (&tx_finish, NULL);
-      ms = ((tx_finish.tv_sec - timing.start_time.tv_sec) * 1000)
-	+ ((tx_finish.tv_usec - timing.start_time.tv_usec) / 1000);
+      ms = ((tx_finish.tv_sec - timing->start_time.tv_sec) * 1000)
+	+ ((tx_finish.tv_usec - timing->start_time.tv_usec) / 1000);
       
       if (success)
 	gzochid_debug ("Transaction completed in %dms", ms);
@@ -381,19 +396,33 @@ static gzochid_transaction_result transaction_execute
 	 : GZOCHID_TRANSACTION_FAILURE;    
 }
 
-gzochid_transaction_result gzochid_transaction_execute 
-(void (*func) (gpointer), gpointer data)
+gzochid_transaction_result 
+gzochid_transaction_execute (void (*func) (gpointer), gpointer data)
 {
-  return transaction_execute (func, data, NULL);
+  gzochid_transaction_timing timing;
+  timing.timeout = NULL;
+
+  gzochid_transaction_begin (&timing);
+  func (data);
+
+  return gzochid_transaction_end ();
 }
 
-gzochid_transaction_result gzochid_transaction_execute_timed
-(void (*func) (gpointer), gpointer data, struct timeval timeout)
+gzochid_transaction_result 
+gzochid_transaction_execute_timed (void (*func) (gpointer), gpointer data, 
+				   struct timeval timeout)
 {
-  return transaction_execute (func, data, &timeout);
+  gzochid_transaction_timing timing;
+  timing.timeout = &timeout;
+
+  gzochid_transaction_begin (&timing);
+  func (data);
+
+  return gzochid_transaction_end ();
 }
 
-gboolean gzochid_transaction_active ()
+gboolean 
+gzochid_transaction_active ()
 {
   gzochid_transaction *transaction = (gzochid_transaction *) 
     g_private_get (&thread_transaction_key);
@@ -401,7 +430,8 @@ gboolean gzochid_transaction_active ()
     && transaction->state == GZOCHID_TRANSACTION_STATE_ACTIVE;
 }
 
-gboolean gzochid_transaction_rollback_only ()
+gboolean 
+gzochid_transaction_rollback_only ()
 {
   gzochid_transaction *transaction = (gzochid_transaction *) 
     g_private_get (&thread_transaction_key);
@@ -411,7 +441,8 @@ gboolean gzochid_transaction_rollback_only ()
   return rollback_only (transaction);
 }
 
-gboolean gzochid_transaction_timed_out ()
+gboolean 
+gzochid_transaction_timed_out ()
 {
   gzochid_transaction *transaction = (gzochid_transaction *) 
     g_private_get (&thread_transaction_key);
@@ -426,7 +457,8 @@ gboolean gzochid_transaction_timed_out ()
   else return FALSE;
 }
 
-gboolean gzochid_transaction_timed ()
+gboolean 
+gzochid_transaction_timed ()
 {
   gzochid_transaction_timing *timing = g_private_get 
     (&thread_transaction_timing_key);

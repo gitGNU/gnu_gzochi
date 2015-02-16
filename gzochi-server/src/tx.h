@@ -1,5 +1,5 @@
 /* tx.h: Prototypes and declarations for tx.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -25,33 +25,73 @@ typedef int (*gzochid_transaction_prepare) (gpointer);
 typedef void (*gzochid_transaction_commit) (gpointer);
 typedef void (*gzochid_transaction_rollback) (gpointer);
 
-typedef enum _gzochid_transaction_result
+/* Timing information for a transaction to be executed. Pass this structure to
+   `gzochid_transaction_begin'. */
+
+struct _gzochid_transaction_timing
+{
+  struct timeval start_time; /* Set by `gzochid_transaction_begin'. */
+  struct timeval *timeout; /* The transaction timeout. May be NULL. */
+};
+
+typedef struct _gzochid_transaction_timing gzochid_transaction_timing;
+
+enum _gzochid_transaction_result
   {
     GZOCHID_TRANSACTION_PENDING = 0,
     GZOCHID_TRANSACTION_SUCCESS = 1,
     GZOCHID_TRANSACTION_FAILURE = 2,
     GZOCHID_TRANSACTION_SHOULD_RETRY = 3
-  } gzochid_transaction_result;
+  };
 
-typedef struct _gzochid_transaction_participant
+typedef enum _gzochid_transaction_result gzochid_transaction_result;
+
+struct _gzochid_transaction_participant
 {
   char *name;
 
   gzochid_transaction_prepare prepare;
   gzochid_transaction_commit commit;
   gzochid_transaction_rollback rollback;
-} gzochid_transaction_participant;
+};
+
+typedef struct _gzochid_transaction_participant gzochid_transaction_participant;
 
 gzochid_transaction_participant *gzochid_transaction_participant_new 
 (char *, gzochid_transaction_prepare, gzochid_transaction_commit,
  gzochid_transaction_rollback);
+
 void gzochid_transaction_participant_free (gzochid_transaction_participant *);
 
 void gzochid_transaction_join (gzochid_transaction_participant *, gpointer);
 gpointer gzochid_transaction_context (gzochid_transaction_participant *);
 
+/* Set up the thread-local dynamic state for a new transaction, using the
+   specified `gzochid_transaction_timing' structure, on which this function sets
+   the start time. 
+*/
+void gzochid_transaction_begin (gzochid_transaction_timing *);
+
+/* Clean up the thread-local dynamic state for the current transaction, which
+   must have initiated with a call to `gzochid_transaction_begin' above, and
+   retrieves the transaction result (success, rollback, retry) from the
+   thread-local transaction state.
+*/
+gzochid_transaction_result gzochid_transaction_end ();
+
+/* Short-hand for calling `gzochid_transaction_begin' followed by invoking the
+   specified function on the specified data followed by calling 
+   `gzochid_transaction_end'. This is the easiest way of executing an untimed
+   transaction.
+*/
 gzochid_transaction_result gzochid_transaction_execute 
 (void (*) (gpointer), gpointer);
+
+/* Short-hand for calling `gzochid_transaction_begin' with a timing argument
+   followed by invoking the specified function on the specified data followed by
+   calling `gzochid_transaction_end'. This is the easiest way of executing a
+   timed transaction.
+*/
 gzochid_transaction_result gzochid_transaction_execute_timed 
 (void (*) (gpointer), gpointer, struct timeval);
 
