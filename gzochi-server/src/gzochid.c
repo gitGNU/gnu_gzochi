@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
 
 #include "admin.h"
 #include "config.h"
@@ -33,11 +34,6 @@
 #include "gzochid.h"
 #include "log.h"
 #include "threads.h"
-
-/* Need to move #include for syslog down here because we have other depedencies
-   like Serveez that attempt to redefine some of its `LOG_' #defines. */
-
-#include <syslog.h>
 
 #define _(String) gettext (String)
 
