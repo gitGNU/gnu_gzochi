@@ -1,5 +1,5 @@
 /* admin.c: Primitive functions for gzochi admin API
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 #include <stdlib.h>
 
 #include "../app.h"
-#include "../auth.h"
+#include "../auth_int.h"
 #include "../game.h"
 #include "../guile.h"
 #include "../scheme.h"
@@ -71,6 +71,16 @@ SCM_DEFINE (primitive_current_application, "primitive-current-application",
 	  scm_from_locale_string (context->descriptor->name));
 }
 
+/* Wraps `gzochid_transaction_end' in a dynamic wind "unwind handler," so it can
+   be called on exit from the dynamic created by `primitive_with_application'.
+*/
+
+static void
+with_application_unwind_handler (void *data)
+{
+  gzochid_transaction_end ();
+}
+
 SCM_DEFINE (primitive_with_application, "primitive-with-application", 
 	    2, 0, 0, (SCM context, SCM thunk), 
 	    "Returns the current application or #f if not set.")
@@ -79,53 +89,38 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
     (scm_call_1 (scm_application_context_name, context));
   gzochid_application_context *app_context = 
     gzochid_game_context_lookup_application (game_context, name);
-  gzochid_auth_identity *debug_identity = calloc 
-    (1, sizeof (gzochid_auth_identity));
-
-  gzochid_application_task transactional_task;
-  gzochid_transactional_application_task_execution *execution = 
-    gzochid_transactional_application_task_execution_new 
-    (&transactional_task, NULL);
-  gzochid_application_task application_task;
-
-  SCM ret = SCM_UNDEFINED;
-  SCM exception_var = scm_make_variable (SCM_BOOL_F);
-  SCM exception = SCM_UNDEFINED;
-  void *args[4];
-
-  debug_identity->name = "[DEBUG]";
-
-  args[0] = thunk;
-  args[1] = SCM_EOL;
-  args[2] = exception_var;
-  args[3] = &ret;
-  
-  transactional_task.worker = gzochid_scheme_application_worker;
-  transactional_task.context = app_context;
-  transactional_task.identity = debug_identity;
-  transactional_task.data = args;
-
-  application_task.worker = gzochid_application_transactional_task_worker;
-  application_task.context = app_context;
-  application_task.identity = debug_identity;
-  application_task.data = execution;
-
-  gzochid_application_task_worker (&application_task);
+  gzochid_auth_identity debug_identity;
+  gzochid_transaction_timing timing;
+  SCM ret = SCM_BOOL_F;
 
   free (name);
+	    
+  debug_identity.name = "[DEBUG]";
+  timing.timeout = NULL;
 
-  exception = scm_variable_ref (exception_var);
-  if (exception != SCM_BOOL_F)
-    scm_throw (SCM_CAR (exception), SCM_CDR (exception));
-  else if (gzochid_transaction_active ())
+  scm_dynwind_begin (0);
+  gzochid_transaction_begin (&timing);
+
+  /* Whether or not the thunk exits non-locally, we need to end the transaction
+     cleanly. */
+
+  scm_dynwind_unwind_handler 
+    (with_application_unwind_handler, NULL, SCM_F_WIND_EXPLICITLY);
+
+  gzochid_with_application_context 
+    (app_context, &debug_identity, (void * (*) (void *)) scm_call_0, thunk);
+  scm_dynwind_end ();
+
+  if (gzochid_transaction_active ())
     gzochid_api_check_transaction ();
 
-  gzochid_transactional_application_task_execution_free (execution);
+  scm_remember_upto_here_1 (thunk);
 
   return ret;
 }
 
-void gzochid_api_admin_init (gzochid_game_context *context)
+void 
+gzochid_api_admin_init (gzochid_game_context *context)
 {
   SCM current_module = scm_current_module ();
   SCM gzochi_admin = scm_c_resolve_module ("gzochi admin");
