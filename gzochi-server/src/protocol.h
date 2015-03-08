@@ -1,5 +1,5 @@
 /* protocol.h: Prototypes and declarations for protocol.c
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,38 +22,28 @@
 #include <gmp.h>
 
 #include "app.h"
-#include "auth.h"
+#include "gzochid-auth.h"
 #include "socket.h"
 
 typedef struct _gzochid_protocol_client gzochid_protocol_client;
 
-gzochid_auth_identity *
-gzochid_protocol_client_get_identity (gzochid_protocol_client *);
+gzochid_auth_identity *gzochid_protocol_client_get_identity 
+(gzochid_protocol_client *);
 
-gzochid_protocol_client *
-gzochid_protocol_client_accept (gzochid_client_socket *);
+gzochid_protocol_client *gzochid_protocol_client_accept 
+(gzochid_client_socket *);
 
-void 
-gzochid_protocol_client_disconnected (gzochid_protocol_client *);
+void gzochid_protocol_client_disconnected (gzochid_protocol_client *);
+void gzochid_protocol_client_free (gzochid_protocol_client *);
 
-void 
-gzochid_protocol_client_free (gzochid_protocol_client *);
+void gzochid_protocol_client_dispatch (gzochid_protocol_client *, 
+				       unsigned char *, short);
 
-void 
-gzochid_protocol_client_dispatch 
-(gzochid_protocol_client *, unsigned char *, short);
+void gzochid_protocol_client_disconnect (gzochid_protocol_client *);
+void gzochid_protocol_client_login_success (gzochid_protocol_client *);
+void gzochid_protocol_client_login_failure (gzochid_protocol_client *);
 
-void 
-gzochid_protocol_client_disconnect (gzochid_protocol_client *);
-
-void 
-gzochid_protocol_client_login_success (gzochid_protocol_client *);
-
-void 
-gzochid_protocol_client_login_failure (gzochid_protocol_client *);
-
-void
-gzochid_protocol_client_send
-(gzochid_protocol_client *, unsigned char *, short);
+void gzochid_protocol_client_send (gzochid_protocol_client *, unsigned char *, 
+				   short);
 
 #endif /* GZOCHID_PROTOCOL_H */

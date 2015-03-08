@@ -1,5 +1,5 @@
 /* auth_int.h: Internal API and prototypes for auth.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 
 #include <glib.h>
 
-#include "auth.h"
+#include "gzochid-auth.h"
 
 struct _gzochid_application_context;
 struct _gzochid_game_context;

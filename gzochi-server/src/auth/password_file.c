@@ -1,5 +1,5 @@
 /* password_file.c: Password file-based authentication plugin for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,11 +21,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../auth.h"
+#include "../gzochid-auth.h"
 
 #define PATH_PROPERTY "path"
 
-static gpointer initialize (GHashTable *properties, GError **error)
+static gpointer 
+initialize (GHashTable *properties, GError **error)
 {
   gchar *path = NULL;
   gchar *line = NULL;
@@ -72,8 +73,9 @@ static gpointer initialize (GHashTable *properties, GError **error)
   return passwords;
 }
 
-static gzochid_auth_identity *authenticate 
-(unsigned char *credentials, short len, gpointer auth_data, GError **error)
+static gzochid_auth_identity *
+authenticate (unsigned char *credentials, short len, gpointer auth_data, 
+	      GError **error)
 {
   GHashTable *passwords = (GHashTable *) auth_data;
   unsigned char *pivot = (unsigned char *) memchr (credentials, '\0', len);

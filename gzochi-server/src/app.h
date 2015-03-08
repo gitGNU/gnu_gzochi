@@ -1,5 +1,5 @@
 /* app.h: Prototypes and declarations for app.c
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,9 +22,9 @@
 #include <gmp.h>
 #include <sys/time.h>
 
-#include "auth.h"
 #include "context.h"
 #include "event.h"
+#include "gzochid-auth.h"
 #include "io.h"
 #include "stats.h"
 #include "storage.h"

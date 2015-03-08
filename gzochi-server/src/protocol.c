@@ -1,5 +1,5 @@
 /* protocol.c: Application communication protocol routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@
 #include "app.h"
 #include "context.h"
 #include "game.h"
+#include "gzochid-auth.h"
 #include "log.h"
 #include "protocol.h"
 

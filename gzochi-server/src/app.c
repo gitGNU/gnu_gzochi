@@ -1,5 +1,5 @@
 /* app.c: Application context routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,13 +23,13 @@
 #include <sys/time.h>
 
 #include "app.h"
-#include "auth.h"
 #include "auth_int.h"
 #include "context.h"
 #include "event.h"
 #include "fsm.h"
 #include "game.h"
 #include "guile.h"
+#include "gzochid-auth.h"
 #include "log.h"
 #include "protocol.h"
 #include "scheme.h"
@@ -47,19 +47,24 @@ static GPrivate thread_identity_key;
 
 G_LOCK_DEFINE_STATIC (load_path);
 
-typedef struct _gzochid_event_transaction_context
+struct _gzochid_event_transaction_context
 {
   gzochid_application_context *app_context;
   struct timeval start_time;
-} gzochid_event_transaction_context;
+};
 
-static void initialize_async (gpointer data, gpointer user_data)
+typedef struct _gzochid_event_transaction_context
+gzochid_event_transaction_context;
+
+static void 
+initialize_async (gpointer data, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) data;
   gzochid_fsm_to_state (context->fsm, GZOCHID_APPLICATION_STATE_RUNNING);
 }
 
-static void initialize_auth (int from_state, int to_state, gpointer user_data)
+static void 
+initialize_auth (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
   gzochid_application_context *app_context = 
@@ -108,7 +113,8 @@ static void initialize_auth (int from_state, int to_state, gpointer user_data)
     }
 }
 
-static void initialize_data (int from_state, int to_state, gpointer user_data)
+static void 
+initialize_data (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
   gzochid_application_context *app_context = 
@@ -155,7 +161,8 @@ static void initialize_data (int from_state, int to_state, gpointer user_data)
   free (names_db);
 }
 
-static void initialize_load_paths_guile_worker
+static void 
+initialize_load_paths_guile_worker
 (gpointer data, gpointer user_data)
 {
   GList *load_path_ptr = (GList *) data;
@@ -167,8 +174,8 @@ static void initialize_load_paths_guile_worker
     }
 }
 
-static void initialize_load_paths
-(int from_state, int to_state, gpointer user_data)
+static void 
+initialize_load_paths (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
   gzochid_application_context *app_context = 
@@ -180,8 +187,8 @@ static void initialize_load_paths
   G_UNLOCK (load_path);
 }
 
-static void initialize_complete 
-(int from_state, int to_state, gpointer user_data)
+static void 
+initialize_complete (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
   gzochid_application_context *app_context = 
@@ -221,8 +228,8 @@ gzochid_serialize_application_task
     (context, task->data, out, NULL);
 }
 
-static gzochid_event_transaction_context *create_transaction_context 
-(gzochid_application_context *app_context)
+static gzochid_event_transaction_context *
+create_transaction_context (gzochid_application_context *app_context)
 {
   gzochid_event_transaction_context *tx_context = 
     malloc (sizeof (gzochid_event_transaction_context));
@@ -233,12 +240,14 @@ static gzochid_event_transaction_context *create_transaction_context
   return tx_context;
 }
 
-static int event_prepare (gpointer data)
+static int 
+event_prepare (gpointer data)
 {
   return TRUE;
 }
 
-static void event_commit (gpointer data)
+static void 
+event_commit (gpointer data)
 {
   gzochid_event_transaction_context *tx_context = 
     (gzochid_event_transaction_context *) data;
@@ -257,7 +266,8 @@ static void event_commit (gpointer data)
   free (tx_context);
 }
 
-static void event_rollback (gpointer data)
+static void 
+event_rollback (gpointer data)
 {
   gzochid_event_transaction_context *tx_context = 
     (gzochid_event_transaction_context *) data;
@@ -277,10 +287,11 @@ static void event_rollback (gpointer data)
   free (tx_context);
 }
 
-static gzochid_transaction_participant event_participant = 
-  { "event", event_prepare, event_commit, event_rollback };
+static gzochid_transaction_participant 
+event_participant = { "event", event_prepare, event_commit, event_rollback };
 
-static void join_transaction (gzochid_application_context *context)
+static void 
+join_transaction (gzochid_application_context *context)
 {
   if (!gzochid_transaction_active ()
       || gzochid_transaction_context (&event_participant) == NULL)
@@ -291,7 +302,8 @@ static void join_transaction (gzochid_application_context *context)
     }
 }
 
-static void event_func_wrapper (gpointer data)
+static void 
+event_func_wrapper (gpointer data)
 {
   gpointer *args = (gpointer *) data;
   gzochid_application_context *context = 
@@ -311,8 +323,9 @@ static void event_func_wrapper (gpointer data)
   func (func_data);  
 }
 
-gzochid_transaction_result gzochid_application_transaction_execute 
-(gzochid_application_context *context, void (*func) (gpointer), gpointer data)
+gzochid_transaction_result 
+gzochid_application_transaction_execute (gzochid_application_context *context, 
+					 void (*func) (gpointer), gpointer data)
 {
   gpointer args[3];
 
@@ -323,7 +336,8 @@ gzochid_transaction_result gzochid_application_transaction_execute
   return gzochid_transaction_execute (event_func_wrapper, args);
 }
 
-gzochid_transaction_result gzochid_application_transaction_execute_timed 
+gzochid_transaction_result 
+gzochid_application_transaction_execute_timed 
 (gzochid_application_context *context, void (*func) (gpointer), gpointer data,
  struct timeval timeout)
 {
@@ -336,9 +350,10 @@ gzochid_transaction_result gzochid_application_transaction_execute_timed
   return gzochid_transaction_execute_timed (event_func_wrapper, args, timeout);
 }
 
-static gzochid_transactional_application_task_execution *execution_new
-(gzochid_application_task *task, gzochid_application_task *cleanup_task,
- struct timeval *timeout)
+static gzochid_transactional_application_task_execution *
+execution_new (gzochid_application_task *task, 
+	       gzochid_application_task *cleanup_task,
+	       struct timeval *timeout)
 {
   gzochid_transactional_application_task_execution *execution = 
     malloc (sizeof (gzochid_transactional_application_task_execution));
@@ -375,7 +390,8 @@ gzochid_transactional_application_task_timed_execution_new
   return execution_new (task, cleanup_task, &timeout);
 }
 
-void gzochid_transactional_application_task_execution_free
+void 
+gzochid_transactional_application_task_execution_free
 (gzochid_transactional_application_task_execution *execution)
 {
   if (execution->timeout != NULL)
@@ -383,7 +399,8 @@ void gzochid_transactional_application_task_execution_free
   free (execution);
 }
 
-static void transactional_task_worker (gpointer data)
+static void 
+transactional_task_worker (gpointer data)
 {
   void **args = (void **) data;
   
@@ -395,7 +412,8 @@ static void transactional_task_worker (gpointer data)
   task->worker (context, identity, task->data);
 }
 
-void gzochid_application_transactional_task_worker 
+void 
+gzochid_application_transactional_task_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer data)
 {
@@ -416,7 +434,8 @@ void gzochid_application_transactional_task_worker
   execution->attempts++;
 }
 
-void gzochid_application_resubmitting_transactional_task_worker 
+void 
+gzochid_application_resubmitting_transactional_task_worker 
 (gzochid_application_context *app_context, gzochid_auth_identity *identity, 
  gpointer data)
 {
@@ -467,25 +486,29 @@ void gzochid_application_resubmitting_transactional_task_worker
     }
 }
 
-void gzochid_application_task_worker (gpointer data)
+void 
+gzochid_application_task_worker (gpointer data)
 {
   gzochid_application_task *task = (gzochid_application_task *) data;
   task->worker (task->context, task->identity, task->data);
 }
 
-void gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
+void 
+gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
 {
   gzochid_application_task_worker (data);
 }
 
-gboolean gzochid_application_should_retry 
+gboolean 
+gzochid_application_should_retry 
 (gzochid_transactional_application_task_execution *execution)
 {
   return execution->result == GZOCHID_TRANSACTION_SHOULD_RETRY
     && execution->attempts < GZOCHID_APPLICATION_MAX_ATTEMPTS_DEFAULT;
 }
 
-static void run_async_transactional (gpointer data)
+static void 
+run_async_transactional (gpointer data)
 {
   GError *err = NULL;
   gzochid_application_context *context = (gzochid_application_context *) data;
@@ -521,13 +544,15 @@ static void run_async_transactional (gpointer data)
     }
 }
 
-static void run_async (gpointer data, gpointer user_data)
+static void 
+run_async (gpointer data, gpointer user_data)
 {
   gzochid_application_transaction_execute 
     ((gzochid_application_context *) data, run_async_transactional, data);
 }
 
-static void run (int from_state, int to_state, gpointer user_data)
+static void 
+run (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
   gzochid_application_context *app_context = 
@@ -541,7 +566,8 @@ static void run (int from_state, int to_state, gpointer user_data)
     (game_context->pool, run_async, app_context, NULL);
 }
 
-static void stop (int from_state, int to_state, gpointer user_data)
+static void 
+stop (int from_state, int to_state, gpointer user_data)
 {
   gzochid_application_context *context = 
     (gzochid_application_context *) user_data;
@@ -555,9 +581,8 @@ static void stop (int from_state, int to_state, gpointer user_data)
 }
 
 static void 
-serialize_callback 
-(gzochid_application_context *context, gpointer data, GString *out, 
- GError **err)
+serialize_callback (gzochid_application_context *context, gpointer data, 
+		    GString *out, GError **err)
 {
   gzochid_application_callback *callback = 
     (gzochid_application_callback *) data;
@@ -570,8 +595,8 @@ serialize_callback
 }
 
 static gpointer 
-deserialize_callback 
-(gzochid_application_context *context, GString *in, GError **err)
+deserialize_callback (gzochid_application_context *context, GString *in, 
+		      GError **err)
 {
   gzochid_application_callback *callback = 
     malloc (sizeof (gzochid_application_callback));
@@ -586,8 +611,8 @@ deserialize_callback
   return callback;
 }
 
-static void finalize_callback 
-(gzochid_application_context *context, gpointer data)
+static void
+finalize_callback (gzochid_application_context *context, gpointer data)
 {
   gzochid_application_callback *callback = 
     (gzochid_application_callback *) data;
@@ -599,11 +624,12 @@ static void finalize_callback
   free (callback);
 }
 
-gzochid_io_serialization gzochid_application_callback_serialization = 
+gzochid_io_serialization 
+gzochid_application_callback_serialization = 
   { serialize_callback, deserialize_callback, finalize_callback };
 
-gzochid_application_callback *gzochid_application_callback_new
-(char *procedure, GList *module, mpz_t scm_oid)
+gzochid_application_callback *
+gzochid_application_callback_new (char *procedure, GList *module, mpz_t scm_oid)
 {
   gzochid_application_callback *callback = calloc
     (1, sizeof (gzochid_application_callback));
@@ -617,12 +643,14 @@ gzochid_application_callback *gzochid_application_callback_new
   return callback;
 }
 
-void gzochid_application_callback_free (gzochid_application_callback *callback)
+void 
+gzochid_application_callback_free (gzochid_application_callback *callback)
 {
   free (callback);
 }
 
-gzochid_application_context *gzochid_application_context_new (void)
+gzochid_application_context *
+gzochid_application_context_new (void)
 {
   gzochid_application_context *context = calloc 
     (1, sizeof (gzochid_application_context));
@@ -641,7 +669,8 @@ gzochid_application_context *gzochid_application_context_new (void)
   return context;
 }
 
-void gzochid_application_context_free (gzochid_application_context *app_context)
+void 
+gzochid_application_context_free (gzochid_application_context *app_context)
 {
   gzochid_context *context = (gzochid_context *) app_context;
   gzochid_context_free (context);
@@ -658,14 +687,16 @@ void gzochid_application_context_free (gzochid_application_context *app_context)
   free (context);
 }
 
-static void update_stats (gzochid_application_event *event, gpointer data)
+static void 
+update_stats (gzochid_application_event *event, gpointer data)
 {
   gzochid_stats_update_from_event ((gzochid_application_stats *) data, event);
 }
 
-void gzochid_application_context_init 
-(gzochid_application_context *context, gzochid_context *parent, 
- gzochid_application_descriptor *descriptor)
+void 
+gzochid_application_context_init (gzochid_application_context *context, 
+				  gzochid_context *parent, 
+				  gzochid_application_descriptor *descriptor)
 {
   char *fsm_name = g_strconcat ("app/", descriptor->name, NULL);
   gzochid_fsm *fsm = gzochid_fsm_new 
@@ -710,8 +741,9 @@ void gzochid_application_context_init
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
 }
 
-void gzochid_application_client_logged_in
-(gzochid_application_context *context, gzochid_protocol_client *client)
+void 
+gzochid_application_client_logged_in (gzochid_application_context *context, 
+				      gzochid_protocol_client *client)
 {
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
@@ -783,8 +815,9 @@ void gzochid_application_client_logged_in
   gzochid_transactional_application_task_execution_free (execution);
 }
 
-void gzochid_application_client_disconnected
-(gzochid_application_context *context, gzochid_protocol_client *client)
+void 
+gzochid_application_client_disconnected (gzochid_application_context *context, 
+					 gzochid_protocol_client *client)
 {
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
@@ -834,8 +867,8 @@ void gzochid_application_client_disconnected
 gzochid_application_worker_serialization 
 received_message_worker_serialization = { NULL, NULL };
 
-gzochid_io_serialization received_message_data_serialization = 
-  { NULL, NULL, NULL };
+gzochid_io_serialization 
+received_message_data_serialization = { NULL, NULL, NULL };
 
 gzochid_application_task_serialization 
 gzochid_client_received_message_task_serialization = 
@@ -845,7 +878,8 @@ gzochid_client_received_message_task_serialization =
     &received_message_data_serialization 
   };
 
-void gzochid_application_session_received_message
+void 
+gzochid_application_session_received_message
 (gzochid_application_context *context, gzochid_protocol_client *client, 
  unsigned char *msg, short len)
 {
@@ -901,15 +935,17 @@ void gzochid_application_session_received_message
     }
 }
 
-void gzochid_application_channel_message_received
+void 
+gzochid_application_channel_message_received
 (gzochid_application_context *context, gzochid_protocol_client *client, 
  char *channel, unsigned char *msg, short len)
 {
 }
 
-void *gzochid_with_application_context 
-(gzochid_application_context *context, gzochid_auth_identity *identity,
- void *(*worker) (gpointer), gpointer data)
+void *
+gzochid_with_application_context (gzochid_application_context *context, 
+				  gzochid_auth_identity *identity,
+				  void *(*worker) (gpointer), gpointer data)
 {
   gpointer ret = NULL;
   gboolean private_needs_context = 
@@ -942,18 +978,21 @@ void *gzochid_with_application_context
   return ret;
 }
 
-gzochid_application_context *gzochid_get_current_application_context (void)
+gzochid_application_context *
+gzochid_get_current_application_context (void)
 {
   return (gzochid_application_context *)
     g_private_get (&thread_application_context_key);
 }
 
-gzochid_auth_identity *gzochid_get_current_identity (void)
+gzochid_auth_identity *
+gzochid_get_current_identity (void)
 {
   return (gzochid_auth_identity *) g_private_get (&thread_identity_key);
 }
 
-void gzochid_register_client_received_message_task_serialization (void)
+void 
+gzochid_register_client_received_message_task_serialization (void)
 {
   gzochid_task_register_serialization 
     (&gzochid_client_received_message_task_serialization);

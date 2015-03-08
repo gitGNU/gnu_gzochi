@@ -1,5 +1,5 @@
 /* task.h: Prototypes and declarations for task.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,12 +23,12 @@
 #include <sys/time.h>
 
 #include "app.h"
-#include "auth.h"
 #include "data.h"
+#include "gzochid-auth.h"
 #include "io.h"
 #include "threads.h"
 
-typedef struct _gzochid_durable_application_task_handle
+struct _gzochid_durable_application_task_handle
 {
   gzochid_application_task_serialization *serialization;
 
@@ -40,28 +40,36 @@ typedef struct _gzochid_durable_application_task_handle
   gboolean repeats;
   struct timeval period;
   struct timeval target_execution_time;
-} gzochid_durable_application_task_handle;
+};
+
+typedef struct _gzochid_durable_application_task_handle
+gzochid_durable_application_task_handle;
 
 typedef gzochid_durable_application_task_handle gzochid_periodic_task_handle;
 
 extern gzochid_io_serialization 
 gzochid_durable_application_task_handle_serialization;
 
-typedef struct _gzochid_task
+struct _gzochid_task
 {
   gzochid_thread_worker worker;
   gpointer data;
   struct timeval target_execution_time;
-} gzochid_task;
+};
 
-typedef struct _gzochid_task_transaction_context
+typedef struct _gzochid_task gzochid_task;
+
+struct _gzochid_task_transaction_context
 {
   gzochid_application_context *context;
   
   gzochid_auth_identity *identity;
 
   GList *scheduled_tasks;
-} gzochid_task_transaction_context;
+};
+
+typedef struct _gzochid_task_transaction_context
+gzochid_task_transaction_context;
 
 gzochid_task *gzochid_task_new 
 (gzochid_thread_worker, gpointer, struct timeval);

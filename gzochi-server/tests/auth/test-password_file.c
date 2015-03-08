@@ -1,5 +1,5 @@
 /* test-password_file.c: Test routines for the password file auth plugin.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,11 +19,12 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-#include "auth.h"
+#include "gzochid-auth.h"
 
 gint gzochid_auth_init_plugin (gzochid_auth_plugin *);
 
-static void test_initialize ()
+static void 
+test_initialize ()
 {
   GError *error = NULL;
   GHashTable *properties = g_hash_table_new (g_str_hash, g_str_equal);
@@ -48,7 +49,8 @@ static void test_initialize ()
   g_hash_table_destroy (passwords);
 }
 
-static void test_initialize_missing_path ()
+static void 
+test_initialize_missing_path ()
 {
   GError *error = NULL;
   GHashTable *properties = g_hash_table_new (g_str_hash, g_str_equal);
@@ -64,7 +66,8 @@ static void test_initialize_missing_path ()
   g_hash_table_destroy (properties);
 }
 
-static void test_initialize_missing_file ()
+static void 
+test_initialize_missing_file ()
 {
   GError *error = NULL;
   GHashTable *properties = g_hash_table_new (g_str_hash, g_str_equal);
@@ -81,7 +84,8 @@ static void test_initialize_missing_file ()
   g_hash_table_destroy (properties);
 }
 
-static void test_authenticate ()
+static void 
+test_authenticate ()
 {
   GError *error = NULL;
   GHashTable *passwords = g_hash_table_new (g_str_hash, g_str_equal);
@@ -102,7 +106,8 @@ static void test_authenticate ()
   g_hash_table_destroy (passwords);
 }
 
-static void test_authenticate_fail ()
+static void 
+test_authenticate_fail ()
 {
   GError *error = NULL;
   GHashTable *passwords = g_hash_table_new (g_str_hash, g_str_equal);
@@ -117,7 +122,8 @@ static void test_authenticate_fail ()
   g_hash_table_destroy (passwords);
 }
 
-static void test_authenticate_error ()
+static void 
+test_authenticate_error ()
 {
   GError *error = NULL;
   GHashTable *passwords = g_hash_table_new (g_str_hash, g_str_equal);
@@ -134,7 +140,8 @@ static void test_authenticate_error ()
   g_hash_table_destroy (passwords);
 }
 
-int main (int argc, char *argv[])
+int 
+main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 

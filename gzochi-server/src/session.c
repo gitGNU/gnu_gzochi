@@ -1,5 +1,5 @@
 /* session.c: Client session management routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,10 +23,10 @@
 #include <string.h>
 
 #include "app.h"
-#include "auth.h"
 #include "auth_int.h"
 #include "data.h"
 #include "game.h"
+#include "gzochid-auth.h"
 #include "io.h"
 #include "log.h"
 #include "protocol.h"
@@ -48,21 +48,27 @@ enum gzochid_client_session_operation
     GZOCHID_CLIENT_SESSION_OP_MESSAGE
   };
 
-typedef struct _gzochid_client_session_pending_operation
+struct _gzochid_client_session_pending_operation
 {
   enum gzochid_client_session_operation type;
   mpz_t target_session;
-} gzochid_client_session_pending_operation;
+};
 
-typedef struct _gzochid_client_session_pending_message_operation
+typedef struct _gzochid_client_session_pending_operation
+gzochid_client_session_pending_operation;
+
+struct _gzochid_client_session_pending_message_operation
 {
   gzochid_client_session_pending_operation base;
 
   unsigned char *message;
   short len;
-} gzochid_client_session_pending_message_operation;
+};
 
-typedef struct _gzochid_client_session_transaction_context
+typedef struct _gzochid_client_session_pending_message_operation
+gzochid_client_session_pending_message_operation;
+
+struct _gzochid_client_session_transaction_context
 {
   gzochid_application_context *context;
   
@@ -70,10 +76,13 @@ typedef struct _gzochid_client_session_transaction_context
   gzochid_client_session_pending_operation *login_operation;
 
   GList *operations;
-} gzochid_client_session_transaction_context;
+};
 
-static gzochid_client_session_transaction_context *create_transaction_context
-(gzochid_application_context *context)
+typedef struct _gzochid_client_session_transaction_context
+gzochid_client_session_transaction_context;
+
+static gzochid_client_session_transaction_context *
+create_transaction_context (gzochid_application_context *context)
 {
   gzochid_client_session_transaction_context *tx_context = 
     calloc (1, sizeof (gzochid_client_session_transaction_context));
@@ -83,8 +92,8 @@ static gzochid_client_session_transaction_context *create_transaction_context
   return tx_context;
 }
 
-static gzochid_client_session_pending_operation *create_disconnect_operation
-(mpz_t target_session)
+static gzochid_client_session_pending_operation *
+create_disconnect_operation (mpz_t target_session)
 {
   gzochid_client_session_pending_operation *op = 
     malloc (sizeof (gzochid_client_session_pending_operation));
@@ -96,8 +105,8 @@ static gzochid_client_session_pending_operation *create_disconnect_operation
   return op;
 }
 
-static gzochid_client_session_pending_operation *create_login_success_operation
-(mpz_t target_session)
+static gzochid_client_session_pending_operation *
+create_login_success_operation (mpz_t target_session)
 {
   gzochid_client_session_pending_operation *op = 
     malloc (sizeof (gzochid_client_session_pending_operation));
@@ -109,8 +118,8 @@ static gzochid_client_session_pending_operation *create_login_success_operation
   return op;  
 }
 
-static gzochid_client_session_pending_operation *create_login_failure_operation
-(mpz_t target_session)
+static gzochid_client_session_pending_operation *
+create_login_failure_operation (mpz_t target_session)
 {
   gzochid_client_session_pending_operation *op = 
     malloc (sizeof (gzochid_client_session_pending_operation));
@@ -122,8 +131,8 @@ static gzochid_client_session_pending_operation *create_login_failure_operation
   return op;  
 }
 
-static gzochid_client_session_pending_operation *create_message_operation
-(mpz_t target_session, unsigned char *msg, short len)
+static gzochid_client_session_pending_operation *
+create_message_operation (mpz_t target_session, unsigned char *msg, short len)
 {
   gzochid_client_session_pending_message_operation *msg_op = 
     malloc (sizeof (gzochid_client_session_pending_message_operation));
@@ -140,12 +149,14 @@ static gzochid_client_session_pending_operation *create_message_operation
   return op;
 }
 
-static int session_prepare (gpointer data)
+static int 
+session_prepare (gpointer data)
 {
   return TRUE;
 }
 
-static void free_operation (gpointer data)
+static void 
+free_operation (gpointer data)
 {
   gzochid_client_session_pending_operation *op = 
     (gzochid_client_session_pending_operation *) data;
@@ -154,15 +165,16 @@ static void free_operation (gpointer data)
   free (op);
 }
 
-static void cleanup_transaction 
-(gzochid_client_session_transaction_context *tx_context)
+static void 
+cleanup_transaction (gzochid_client_session_transaction_context *tx_context)
 {
   g_list_free_full (tx_context->operations, free_operation);
   
   free (tx_context);
 }
 
-static void session_commit_operation
+static void 
+session_commit_operation
 (gzochid_client_session_transaction_context *tx_context, 
  gzochid_client_session_pending_operation *op)
 {
@@ -214,7 +226,8 @@ static void session_commit_operation
   g_mutex_unlock (&context->client_mapping_lock);
 }
 
-static void session_commit_operation_visitor (gpointer data, gpointer user_data)
+static void 
+session_commit_operation_visitor (gpointer data, gpointer user_data)
 {
   gzochid_client_session_transaction_context *tx_context =
     (gzochid_client_session_transaction_context *) user_data;
@@ -224,7 +237,8 @@ static void session_commit_operation_visitor (gpointer data, gpointer user_data)
   session_commit_operation (tx_context, op);
 }
 
-static void session_commit (gpointer data)
+static void 
+session_commit (gpointer data)
 {
   gzochid_client_session_transaction_context *tx_context = 
     (gzochid_client_session_transaction_context *) data;
@@ -238,7 +252,8 @@ static void session_commit (gpointer data)
   cleanup_transaction (tx_context);
 }
 
-static void session_rollback (gpointer data)
+static void 
+session_rollback (gpointer data)
 {
   gzochid_client_session_transaction_context *tx_context = 
     (gzochid_client_session_transaction_context *) data;
@@ -246,8 +261,9 @@ static void session_rollback (gpointer data)
   cleanup_transaction (tx_context);
 }
 
-static gzochid_client_session_handler *deserialize_handler 
-(gzochid_application_context *context, GString *in, GError **err)
+static gzochid_client_session_handler *
+deserialize_handler (gzochid_application_context *context, GString *in, 
+		     GError **err)
 {
   gzochid_client_session_handler *handler = malloc 
     (sizeof (gzochid_client_session_handler)); 
@@ -260,8 +276,9 @@ static gzochid_client_session_handler *deserialize_handler
   return handler;
 }
 
-static gpointer deserialize_client_session
-(gzochid_application_context *context, GString *in, GError **err)
+static gpointer 
+deserialize_client_session (gzochid_application_context *context, GString *in, 
+			    GError **err)
 {
   gzochid_auth_identity *identity = 
     gzochid_auth_identity_deserializer (context, in, NULL);
@@ -280,9 +297,10 @@ static gpointer deserialize_client_session
   return session;
 }
 
-static void serialize_handler 
-(gzochid_application_context *context, gzochid_client_session_handler *handler,
- GString *out, GError **err)
+static void 
+serialize_handler (gzochid_application_context *context, 
+		   gzochid_client_session_handler *handler, GString *out, 
+		   GError **err)
 {
   gzochid_application_callback_serialization.serializer 
     (context, handler->received_message, out, NULL);
@@ -290,8 +308,9 @@ static void serialize_handler
     (context, handler->disconnected, out, NULL);
 }
 
-static void serialize_client_session 
-(gzochid_application_context *context, gpointer obj, GString *out, GError **err)
+static void 
+serialize_client_session (gzochid_application_context *context, gpointer obj, 
+			  GString *out, GError **err)
 {
   gzochid_client_session *session = (gzochid_client_session *) obj;
 
@@ -308,8 +327,9 @@ static void serialize_client_session
   else gzochid_util_serialize_boolean (FALSE, out);
 }
 
-static void finalize_handler 
-(gzochid_application_context *context, gzochid_client_session_handler *handler)
+static void 
+finalize_handler (gzochid_application_context *context, 
+		  gzochid_client_session_handler *handler)
 {
   gzochid_application_callback_serialization.finalizer 
     (context, handler->received_message);
@@ -318,8 +338,8 @@ static void finalize_handler
   free (handler);
 }
 
-static void finalize_client_session
-(gzochid_application_context *context, gpointer obj)
+static void 
+finalize_client_session (gzochid_application_context *context, gpointer obj)
 {
   gzochid_client_session *session = (gzochid_client_session *) obj;
 
@@ -343,8 +363,9 @@ gzochid_io_serialization gzochid_client_session_serialization =
     finalize_client_session 
   };
 
-static void remove_session
-(gzochid_application_context *context, const char *oid_str, GError **err)
+static void 
+remove_session (gzochid_application_context *context, const char *oid_str, 
+		GError **err)
 {
   GError *local_err = NULL;
   GString *binding = g_string_new (SESSION_PREFIX);
@@ -402,15 +423,16 @@ static void remove_session
   g_string_free (binding, TRUE);
 }
 
-void gzochid_client_session_disconnected_worker
+void 
+gzochid_client_session_disconnected_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gpointer data)
 {
   remove_session (context, (const char *) data, NULL);
 }
 
-gzochid_client_session *gzochid_client_session_new 
-(gzochid_auth_identity *identity)
+gzochid_client_session *
+gzochid_client_session_new (gzochid_auth_identity *identity)
 {
   gzochid_client_session *session = (gzochid_client_session *)
     calloc (1, sizeof (gzochid_client_session));
@@ -422,15 +444,16 @@ gzochid_client_session *gzochid_client_session_new
   return session;
 }
 
-void gzochid_client_session_free (gzochid_client_session *session)
+void 
+gzochid_client_session_free (gzochid_client_session *session)
 {
   mpz_clear (session->scm_oid);
   g_sequence_free (session->channels);
   free (session);
 }
 
-static gzochid_client_session_transaction_context *join_transaction 
-(gzochid_application_context *context)
+static gzochid_client_session_transaction_context *
+join_transaction (gzochid_application_context *context)
 {
   gzochid_client_session_transaction_context *tx_context = NULL;
 
@@ -445,8 +468,9 @@ static gzochid_client_session_transaction_context *join_transaction
   return tx_context;
 }
 
-void gzochid_client_session_disconnect 
-(gzochid_application_context *context, gzochid_client_session *session)
+void 
+gzochid_client_session_disconnect (gzochid_application_context *context, 
+				   gzochid_client_session *session)
 {
   GError *err = NULL;
   char *oid_str = NULL;
@@ -469,8 +493,9 @@ void gzochid_client_session_disconnect
   free (oid_str);
 }
 
-void gzochid_client_session_send_login_success
-(gzochid_application_context *context, gzochid_client_session *session)
+void 
+gzochid_client_session_send_login_success (gzochid_application_context *context,
+					   gzochid_client_session *session)
 {
   gzochid_client_session_transaction_context *tx_context =
     join_transaction (context);
@@ -484,8 +509,9 @@ void gzochid_client_session_send_login_success
     (reference->oid);
 }
 
-void gzochid_client_session_send_login_failure
-(gzochid_application_context *context, gzochid_client_session *session)
+void 
+gzochid_client_session_send_login_failure (gzochid_application_context *context,
+					   gzochid_client_session *session)
 {
   gzochid_client_session_transaction_context *tx_context =
     join_transaction (context);
@@ -499,9 +525,10 @@ void gzochid_client_session_send_login_failure
   tx_context->login_failed = TRUE;
 }
 
-void gzochid_client_session_send_message 
-(gzochid_application_context *context, gzochid_client_session *session, 
- unsigned char *msg, short len)
+void 
+gzochid_client_session_send_message (gzochid_application_context *context, 
+				     gzochid_client_session *session, 
+				     unsigned char *msg, short len)
 {
   gzochid_client_session_transaction_context *tx_context =
     join_transaction (context);
@@ -515,24 +542,29 @@ void gzochid_client_session_send_message
      create_message_operation (reference->oid, msg, len));
 }
 
-typedef struct _gzochid_persistence_task_data
+struct _gzochid_persistence_task_data
 {
   gpointer data;
   gzochid_io_serialization *serialization;
   gzochid_oid_holder *holder;
-} gzochid_persistence_task_data;
+};
 
+typedef struct _gzochid_persistence_task_data gzochid_persistence_task_data;
 
-typedef struct _gzochid_prefix_binding_persistence_task_data
+struct _gzochid_prefix_binding_persistence_task_data
 {
   gzochid_persistence_task_data base;
 
   char *prefix;
-} gzochid_prefix_binding_persistence_task_data;
+};
 
-static void init_persistence_task 
-(gzochid_persistence_task_data *task, gzochid_io_serialization *serialization, 
- gpointer data, gzochid_oid_holder *holder)
+typedef struct _gzochid_prefix_binding_persistence_task_data
+ gzochid_prefix_binding_persistence_task_data;
+
+static void 
+init_persistence_task (gzochid_persistence_task_data *task, 
+		       gzochid_io_serialization *serialization, gpointer data, 
+		       gzochid_oid_holder *holder)
 {
   task->data = data;
   task->serialization = serialization;
@@ -554,14 +586,15 @@ gzochid_prefix_binding_persistence_task_data_new
   return task;
 }
 
-void gzochid_persistence_task_data_free (gzochid_persistence_task_data *task)
+void 
+gzochid_persistence_task_data_free (gzochid_persistence_task_data *task)
 {
   free (task);
 }
 
-static void persistence_task_worker
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
+static void 
+persistence_task_worker (gzochid_application_context *context, 
+			 gzochid_auth_identity *identity, gpointer data)
 {
   gzochid_persistence_task_data *persistence_task = 
     (gzochid_persistence_task_data *) data;
@@ -573,9 +606,10 @@ static void persistence_task_worker
   mpz_set (persistence_task->holder->oid, reference->oid);
 }
 
-static void prefix_binding_persistence_task_worker
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
+static void 
+prefix_binding_persistence_task_worker (gzochid_application_context *context,
+					gzochid_auth_identity *identity, 
+					gpointer data)
 {
   gzochid_prefix_binding_persistence_task_data *
     prefix_binding_persistence_task = 
@@ -597,7 +631,8 @@ static void prefix_binding_persistence_task_worker
   g_string_free (binding, TRUE);
 }
 
-gzochid_task *gzochid_data_prefix_binding_persistence_task_new
+gzochid_task *
+gzochid_data_prefix_binding_persistence_task_new
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gzochid_io_serialization *serialization, gpointer data, 
  gzochid_oid_holder *holder, char *prefix)
@@ -619,7 +654,8 @@ gzochid_task *gzochid_data_prefix_binding_persistence_task_new
     (gzochid_application_task_thread_worker, application_task);
 }
 
-void gzochid_data_prefix_binding_persistence_task_free (gzochid_task *task)
+void 
+gzochid_data_prefix_binding_persistence_task_free (gzochid_task *task)
 {
   gzochid_application_task *application_task = 
     (gzochid_application_task *) task->data;
@@ -637,9 +673,9 @@ void gzochid_data_prefix_binding_persistence_task_free (gzochid_task *task)
   free (task);
 }
 
-void gzochid_client_session_persist 
-(gzochid_application_context *context, gzochid_client_session *session, 
- mpz_t oid)
+void 
+gzochid_client_session_persist (gzochid_application_context *context, 
+				gzochid_client_session *session, mpz_t oid)
 {
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
@@ -656,8 +692,9 @@ void gzochid_client_session_persist
   gzochid_data_prefix_binding_persistence_task_free (task);
 }
 
-void gzochid_sweep_client_sessions 
-(gzochid_application_context *context, gzochid_auth_identity *identity)
+void 
+gzochid_sweep_client_sessions (gzochid_application_context *context, 
+			       gzochid_auth_identity *identity)
 {
   mpz_t oid;
   GError *err = NULL;

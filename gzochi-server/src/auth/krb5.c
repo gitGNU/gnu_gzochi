@@ -1,5 +1,5 @@
 /* krb5.c: Kerberos 5 authentication plugin for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,19 +21,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../auth.h"
+#include "../gzochid-auth.h"
 
 #define SERVICE_NAME_PROPERTY "service_name"
 #define KEYTAB_FILE_PROPERTY "keytab_file"
 
-typedef struct _gzochid_auth_krb5_context
+struct _gzochid_auth_krb5_context
 {
   krb5_context context;
   krb5_principal principal;
   krb5_keytab keytab;
-} gzochid_auth_krb5_context;
+};
 
-static gpointer initialize (GHashTable *properties, GError **error)
+typedef struct _gzochid_auth_krb5_context gzochid_auth_krb5_context;
+
+static gpointer 
+initialize (GHashTable *properties, GError **error)
 {
   char *service_name = g_hash_table_lookup (properties, SERVICE_NAME_PROPERTY);
   krb5_error_code error_code;
@@ -88,8 +91,9 @@ static gpointer initialize (GHashTable *properties, GError **error)
   return context;
 }
 
-static gzochid_auth_identity *authenticate
-(unsigned char *credentials, short len, gpointer auth_data, GError **error)
+static gzochid_auth_identity *
+authenticate (unsigned char *credentials, short len, gpointer auth_data, 
+	      GError **error)
 {
   gzochid_auth_krb5_context *context = (gzochid_auth_krb5_context *) auth_data;
   gzochid_auth_identity *identity = NULL;

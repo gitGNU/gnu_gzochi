@@ -43,7 +43,9 @@ bin_PROGRAMS = gzochid gzochi-dump gzochi-load gzochi-migrate
 dist_noinst_DATA = dtd/game.dtd dtd/migration.dtd
 dist_sysconf_DATA = conf/gzochid.conf
 
-noinst_HEADERS = admin.h app.h auth.h auth_int.h channel.h config.h context.h \
+dist_include_HEADERS = gzochid-auth.h
+
+noinst_HEADERS = admin.h app.h auth_int.h channel.h config.h context.h \
 	data.h debug.h descriptor.h event.h fsm.h game.h guile.h gzochid.h \
 	httpd.h io.h log.h protocol.h reloc.h schedule.h scheme.h session.h \
 	socket.h stats.h storage.h task.h threads.h toollib.h tx.h txlog.h \

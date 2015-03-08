@@ -20,9 +20,9 @@
 #include <stdlib.h>
 
 #include "../app.h"
-#include "../auth_int.h"
 #include "../game.h"
 #include "../guile.h"
+#include "../gzochid-auth.h"
 #include "../scheme.h"
 #include "../tx.h"
 

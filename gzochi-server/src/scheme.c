@@ -1,5 +1,5 @@
 /* scheme.c: Supplementary Scheme routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -25,9 +25,9 @@
 #include <string.h>
 
 #include "app.h"
-#include "auth.h"
 #include "data.h"
 #include "guile.h"
+#include "gzochid-auth.h"
 #include "io.h"
 #include "log.h"
 #include "reloc.h"
@@ -83,7 +83,8 @@ static SCM scm_make_name_not_bound_condition;
 static SCM scm_transaction_retry_condition_p;
 static SCM scm_transaction_aborted_condition_p;
 
-static SCM resolve_procedure (char *procedure, GList *module)
+static SCM 
+resolve_procedure (char *procedure, GList *module)
 {
   SCM scm_procedure = scm_from_locale_symbol (procedure);
   SCM scm_module = gzochid_scheme_glist_to_list 
@@ -91,7 +92,8 @@ static SCM resolve_procedure (char *procedure, GList *module)
   return scm_public_ref (scm_module, scm_procedure);
 }
 
-static gpointer scheme_invoke_inner (gpointer data)
+static gpointer 
+scheme_invoke_inner (gpointer data)
 {
   void **ptr = (void **) data;
 
@@ -102,9 +104,10 @@ static gpointer scheme_invoke_inner (gpointer data)
   return gzochid_guile_invoke (procedure, args, exception_var);
 }
 
-static SCM scheme_invoke 
-(gzochid_application_context *context, gzochid_auth_identity *identity,
- SCM proc, SCM args, SCM exception_var)
+static SCM 
+scheme_invoke (gzochid_application_context *context, 
+	       gzochid_auth_identity *identity, SCM proc, SCM args, 
+	       SCM exception_var)
 {
   void *data[3];
   SCM ret = SCM_EOL;
@@ -139,17 +142,20 @@ static void scheme_rollback (gpointer data) { }
 static gzochid_transaction_participant scheme_participant = 
   { "scheme", scheme_prepare, scheme_commit, scheme_rollback };
 
-static gboolean is_transaction_retry (SCM cond)
+static gboolean 
+is_transaction_retry (SCM cond)
 {
   return scm_is_true (scm_call_1 (scm_transaction_retry_condition_p, cond));
 }
 
-static gboolean is_transaction_aborted (SCM cond)
+static gboolean 
+is_transaction_aborted (SCM cond)
 {
   return scm_is_true (scm_call_1 (scm_transaction_aborted_condition_p, cond));
 }
 
-static gboolean triggered_by_rollback (SCM cond)
+static gboolean 
+triggered_by_rollback (SCM cond)
 {
   return is_transaction_aborted (cond) && gzochid_transaction_rollback_only ();
 }
@@ -176,7 +182,8 @@ void gzochid_scheme_application_worker
 	 is_transaction_retry (scm_variable_ref (exception_var)));
 }
 
-void gzochid_scheme_application_task_worker 
+void 
+gzochid_scheme_application_task_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer task)
 {
@@ -203,8 +210,8 @@ void gzochid_scheme_application_task_worker
 	 is_transaction_retry (scm_variable_ref (exception_var)));
 }
 
-static gzochid_application_callback *scm_to_callback 
-(gzochid_application_context *context, SCM scm_callback)
+static gzochid_application_callback *
+scm_to_callback (gzochid_application_context *context, SCM scm_callback)
 {
   GList *module = gzochid_scheme_callback_module (scm_callback);
   char *procedure = gzochid_scheme_callback_procedure (scm_callback);
@@ -223,7 +230,8 @@ static gzochid_application_callback *scm_to_callback
 static SCM gzochid_scheme_string_hash;
 static SCM gzochid_scheme_string_equiv;
 
-void gzochid_scheme_application_initialized_worker 
+void 
+gzochid_scheme_application_initialized_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer data)
 {
@@ -267,7 +275,8 @@ void gzochid_scheme_application_initialized_worker
 	 (context, "s.initializer", callback_reference->oid, NULL);
 }
 
-static gpointer unpack_handler (gpointer data)
+static gpointer 
+unpack_handler (gpointer data)
 {
   SCM handler = (SCM) data;
   SCM received_message = gzochid_scheme_handler_received_message (handler);
@@ -288,7 +297,8 @@ static gpointer unpack_handler (gpointer data)
   return session_handler;
 }
 
-void gzochid_scheme_application_logged_in_worker 
+void 
+gzochid_scheme_application_logged_in_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer data)
 {
@@ -381,7 +391,8 @@ void gzochid_scheme_application_logged_in_worker
     }
 }
 
-void gzochid_scheme_application_received_message_worker 
+void 
+gzochid_scheme_application_received_message_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer ptr)
 {
@@ -456,7 +467,8 @@ void gzochid_scheme_application_received_message_worker
   g_list_free (gpa);
 }
 
-void gzochid_scheme_application_disconnected_worker 
+void 
+gzochid_scheme_application_disconnected_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gpointer ptr)
 {
@@ -555,39 +567,21 @@ void gzochid_scheme_application_disconnected_worker
   g_list_free (gpa);
 }
 
-static void scheme_worker_serializer 
-(gzochid_application_context *context, gzochid_application_worker worker, 
- GString *out)
+static void 
+scheme_worker_serializer (gzochid_application_context *context, 
+			  gzochid_application_worker worker, GString *out)
 {
 }
 
-static gzochid_application_worker scheme_worker_deserializer
-(gzochid_application_context *context, GString *in)
+static gzochid_application_worker 
+scheme_worker_deserializer (gzochid_application_context *context, GString *in)
 {
   return gzochid_scheme_application_task_worker;
 }
 
-gboolean is_managed_record (SCM obj)
-{
-  return scm_is_true (scm_call_1 (scm_managed_record_p, obj));
-}
-
-gboolean for_all (SCM lst, gboolean (*pred) (SCM))
-{
-  SCM ptr = lst;
-  while (ptr != SCM_EOL)
-    {
-      if (!pred (SCM_CAR (ptr)))
-	return FALSE;
-      ptr = SCM_CDR (ptr);
-    }
-
-  return TRUE;
-}
-
 static void 
-scheme_managed_record_serializer
-(gzochid_application_context *context, SCM arg, GString *out, GError **err)
+scheme_managed_record_serializer (gzochid_application_context *context, SCM arg,
+				  GString *out, GError **err)
 {
   unsigned char vec_len_str[4];
   GList *gpd = g_list_append 
@@ -635,8 +629,8 @@ scheme_managed_record_serializer
 }
 
 static void *
-scheme_managed_record_deserializer
-(gzochid_application_context *context, GString *in, GError **err)
+scheme_managed_record_deserializer (gzochid_application_context *context, 
+				    GString *in, GError **err)
 {
   int vec_len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
   SCM vec = SCM_EOL, port = SCM_EOL, record = SCM_EOL;
@@ -687,7 +681,8 @@ scheme_managed_record_deserializer
   return record;
 }
 
-static void *scheme_serializer_inner (void *data)
+static void *
+scheme_serializer_inner (void *data)
 {
   void **ptr = (void **) data;
   gzochid_application_context *context = (gzochid_application_context *) ptr[0];
@@ -701,8 +696,8 @@ static void *scheme_serializer_inner (void *data)
 }
 
 static void 
-scheme_serializer
-(gzochid_application_context *context, void *ptr, GString *out, GError **err)
+scheme_serializer (gzochid_application_context *context, void *ptr, 
+		   GString *out, GError **err)
 {
   void *args[4];
 
@@ -714,7 +709,8 @@ scheme_serializer
   scm_with_guile (scheme_serializer_inner, args);
 }
 
-static void *scheme_deserializer_inner (void *data)
+static void *
+scheme_deserializer_inner (void *data)
 {
   void **ptr = (void **) data;
   gzochid_application_context *context = (gzochid_application_context *) ptr[0];
@@ -724,8 +720,9 @@ static void *scheme_deserializer_inner (void *data)
   return scheme_managed_record_deserializer (context, in, err);
 }
 
-static void *scheme_deserializer
-(gzochid_application_context *context, GString *in, GError **err)
+static void *
+scheme_deserializer (gzochid_application_context *context, GString *in, 
+		     GError **err)
 {
   void *args[3];
 
@@ -736,14 +733,15 @@ static void *scheme_deserializer
   return scm_with_guile (scheme_deserializer_inner, args);
 }
 
-static void *scheme_finalizer_inner (void *data)
+static void *
+scheme_finalizer_inner (void *data)
 {
   scm_gc_unprotect_object ((SCM) data);
   return NULL;
 }
 
-static void scheme_finalizer 
-(gzochid_application_context *context, gpointer data)
+static void 
+scheme_finalizer (gzochid_application_context *context, gpointer data)
 {
   scm_with_guile (scheme_finalizer_inner, data);
 }
@@ -761,9 +759,10 @@ gzochid_application_task_serialization gzochid_scheme_task_serialization =
     &gzochid_scheme_data_serialization 
   };
 
-gzochid_application_task *gzochid_scheme_task_new 
-(gzochid_application_context *context, gzochid_auth_identity *identity,
- char *procedure, GList *module_name, SCM data)
+gzochid_application_task *
+gzochid_scheme_task_new (gzochid_application_context *context, 
+			 gzochid_auth_identity *identity, char *procedure, 
+			 GList *module_name, SCM data)
 {
   SCM scm_data = gzochid_scheme_invoke 
     (context,
@@ -786,12 +785,14 @@ gzochid_application_task *gzochid_scheme_task_new
   return task;
 }
 
-static gpointer scm_symbol_to_locale_string (SCM sym)
+static gpointer 
+scm_symbol_to_locale_string (SCM sym)
 {
   return scm_to_locale_string (scm_symbol_to_string (sym));
 }
 
-SCM gzochid_scheme_glist_to_list (GList *lst, SCM (*transformer) (gpointer))
+SCM 
+gzochid_scheme_glist_to_list (GList *lst, SCM (*transformer) (gpointer))
 {
   SCM ret = SCM_EOL;
   GList *lst_ptr = lst;
@@ -805,7 +806,8 @@ SCM gzochid_scheme_glist_to_list (GList *lst, SCM (*transformer) (gpointer))
   return scm_reverse (ret);
 }
 
-GList *gzochid_scheme_list_to_glist (SCM lst, gpointer (*transformer) (SCM))
+GList *
+gzochid_scheme_list_to_glist (SCM lst, gpointer (*transformer) (SCM))
 {
   GList *ret = NULL;
   SCM lst_ptr = lst;
@@ -819,7 +821,8 @@ GList *gzochid_scheme_list_to_glist (SCM lst, gpointer (*transformer) (SCM))
   return ret;
 }
 
-SCM gzochid_scheme_ghashtable_to_hashtable 
+SCM 
+gzochid_scheme_ghashtable_to_hashtable 
 (GHashTable *ht, SCM hash_func, SCM key_equal_func,
  SCM (*key_transformer) (gpointer), SCM (*value_transformer) (gpointer))
 {
@@ -835,7 +838,8 @@ SCM gzochid_scheme_ghashtable_to_hashtable
   return ret;
 }
 
-GHashTable *gzochid_scheme_hashtable_to_ghashtable
+GHashTable *
+gzochid_scheme_hashtable_to_ghashtable
 (SCM ht, GHashFunc hash_func, GEqualFunc key_equal_func, 
  gpointer (*key_transformer) (SCM), gpointer (*value_transformer) (SCM))
 {
@@ -856,24 +860,28 @@ GHashTable *gzochid_scheme_hashtable_to_ghashtable
   return ret;
 }
 
-char *gzochid_scheme_callback_procedure (SCM callback)
+char *
+gzochid_scheme_callback_procedure (SCM callback)
 {
   return scm_symbol_to_locale_string 
     (scm_call_1 (scm_callback_procedure, callback));
 }
 
-GList *gzochid_scheme_callback_module (SCM callback)
+GList *
+gzochid_scheme_callback_module (SCM callback)
 {
   return gzochid_scheme_list_to_glist
     (scm_call_1 (scm_callback_module, callback), scm_symbol_to_locale_string);
 }
 
-SCM gzochid_scheme_callback_data (SCM callback)
+SCM 
+gzochid_scheme_callback_data (SCM callback)
 {
   return scm_call_1 (scm_callback_data, callback);
 }
 
-SCM gzochid_scheme_create_callback (gzochid_application_callback *callback, ...)
+SCM 
+gzochid_scheme_create_callback (gzochid_application_callback *callback, ...)
 {
   SCM cb = SCM_BOOL_F;
   SCM lst_args = SCM_EOL, arg = SCM_BOOL_F;
@@ -895,7 +903,8 @@ SCM gzochid_scheme_create_callback (gzochid_application_callback *callback, ...)
   return cb;
 }
 
-SCM gzochid_scheme_create_bytevector (unsigned char *bytes, size_t len)
+SCM 
+gzochid_scheme_create_bytevector (unsigned char *bytes, size_t len)
 {
   SCM bv = scm_take_u8vector (bytes, len);
   
@@ -904,52 +913,61 @@ SCM gzochid_scheme_create_bytevector (unsigned char *bytes, size_t len)
   return bv;
 }
 
-SCM gzochid_scheme_create_managed_hashtable (GHashTable *properties)
+SCM 
+gzochid_scheme_create_managed_hashtable (GHashTable *properties)
 {
   SCM ht = scm_call_0 (scm_make_managed_hashtable);
   scm_gc_protect_object (ht);
   return ht;
 }
 
-SCM gzochid_scheme_r6rs_raise (SCM cond)
+SCM 
+gzochid_scheme_r6rs_raise (SCM cond)
 {
   return scm_call_1 (scm_r6rs_raise, cond);
 }
 
-SCM gzochid_scheme_r6rs_raise_continuable (SCM cond)
+SCM 
+gzochid_scheme_r6rs_raise_continuable (SCM cond)
 {
   return scm_call_1 (scm_r6rs_raise_continuable, cond);
 }
 
-SCM gzochid_scheme_make_object_removed_condition ()
+SCM 
+gzochid_scheme_make_object_removed_condition ()
 {
   return scm_call_0 (scm_make_object_removed_condition);
 }
 
-SCM gzochid_scheme_make_name_exists_condition (char *name)
+SCM 
+gzochid_scheme_make_name_exists_condition (char *name)
 {
   return scm_call_1 
     (scm_make_name_exists_condition, scm_from_locale_string (name));
 }
 
-SCM gzochid_scheme_make_name_not_bound_condition (char *name)
+SCM 
+gzochid_scheme_make_name_not_bound_condition (char *name)
 {
   return scm_call_1
     (scm_make_name_not_bound_condition, scm_from_locale_string (name));
 }
 
-SCM gzochid_scheme_handler_received_message (SCM handler)
+SCM 
+gzochid_scheme_handler_received_message (SCM handler)
 {
   return scm_call_1 (scm_handler_received_message, handler);
 }
 
-SCM gzochid_scheme_handler_disconnected (SCM handler)
+SCM 
+gzochid_scheme_handler_disconnected (SCM handler)
 {
   return scm_call_1 (scm_handler_disconnected, handler);
 }
 
-SCM gzochid_scheme_create_client_session 
-(gzochid_client_session *session, mpz_t oid)
+SCM 
+gzochid_scheme_create_client_session (gzochid_client_session *session, 
+				      mpz_t oid)
 {
   char *oid_str = mpz_get_str (NULL, 16, oid);
 
@@ -964,7 +982,8 @@ SCM gzochid_scheme_create_client_session
   return ret;
 }
 
-void gzochid_scheme_client_session_oid (SCM session, mpz_t oid)
+void 
+gzochid_scheme_client_session_oid (SCM session, mpz_t oid)
 {
   SCM scm_oid = scm_call_1 (scm_client_session_oid, session);
   char *oid_str = scm_to_locale_string 
@@ -974,7 +993,8 @@ void gzochid_scheme_client_session_oid (SCM session, mpz_t oid)
   free (oid_str);
 }
 
-SCM gzochid_scheme_create_managed_reference 
+SCM 
+gzochid_scheme_create_managed_reference 
 (gzochid_data_managed_reference *reference)
 {
   char *oid_str = mpz_get_str (NULL, 16, reference->oid);
@@ -996,7 +1016,8 @@ SCM gzochid_scheme_create_managed_reference
   return ret;
 }
 
-SCM gzochid_scheme_create_channel (gzochid_channel *channel, mpz_t oid)
+SCM 
+gzochid_scheme_create_channel (gzochid_channel *channel, mpz_t oid)
 {
   char *oid_str = mpz_get_str (NULL, 16, oid);
   
@@ -1011,7 +1032,8 @@ SCM gzochid_scheme_create_channel (gzochid_channel *channel, mpz_t oid)
   return ret;
 }
 
-SCM gzochid_scheme_create_periodic_task_handle (mpz_t oid)
+SCM 
+gzochid_scheme_create_periodic_task_handle (mpz_t oid)
 {
   char *oid_str = mpz_get_str (NULL, 16, oid);
   
@@ -1025,7 +1047,8 @@ SCM gzochid_scheme_create_periodic_task_handle (mpz_t oid)
   return ret;
 }
 
-static void bind_scm (char *module, SCM *binding, char *name)
+static void 
+bind_scm (char *module, SCM *binding, char *name)
 {
   SCM var = scm_c_public_variable (module, name);
 
@@ -1036,7 +1059,8 @@ static void bind_scm (char *module, SCM *binding, char *name)
   scm_gc_protect_object (*binding);
 }
 
-static void *initialize_bindings (void *ptr)
+static void *
+initialize_bindings (void *ptr)
 {
   bind_scm ("rnrs exceptions", &scm_r6rs_raise, "raise");
   bind_scm ("rnrs exceptions", &scm_r6rs_raise_continuable, 
@@ -1109,7 +1133,8 @@ static void *initialize_bindings (void *ptr)
   return NULL;
 }
 
-void gzochid_scheme_managed_reference_oid (SCM reference, mpz_t oid)
+void 
+gzochid_scheme_managed_reference_oid (SCM reference, mpz_t oid)
 {
   SCM num = scm_call_1 (scm_managed_reference_oid, reference);
   char *oid_str = scm_to_locale_string 
@@ -1120,7 +1145,8 @@ void gzochid_scheme_managed_reference_oid (SCM reference, mpz_t oid)
   free (oid_str);
 }
 
-void gzochid_scheme_channel_oid (SCM channel, mpz_t oid)
+void 
+gzochid_scheme_channel_oid (SCM channel, mpz_t oid)
 {
   SCM num = scm_call_1 (scm_channel_oid, channel);
   char *oid_str = scm_to_locale_string
@@ -1131,7 +1157,8 @@ void gzochid_scheme_channel_oid (SCM channel, mpz_t oid)
   free (oid_str);
 }
 
-void gzochid_scheme_task_handle_oid (SCM handle, mpz_t oid)
+void 
+gzochid_scheme_task_handle_oid (SCM handle, mpz_t oid)
 {
   SCM num = scm_call_1 (scm_task_handle_oid, handle);
   char *oid_str = scm_to_locale_string
@@ -1142,7 +1169,8 @@ void gzochid_scheme_task_handle_oid (SCM handle, mpz_t oid)
   free (oid_str);
 }
 
-void gzochid_scheme_initialize_bindings (void)
+void 
+gzochid_scheme_initialize_bindings (void)
 {
   scm_with_guile (initialize_bindings, NULL);
 }

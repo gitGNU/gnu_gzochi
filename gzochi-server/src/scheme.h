@@ -1,5 +1,5 @@
 /* scheme.h: Prototypes and declarations for scheme.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,9 +23,9 @@
 #include <libguile.h>
 
 #include "app.h"
-#include "auth.h"
 #include "channel.h"
 #include "data.h"
+#include "gzochid-auth.h"
 #include "io.h"
 #include "session.h"
 #include "task.h"

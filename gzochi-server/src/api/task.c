@@ -1,5 +1,5 @@
 /* task.c: Primitive functions for user-facing gzochi task management API
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,8 +20,8 @@
 #include <libguile.h>
 
 #include "../app.h"
-#include "../auth.h"
 #include "../auth_int.h"
+#include "../gzochid-auth.h"
 #include "../scheme.h"
 #include "../task.h"
 

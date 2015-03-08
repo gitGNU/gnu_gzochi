@@ -1,5 +1,5 @@
 /* task.c: Application task management routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,11 +23,11 @@
 #include <string.h>
 
 #include "app.h"
-#include "auth.h"
 #include "auth_int.h"
 #include "data.h"
 #include "game.h"
 #include "guile.h"
+#include "gzochid-auth.h"
 #include "io.h"
 #include "schedule.h"
 #include "task.h"
@@ -39,10 +39,13 @@
 
 GHashTable *serialization_registry = NULL;
 
-typedef struct _gzochid_durable_application_task
+struct _gzochid_durable_application_task
 {
   mpz_t handle_oid;
-} gzochid_durable_application_task;
+};
+
+typedef struct _gzochid_durable_application_task
+gzochid_durable_application_task;
 
 gzochid_application_task_serialization *
 gzochid_lookup_task_serialization (char *name)
@@ -51,25 +54,28 @@ gzochid_lookup_task_serialization (char *name)
     g_hash_table_lookup (serialization_registry, name);
 }
 
-void gzochid_task_register_serialization 
+void 
+gzochid_task_register_serialization 
 (gzochid_application_task_serialization *serialization)
 {
   g_hash_table_insert 
     (serialization_registry, serialization->name, serialization);
 }
 
-void gzochid_task_initialize_serialization_registry (void)
+void 
+gzochid_task_initialize_serialization_registry (void)
 {
   serialization_registry = g_hash_table_new (g_str_hash, g_str_equal);
 }
 
-static int task_prepare (gpointer data)
+static int 
+task_prepare (gpointer data)
 {
   return TRUE;
 }
 
-static gzochid_task_transaction_context *create_transaction_context 
-(gzochid_application_context *app_context)
+static gzochid_task_transaction_context *
+create_transaction_context (gzochid_application_context *app_context)
 {
   gzochid_task_transaction_context *tx_context = 
     calloc (1, sizeof (gzochid_task_transaction_context));
@@ -79,15 +85,17 @@ static gzochid_task_transaction_context *create_transaction_context
   return tx_context;
 }
 
-static void cleanup_transaction (gzochid_task_transaction_context *tx_context)
+static void 
+cleanup_transaction (gzochid_task_transaction_context *tx_context)
 {
   g_list_free (tx_context->scheduled_tasks);
   free (tx_context);
 }
 
-gzochid_application_task *gzochid_application_task_new 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gzochid_application_worker worker, gpointer data)
+gzochid_application_task *
+gzochid_application_task_new (gzochid_application_context *context,
+			      gzochid_auth_identity *identity, 
+			      gzochid_application_worker worker, gpointer data)
 {
   gzochid_application_task *task = malloc (sizeof (gzochid_application_task));
 
@@ -99,7 +107,8 @@ gzochid_application_task *gzochid_application_task_new
   return task;
 }
 
-gzochid_task *gzochid_task_make_transactional_application_task
+gzochid_task *
+gzochid_task_make_transactional_application_task
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gzochid_application_worker worker, gpointer data, 
  struct timeval target_execution_time)
@@ -119,8 +128,8 @@ gzochid_task *gzochid_task_make_transactional_application_task
      target_execution_time);
 }
 
-gzochid_durable_application_task *gzochid_durable_application_task_new 
-(mpz_t handle_oid)
+gzochid_durable_application_task *
+gzochid_durable_application_task_new (mpz_t handle_oid)
 {
   gzochid_durable_application_task *task = 
     malloc (sizeof (gzochid_durable_application_task));
@@ -131,8 +140,9 @@ gzochid_durable_application_task *gzochid_durable_application_task_new
   return task;
 }
 
-gzochid_durable_application_task_handle *create_durable_task_handle
-(gzochid_data_managed_reference *task_data_reference, 
+gzochid_durable_application_task_handle *
+create_durable_task_handle 
+(gzochid_data_managed_reference *task_data_reference,
  gzochid_application_task_serialization *serialization,
  gzochid_auth_identity *identity, struct timeval target_execution_time)
 {
@@ -150,7 +160,8 @@ gzochid_durable_application_task_handle *create_durable_task_handle
   return durable_task_handle;
 }
 
-gzochid_durable_application_task_handle *create_durable_periodic_task_handle
+gzochid_durable_application_task_handle *
+create_durable_periodic_task_handle
 (gzochid_data_managed_reference *task_data_reference, 
  gzochid_application_task_serialization *serialization, 
  gzochid_auth_identity *identity, struct timeval target_execution_time, 
@@ -166,8 +177,8 @@ gzochid_durable_application_task_handle *create_durable_periodic_task_handle
   return durable_task_handle;
 }
 
-void gzochid_durable_application_task_free 
-(gzochid_durable_application_task *task)
+void 
+gzochid_durable_application_task_free (gzochid_durable_application_task *task)
 {
   free (task);
 }
@@ -232,8 +243,9 @@ serialize_durable_task_handle
   gzochid_util_serialize_timeval (handle->target_execution_time, out);
 }
 
-static void finalize_durable_task_handle
-(gzochid_application_context *context, gpointer data)
+static void
+finalize_durable_task_handle (gzochid_application_context *context, 
+			      gpointer data)
 {
   gzochid_durable_application_task_handle *handle = 
     (gzochid_durable_application_task_handle *) data;
@@ -242,7 +254,7 @@ static void finalize_durable_task_handle
   free (handle);
 }
 
-gzochid_io_serialization 
+gzochid_io_serialization
 gzochid_durable_application_task_handle_serialization = 
   { 
     serialize_durable_task_handle, 
@@ -250,9 +262,9 @@ gzochid_durable_application_task_handle_serialization =
     finalize_durable_task_handle
   };
 
-gzochid_task *gzochid_task_new 
-(gzochid_thread_worker worker, gpointer data, 
- struct timeval target_execution_time)
+gzochid_task *
+gzochid_task_new (gzochid_thread_worker worker, gpointer data, 
+		  struct timeval target_execution_time)
 {
   gzochid_task *task = malloc (sizeof (gzochid_task));
   
@@ -263,8 +275,8 @@ gzochid_task *gzochid_task_new
   return task;
 }
 
-gzochid_task *gzochid_task_immediate_new 
-(gzochid_thread_worker worker, gpointer data)
+gzochid_task *
+gzochid_task_immediate_new (gzochid_thread_worker worker, gpointer data)
 {
   struct timeval now;
   gettimeofday (&now, NULL);
@@ -277,8 +289,9 @@ static void durable_task_application_worker
 static void durable_task_cleanup_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
-static gzochid_task *wrap_durable_task 
-(gzochid_application_context *context, mpz_t oid, GError **err)
+static gzochid_task *
+wrap_durable_task (gzochid_application_context *context, mpz_t oid,
+		   GError **err)
 {
   GError *local_err = NULL;
   gzochid_game_context *game_context = (gzochid_game_context *) 
@@ -328,7 +341,8 @@ static gzochid_task *wrap_durable_task
 }
 
 
-static void commit_scheduled_task (gpointer data, gpointer user_data)
+static void 
+commit_scheduled_task (gpointer data, gpointer user_data)
 {
   gzochid_task_transaction_context *tx_context = 
     (gzochid_task_transaction_context *) user_data;
@@ -341,7 +355,8 @@ static void commit_scheduled_task (gpointer data, gpointer user_data)
   gzochid_schedule_submit_task (game_context->task_queue, task);
 }
 
-static void task_commit (gpointer data)
+static void 
+task_commit (gpointer data)
 {
   gzochid_task_transaction_context *tx_context = 
     (gzochid_task_transaction_context *) data;
@@ -351,7 +366,8 @@ static void task_commit (gpointer data)
   cleanup_transaction (tx_context);
 }
 
-static void task_rollback (gpointer data)
+static void 
+task_rollback (gpointer data)
 { 
   gzochid_task_transaction_context *tx_context = 
     (gzochid_task_transaction_context *) data;
@@ -361,8 +377,8 @@ static void task_rollback (gpointer data)
 static gzochid_transaction_participant task_participant = 
   { "task", task_prepare, task_commit, task_rollback };
 
-static gzochid_task_transaction_context *join_transaction 
-(gzochid_application_context *context)
+static gzochid_task_transaction_context *
+join_transaction (gzochid_application_context *context)
 {
   gzochid_task_transaction_context *tx_context = NULL;
 
@@ -376,8 +392,9 @@ static gzochid_task_transaction_context *join_transaction
   return tx_context;
 }
 
-static void remove_durable_task 
-(gzochid_application_context *context, mpz_t oid, GError **err)
+static void 
+remove_durable_task (gzochid_application_context *context, mpz_t oid, 
+		     GError **err)
 {
   GError *local_err = NULL;
   char *oid_str = mpz_get_str (NULL, 16, oid);
@@ -401,7 +418,8 @@ static void remove_durable_task
   free (oid_str);
  }
 
-void gzochid_restart_tasks (gzochid_application_context *context)
+void 
+gzochid_restart_tasks (gzochid_application_context *context)
 {
   mpz_t oid;
   GError *err = NULL;
@@ -465,7 +483,8 @@ void gzochid_restart_tasks (gzochid_application_context *context)
   mpz_clear (oid);  
 }
 
-gzochid_durable_application_task_handle *build_durable_task_handle
+gzochid_durable_application_task_handle *
+build_durable_task_handle 
 (gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization, 
  struct timeval delay, struct timeval *period, GError **err)
@@ -525,9 +544,9 @@ gzochid_durable_application_task_handle *build_durable_task_handle
     }
 }
  
-static void durable_task_application_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
+static void 
+durable_task_application_worker (gzochid_application_context *context, 
+				 gzochid_auth_identity *identity, gpointer data)
 {
   GError *err = NULL;
   gzochid_durable_application_task *task = 
@@ -612,9 +631,9 @@ static void durable_task_application_worker
     }
 }
 
-static void durable_task_cleanup_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
+static void 
+durable_task_cleanup_worker (gzochid_application_context *context, 
+			     gzochid_auth_identity *identity, gpointer data)
 {
   char *oid_str = (char *) data;
   mpz_t oid;
@@ -628,12 +647,14 @@ static void durable_task_cleanup_worker
   free (oid_str);
 }
 
-void gzochid_task_free (gzochid_task *task)
+void 
+gzochid_task_free (gzochid_task *task)
 {
   free (task);
 }
 
-void gzochid_schedule_durable_task
+void 
+gzochid_schedule_durable_task 
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization)
@@ -643,8 +664,8 @@ void gzochid_schedule_durable_task
     (context, identity, task, serialization, immediate);
 }
 
-static void schedule_durable_task 
-(gzochid_application_context *context, gzochid_task *task)
+static void 
+schedule_durable_task (gzochid_application_context *context, gzochid_task *task)
 {
   gzochid_task_transaction_context *tx_context = join_transaction (context);
 
@@ -652,7 +673,8 @@ static void schedule_durable_task
     (tx_context->scheduled_tasks, task);
 }
 
-void gzochid_schedule_delayed_durable_task
+void 
+gzochid_schedule_delayed_durable_task
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization, 
@@ -675,7 +697,8 @@ void gzochid_schedule_delayed_durable_task
   else g_error_free (err);
 }
 
-gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task 
+gzochid_periodic_task_handle *
+gzochid_schedule_periodic_durable_task 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gzochid_application_task *task,
  gzochid_application_task_serialization *serialization, 
@@ -700,8 +723,9 @@ gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task
   return handle;
 }
 
-void gzochid_cancel_periodic_task 
-(gzochid_application_context *context, gzochid_periodic_task_handle *handle)
+void 
+gzochid_cancel_periodic_task (gzochid_application_context *context, 
+			      gzochid_periodic_task_handle *handle)
 {
   handle->repeats = FALSE;
 

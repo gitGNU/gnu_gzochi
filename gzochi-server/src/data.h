@@ -1,5 +1,5 @@
 /* data.h: Prototypes and declarations for data.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 #include <gmp.h>
 
 #include "app.h"
-#include "auth.h"
+#include "gzochid-auth.h"
 #include "io.h"
 #include "storage.h"
 
@@ -44,10 +44,12 @@ typedef enum
   }
   GzochidDataError;
 
-typedef struct _gzochid_oid_holder
+struct _gzochid_oid_holder
 {
   mpz_t oid;
-} gzochid_oid_holder;
+};
+
+typedef struct _gzochid_oid_holder gzochid_oid_holder;
 
 enum gzochid_data_managed_reference_state
   {
@@ -61,7 +63,7 @@ enum gzochid_data_managed_reference_state
     GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED
   };
 
-typedef struct _gzochid_data_managed_reference
+struct _gzochid_data_managed_reference
 {
   gzochid_application_context *context;
   enum gzochid_data_managed_reference_state state;
@@ -69,16 +71,20 @@ typedef struct _gzochid_data_managed_reference
 
   mpz_t oid;
   void *obj;
-} gzochid_data_managed_reference;
+};
 
-typedef struct _gzochid_data_oid_block
+typedef struct _gzochid_data_managed_reference gzochid_data_managed_reference;
+
+struct _gzochid_data_oid_block
 {
   mpz_t first;
   mpz_t next;
   mpz_t last;  
-} gzochid_data_oid_block;
+};
 
-typedef struct _gzochid_data_transaction_context
+typedef struct _gzochid_data_oid_block gzochid_data_oid_block;
+
+struct _gzochid_data_transaction_context
 {
   gzochid_application_context *context;
 
@@ -90,15 +96,21 @@ typedef struct _gzochid_data_transaction_context
   GHashTable *oids_to_references;
   GHashTable *ptrs_to_references;
 
-} gzochid_data_transaction_context;
+};
 
-typedef struct _gzochid_data_managed_reference_holder
+typedef struct _gzochid_data_transaction_context
+gzochid_data_transaction_context;
+
+struct _gzochid_data_managed_reference_holder
 {
   gzochid_application_context *context;
   gzochid_data_managed_reference *reference;
   gzochid_io_serialization *serialization;
   void *data;
-} gzochid_data_managed_reference_holder;
+};
+
+typedef struct _gzochid_data_managed_reference_holder
+gzochid_data_managed_reference_holder;
 
 gzochid_oid_holder *gzochid_oid_holder_new (void);
 void gzochid_oid_holder_free (gzochid_oid_holder *);

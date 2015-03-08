@@ -1,5 +1,5 @@
 /* test-krb5.c: Test routines for the Kerberos v5 auth plugin.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,11 +21,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "auth.h"
+#include "gzochid-auth.h"
 
 gint gzochid_auth_init_plugin (gzochid_auth_plugin *);
 
-static void test_initialize ()
+static void 
+test_initialize ()
 {
   GError *error = NULL;
   GHashTable *properties = g_hash_table_new (g_str_hash, g_str_equal);
@@ -38,7 +39,8 @@ static void test_initialize ()
   free (plugin);
 }
 
-static void test_authenticate ()
+static void 
+test_authenticate ()
 {
   GError *error = NULL;
   GHashTable *properties = g_hash_table_new (g_str_hash, g_str_equal);
@@ -59,7 +61,8 @@ static void test_authenticate ()
   free (plugin);
 }
 
-int main (int argc, char *argv[])
+int 
+xmain (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
