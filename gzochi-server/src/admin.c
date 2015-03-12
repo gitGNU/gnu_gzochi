@@ -1,5 +1,5 @@
 /* Administrative context routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,38 +16,44 @@
  */
 
 #include <glib.h>
+#include <libguile.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 #include "admin.h"
 #include "config.h"
 #include "context.h"
 #include "debug.h"
-#include "guile.h"
 #include "gzochid.h"
 #include "httpd.h"
 #include "threads.h"
 
 #include "api/admin.h"
 
-static void initialize_async (gpointer data, gpointer user_data)
+static void 
+initialize_async (gpointer data, gpointer user_data)
 {
-  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_context *context = user_data;
   gzochid_fsm_to_state (context->fsm, GZOCHID_ADMIN_STATE_RUNNING);
 }
 
-static void initialize_guile (gpointer data, gpointer user_data)
+static void *
+initialize_guile (void *data)
 {
-  gzochid_context *context = (gzochid_context *) data;
+  gzochid_context *context = data;
   gzochid_server_context *server_context = 
     (gzochid_server_context *) context->parent;
 
   gzochid_api_admin_init 
-    ((gzochid_game_context *) server_context->game_context);  
+    ((gzochid_game_context *) server_context->game_context);
+
+  return NULL;
 }
 
-static void initialize (int from_state, int to_state, gpointer user_data)
+static void 
+initialize (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_context *context = user_data;
   gzochid_admin_context *admin_context = (gzochid_admin_context *) context;
 
   admin_context->pool = 
@@ -76,23 +82,26 @@ static void initialize (int from_state, int to_state, gpointer user_data)
       gzochid_debug_context_init (debug_context, context, port);
     }
   
-  gzochid_guile_run (initialize_guile, context);
+  scm_with_guile (initialize_guile, context);
   gzochid_thread_pool_push (admin_context->pool, initialize_async, NULL, NULL);
 }
 
-gzochid_admin_context *gzochid_admin_context_new (void)
+gzochid_admin_context *
+gzochid_admin_context_new (void)
 {
   return calloc (1, sizeof (gzochid_admin_context));
 }
 
-void gzochid_admin_context_free (gzochid_admin_context *context)
+void 
+gzochid_admin_context_free (gzochid_admin_context *context)
 {
   gzochid_context_free ((gzochid_context *) context);
   free (context);
 }
 
-void gzochid_admin_context_init 
-(gzochid_admin_context *context, gzochid_context *parent, GHashTable *config)
+void 
+gzochid_admin_context_init (gzochid_admin_context *context, 
+			    gzochid_context *parent, GHashTable *config)
 {
   gzochid_fsm *fsm = gzochid_fsm_new 
     ("admin", GZOCHID_ADMIN_STATE_INITIALIZING, "INITIALIZING");

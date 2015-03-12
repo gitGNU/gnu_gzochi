@@ -161,17 +161,18 @@ initialize_data (int from_state, int to_state, gpointer user_data)
   free (names_db);
 }
 
-static void 
-initialize_load_paths_guile_worker
-(gpointer data, gpointer user_data)
+static void *
+initialize_load_paths_guile_worker (void *data)
 {
-  GList *load_path_ptr = (GList *) data;
+  GList *load_path_ptr = data;
 
   while (load_path_ptr != NULL)
     {
       gzochid_guile_add_to_load_path ((char *) load_path_ptr->data);
       load_path_ptr = load_path_ptr->next;
     }
+
+  return NULL;
 }
 
 static void 
@@ -182,7 +183,7 @@ initialize_load_paths (int from_state, int to_state, gpointer user_data)
     (gzochid_application_context *) context;
   
   G_LOCK (load_path);
-  gzochid_guile_run 
+  scm_with_guile 
     (initialize_load_paths_guile_worker, app_context->descriptor->load_paths);
   G_UNLOCK (load_path);
 }
@@ -198,7 +199,7 @@ initialize_complete (int from_state, int to_state, gpointer user_data)
   gzochid_game_context_register_application 
     (game_context, app_context->descriptor->name, app_context);
 
-  gzochid_guile_thread_pool_push 
+  gzochid_thread_pool_push
     (game_context->pool, initialize_async, user_data, NULL);
 }
 
@@ -544,11 +545,18 @@ run_async_transactional (gpointer data)
     }
 }
 
-static void 
-run_async (gpointer data, gpointer user_data)
+static void *
+run_async_guile (void *data)
 {
   gzochid_application_transaction_execute 
     ((gzochid_application_context *) data, run_async_transactional, data);
+  return NULL;
+}
+
+static void 
+run_async (gpointer data, gpointer user_data)
+{
+  scm_with_guile (run_async_guile, data);
 }
 
 static void 
@@ -562,8 +570,7 @@ run (int from_state, int to_state, gpointer user_data)
   if (from_state != GZOCHID_APPLICATION_STATE_INITIALIZING)
     return;
 
-  gzochid_guile_thread_pool_push 
-    (game_context->pool, run_async, app_context, NULL);
+  gzochid_thread_pool_push (game_context->pool, run_async, app_context, NULL);
 }
 
 static void 

@@ -1,5 +1,5 @@
 /* schedule.c: Task execution and task queue management routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -17,12 +17,13 @@
 
 #include <assert.h>
 #include <glib.h>
+#include <libguile.h>
 
-#include "guile.h"
 #include "schedule.h"
 #include "task.h"
 
-gzochid_task_queue *gzochid_schedule_task_queue_new (GThreadPool *pool)
+gzochid_task_queue *
+gzochid_schedule_task_queue_new (GThreadPool *pool)
 {
   gzochid_task_queue *task_queue = malloc (sizeof (gzochid_task_queue));
   
@@ -36,20 +37,40 @@ gzochid_task_queue *gzochid_schedule_task_queue_new (GThreadPool *pool)
   return task_queue;
 }
 
-static void pending_task_executor (gpointer data, gpointer user_data)
+static void *
+pending_task_executor_inner (void *data)
 {
-  gzochid_pending_task *pending_task = (gzochid_pending_task *) data;
+  void **args = data;
+  gzochid_pending_task *pending_task = args[0];
+  gpointer user_data = args[1];
+
+  pending_task->task->worker (pending_task->task->data, user_data);
+
+  return NULL;
+}
+
+static void 
+pending_task_executor (gpointer data, gpointer user_data)
+{
+  gzochid_pending_task *pending_task = data;
+  void *args[2];
 
   g_mutex_lock (&pending_task->mutex);
-  pending_task->task->worker (pending_task->task->data, user_data);
+
+  args[0] = pending_task;
+  args[1] = user_data;
+
+  scm_with_guile (pending_task_executor_inner, args);
+
   pending_task->state = GZOCHID_PENDING_TASK_STATE_COMPLETED;
   g_cond_broadcast (&pending_task->cond);
   g_mutex_unlock (&pending_task->mutex);
 }
 
-gpointer gzochid_schedule_task_executor (gpointer data)
+gpointer 
+gzochid_schedule_task_executor (gpointer data)
 {
-  gzochid_task_queue *task_queue = (gzochid_task_queue *) data;
+  gzochid_task_queue *task_queue = data;
 
   g_mutex_lock (&task_queue->mutex);
   while (TRUE)
@@ -60,16 +81,15 @@ gpointer gzochid_schedule_task_executor (gpointer data)
 	{
 	  struct timeval current_time;
 	  gzochid_pending_task *pending_task = 
-	    (gzochid_pending_task *) g_queue_peek_head (task_queue->queue);
+	    g_queue_peek_head (task_queue->queue);
 
 	  gettimeofday (&current_time, NULL);
 
 	  if (timercmp 
 	      (&current_time, &pending_task->scheduled_execution_time, >))
 	    {
-	      pending_task = (gzochid_pending_task *) 
-		g_queue_pop_head (task_queue->queue);
-	      gzochid_guile_thread_pool_push 
+	      pending_task = g_queue_pop_head (task_queue->queue);
+	      gzochid_thread_pool_push 
 		(task_queue->pool, pending_task_executor, pending_task, NULL);
 	    }
 	  else 
@@ -92,14 +112,16 @@ gpointer gzochid_schedule_task_executor (gpointer data)
   return NULL;
 }
 
-void gzochid_schedule_task_queue_start (gzochid_task_queue *task_queue)
+void 
+gzochid_schedule_task_queue_start (gzochid_task_queue *task_queue)
 {
   if (task_queue->consumer_thread == NULL)
     task_queue->consumer_thread = g_thread_new
       ("task-consumer", gzochid_schedule_task_executor, task_queue);
 }
 
-gzochid_pending_task *gzochid_pending_task_new (gzochid_task *task)
+gzochid_pending_task *
+gzochid_pending_task_new (gzochid_task *task)
 {
   gzochid_pending_task *pending_task = malloc (sizeof (gzochid_pending_task));
 
@@ -113,7 +135,8 @@ gzochid_pending_task *gzochid_pending_task_new (gzochid_task *task)
   return pending_task;
 }
 
-gint pending_task_compare (gconstpointer a, gconstpointer b, gpointer user_data)
+gint 
+pending_task_compare (gconstpointer a, gconstpointer b, gpointer user_data)
 {
   gzochid_pending_task *pending_task_a = (gzochid_pending_task *) a;
   gzochid_pending_task *pending_task_b = (gzochid_pending_task *) b;
@@ -128,7 +151,8 @@ gint pending_task_compare (gconstpointer a, gconstpointer b, gpointer user_data)
 	 - pending_task_b->scheduled_execution_time.tv_usec;
 }
 
-static void task_chain_worker (gpointer data, gpointer user_data)
+static void 
+task_chain_worker (gpointer data, gpointer user_data)
 {
   GList *tasks = (GList *) data;
   GList *task_ptr = tasks;
@@ -142,8 +166,9 @@ static void task_chain_worker (gpointer data, gpointer user_data)
   g_list_free (tasks);
 }
 
-gzochid_pending_task *gzochid_schedule_submit_task_chain
-(gzochid_task_queue *task_queue, GList *tasks)
+gzochid_pending_task *
+gzochid_schedule_submit_task_chain (gzochid_task_queue *task_queue, 
+				    GList *tasks)
 {
   GList *tasks_copy = g_list_copy (tasks);
   gzochid_task *task = malloc (sizeof (gzochid_task));
@@ -158,8 +183,9 @@ gzochid_pending_task *gzochid_schedule_submit_task_chain
   return gzochid_schedule_submit_task (task_queue, task);
 }
 
-gzochid_pending_task *gzochid_schedule_submit_task
-(gzochid_task_queue *task_queue, gzochid_task *task)
+gzochid_pending_task *
+gzochid_schedule_submit_task (gzochid_task_queue *task_queue, 
+			      gzochid_task *task)
 {
   gzochid_pending_task *pending_task = gzochid_pending_task_new (task);
   
@@ -172,15 +198,16 @@ gzochid_pending_task *gzochid_schedule_submit_task
   return pending_task;
 }
 
-static void free_pending_task (gzochid_pending_task *pending_task)
+static void 
+free_pending_task (gzochid_pending_task *pending_task)
 {
   g_mutex_clear (&pending_task->mutex);
   g_cond_clear (&pending_task->cond);
   free (pending_task);
 }
 
-void gzochid_schedule_run_task 
-(gzochid_task_queue *task_queue, gzochid_task *task)
+void 
+gzochid_schedule_run_task (gzochid_task_queue *task_queue, gzochid_task *task)
 {
   gzochid_pending_task *pending_task = 
     gzochid_schedule_submit_task (task_queue, task);
@@ -193,7 +220,8 @@ void gzochid_schedule_run_task
   free_pending_task (pending_task);
 }
 
-void gzochid_schedule_execute_task (gzochid_task *task)
+void 
+gzochid_schedule_execute_task (gzochid_task *task)
 {
   task->worker (task->data, NULL);
 }

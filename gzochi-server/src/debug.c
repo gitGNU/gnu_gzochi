@@ -1,5 +1,5 @@
 /* debug.c: Remote debugging module for gzochid
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,24 +15,29 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <libguile.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 #include "admin.h"
 #include "context.h"
 #include "debug.h"
 #include "fsm.h"
-#include "log.h"
 #include "guile.h"
+#include "log.h"
+#include "threads.h"
 
 static SCM scm_run_repl_server;
 
-static void initialize_async (gpointer data, gpointer user_data)
+static void 
+initialize_async (gpointer data, gpointer user_data)
 {
-  gzochid_context *context = (gzochid_context *) data;
+  gzochid_context *context = data;
   gzochid_fsm_to_state (context->fsm, GZOCHID_DEBUG_STATE_RUNNING);
 }
 
-static void initialize_guile (gpointer data, gpointer user_data)
+static void *
+initialize_guile (void *data)
 {
   SCM gzochi_private_debug = scm_c_resolve_module ("gzochi private debug");
   SCM run_repl_server_var = scm_c_module_lookup 
@@ -40,23 +45,27 @@ static void initialize_guile (gpointer data, gpointer user_data)
   
   scm_run_repl_server = scm_variable_ref (run_repl_server_var);
   scm_gc_protect_object (scm_run_repl_server);
+
+  return NULL;
 }
 
-static void initialize (int from_state, int to_state, gpointer user_data)
+static void 
+initialize (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_context *context = user_data;
   gzochid_admin_context *admin_context =
     (gzochid_admin_context *) context->parent;
 
-  gzochid_guile_run (initialize_guile, NULL);
+  scm_with_guile (initialize_guile, NULL);
 
   gzochid_thread_pool_push
     (admin_context->pool, initialize_async, context, NULL);
 }
 
-static void run_repl_server (gpointer data, gpointer user_data)
+static void *
+run_repl_server (void *data)
 {
-  gzochid_debug_context *context = (gzochid_debug_context *) data;
+  gzochid_debug_context *context = data;
 
   SCM port = scm_from_int (context->port);
 
@@ -64,16 +73,20 @@ static void run_repl_server (gpointer data, gpointer user_data)
     (scm_run_repl_server, 
      scm_list_2 (scm_from_locale_keyword ("port"), port), 
      SCM_BOOL_F);
+
+  return NULL;
 }
 
-static void run_async (gpointer data, gpointer user_data)
+static void 
+run_async (gpointer data, gpointer user_data)
 {
-  gzochid_guile_run (run_repl_server, data);
+  scm_with_guile (run_repl_server, data);
 }
 
-static void run (int from_state, int to_state, gpointer user_data)
+static void 
+run (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_context *context = user_data;
   gzochid_debug_context *debug_context = (gzochid_debug_context *) context;
   gzochid_admin_context *admin_context =
     (gzochid_admin_context *) context->parent;
@@ -82,22 +95,26 @@ static void run (int from_state, int to_state, gpointer user_data)
   gzochid_thread_pool_push (admin_context->pool, run_async, user_data, NULL);  
 }
 
-static void stop (int from_state, int to_state, gpointer user_data)
+static void 
+stop (int from_state, int to_state, gpointer user_data)
 {
 }
 
-gzochid_debug_context *gzochid_debug_context_new (void)
+gzochid_debug_context *
+gzochid_debug_context_new (void)
 {
   return calloc (1, sizeof (gzochid_debug_context));
 }
 
-void gzochid_debug_context_free (gzochid_debug_context *context)
+void 
+gzochid_debug_context_free (gzochid_debug_context *context)
 {
   gzochid_context_free ((gzochid_context *) context);
 }
 
-void gzochid_debug_context_init 
-(gzochid_debug_context *context, gzochid_context *parent, int port)
+void 
+gzochid_debug_context_init (gzochid_debug_context *context, 
+			    gzochid_context *parent, int port)
 {
   gzochid_fsm *fsm = gzochid_fsm_new
     ("debug", GZOCHID_DEBUG_STATE_INITIALIZING, "INITIALIZING");

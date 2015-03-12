@@ -1,5 +1,5 @@
 /* guile.c: GNU Guile interface routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -32,20 +32,14 @@ static SCM scm_make_thunk;
 
 static SCM scm_add_to_load_path;
 
-typedef struct _gzochid_guile_thread_work 
+static SCM 
+guile_catch_body (void *data)
 {
-  gzochid_thread_worker worker;
-  gpointer data;
-  gpointer user_data;
-} gzochid_guile_thread_work;
+  void **ptr = data;
 
-static SCM guile_catch_body (void *data)
-{
-  void **ptr = (void **) data;
-
-  SCM procedure = (SCM) ptr[0];
-  SCM args = (SCM) ptr[1];
-  SCM exception_var = (SCM) ptr[2];
+  SCM procedure = ptr[0];
+  SCM args = ptr[1];
+  SCM exception_var = ptr[2];
   
   return scm_call_2 
     (scm_r6rs_with_exception_handler,
@@ -79,7 +73,7 @@ static SCM r6rs_exception_handler (SCM exception_var, SCM cond)
 
 static SCM guile_catch_handler (void *data, SCM tag, SCM throw_args)
 {
-  SCM exception_variable = (SCM) data;
+  SCM exception_variable = data;
 
   if (scm_variable_p (exception_variable) == SCM_BOOL_T
       && scm_variable_ref (exception_variable) == SCM_UNSPECIFIED)
@@ -90,7 +84,7 @@ static SCM guile_catch_handler (void *data, SCM tag, SCM throw_args)
 
 static SCM guile_pre_unwind_handler (void *data, SCM tag, SCM throw_args)
 {
-  SCM exception_variable = (SCM) data;
+  SCM exception_variable = data;
 
   if (scm_variable_p (exception_variable) == SCM_BOOL_T
       && scm_variable_ref (exception_variable) == SCM_UNSPECIFIED)
@@ -129,46 +123,8 @@ SCM gzochid_guile_invoke (SCM procedure, SCM args, SCM exception_var)
   return ret;
 }
 
-static void *guile_unwrapper (gpointer data)
-{
-  gzochid_guile_thread_work *work = (gzochid_guile_thread_work *) data;
-  work->worker (work->data, work->user_data);
-  free (work);
-
-  return NULL;
-}
-
-static void guile_dispatch (gpointer data, gpointer user_data)
-{
-  gzochid_guile_thread_work *work = (gzochid_guile_thread_work *) data;
-  work->user_data = user_data;
-  scm_with_guile (guile_unwrapper, work);
-}
-
-void gzochid_guile_run (gzochid_thread_worker worker, gpointer data)
-{
-  gzochid_guile_thread_work *work = 
-    calloc (1, sizeof (gzochid_guile_thread_work));
-  
-  work->worker = worker;
-  work->data = data;
-  
-  guile_dispatch (work, NULL);
-}
-
-void gzochid_guile_thread_pool_push
-(GThreadPool *pool, gzochid_thread_worker worker, gpointer data, GError **error)
-{ 
-  gzochid_guile_thread_work *work = calloc 
-    (1, sizeof (gzochid_guile_thread_work));
-
-  work->worker = worker;
-  work->data = data;
-
-  gzochid_thread_pool_push (pool, guile_dispatch, work, error);
-}
-
-void gzochid_guile_add_to_load_path (char *path)
+void 
+gzochid_guile_add_to_load_path (char *path)
 {
   SCM scm_path = scm_from_locale_string (path);
 
@@ -176,7 +132,8 @@ void gzochid_guile_add_to_load_path (char *path)
     (scm_add_to_load_path, scm_list_1 (scm_path), SCM_BOOL_F);
 }
 
-static void bind_scm (char *module, SCM *binding, char *name)
+static void 
+bind_scm (char *module, SCM *binding, char *name)
 {
   SCM var = scm_c_public_variable (module, name);
 
