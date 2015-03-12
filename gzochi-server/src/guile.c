@@ -24,8 +24,11 @@
 #include "threads.h"
 
 static SCM scm_r6rs_with_exception_handler;
-
 static SCM scm_r6rs_exception_handler;
+
+static SCM scm_r6rs_raise;
+static SCM scm_r6rs_raise_continuable;
+
 static SCM scm_exception_printer;
 static SCM scm_make_handler;
 static SCM scm_make_thunk;
@@ -47,7 +50,8 @@ guile_catch_body (void *data)
      scm_call_2 (scm_make_thunk, procedure, args));
 }
 
-static SCM r6rs_exception_handler (SCM exception_var, SCM cond)
+static SCM 
+r6rs_exception_handler (SCM exception_var, SCM cond)
 {
   SCM output = scm_open_output_string ();
   SCM output_string = SCM_BOOL_F;
@@ -123,6 +127,18 @@ SCM gzochid_guile_invoke (SCM procedure, SCM args, SCM exception_var)
   return ret;
 }
 
+SCM 
+gzochid_guile_r6rs_raise (SCM cond)
+{
+  return scm_call_1 (scm_r6rs_raise, cond);
+}
+
+SCM 
+gzochid_guile_r6rs_raise_continuable (SCM cond)
+{
+  return scm_call_1 (scm_r6rs_raise_continuable, cond);
+}
+
 void 
 gzochid_guile_add_to_load_path (char *path)
 {
@@ -150,6 +166,9 @@ void gzochid_guile_init ()
     ("r6rs_exception_handler", 2, 0, 0, r6rs_exception_handler);
   scm_gc_protect_object (scm_r6rs_exception_handler);
 
+  bind_scm ("rnrs exceptions", &scm_r6rs_raise, "raise");
+  bind_scm ("rnrs exceptions", &scm_r6rs_raise_continuable, 
+	    "raise-continuable");
   bind_scm ("rnrs exceptions", &scm_r6rs_with_exception_handler, 
 	    "with-exception-handler");
 

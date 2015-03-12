@@ -74,7 +74,7 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
       if (reference->obj == NULL
 	  || reference->state == 
 	  GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED)
-	gzochid_scheme_r6rs_raise 
+	gzochid_guile_r6rs_raise 
 	  (gzochid_scheme_make_object_removed_condition ());
       else 
 	{
@@ -144,7 +144,7 @@ SCM_DEFINE (primitive_get_binding, "primitive-get-binding", 1, 0, 0, (SCM name),
   gzochid_api_check_transaction ();
 
   if (! scm_is_false (cond))    
-    gzochid_scheme_r6rs_raise (cond);
+    gzochid_guile_r6rs_raise (cond);
 
   return ret;
 }
@@ -165,7 +165,7 @@ SCM_DEFINE (primitive_set_binding_x, "primitive-set-binding!", 2, 0, 0,
       free (cname);
       free (prefixed_name);
 
-      gzochid_scheme_r6rs_raise (cond);
+      gzochid_guile_r6rs_raise (cond);
     }
   else if (err == NULL)
     {
@@ -202,7 +202,7 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
       free (cname);
       free (prefixed_name);
 
-      gzochid_scheme_r6rs_raise (cond);
+      gzochid_guile_r6rs_raise (cond);
     }
   else if (err == NULL)
     {

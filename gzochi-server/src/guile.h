@@ -20,6 +20,8 @@
 
 #include <libguile.h>
 
+SCM gzochid_guile_r6rs_raise (SCM);
+SCM gzochid_guile_r6rs_raise_continuable (SCM);
 
 SCM gzochid_guile_invoke (SCM, SCM, SCM);
 

@@ -1,5 +1,5 @@
 /* util.c: Shared utility procedures for Scheme->C API.
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 #include <libguile.h>
 
 #include "../app.h"
+#include "../guile.h"
 #include "../scheme.h"
 #include "../tx.h"
 
@@ -31,43 +32,47 @@ static SCM scm_make_transaction_aborted_condition;
 static SCM scm_make_transaction_retry_condition;
 static SCM scm_make_transaction_timeout_condition;
 
-gzochid_application_context *gzochid_api_ensure_current_application_context ()
+gzochid_application_context *
+gzochid_api_ensure_current_application_context ()
 {
   gzochid_application_context *context = 
     gzochid_get_current_application_context();
   if (context == NULL)
-    gzochid_scheme_r6rs_raise 
+    gzochid_guile_r6rs_raise 
       (scm_call_0 (scm_make_no_current_application_condition));
 
   return context;
 }
 
-void gzochid_api_check_not_found (GError *err)
+void 
+gzochid_api_check_not_found (GError *err)
 {
   assert (err != NULL);
   if (err->code == GZOCHID_DATA_ERROR_NOT_FOUND)
     {
       g_error_free (err);
-      gzochid_scheme_r6rs_raise_continuable
+      gzochid_guile_r6rs_raise_continuable
 	(gzochid_scheme_make_object_removed_condition ());
     }
   else g_error_free (err);
 }
 
-void gzochid_api_check_transaction ()
+void 
+gzochid_api_check_transaction ()
 {
   if (gzochid_transaction_timed_out ())
-    gzochid_scheme_r6rs_raise
+    gzochid_guile_r6rs_raise
       (scm_call_2 (scm_condition, 
 		   scm_call_0 (scm_make_transaction_timeout_condition),
 		   scm_call_0 (scm_make_transaction_retry_condition)));
 
   if (gzochid_transaction_rollback_only ())
-    gzochid_scheme_r6rs_raise 
+    gzochid_guile_r6rs_raise 
       (scm_call_0 (scm_make_transaction_aborted_condition));
 }
 
-static void bind_scm (char *module, SCM *binding, char *name)
+static void 
+bind_scm (char *module, SCM *binding, char *name)
 {
   SCM var = scm_c_public_variable (module, name);
 
@@ -78,7 +83,8 @@ static void bind_scm (char *module, SCM *binding, char *name)
   scm_gc_protect_object (*binding);
 }
 
-void gzochid_api_util_init ()
+void 
+gzochid_api_util_init ()
 {
   bind_scm ("rnrs conditions", &scm_condition, "condition");
   

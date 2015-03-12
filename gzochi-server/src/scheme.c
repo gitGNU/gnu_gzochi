@@ -74,9 +74,6 @@ static SCM scm_channel_oid;
 static SCM scm_make_task_handle;
 static SCM scm_task_handle_oid;
 
-static SCM scm_r6rs_raise;
-static SCM scm_r6rs_raise_continuable;
-
 static SCM scm_make_object_removed_condition;
 static SCM scm_make_name_exists_condition;
 static SCM scm_make_name_not_bound_condition;
@@ -922,18 +919,6 @@ gzochid_scheme_create_managed_hashtable (GHashTable *properties)
 }
 
 SCM 
-gzochid_scheme_r6rs_raise (SCM cond)
-{
-  return scm_call_1 (scm_r6rs_raise, cond);
-}
-
-SCM 
-gzochid_scheme_r6rs_raise_continuable (SCM cond)
-{
-  return scm_call_1 (scm_r6rs_raise_continuable, cond);
-}
-
-SCM 
 gzochid_scheme_make_object_removed_condition ()
 {
   return scm_call_0 (scm_make_object_removed_condition);
@@ -1062,10 +1047,6 @@ bind_scm (char *module, SCM *binding, char *name)
 static void *
 initialize_bindings (void *ptr)
 {
-  bind_scm ("rnrs exceptions", &scm_r6rs_raise, "raise");
-  bind_scm ("rnrs exceptions", &scm_r6rs_raise_continuable, 
-	    "raise-continuable");
-
   bind_scm ("rnrs hashtables", &gzochid_scheme_string_hash, "string-hash");
   bind_scm ("rnrs base", &gzochid_scheme_string_equiv, "equal?");
 
