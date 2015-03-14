@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2014 Julian Graham
+# Copyright (C) 2015 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ test_programs = \
 	test-event \
 	test-reloc \
 	test-scheme \
+	test-scheme-task \
 	test-task \
 	test-util
 
@@ -49,28 +50,32 @@ TESTS = $(test_programs)
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
 test_data_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
-test_data_SOURCES = mock-app.c mock-schedule.c mock-storage.c test-data.c
-test_data_LDADD = $(top_builddir)/src/libgzochid_la-auth.o \
+test_data_SOURCES = mock-storage.c test-data.c
+test_data_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
+	$(top_builddir)/src/libgzochid_la-auth.o \
+	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-data.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
-	$(top_builddir)/src/libgzochid_la-task.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
-	$(top_builddir)/src/libgzochid_la-txlog.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_event_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
-test_event_SOURCES = mock-app.c mock-storage.c test-event.c
+test_event_SOURCES = mock-storage.c test-event.c
 test_event_LDADD = $(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
 
 test_reloc_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
-test_reloc_SOURCES = test-reloc.c mock-app.c mock-storage.c
-test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-event.o \
+test_reloc_SOURCES = test-reloc.c mock-storage.c
+test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
+	$(top_builddir)/src/libgzochid_la-context.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
 	$(top_builddir)/src/libgzochid_la-reloc.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
@@ -79,16 +84,24 @@ test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-event.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GUILE_LIBS@
 
 test_scheme_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
-test_scheme_SOURCES = test-scheme.c mock-app.c mock-data.c mock-reloc.c \
-	mock-session.c mock-storage.c mock-task.c mock-tx.c mock-txlog.c
-test_scheme_LDADD = $(top_builddir)/src/libgzochid_la-auth.o \
+test_scheme_SOURCES = test-scheme.c mock-data.c
+test_scheme_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
+	$(top_builddir)/src/libgzochid_la-auth.o \
+	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-reloc.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
-	$(top_builddir)/src/libgzochid_la-threads.o \
+	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+test_scheme_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_scheme_task_SOURCES = test-scheme-task.c 
+test_scheme_task_LDADD = $(top_builddir)/src/libgzochid.la \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_storage_bdb_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
@@ -115,10 +128,14 @@ test_storage_mem_LDADD = $(top_builddir)/src/libgzochid_la-storage-mem.o \
 	@GLIB_LIBS@
 
 test_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
-test_task_SOURCES = test-task.c mock-app.c mock-guile.c mock-storage.c 
-test_task_LDADD = $(top_builddir)/src/libgzochid_la-auth.o \
+test_task_SOURCES = test-task.c mock-storage.c 
+test_task_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
+	$(top_builddir)/src/libgzochid_la-app-task.o \
+	$(top_builddir)/src/libgzochid_la-auth.o \
+	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-data.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-task.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-schedule.o \
@@ -126,7 +143,7 @@ test_task_LDADD = $(top_builddir)/src/libgzochid_la-auth.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-txlog.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	$(GZOCHI_COMMON_LIBS) @GMODULE_LIBS@ @GLIB_LIBS@
+	$(GZOCHI_COMMON_LIBS) @GMODULE_LIBS@ @GLIB_LIBS@ @GUILE_LIBS@
 
 test_util_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
 test_util_SOURCES = test-util.c

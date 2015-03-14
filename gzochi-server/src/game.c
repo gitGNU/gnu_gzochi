@@ -1,5 +1,5 @@
 /* game.c: Game context management routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <syslog.h>
 
 #include "app.h"
 #include "auth_int.h"
@@ -34,6 +33,7 @@
 #include "game.h"
 #include "log.h"
 #include "scheme.h"
+#include "scheme-task.h"
 #include "socket.h"
 #include "task.h"
 #include "threads.h"
@@ -45,8 +45,9 @@
 #define SERVER_FS_APPS_DEFAULT "/var/gzochid/deploy"
 #define SERVER_FS_DATA_DEFAULT "/var/gzochid/data"
 
-static void initialize_application 
-(gzochid_game_context *context, gzochid_application_descriptor *descriptor)
+static void 
+initialize_application (gzochid_game_context *context, 
+			gzochid_application_descriptor *descriptor)
 {
   gzochid_application_context *application_context =
     gzochid_application_context_new ();
@@ -57,7 +58,8 @@ static void initialize_application
 		   g_main_loop_get_context (context->event_loop));
 }
 
-static void scan_app_dir (gzochid_game_context *context, char *dir)
+static void 
+scan_app_dir (gzochid_game_context *context, char *dir)
 {
   char *descriptor_file = g_strconcat (dir, "/", GAME_DESCRIPTOR_XML, NULL);
 
@@ -82,7 +84,8 @@ static void scan_app_dir (gzochid_game_context *context, char *dir)
   g_free (descriptor_file);
 }
 
-static void scan_apps_dir (gzochid_game_context *context)
+static void 
+scan_apps_dir (gzochid_game_context *context)
 {
   GDir *dir = g_dir_open (context->apps_dir, O_RDONLY, NULL);
   const char *name = g_dir_read_name (dir);
@@ -98,22 +101,25 @@ static void scan_apps_dir (gzochid_game_context *context)
   g_dir_close (dir);
 }
 
-static void initialize_async (gpointer data, gpointer user_data)
+static void 
+initialize_async (gpointer data, gpointer user_data)
 {
-  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_context *context = user_data;
   gzochid_fsm_to_state (context->fsm, GZOCHID_GAME_STATE_RUNNING);
 }
 
-static void initialize_auth (int from_state, int to_state, gpointer user_data)
+static void 
+initialize_auth (int from_state, int to_state, gpointer user_data)
 {
   gzochid_game_context *context = (gzochid_game_context *) user_data;
 
   gzochid_auth_init (context);
 }
 
-static void initialize_server (int from_state, int to_state, gpointer user_data)
+static void 
+initialize_server (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_game_context *context = (gzochid_game_context *) user_data;
+  gzochid_game_context *context = user_data;
 
   context->server = gzochid_socket_server_context_new ();
   gzochid_socket_server_context_init 
@@ -122,9 +128,10 @@ static void initialize_server (int from_state, int to_state, gpointer user_data)
     ((gzochid_context *) context->server, GZOCHID_SOCKET_SERVER_STATE_RUNNING);
 }
 
-static void initialize_apps (int from_state, int to_state, gpointer user_data)
+static void 
+initialize_apps (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_game_context *context = (gzochid_game_context *) user_data;
+  gzochid_game_context *context = user_data;
   
   if (!g_file_test (context->work_dir, G_FILE_TEST_EXISTS))
     {
@@ -146,57 +153,64 @@ static void initialize_apps (int from_state, int to_state, gpointer user_data)
   scan_apps_dir (context);
 }
 
-static void initialize_scheme_api
-(int from_state, int to_state, gpointer user_data)
+static void
+initialize_scheme_api (int from_state, int to_state, gpointer user_data)
 {
   gzochid_scheme_initialize_bindings ();
+  gzochid_scheme_task_initialize_bindings ();
 }
 
-static void initialize_serialization_registry
-(int from_state, int to_state, gpointer user_data)
+static void 
+initialize_serialization_registry (int from_state, int to_state, 
+				   gpointer user_data)
 {
   gzochid_task_initialize_serialization_registry ();
 }
 
 static void 
-initialize_scheme_task_serialization 
-(int from_state, int to_staet, gpointer user_data)
+initialize_scheme_task_serialization (int from_state, int to_state,
+				      gpointer user_data)
 {
   gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
 }
 
-static void initialize_client_received_message_task_serialization
-(int from_state, int to_state, gpointer user_data)
+static void 
+initialize_client_received_message_task_serialization (int from_state, 
+						       int to_state, 
+						       gpointer user_data)
 {
   gzochid_register_client_received_message_task_serialization ();
 }
 
-static void initialize_complete
-(int from_state, int to_state, gpointer user_data)
+static void 
+initialize_complete (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_game_context *context = (gzochid_game_context *) user_data;
+  gzochid_game_context *context = user_data;
   gzochid_thread_pool_push (context->pool, initialize_async, NULL, NULL);  
 }
 
-static gpointer event_loop (gpointer data)
+static gpointer 
+event_loop (gpointer data)
 {
-  gzochid_game_context *context = (gzochid_game_context *) data;
+  gzochid_game_context *context = data;
   g_main_loop_run (context->event_loop);
   return NULL;
 }
 
-static void initialize_event_loop 
-(int from_state, int to_state, gpointer user_data)
+static void 
+initialize_event_loop (int from_state, int to_state, gpointer user_data)
 {
   g_thread_new ("event-loop", event_loop, user_data);
 }
 
-gzochid_game_context *gzochid_game_context_new (void)
+gzochid_game_context *
+gzochid_game_context_new (void)
 {
   return calloc (1, sizeof (gzochid_game_context));
 }
 
-void gzochid_game_context_free (gzochid_game_context *context)
+void 
+gzochid_game_context_free (gzochid_game_context *context)
 {
   gzochid_context_free ((gzochid_context *) context);
 
@@ -206,8 +220,9 @@ void gzochid_game_context_free (gzochid_game_context *context)
   free (context);
 } 
 
-void gzochid_game_context_init
-(gzochid_game_context *context, gzochid_context *parent, GHashTable *config)
+void 
+gzochid_game_context_init (gzochid_game_context *context, 
+			   gzochid_context *parent, GHashTable *config)
 {
   long tx_timeout_ms = 0;
   gzochid_fsm *fsm = gzochid_fsm_new 
@@ -277,25 +292,30 @@ void gzochid_game_context_init
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
 }
 
-void gzochid_game_context_register_application
-(gzochid_game_context *context, char *name, gzochid_application_context *app)
+void 
+gzochid_game_context_register_application (gzochid_game_context *context, 
+					   char *name, 
+					   gzochid_application_context *app)
 {
   g_hash_table_insert (context->applications, name, app);
 }
 
-void gzochid_game_context_unregister_application
-(gzochid_game_context *context, char *name)
+void 
+gzochid_game_context_unregister_application (gzochid_game_context *context, 
+					     char *name)
 {
   g_hash_table_remove (context->applications, name);
 }
 
-gzochid_application_context *gzochid_game_context_lookup_application 
-(gzochid_game_context *context, char *name)
+gzochid_application_context *
+gzochid_game_context_lookup_application (gzochid_game_context *context, 
+					 char *name)
 {
   return g_hash_table_lookup (context->applications, name);
 }
 
-GList *gzochid_game_context_get_applications (gzochid_game_context *context)
+GList *
+gzochid_game_context_get_applications (gzochid_game_context *context)
 {
   return g_hash_table_get_values (context->applications);
 }

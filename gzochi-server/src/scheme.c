@@ -15,12 +15,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <assert.h>
 #include <glib.h>
 #include <gmp.h>
 #include <gzochi-common.h>
 #include <libguile.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,17 +32,7 @@
 #include "log.h"
 #include "reloc.h"
 #include "scheme.h"
-#include "session.h"
-#include "task.h"
 #include "tx.h"
-#include "txlog.h"
-
-#include "api/channel.h"
-#include "api/data.h"
-#include "api/log.h"
-#include "api/session.h"
-#include "api/task.h"
-#include "api/util.h"
 
 static SCM scm_make_callback;
 static SCM scm_callback_module;
@@ -74,11 +64,51 @@ static SCM scm_channel_oid;
 static SCM scm_make_task_handle;
 static SCM scm_task_handle_oid;
 
+static SCM scm_transaction_retry_condition_p;
+static SCM scm_transaction_aborted_condition_p;
+
 static SCM scm_make_object_removed_condition;
 static SCM scm_make_name_exists_condition;
 static SCM scm_make_name_not_bound_condition;
-static SCM scm_transaction_retry_condition_p;
-static SCM scm_transaction_aborted_condition_p;
+
+GQuark gzochid_scheme_error_quark (void)
+{
+  return g_quark_from_static_string ("gzochid-scheme-error-quark");
+}
+
+static gpointer 
+scheme_invoke_inner (gpointer data)
+{
+  void **ptr = data;
+
+  SCM procedure = ptr[0];
+  SCM args = ptr[1];
+  SCM exception_var = ptr[2];
+
+  return gzochid_guile_invoke (procedure, args, exception_var);
+}
+
+SCM
+gzochid_scheme_invoke (gzochid_application_context *context, 
+		       gzochid_auth_identity *identity, SCM proc, SCM args, 
+		       SCM exception_var)
+{
+  void *data[3];
+  SCM ret = SCM_EOL;
+
+  data[0] = proc;
+  data[1] = args;
+  data[2] = exception_var;
+
+  ret = gzochid_with_application_context 
+    (context, identity, scheme_invoke_inner, data);
+
+  scm_remember_upto_here_1 (proc);
+  scm_remember_upto_here_1 (args);
+  scm_remember_upto_here_1 (exception_var);
+
+  return ret;
+}
 
 static SCM 
 resolve_procedure (char *procedure, GList *module)
@@ -89,491 +119,15 @@ resolve_procedure (char *procedure, GList *module)
   return scm_public_ref (scm_module, scm_procedure);
 }
 
-static gpointer 
-scheme_invoke_inner (gpointer data)
+SCM 
+gzochid_scheme_invoke_callback (gzochid_application_context *context,
+				gzochid_auth_identity *identity, 
+				char *procedure, GList *module, SCM args, 
+				SCM exception_var)
 {
-  void **ptr = (void **) data;
-
-  SCM procedure = (SCM) ptr[0];
-  SCM args = (SCM) ptr[1];
-  SCM exception_var = (SCM) ptr[2];
-
-  return gzochid_guile_invoke (procedure, args, exception_var);
-}
-
-static SCM 
-scheme_invoke (gzochid_application_context *context, 
-	       gzochid_auth_identity *identity, SCM proc, SCM args, 
-	       SCM exception_var)
-{
-  void *data[3];
-  SCM ret = SCM_EOL;
-
-  data[0] = proc;
-  data[1] = args;
-  data[2] = exception_var;
-
-  ret = (SCM) gzochid_with_application_context 
-    (context, identity, scheme_invoke_inner, data);
-
-  scm_remember_upto_here_1 (proc);
-  scm_remember_upto_here_1 (args);
-  scm_remember_upto_here_1 (exception_var);
-
-  return ret;
-}
-
-SCM gzochid_scheme_invoke
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- char *procedure, GList *module, SCM args, SCM exception_var)
-{
-  return scheme_invoke 
+  return gzochid_scheme_invoke 
     (context, identity, resolve_procedure (procedure, module), args, 
      exception_var);
-}
-
-static int scheme_prepare (gpointer data) { return TRUE; }
-static void scheme_commit (gpointer data) { }
-static void scheme_rollback (gpointer data) { }
-
-static gzochid_transaction_participant scheme_participant = 
-  { "scheme", scheme_prepare, scheme_commit, scheme_rollback };
-
-static gboolean 
-is_transaction_retry (SCM cond)
-{
-  return scm_is_true (scm_call_1 (scm_transaction_retry_condition_p, cond));
-}
-
-static gboolean 
-is_transaction_aborted (SCM cond)
-{
-  return scm_is_true (scm_call_1 (scm_transaction_aborted_condition_p, cond));
-}
-
-static gboolean 
-triggered_by_rollback (SCM cond)
-{
-  return is_transaction_aborted (cond) && gzochid_transaction_rollback_only ();
-}
-
-void gzochid_scheme_application_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer ptr)
-{
-  void **data = (void **) ptr;
-
-  SCM proc = (SCM) data[0];
-  SCM args = (SCM) data[1];
-  SCM exception_var = (SCM) data[2];
-  SCM *ret = (SCM *) data[3];
-
-  gzochid_transaction_join (&scheme_participant, NULL);
-
-  *ret = scheme_invoke (context, identity, proc, args, exception_var);
-
-  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    if (! triggered_by_rollback (scm_variable_ref (exception_var)))
-      gzochid_transaction_mark_for_rollback 
-	(&scheme_participant, 
-	 is_transaction_retry (scm_variable_ref (exception_var)));
-}
-
-void 
-gzochid_scheme_application_task_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer task)
-{
-  SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *args = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "task");
-
-  gzochid_transaction_join (&scheme_participant, NULL);
-
-  gzochid_scheme_invoke 
-    (context, 
-     identity,
-     "gzochi:run-task", 
-     args,
-     scm_list_1 ((SCM) task), 
-     exception_var);
-
-  g_list_free (args);
-
-  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    if (! triggered_by_rollback (scm_variable_ref (exception_var)))
-      gzochid_transaction_mark_for_rollback 
-	(&scheme_participant,
-	 is_transaction_retry (scm_variable_ref (exception_var)));
-}
-
-static gzochid_application_callback *
-scm_to_callback (gzochid_application_context *context, SCM scm_callback)
-{
-  GList *module = gzochid_scheme_callback_module (scm_callback);
-  char *procedure = gzochid_scheme_callback_procedure (scm_callback);
-  gzochid_data_managed_reference *reference = 
-    gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, scm_callback);
-
-  mpz_t oid;
-  
-  mpz_init (oid);
-  mpz_set (oid, reference->oid);      
-    
-  return gzochid_application_callback_new (procedure, module, oid);
-}
-
-static SCM gzochid_scheme_string_hash;
-static SCM gzochid_scheme_string_equiv;
-
-void 
-gzochid_scheme_application_initialized_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
-{
-  GHashTable *properties = (GHashTable *) data;
-  gzochid_data_managed_reference *callback_reference = NULL;
-  SCM callback = gzochid_scheme_create_callback 
-    (context->descriptor->initialized, NULL);
-  SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *args = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
-
-  callback_reference = gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, callback);
-
-  gzochid_transaction_join (&scheme_participant, NULL);
-
-  gzochid_scheme_invoke 
-    (context,
-     identity,
-     "gzochi:execute-initialized",
-     args,
-     scm_list_2 (callback,
-		 gzochid_scheme_ghashtable_to_hashtable 
-		 (properties, 
-		  gzochid_scheme_string_hash,
-		  gzochid_scheme_string_equiv,
-		  (SCM (*) (gpointer)) scm_from_locale_string,
-		  (SCM (*) (gpointer)) scm_from_locale_string)),
-     exception_var);
-
-  g_list_free (args);
-
-  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    {
-      if (! triggered_by_rollback (scm_variable_ref (exception_var)))
-	gzochid_transaction_mark_for_rollback 
-	  (&scheme_participant,
-	   is_transaction_retry (scm_variable_ref (exception_var)));
-    }
-  else gzochid_data_set_binding_to_oid 
-	 (context, "s.initializer", callback_reference->oid, NULL);
-}
-
-static gpointer 
-unpack_handler (gpointer data)
-{
-  SCM handler = (SCM) data;
-  SCM received_message = gzochid_scheme_handler_received_message (handler);
-  SCM disconnected = gzochid_scheme_handler_disconnected (handler);
-
-  gzochid_application_context *context = 
-    gzochid_get_current_application_context ();
-  gzochid_client_session_handler *session_handler = 
-    malloc (sizeof (gzochid_client_session_handler));
-
-  scm_gc_protect_object (received_message);
-  scm_gc_protect_object (disconnected);
-
-  session_handler->received_message = scm_to_callback 
-    (context, received_message);
-  session_handler->disconnected = scm_to_callback (context, disconnected);
-
-  return session_handler;
-}
-
-void 
-gzochid_scheme_application_logged_in_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
-{
-  GError *err = NULL;
-  mpz_t session_oid;
-  char *session_oid_str = (char *) data;
-  gzochid_client_session *session = NULL;
-  gzochid_data_managed_reference *session_reference = NULL;
-
-  SCM scm_session = SCM_BOOL_F;
-
-  SCM cb = SCM_BOOL_F;
-  gzochid_data_managed_reference *callback_reference = NULL;
-
-  SCM handler = SCM_BOOL_F;
-  SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *args = NULL;
-    
-  mpz_init (session_oid);
-  mpz_set_str (session_oid, session_oid_str, 16);
-  session_reference = gzochid_data_create_reference_to_oid
-    (context, &gzochid_client_session_serialization, session_oid);
-  mpz_clear (session_oid);
-
-  gzochid_data_dereference (session_reference, &err);
-
-  if (err != NULL)
-    {
-      g_error_free (err);
-      return;
-    }
-
-  args = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
-
-  session = (gzochid_client_session *) session_reference->obj;
-
-  scm_session = gzochid_scheme_create_client_session 
-    (session, session_reference->oid);
-
-  cb = gzochid_scheme_create_callback (context->descriptor->logged_in, NULL);
-  callback_reference = gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, cb);
-
-  gzochid_transaction_join (&scheme_participant, NULL);
-
-  handler = gzochid_scheme_invoke 
-    (context,
-     identity,
-     "gzochi:execute-logged-in",
-     args,
-     scm_list_2 ((SCM) callback_reference->obj, (SCM) scm_session), 
-     exception_var);
-  
-  g_list_free (args);
-
-  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    {
-      if (! triggered_by_rollback (scm_variable_ref (exception_var)))
-	gzochid_transaction_mark_for_rollback 
-	  (&scheme_participant, 
-	   is_transaction_retry (scm_variable_ref (exception_var)));
-    }
-  else if (scm_is_false (handler))
-    {
-      gzochid_client_session_send_login_failure (context, session);
-      gzochid_client_session_disconnect (context, session);
-    }
-  else
-    {
-      session->handler = (gzochid_client_session_handler *) 
-	gzochid_with_application_context 
-	(context, identity, unpack_handler, handler);
-
-      gzochid_data_mark 
-	(context, &gzochid_client_session_serialization, session, &err);
-      if (err == NULL)
-	{
-	  gzochid_scm_location_info *scm_session_reloc = 
-	    gzochid_scm_location_get (context, scm_session);
-	  gzochid_data_managed_reference *reloc_reference = 
-	    gzochid_data_create_reference 
-	    (context, &gzochid_scm_location_aware_serialization, 
-	     scm_session_reloc);
-
-	  mpz_set (session->scm_oid, reloc_reference->oid);
-	  gzochid_client_session_send_login_success (context, session);
-	}
-      else g_error_free (err);
-    }
-}
-
-void 
-gzochid_scheme_application_received_message_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer ptr)
-{
-  GError *err = NULL;
-  gzochid_client_session *session = NULL;
-  gzochid_data_managed_reference *session_reference = NULL;
-  gzochid_data_managed_reference *callback_reference = NULL;
-
-  SCM bv = SCM_BOOL_F;
-  SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *gpa = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
-
-  unsigned char *message = NULL;
-  short *message_len_ptr = NULL;
-  void **data = (void **) ptr;
-
-  mpz_t session_oid;
-  mpz_init (session_oid);
-  mpz_set_str (session_oid, (char *) data[0], 16);
-
-  message = (unsigned char *) data[1];
-  message_len_ptr = (short *) data[2];
-
-  session_reference = gzochid_data_create_reference_to_oid 
-    (context, &gzochid_client_session_serialization, session_oid);
-
-  mpz_clear (session_oid);
-
-  gzochid_data_dereference (session_reference, &err);
-
-  if (err != NULL)
-    {
-      g_error_free (err);
-      return;
-    }
-
-  session = (gzochid_client_session *) session_reference->obj;
-
-  bv = gzochid_scheme_create_bytevector (message, *message_len_ptr);
-  callback_reference =
-    gzochid_data_create_reference_to_oid
-    (context, &gzochid_scheme_data_serialization, 
-     session->handler->received_message->scm_oid);
-
-  gzochid_data_dereference (callback_reference, &err);
-
-  if (err != NULL)
-    {
-      g_error_free (err);
-      return;
-    }
-      
-  gzochid_scheme_invoke
-    (context, 
-     identity,
-     "gzochi:execute-received-message", gpa,
-     scm_list_2 ((SCM) callback_reference->obj, bv),
-     exception_var);
-
-  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    {
-      if (! triggered_by_rollback (scm_variable_ref (exception_var)))
-	{
-	  gzochid_transaction_join (&scheme_participant, NULL);
-	  gzochid_transaction_mark_for_rollback 
-	    (&scheme_participant, 
-	     is_transaction_retry (scm_variable_ref (exception_var)));
-	}
-    }
-
-  g_list_free (gpa);
-}
-
-void 
-gzochid_scheme_application_disconnected_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer ptr)
-{
-  GError *err = NULL;
-  gzochid_client_session *session = NULL;
-  gzochid_data_managed_reference *session_reference = NULL;
-  gzochid_data_managed_reference *callback_reference = NULL;
-
-  SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *gpa = NULL;
-  char *oid_str = (char *) ptr;
-  mpz_t session_oid;
-
-  mpz_init (session_oid);
-  mpz_set_str (session_oid, oid_str, 16);
-
-  session_reference = gzochid_data_create_reference_to_oid 
-    (context, &gzochid_client_session_serialization, session_oid);
-  mpz_clear (session_oid);
-
-  gzochid_data_dereference (session_reference, &err);
-
-  if (err != NULL)
-    {
-      if (err->message != NULL)
-	gzochid_warning
-	  ("Failed to dereference disconnecting session '%s': %s", 
-	   oid_str, err->message);
-      else gzochid_warning 
-	     ("Failed to dereference disconnecting session '%s'.", oid_str);
-
-      g_error_free (err);
-      return;
-    }
-
-  session = (gzochid_client_session *) session_reference->obj;
-
-  /* A client may disconnect before the login process has completed or after
-     it has failed enough times to stop being retried. */
-
-  if (session->handler == NULL)
-    {
-      gzochid_tx_warning 
-	(context, "Session '%s' disconnected after incomplete login.", ptr);
-
-      g_list_free (gpa);
-
-      gzochid_client_session_disconnected_worker (context, identity, oid_str);
-      return;
-    }
-
-  callback_reference =
-    gzochid_data_create_reference_to_oid
-    (context, &gzochid_scheme_data_serialization, 
-     session->handler->disconnected->scm_oid);
-
-  gzochid_data_dereference (callback_reference, &err);
-  
-  if (err != NULL)
-    {
-      if (err->message != NULL)
-	gzochid_warning
-	  ("Failed to retrieve disconnect callback for session '%s': %s", 
-	   oid_str, err->message);
-      else gzochid_warning 
-	     ("Failed to retrieve disconnect callback for session '%s'.", 
-	      oid_str);
-
-      g_error_free (err);      
-      gzochid_client_session_disconnected_worker (context, identity, oid_str);
-      return;
-    }
-
-  gpa = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
-
-  gzochid_scheme_invoke
-    (context, 
-     identity,
-     "gzochi:execute-disconnected", gpa,
-     scm_list_1 ((SCM) callback_reference->obj),
-     exception_var);
-
-  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
-    {
-      if (! triggered_by_rollback (scm_variable_ref (exception_var)))
-	{
-	  gzochid_transaction_join (&scheme_participant, NULL);
-	  gzochid_transaction_mark_for_rollback 
-	    (&scheme_participant, 
-	     is_transaction_retry (scm_variable_ref (exception_var)));
-	}
-    }
-
-  gzochid_client_session_disconnected_worker (context, identity, oid_str);
-  g_list_free (gpa);
-}
-
-static void 
-scheme_worker_serializer (gzochid_application_context *context, 
-			  gzochid_application_worker worker, GString *out)
-{
-}
-
-static gzochid_application_worker 
-scheme_worker_deserializer (gzochid_application_context *context, GString *in)
-{
-  return gzochid_scheme_application_task_worker;
 }
 
 static void 
@@ -592,7 +146,7 @@ scheme_managed_record_serializer (gzochid_application_context *context, SCM arg,
   port = SCM_CAR (port_and_proc);
   proc = SCM_CADR (port_and_proc);
 
-  gzochid_scheme_invoke 
+  gzochid_scheme_invoke_callback
     (context,
      NULL,
      "gzochi:serialize-managed-record", gpd,
@@ -601,14 +155,13 @@ scheme_managed_record_serializer (gzochid_application_context *context, SCM arg,
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
-      /* Don't join the transaction here as the serializer should only be
-	 called during the PREPARING phase, which is too late to join. */
+      if (gzochid_scheme_is_transaction_retry 
+	  (scm_variable_ref (exception_var)))
+	g_set_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_RETRY,
+		     "Failed to serialize managed record.");
+      else g_set_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_FAILED,
+			"Failed toserialize managed record.");
 
-      gzochid_transaction_mark_for_rollback 
-	(&scheme_participant, 
-	 is_transaction_retry (scm_variable_ref (exception_var)));
-      g_set_error (err, GZOCHID_IO_ERROR, GZOCHID_IO_ERROR_SERIALIZATION,
-		   "Failed to serialize managed record.");
       g_list_free (gpd);
       return;
     }
@@ -640,7 +193,7 @@ scheme_managed_record_deserializer (gzochid_application_context *context,
 
   port = scm_open_bytevector_input_port (vec, SCM_BOOL_F);
 
-  record = gzochid_scheme_invoke 
+  record = gzochid_scheme_invoke_callback
     (context, 
      NULL,
      "gzochi:deserialize-managed-record", 
@@ -653,16 +206,12 @@ scheme_managed_record_deserializer (gzochid_application_context *context,
   
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
-      if (! triggered_by_rollback (scm_variable_ref (exception_var))) 
-	{
-	  gzochid_transaction_join (&scheme_participant, NULL);
-	  gzochid_transaction_mark_for_rollback 
-	    (&scheme_participant, 
-	     is_transaction_retry (scm_variable_ref (exception_var)));
-	}
-
-      g_set_error (err, GZOCHID_IO_ERROR, GZOCHID_IO_ERROR_SERIALIZATION,
-		   "Failed to deserialize managed record.");
+      if (gzochid_scheme_is_transaction_retry 
+	  (scm_variable_ref (exception_var)))
+	g_set_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_RETRY,
+		     "Failed to deserialize managed record.");
+      else g_set_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_FAILED,
+			"Failed to deserialize managed record.");
     }
   else 
     {
@@ -681,11 +230,11 @@ scheme_managed_record_deserializer (gzochid_application_context *context,
 static void *
 scheme_serializer_inner (void *data)
 {
-  void **ptr = (void **) data;
-  gzochid_application_context *context = (gzochid_application_context *) ptr[0];
-  SCM task = (SCM) ptr[1];
-  GString *out = (GString *) ptr[2];
-  GError **err = (GError **) ptr[3];
+  void **ptr = data;
+  gzochid_application_context *context = ptr[0];
+  SCM task = ptr[1];
+  GString *out = ptr[2];
+  GError **err = ptr[3];
 
   scheme_managed_record_serializer (context, task, out, err);
 
@@ -709,10 +258,10 @@ scheme_serializer (gzochid_application_context *context, void *ptr,
 static void *
 scheme_deserializer_inner (void *data)
 {
-  void **ptr = (void **) data;
-  gzochid_application_context *context = (gzochid_application_context *) ptr[0];
-  GString *in = (GString *) ptr[1];
-  GError **err = (GError **) ptr[2];
+  void **ptr = data;
+  gzochid_application_context *context = ptr[0];
+  GString *in = ptr[1];
+  GError **err = ptr[2];
 
   return scheme_managed_record_deserializer (context, in, err);
 }
@@ -733,7 +282,7 @@ scheme_deserializer (gzochid_application_context *context, GString *in,
 static void *
 scheme_finalizer_inner (void *data)
 {
-  scm_gc_unprotect_object ((SCM) data);
+  scm_gc_unprotect_object (data);
   return NULL;
 }
 
@@ -743,44 +292,8 @@ scheme_finalizer (gzochid_application_context *context, gpointer data)
   scm_with_guile (scheme_finalizer_inner, data);
 }
 
-static gzochid_application_worker_serialization scheme_worker_serialization =
-  { scheme_worker_serializer, scheme_worker_deserializer };
-
 gzochid_io_serialization gzochid_scheme_data_serialization =
   { scheme_serializer, scheme_deserializer, scheme_finalizer };
-
-gzochid_application_task_serialization gzochid_scheme_task_serialization = 
-  { 
-    "scheme", 
-    &scheme_worker_serialization, 
-    &gzochid_scheme_data_serialization 
-  };
-
-gzochid_application_task *
-gzochid_scheme_task_new (gzochid_application_context *context, 
-			 gzochid_auth_identity *identity, char *procedure, 
-			 GList *module_name, SCM data)
-{
-  SCM scm_data = gzochid_scheme_invoke 
-    (context,
-     NULL,
-     "gzochi:make-callback",
-     g_list_append (g_list_append (NULL, "gzochi"), "app"), 
-     scm_cons 
-     (scm_from_locale_symbol (procedure),
-      scm_cons (gzochid_scheme_glist_to_list 
-		(module_name, (SCM (*) (gpointer)) scm_from_locale_symbol),
-		data)), 
-     SCM_BOOL_F);
-
-  gzochid_application_task *task = NULL; 
-
-  scm_gc_protect_object (scm_data);
-  task = gzochid_application_task_new
-    (context, identity, gzochid_scheme_application_task_worker, scm_data);
-  
-  return task;
-}
 
 static gpointer 
 scm_symbol_to_locale_string (SCM sym)
@@ -918,6 +431,25 @@ gzochid_scheme_create_managed_hashtable (GHashTable *properties)
   return ht;
 }
 
+gboolean 
+gzochid_scheme_is_transaction_retry (SCM cond)
+{
+  return scm_is_true (scm_call_1 (scm_transaction_retry_condition_p, cond));
+}
+
+gboolean 
+gzochid_scheme_is_transaction_aborted (SCM cond)
+{
+  return scm_is_true (scm_call_1 (scm_transaction_aborted_condition_p, cond));
+}
+
+gboolean 
+gzochid_scheme_triggered_by_rollback (SCM cond)
+{
+  return gzochid_scheme_is_transaction_aborted (cond) 
+    && gzochid_transaction_rollback_only ();
+}
+
 SCM 
 gzochid_scheme_make_object_removed_condition ()
 {
@@ -990,8 +522,7 @@ gzochid_scheme_create_managed_reference
   SCM ret = SCM_BOOL_F;
 
   if (reference->obj != NULL)
-    data = gzochid_scm_location_resolve 
-      (reference->context, (gzochid_scm_location_info *) reference->obj);
+    data = gzochid_scm_location_resolve (reference->context, reference->obj);
   
   ret = scm_call_2 (scm_make_managed_reference, scm_oid, data);
 
@@ -1047,9 +578,6 @@ bind_scm (char *module, SCM *binding, char *name)
 static void *
 initialize_bindings (void *ptr)
 {
-  bind_scm ("rnrs hashtables", &gzochid_scheme_string_hash, "string-hash");
-  bind_scm ("rnrs base", &gzochid_scheme_string_equiv, "equal?");
-
   bind_scm ("rnrs hashtables", &scm_hashtable_keys, "hashtable-keys");
   bind_scm ("rnrs hashtables", &scm_hashtable_ref, "hashtable-ref");
   bind_scm ("rnrs hashtables", &scm_hashtable_set_x, "hashtable-set!");
@@ -1059,6 +587,11 @@ initialize_bindings (void *ptr)
   bind_scm ("gzochi app", &scm_callback_module, "gzochi:callback-module");
   bind_scm ("gzochi app", &scm_callback_procedure, "gzochi:callback-procedure");
   bind_scm ("gzochi app", &scm_callback_data, "gzochi:callback-data");
+
+  bind_scm ("gzochi conditions", &scm_transaction_retry_condition_p,
+	    "gzochi:transaction-retry-condition?");
+  bind_scm ("gzochi conditions", &scm_transaction_aborted_condition_p,
+	    "gzochi:transaction-aborted-condition?");
 
   bind_scm ("gzochi private channel", &scm_make_channel, 
 	    "gzochi:make-channel");
@@ -1075,10 +608,6 @@ initialize_bindings (void *ptr)
 	    "gzochi:make-name-not-bound-condition");
   bind_scm ("gzochi conditions", &scm_make_object_removed_condition,
 	    "gzochi:make-object-removed-condition");
-  bind_scm ("gzochi conditions", &scm_transaction_retry_condition_p,
-	    "gzochi:transaction-retry-condition?");
-  bind_scm ("gzochi conditions", &scm_transaction_aborted_condition_p,
-	    "gzochi:transaction-aborted-condition?");
 
   bind_scm ("gzochi data", &scm_make_managed_hashtable, 
 	    "gzochi:make-managed-hashtable");
@@ -1104,13 +633,6 @@ initialize_bindings (void *ptr)
   bind_scm ("gzochi private task", &scm_task_handle_oid, 
 	    "gzochi:task-handle-oid");
  
-  gzochid_api_channel_init ();
-  gzochid_api_data_init ();
-  gzochid_api_log_init ();
-  gzochid_api_session_init ();
-  gzochid_api_task_init ();
-  gzochid_api_util_init ();
-  
   return NULL;
 }
 

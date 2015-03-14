@@ -1,5 +1,5 @@
-/* mock-task.c: Test-time replacements for task.c routines.
- * Copyright (C) 2014 Julian Graham
+/* callback.h: Prototypes and declarations for callback.c
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,22 +15,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef GZOCHID_CALLBACK_H
+#define GZOCHID_CALLBACK_H
+
 #include <glib.h>
-#include <stdlib.h>
+#include <gmp.h>
 
-#include "app.h"
-#include "auth.h"
+#include "io.h"
 
-gzochid_application_task *gzochid_application_task_new 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gzochid_application_worker worker, gpointer data)
+struct _gzochid_application_callback
 {
-  gzochid_application_task *task = malloc (sizeof (gzochid_application_task));
+  GList *module;
+  char *procedure;
+  mpz_t scm_oid;
+};
 
-  task->context = context;
-  task->identity = identity;
-  task->worker = worker;
-  task->data = data;
+typedef struct _gzochid_application_callback gzochid_application_callback;
 
-  return task;
-}
+gzochid_io_serialization gzochid_application_callback_serialization;
+
+gzochid_application_callback *gzochid_application_callback_new 
+(char *, GList *, mpz_t);
+void gzochid_application_callback_free (gzochid_application_callback *);
+
+#endif /* GZOCHID_CALLBACK_H */

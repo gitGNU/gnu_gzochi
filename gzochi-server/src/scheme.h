@@ -26,32 +26,18 @@
 #include "channel.h"
 #include "data.h"
 #include "gzochid-auth.h"
-#include "io.h"
 #include "session.h"
-#include "task.h"
 
-void gzochid_scheme_application_worker
-(gzochid_application_context *, gzochid_auth_identity *, gpointer);
-void gzochid_scheme_application_task_worker
-(gzochid_application_context *, gzochid_auth_identity *, gpointer);
-void gzochid_scheme_application_initialized_worker
-(gzochid_application_context *, gzochid_auth_identity *, gpointer);
-void gzochid_scheme_application_logged_in_worker
-(gzochid_application_context *, gzochid_auth_identity *, gpointer);
-void gzochid_scheme_application_received_message_worker
-(gzochid_application_context *, gzochid_auth_identity *, gpointer);
-void gzochid_scheme_application_disconnected_worker
-(gzochid_application_context *, gzochid_auth_identity *, gpointer);
-extern gzochid_io_serialization gzochid_scheme_data_serialization;
-extern gzochid_application_task_serialization
-gzochid_scheme_task_serialization;
+#define GZOCHID_SCHEME_ERROR gzochid_scheme_error_quark ()
 
-SCM gzochid_scheme_invoke 
-(gzochid_application_context *, gzochid_auth_identity *, char *, GList *, SCM, 
- SCM);
+GQuark gzochid_scheme_error_quark (void);
 
-gzochid_application_task *gzochid_scheme_task_new
-(gzochid_application_context *, gzochid_auth_identity *, char *, GList *, SCM);
+typedef enum
+  {
+    GZOCHID_SCHEME_ERROR_RETRY,
+    GZOCHID_SCHEME_ERROR_FAILED
+  }
+  GzochidSchemeError;
 
 SCM gzochid_scheme_glist_to_list (GList *, SCM (*) (gpointer));
 GList *gzochid_scheme_list_to_glist (SCM, gpointer (*) (SCM));
@@ -65,6 +51,10 @@ SCM gzochid_scheme_create_callback (gzochid_application_callback *, ...);
 char *gzochid_scheme_callback_procedure (SCM);
 GList *gzochid_scheme_callback_module (SCM);
 SCM gzochid_scheme_callback_data (SCM);
+
+gboolean gzochid_scheme_is_transaction_retry (SCM);
+gboolean gzochid_scheme_is_transaction_aborted (SCM);
+gboolean gzochid_scheme_triggered_by_rollback (SCM);
 
 SCM gzochid_scheme_make_name_exists_condition (char *);
 SCM gzochid_scheme_make_name_not_bound_condition (char *);
@@ -84,6 +74,14 @@ void gzochid_scheme_managed_reference_oid (SCM, mpz_t);
 void gzochid_scheme_client_session_oid (SCM, mpz_t);
 void gzochid_scheme_channel_oid (SCM, mpz_t);
 void gzochid_scheme_task_handle_oid (SCM, mpz_t);
+
+SCM gzochid_scheme_invoke 
+(gzochid_application_context *, gzochid_auth_identity *, SCM, SCM, SCM);
+SCM gzochid_scheme_invoke_callback
+(gzochid_application_context *, gzochid_auth_identity *, char *, GList *, SCM,
+ SCM);
+
+extern gzochid_io_serialization gzochid_scheme_data_serialization;
 
 void gzochid_scheme_initialize_bindings (void);
 

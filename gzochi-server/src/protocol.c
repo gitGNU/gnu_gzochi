@@ -17,15 +17,17 @@
 
 #include <assert.h>
 #include <glib.h>
+#include <gmp.h>
 #include <gzochi-common.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <syslog.h>
 
 #include "app.h"
 #include "context.h"
 #include "game.h"
 #include "gzochid-auth.h"
+#include "lifecycle.h"
 #include "log.h"
 #include "protocol.h"
 

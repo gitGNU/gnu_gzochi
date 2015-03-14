@@ -19,13 +19,11 @@
 #define GZOCHID_APP_H
 
 #include <glib.h>
-#include <gmp.h>
-#include <sys/time.h>
 
+#include "callback.h"
 #include "context.h"
 #include "event.h"
 #include "gzochid-auth.h"
-#include "io.h"
 #include "stats.h"
 #include "storage.h"
 #include "tx.h"
@@ -38,14 +36,7 @@ enum gzochid_application_state
     GZOCHID_APPLICATION_STATE_STOPPED
   };
 
-typedef struct _gzochid_application_callback
-{
-  GList *module;
-  char *procedure;
-  mpz_t scm_oid;
-} gzochid_application_callback;
-
-typedef struct _gzochid_application_descriptor
+struct _gzochid_application_descriptor
 {
   char *name;
   char *description;
@@ -60,9 +51,11 @@ typedef struct _gzochid_application_descriptor
   GHashTable *auth_properties;
 
   GHashTable *properties;
-} gzochid_application_descriptor;
+};
 
-typedef struct _gzochid_application_context
+typedef struct _gzochid_application_descriptor gzochid_application_descriptor;
+
+struct _gzochid_application_context
 {
   gzochid_context base;
 
@@ -86,113 +79,22 @@ typedef struct _gzochid_application_context
   
   gzochid_application_event_source *event_source;
   gzochid_application_stats *stats;
-} gzochid_application_context;
+};
 
-typedef void (*gzochid_application_worker) 
-(gzochid_application_context *, gzochid_auth_identity *, gpointer);
-
-typedef struct _gzochid_application_task
-{
-  gzochid_application_worker worker;
-  gzochid_application_context *context;
-  gzochid_auth_identity *identity;
-  gpointer data;
-
-} gzochid_application_task;
-
-typedef struct _gzochid_application_worker_serialization
-{
-  void (*serializer) 
-  (gzochid_application_context *, gzochid_application_worker, GString *);
-  gzochid_application_worker (*deserializer) 
-  (gzochid_application_context *, GString *);
-} gzochid_application_worker_serialization;
-
-typedef struct _gzochid_application_task_serialization
-{
-  char *name;
-  gzochid_application_worker_serialization *worker_serialization;
-  gzochid_io_serialization *data_serialization;
-} gzochid_application_task_serialization;
-
-typedef struct _gzochid_transactional_application_task_execution
-{
-  gzochid_application_task *task;
-  gzochid_application_task *cleanup_task;
-
-  struct timeval *timeout;
-  unsigned int attempts;
-  gzochid_transaction_result result;
-} gzochid_transactional_application_task_execution;
-
-gzochid_application_task *gzochid_deserialize_application_task 
-(gzochid_application_context *, gzochid_application_task_serialization *, 
- GString *);
-
-void gzochid_serialize_application_task 
-(gzochid_application_context *, gzochid_application_task_serialization *, 
- gzochid_application_task *, GString *);
-
-gzochid_transaction_result gzochid_application_transaction_execute 
-(gzochid_application_context *, void (*) (gpointer), gpointer);
-
-gzochid_transaction_result gzochid_application_transaction_execute_timed 
-(gzochid_application_context *, void (*) (gpointer), gpointer, struct timeval);
-
-gzochid_transactional_application_task_execution *
-gzochid_transactional_application_task_execution_new 
-(gzochid_application_task *, gzochid_application_task *);
-
-gzochid_transactional_application_task_execution *
-gzochid_transactional_application_task_timed_execution_new 
-(gzochid_application_task *, gzochid_application_task *, struct timeval);
-
-void gzochid_transactional_application_task_execution_free
-(gzochid_transactional_application_task_execution *);
-
-void gzochid_application_transactional_task_worker 
-(gzochid_application_context *, gzochid_auth_identity *, gpointer);
-void gzochid_application_resubmitting_transactional_task_worker 
-(gzochid_application_context *, gzochid_auth_identity *, gpointer);
-
-void gzochid_application_task_worker (gpointer);
-void gzochid_application_task_thread_worker (gpointer, gpointer);
-
-gboolean gzochid_application_should_retry 
-(gzochid_transactional_application_task_execution *);
-
-extern gzochid_io_serialization gzochid_application_callback_serialization;
-
-gzochid_application_callback *gzochid_application_callback_new 
-(char *, GList *, mpz_t);
-void gzochid_application_callback_free (gzochid_application_callback *);
-
-gzochid_application_descriptor *gzochid_application_parse_descriptor (char *);
+typedef struct _gzochid_application_context gzochid_application_context;
 
 gzochid_application_context *gzochid_application_context_new (void);
+
 void gzochid_application_context_free (gzochid_application_context *);
-void gzochid_application_context_init 
-(gzochid_application_context *, gzochid_context *, 
- gzochid_application_descriptor *);
+void gzochid_application_context_init (gzochid_application_context *, 
+				       gzochid_context *, 
+				       gzochid_application_descriptor *);
 
-void gzochid_register_client_received_message_task_serialization (void);
+void *gzochid_with_application_context (gzochid_application_context *, 
+					gzochid_auth_identity *,
+					void *(*) (gpointer), 
+					gpointer);
 
-struct _gzochid_protocol_client;
-
-void gzochid_application_client_logged_in
-(gzochid_application_context *, struct _gzochid_protocol_client *);
-void gzochid_application_client_disconnected
-(gzochid_application_context *, struct _gzochid_protocol_client *);
-void gzochid_application_session_received_message 
-(gzochid_application_context *, struct _gzochid_protocol_client *, 
- unsigned char *, short);
-void gzochid_application_channel_message_received
-(gzochid_application_context *, struct _gzochid_protocol_client *, 
- char *, unsigned char *, short);
-
-void *gzochid_with_application_context 
-(gzochid_application_context *, gzochid_auth_identity *, void *(*) (gpointer), 
- gpointer);
 gzochid_application_context *gzochid_get_current_application_context (void);
 gzochid_auth_identity *gzochid_get_current_identity (void);
 

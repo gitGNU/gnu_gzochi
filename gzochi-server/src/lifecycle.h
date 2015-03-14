@@ -1,5 +1,5 @@
-/* mock-schedule.c: Test-time replacements for schedule.c routines.
- * Copyright (C) 2014 Julian Graham
+/* lifecycle.h: Prototypes and declarations for lifecycle.c
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,24 +15,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stddef.h>
+#ifndef GZOCHID_LIFECYCLE_H
+#define GZOCHID_LIFECYCLE_H
 
-#include "schedule.h"
-#include "task.h"
+#include "app.h"
+#include "protocol.h"
 
-gzochid_pending_task *gzochid_schedule_submit_task
-(gzochid_task_queue *task_queue, gzochid_task *task)
-{
-  gzochid_schedule_execute_task (task);
-}
+void gzochid_application_client_logged_in (gzochid_application_context *, 
+					   gzochid_protocol_client *);
 
-void gzochid_schedule_run_task 
-(gzochid_task_queue *task_queue, gzochid_task *task)
-{
-  gzochid_schedule_execute_task (task);
-}
+void gzochid_application_client_disconnected (gzochid_application_context *, 
+					      gzochid_protocol_client *);
 
-void gzochid_schedule_execute_task (gzochid_task *task)
-{
-  task->worker (task->data, NULL);
-}
+void gzochid_application_session_received_message 
+(gzochid_application_context *, gzochid_protocol_client *, unsigned char *, 
+ short);
+
+#endif /* GZOCHID_LIFECYCLE_H */

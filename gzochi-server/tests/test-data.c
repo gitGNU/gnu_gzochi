@@ -63,17 +63,19 @@ gzochid_io_serialization test_serialization =
 gzochid_io_serialization test_serialization_failure_serializer = 
   { test_failure_serializer, test_deserializer, test_finalizer };
 
-static void reset_serialization_state ()
+static void 
+reset_serialization_state ()
 {
   serialized = FALSE;
   deserialized = FALSE;
   finalized = FALSE;
 }
 
-static void fetch_reference (gpointer data)
+static void 
+fetch_reference (gpointer data)
 {
   mpz_t z;
-  gzochid_application_context *context = (gzochid_application_context *) data;
+  gzochid_application_context *context = data;
   gzochid_data_managed_reference *ref = NULL;
 
   mpz_init (z);
@@ -84,12 +86,25 @@ static void fetch_reference (gpointer data)
   mpz_clear (z);
 }
 
+static void 
+application_context_init (gzochid_application_context *context)
+{
+  context->storage_context = gzochid_storage_initialize ("/dev/null");
+  context->meta = gzochid_storage_open
+    (context->storage_context, "/dev/null", 0);
+  context->oids = gzochid_storage_open 
+    (context->storage_context, "/dev/null", 0);
+  context->names = gzochid_storage_open 
+    (context->storage_context, "/dev/null", 0);
+}
+
 static void test_data_reference_finalize ()
 {
   mpz_t z;
   char *key = NULL;
   gzochid_application_context *context = gzochid_application_context_new ();
 
+  application_context_init (context);
   reset_serialization_state ();
 
   mpz_init (z);
@@ -112,7 +127,7 @@ static void
 flush_reference_failure (gpointer data)
 {
   GString *str = g_string_new ("test-string");
-  gzochid_application_context *context = (gzochid_application_context *) data;
+  gzochid_application_context *context = data;
 
   gzochid_data_create_reference
     (context, &test_serialization_failure_serializer, str);
@@ -124,6 +139,7 @@ test_data_transaction_prepare_flush_reference_failure ()
   gzochid_application_context *context = gzochid_application_context_new ();
   gzochid_transaction_result result;
 
+  application_context_init (context);
   reset_serialization_state ();
   result = gzochid_transaction_execute (flush_reference_failure, context);
 
@@ -134,25 +150,29 @@ test_data_transaction_prepare_flush_reference_failure ()
   g_assert (finalized);  
 }
 
-static void binding_exists_timed_out (gpointer data)
+static void 
+binding_exists_timed_out (gpointer data)
 {
   GError *error = NULL;
-  gzochid_application_context *context = (gzochid_application_context *) data;
+  gzochid_application_context *context = data;
   gboolean exists = gzochid_data_binding_exists (context, "test", &error);
 
   g_assert (! exists);
   g_assert_error (error, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION);
 }
 
-static void test_data_transaction_timeout ()
+static 
+void test_data_transaction_timeout ()
 {
   struct timeval tm = { 0, 0 };
   gzochid_application_context *context = gzochid_application_context_new ();
 
+  application_context_init (context);
   gzochid_transaction_execute_timed (binding_exists_timed_out, context, tm);
 }
 
-int main (int argc, char *argv[])
+int 
+main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 

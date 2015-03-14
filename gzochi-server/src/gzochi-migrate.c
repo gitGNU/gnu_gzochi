@@ -1,5 +1,5 @@
 /* gzochid-migrate.c: Utility for migrating game data schema
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@
 #include "guile.h"
 #include "reloc.h"
 #include "scheme.h"
+#include "scheme-task.h"
 #include "storage.h"
 #include "toollib.h"
 #include "tx.h"
@@ -109,9 +110,8 @@ struct migration_descriptor
  */
 
 static const gchar *
-attribute_value 
-(const gchar **attribute_names, const gchar **attribute_values,
- const gchar *attribute_name)
+attribute_value (const gchar **attribute_names, const gchar **attribute_values,
+		 const gchar *attribute_name)
 {
   int i = 0;
   while (attribute_names[i] != NULL)
@@ -125,15 +125,14 @@ attribute_value
 }
 
 static void
-start_element 
-(GMarkupParseContext *context, const gchar *element_name,
- const gchar **attribute_names, const gchar **attribute_values,
- gpointer user_data, GError **error)
+start_element (GMarkupParseContext *context, const gchar *element_name,
+	       const gchar **attribute_names, const gchar **attribute_values,
+	       gpointer user_data, GError **error)
 {
-  struct migration_descriptor *md = (struct migration_descriptor *) user_data;
+  struct migration_descriptor *md = user_data;
   const GSList *stack = g_markup_parse_context_get_element_stack (context);
   char *parent = stack == NULL || stack->next == NULL 
-    ? NULL : (char *) stack->next->data;
+    ? NULL : stack->next->data;
 
   if (strcmp (element_name, "migration") == 0)
     {
@@ -250,13 +249,12 @@ start_element
 }
 
 static void
-text 
-(GMarkupParseContext *context, const gchar *text, gsize text_len,
- gpointer user_data, GError **error)
+text (GMarkupParseContext *context, const gchar *text, gsize text_len,
+      gpointer user_data, GError **error)
 {
-  struct migration_descriptor *md = (struct migration_descriptor *) user_data;
+  struct migration_descriptor *md = user_data;
   const GSList *stack = g_markup_parse_context_get_element_stack (context);
-  char *parent = stack == NULL ? NULL : (char *) stack->data;
+  char *parent = stack == NULL ? NULL : stack->data;
  
   gchar *text_clone = g_strdup (text);
   text_clone = g_strstrip (text_clone);
@@ -275,8 +273,7 @@ text
 }
 
 static void
-error
-(GMarkupParseContext *context, GError *err, gpointer user_data)
+error (GMarkupParseContext *context, GError *err, gpointer user_data)
 {
   g_critical ("Failed to parse migration descriptor: %s", err->message);
   exit (EXIT_FAILURE);
@@ -308,7 +305,7 @@ static SCM
 enqueue_oids (SCM migration_ptr, SCM oids)
 {
   mpz_t oid;
-  struct migration *m = (struct migration *) scm_to_pointer (migration_ptr);
+  struct migration *m = scm_to_pointer (migration_ptr);
 
   mpz_init (oid);
 
@@ -404,15 +401,15 @@ append_load_paths (GList *load_paths)
   GList *load_path_ptr = load_paths;
   while (load_path_ptr != NULL)
     {
-      gzochid_guile_add_to_load_path ((char *) load_path_ptr->data);
+      gzochid_guile_add_to_load_path (load_path_ptr->data);
       load_path_ptr = load_path_ptr->next;
     }
 }
 
 static struct migration *
-create_migration 
-(gzochid_application_context *context, struct migration_descriptor *md, 
- gboolean dry_run, gboolean quiet)
+create_migration (gzochid_application_context *context, 
+		  struct migration_descriptor *md, gboolean dry_run, 
+		  gboolean quiet)
 { 
   struct migration *m = malloc (sizeof (struct migration));
   char *scratch_dir_template = strdup ("gzochid-migrate-XXXXXXX");
@@ -506,8 +503,7 @@ cleanup_migration (struct migration *m)
 }
 
 static gzochid_storage_store *
-open_store 
-(gzochid_storage_context *context, char *path, char *db)
+open_store (gzochid_storage_context *context, char *path, char *db)
 {
   gchar *filename = g_strconcat (path, "/", db, NULL);
   gzochid_storage_store *store = gzochid_tool_open_store (context, filename);
@@ -568,8 +564,7 @@ invoke_callback (struct migration *m, gzochid_data_managed_reference *obj_ref)
 {
   SCM migration_ptr = scm_from_pointer (m, NULL);
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  SCM obj = gzochid_scm_location_resolve 
-    (m->context, (gzochid_scm_location_info *) obj_ref->obj);
+  SCM obj = gzochid_scm_location_resolve (m->context, obj_ref->obj);
   SCM ret = SCM_BOOL_F;
 
   gpointer args[4];
@@ -609,9 +604,9 @@ migration_participant = { "migration", prepare, commit, rollback };
 static void
 migrate_object_tx (gpointer data)
 {
-  gpointer *args = (gpointer *) data;
-  struct migration *m = (struct migration *) args[0];
-  char *oid_str = (char *) args[1];
+  gpointer *args = data;
+  struct migration *m = args[0];
+  char *oid_str = args[1];
 
   mpz_t oid;
 

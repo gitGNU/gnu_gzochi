@@ -1,5 +1,5 @@
 /* test-task.c: Test routines for task.c in gzochid.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,12 +20,13 @@
 #include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 
 #include "app.h"
-#include "auth.h"
+#include "app-task.h"
 #include "game.h"
+#include "gzochid-auth.h"
+#include "io.h"
 #include "schedule.h"
 #include "task.h"
 #include "threads.h"
@@ -35,9 +36,9 @@ static GCond test_worker_cond;
 static GMutex test_worker_mutex;
 static int test_worker_counter;
 
-static void test_worker 
-(gzochid_application_context *context, gzochid_auth_identity *identity, 
- gpointer data)
+static void 
+test_worker (gzochid_application_context *context, 
+	     gzochid_auth_identity *identity, gpointer data)
 {
   g_mutex_lock (&test_worker_mutex);
 
@@ -47,14 +48,14 @@ static void test_worker
   g_mutex_unlock (&test_worker_mutex);
 }
 
-static void test_worker_serializer
-(gzochid_application_context *context, gzochid_application_worker worker, 
- GString *out)
+static void 
+test_worker_serializer (gzochid_application_context *context, 
+			gzochid_application_worker worker, GString *out)
 {
 }
 
-static gzochid_application_worker test_worker_deserializer
-(gzochid_application_context *context, GString *in)
+static gzochid_application_worker 
+test_worker_deserializer (gzochid_application_context *context, GString *in)
 {
   return test_worker;
 }
@@ -62,20 +63,22 @@ static gzochid_application_worker test_worker_deserializer
 static gzochid_application_worker_serialization worker_serialization = 
   { test_worker_serializer, test_worker_deserializer };
 
-static void serialize_test_worker_counter 
-(gzochid_application_context *context, gpointer data, GString *out, 
- GError **error)
+static void 
+serialize_test_worker_counter (gzochid_application_context *context,
+			       gpointer data, GString *out, GError **error)
 {
 }
 
-static gpointer deserialize_test_worker_counter 
-(gzochid_application_context *context, GString *in, GError **error)
+static gpointer 
+deserialize_test_worker_counter (gzochid_application_context *context,
+				 GString *in, GError **error)
 {
   return "";
 }
 
-static void finalize_test_worker_counter 
-(gzochid_application_context *context, gpointer data)
+static void 
+finalize_test_worker_counter (gzochid_application_context *context, 
+			      gpointer data)
 {
 }
 
@@ -96,7 +99,8 @@ typedef struct test_context
   mpz_t handle_oid;
 } test_context;
 
-static void test_periodic_cancel_inner0 (gpointer data)
+static void 
+test_periodic_cancel_inner0 (gpointer data)
 {
   test_context *context = (test_context *) data;
   struct timeval immediate = { 0, 0 };
@@ -113,7 +117,8 @@ static void test_periodic_cancel_inner0 (gpointer data)
   mpz_set (context->handle_oid, handle_ref->oid);
 }
 
-static void test_periodic_cancel_inner1 (gpointer data)
+static void 
+test_periodic_cancel_inner1 (gpointer data)
 {
   test_context *context = (test_context *) data;
   gzochid_data_managed_reference *handle_ref = 
@@ -129,7 +134,20 @@ static void test_periodic_cancel_inner1 (gpointer data)
      (gzochid_durable_application_task_handle *) handle_ref->obj);
 }
 
-static void test_periodic_cancel ()
+static void 
+application_context_init (gzochid_application_context *context)
+{
+  context->storage_context = gzochid_storage_initialize ("/dev/null");
+  context->meta = gzochid_storage_open
+    (context->storage_context, "/dev/null", 0);
+  context->oids = gzochid_storage_open 
+    (context->storage_context, "/dev/null", 0);
+  context->names = gzochid_storage_open 
+    (context->storage_context, "/dev/null", 0);
+}
+
+static void 
+test_periodic_cancel ()
 {
   test_context context;
   gboolean submitted = FALSE, done = FALSE;
@@ -141,7 +159,8 @@ static void test_periodic_cancel ()
     gzochid_application_context_new ();
   gzochid_auth_identity *identity = malloc (sizeof (gzochid_auth_identity));
 
-  identity->name = strdup ("test");
+  application_context_init (app_context);
+  identity->name = "test";
 
   ((gzochid_context *) app_context)->parent = (gzochid_context *) game_context;
   game_context->task_queue = gzochid_schedule_task_queue_new 
@@ -179,7 +198,8 @@ static void test_periodic_cancel ()
   mpz_clear (context.handle_oid);
 }
 
-int main (int argc, char *argv[])
+int
+main (int argc, char *argv[])
 {
   g_cond_init (&test_worker_cond);
   g_mutex_init (&test_worker_mutex);

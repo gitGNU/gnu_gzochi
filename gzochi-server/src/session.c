@@ -31,7 +31,7 @@
 #include "log.h"
 #include "protocol.h"
 #include "reloc.h"
-#include "scheme.h"
+#include "scheme-task.h"
 #include "session.h"
 #include "task.h"
 #include "tx.h"
@@ -158,8 +158,7 @@ session_prepare (gpointer data)
 static void 
 free_operation (gpointer data)
 {
-  gzochid_client_session_pending_operation *op = 
-    (gzochid_client_session_pending_operation *) data;
+  gzochid_client_session_pending_operation *op = data;
 
   mpz_clear (op->target_session);
   free (op);
@@ -185,8 +184,7 @@ session_commit_operation
   gzochid_protocol_client *client = NULL;
 
   g_mutex_lock (&context->client_mapping_lock);
-  client = (gzochid_protocol_client *) g_hash_table_lookup 
-    (context->oids_to_clients, oid_str);
+  client = g_hash_table_lookup (context->oids_to_clients, oid_str);
 
   if (client == NULL)
     {
@@ -229,10 +227,8 @@ session_commit_operation
 static void 
 session_commit_operation_visitor (gpointer data, gpointer user_data)
 {
-  gzochid_client_session_transaction_context *tx_context =
-    (gzochid_client_session_transaction_context *) user_data;
-  gzochid_client_session_pending_operation *op = 
-    (gzochid_client_session_pending_operation *) data;
+  gzochid_client_session_transaction_context *tx_context = user_data;
+  gzochid_client_session_pending_operation *op = data;
 
   session_commit_operation (tx_context, op);
 }
@@ -240,8 +236,7 @@ session_commit_operation_visitor (gpointer data, gpointer user_data)
 static void 
 session_commit (gpointer data)
 {
-  gzochid_client_session_transaction_context *tx_context = 
-    (gzochid_client_session_transaction_context *) data;
+  gzochid_client_session_transaction_context *tx_context = data;
 
   if (tx_context->login_operation != NULL)
     session_commit_operation (tx_context, tx_context->login_operation);
@@ -255,8 +250,7 @@ session_commit (gpointer data)
 static void 
 session_rollback (gpointer data)
 {
-  gzochid_client_session_transaction_context *tx_context = 
-    (gzochid_client_session_transaction_context *) data;
+  gzochid_client_session_transaction_context *tx_context = data;
 
   cleanup_transaction (tx_context);
 }
@@ -312,7 +306,7 @@ static void
 serialize_client_session (gzochid_application_context *context, gpointer obj, 
 			  GString *out, GError **err)
 {
-  gzochid_client_session *session = (gzochid_client_session *) obj;
+  gzochid_client_session *session = obj;
 
   gzochid_auth_identity_serializer (context, session->identity, out, NULL);
   gzochid_util_serialize_sequence 
@@ -341,7 +335,7 @@ finalize_handler (gzochid_application_context *context,
 static void 
 finalize_client_session (gzochid_application_context *context, gpointer obj)
 {
-  gzochid_client_session *session = (gzochid_client_session *) obj;
+  gzochid_client_session *session = obj;
 
   gzochid_auth_identity_finalizer (context, session->identity);
   g_sequence_free (session->channels);
@@ -386,8 +380,7 @@ remove_session (gzochid_application_context *context, const char *oid_str,
 
       if (local_err == NULL)
 	{
-	  gzochid_client_session *session = 
-	    (gzochid_client_session *) session_reference->obj;
+	  gzochid_client_session *session = session_reference->obj;
 	  gzochid_data_managed_reference *scm_session_reference =
 	    gzochid_data_create_reference_to_oid 
 	    (context, &gzochid_scm_location_aware_serialization, 
@@ -428,7 +421,7 @@ gzochid_client_session_disconnected_worker
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gpointer data)
 {
-  remove_session (context, (const char *) data, NULL);
+  remove_session (context, data, NULL);
 }
 
 gzochid_client_session *
@@ -596,9 +589,7 @@ static void
 persistence_task_worker (gzochid_application_context *context, 
 			 gzochid_auth_identity *identity, gpointer data)
 {
-  gzochid_persistence_task_data *persistence_task = 
-    (gzochid_persistence_task_data *) data;
-
+  gzochid_persistence_task_data *persistence_task = data;
   gzochid_data_managed_reference *reference = 
     gzochid_data_create_reference 
     (context, persistence_task->serialization, persistence_task->data);
@@ -612,8 +603,7 @@ prefix_binding_persistence_task_worker (gzochid_application_context *context,
 					gpointer data)
 {
   gzochid_prefix_binding_persistence_task_data *
-    prefix_binding_persistence_task = 
-    (gzochid_prefix_binding_persistence_task_data *) data;
+    prefix_binding_persistence_task = data;
   gzochid_persistence_task_data *persistence_task =
     (gzochid_persistence_task_data *) prefix_binding_persistence_task;
   GString *binding = g_string_new (prefix_binding_persistence_task->prefix);
@@ -657,14 +647,11 @@ gzochid_data_prefix_binding_persistence_task_new
 void 
 gzochid_data_prefix_binding_persistence_task_free (gzochid_task *task)
 {
-  gzochid_application_task *application_task = 
-    (gzochid_application_task *) task->data;
+  gzochid_application_task *application_task = task->data;
   gzochid_transactional_application_task_execution *execution = 
-    (gzochid_transactional_application_task_execution *) 
     application_task->data;
   gzochid_application_task *transactional_task = execution->task;
-  gzochid_persistence_task_data *data = 
-    (gzochid_persistence_task_data *) transactional_task->data;
+  gzochid_persistence_task_data *data = transactional_task->data;
   
   free (data);
   free (transactional_task);

@@ -17,16 +17,16 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <libguile.h>
+#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "app.h"
+#include "app-task.h"
 #include "auth_int.h"
 #include "data.h"
 #include "game.h"
-#include "guile.h"
 #include "gzochid-auth.h"
 #include "io.h"
 #include "schedule.h"

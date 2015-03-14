@@ -19,10 +19,10 @@
 #define GZOCHID_TASK_H
 
 #include <glib.h>
-#include <gmp.h>
 #include <sys/time.h>
 
 #include "app.h"
+#include "app-task.h"
 #include "data.h"
 #include "gzochid-auth.h"
 #include "io.h"
@@ -62,9 +62,7 @@ typedef struct _gzochid_task gzochid_task;
 struct _gzochid_task_transaction_context
 {
   gzochid_application_context *context;
-  
   gzochid_auth_identity *identity;
-
   GList *scheduled_tasks;
 };
 

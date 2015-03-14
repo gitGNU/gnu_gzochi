@@ -23,6 +23,7 @@
 #include "../auth_int.h"
 #include "../gzochid-auth.h"
 #include "../scheme.h"
+#include "../scheme-task.h"
 #include "../task.h"
 
 #include "task.h"
@@ -130,7 +131,8 @@ SCM_DEFINE (primitive_cancel_task, "primitive-cancel-task", 1, 0, 0,
   return SCM_UNSPECIFIED;
 }
 
-void gzochid_api_task_init (void)
+void 
+gzochid_api_task_init (void)
 {
   SCM current_module = scm_current_module ();
   SCM gzochi_private_task = scm_c_resolve_module ("gzochi private task");
