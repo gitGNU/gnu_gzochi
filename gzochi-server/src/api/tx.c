@@ -15,7 +15,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SCM_MAGIC_SNARFER
 #include <assert.h>
 #include <glib.h>
 #include <libguile.h>
@@ -29,10 +28,6 @@
 
 #include "tx.h"
 #include "util.h"
-
-#else
-#include <libguile/snarf.h>
-#endif /* SCM_MAGIC_SNARFER */
 
 /* This file contains an implementation of a transaction participant that acts
    as a bridge between the gzochid transaction subsystem and transaction
@@ -289,10 +284,8 @@ gzochid_api_tx_init (void)
 
   SCM current_module = scm_current_module ();
 
-#ifndef SCM_MAGIC_SNARFER
-#include "tx.x"
-#endif /* SCM_MAGIC_SNARFER */
-
+  #include "tx.x"
+  
   /* ...and restore it post-snarf. */
   
   scm_set_current_module (current_module);
