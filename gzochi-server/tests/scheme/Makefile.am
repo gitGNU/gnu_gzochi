@@ -19,6 +19,7 @@
 #
 
 test_programs = gzochi/test-data.scm \
+	gzochi/test-tx.scm \
 	gzochi/private/test-app.scm \
 	gzochi/private/test-data.scm
 

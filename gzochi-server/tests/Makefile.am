@@ -18,7 +18,7 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = auth scheme
+SUBDIRS = api auth scheme
 
 test_programs = \
 	test-data \

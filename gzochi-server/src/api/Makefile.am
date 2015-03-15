@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2014 Julian Graham
+# Copyright (C) 2015 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,14 +21,14 @@
 AM_CFLAGS = @CFLAGS@ @GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ -Wall -Werror
 
 noinst_LTLIBRARIES = libgzochid-api.la
-noinst_HEADERS = admin.h channel.h data.h log.h session.h task.h util.h
+noinst_HEADERS = admin.h channel.h data.h log.h session.h task.h tx.h util.h
 
 libgzochid_api_la_SOURCES = admin.c channel.c data.c log.c session.c \
-	task.c util.c
+	task.c tx.c util.c
 
 SUFFIXES = .x
 .c.x:
 	guile-snarf -o $@ $< @DEFS@ @CFLAGS@ @GLIB_CFLAGS@ @GUILE_CFLAGS@
 
-BUILT_SOURCES = admin.x channel.x data.x log.x session.x task.x
+BUILT_SOURCES = admin.x channel.x data.x log.x session.x task.x tx.x
 CLEANFILES = $(BUILT_SOURCES)
