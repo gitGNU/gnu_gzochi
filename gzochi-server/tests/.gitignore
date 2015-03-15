@@ -4,6 +4,7 @@ test-data
 test-event
 test-reloc
 test-scheme
+test-scheme-task
 test-storage-bdb
 test-storage-hdb
 test-storage-lmdb
