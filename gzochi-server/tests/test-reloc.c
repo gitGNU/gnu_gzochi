@@ -1,5 +1,5 @@
 /* test-reloc.c: Test routines for reloc.c in gzochid.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 #include "app.h"
 #include "io.h"
 #include "reloc.h"
+#include "scheme.h"
 #include "tx.h"
 
 static int prepare (gpointer data) { return TRUE; }
@@ -42,7 +43,7 @@ deserializer (gzochid_application_context *context, GString *str, GError **err)
 {
   gzochid_transaction_join (&test_participant, NULL);
   gzochid_transaction_mark_for_rollback (&test_participant, TRUE);
-  g_set_error (err, GZOCHID_IO_ERROR, GZOCHID_IO_ERROR_SERIALIZATION,
+  g_set_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_RETRY,
 	       "Failed to deserialize managed record.");
   return SCM_BOOL_F;
 }
@@ -52,13 +53,6 @@ finalizer (gzochid_application_context *context, void *obj)
 {
 }
 
-gzochid_io_serialization gzochid_scheme_data_serialization = 
-  {
-    serializer,
-    deserializer,
-    finalizer
-  };
-
 static void
 test_deserializer_error_inner (gpointer data)
 {
@@ -66,11 +60,16 @@ test_deserializer_error_inner (gpointer data)
   GString *str = g_string_new ("");
 
   gzochid_scm_location_aware_serialization.deserializer (context, str, NULL);
+  g_assert (gzochid_transaction_rollback_only ());
 }
 
 static void
 test_deserializer_error ()
 {
+  gzochid_scheme_data_serialization.serializer = serializer;
+  gzochid_scheme_data_serialization.deserializer = deserializer;
+  gzochid_scheme_data_serialization.finalizer = finalizer;
+  
   gzochid_transaction_execute (test_deserializer_error_inner, NULL);
 }
 

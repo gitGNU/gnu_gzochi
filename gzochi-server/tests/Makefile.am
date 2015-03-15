@@ -76,9 +76,11 @@ test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-fsm.o \
+	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
 	$(top_builddir)/src/libgzochid_la-reloc.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-scheme.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GUILE_LIBS@
