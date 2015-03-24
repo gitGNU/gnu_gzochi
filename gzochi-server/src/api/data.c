@@ -1,5 +1,5 @@
 /* data.c: Primitive functions for user-facing gzochi data management API
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 
 #include "../app.h"
 #include "../data.h"
+#include "../guile.h"
 #include "../reloc.h"
 #include "../scheme.h"
 
