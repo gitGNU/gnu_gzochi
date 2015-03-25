@@ -155,8 +155,25 @@ static void probe_auth_plugins
       GSequence *plugin_queue = g_sequence_new (free);
       while ((file = g_dir_read_name (plugin_dir)) != NULL)
 	{
-	  gchar *stripped_file = remove_extension (file);
-	  gchar *path = g_build_filename (search_path, stripped_file, NULL);
+	  char *stripped_file = NULL;
+	  gchar *path = g_build_filename (search_path, file, NULL);
+
+	  /* Make a reasonable attempt to ignore non-regular files, like
+	     directories. This test is obviously not synchronous, which means
+	     that it could be "fooled" by a file that is removed or replaced
+	     with some other entity; the consequence is warning downstream. */
+
+	  if (!g_file_test (path, G_FILE_TEST_IS_REGULAR))
+	    {
+	      g_free (path);
+	      continue;
+	    }
+
+	  g_free (path);
+	  stripped_file = remove_extension (file);
+	  path = g_build_filename (search_path, stripped_file, NULL);
+
+	  free (stripped_file);
 
 	  if (g_sequence_lookup 
 	      (plugin_queue, path, gzochid_util_string_data_compare, NULL) 
