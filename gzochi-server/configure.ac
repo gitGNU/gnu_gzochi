@@ -102,30 +102,6 @@ AS_IF([test "x$with_mdb" != xno],
   []) 
 
 AM_CONDITIONAL([HAVE_LMDB], [test x$have_lmdb = xtrue])
-AC_ARG_WITH([storage-engine],
-  [AS_HELP_STRING([--with-storage-engine=ENGINE],
-    [storage engine ENGINE [bdb]])],
-  [GZOCHI_STORAGE_ENGINE="$withval"],
-  [GZOCHI_STORAGE_ENGINE="bdb"])
-
-AS_CASE([$GZOCHI_STORAGE_ENGINE],
-  [bdb], [AC_SEARCH_LIBS([db_create], [db], [], 
-                         [AC_MSG_ERROR([libdb is required.])]) 
-          AC_CHECK_HEADER([db.h], [], [AC_MSG_ERROR([db.h is required.])])],
-  [hdb], [AC_SEARCH_LIBS([ham_env_create], [hamsterdb], [],
-                         [AC_MSG_ERROR([libhamsterdb is required.])])
-          AC_CHECK_HEADER([ham/hamsterdb.h], [], 
-                          [AC_MSG_ERROR([ham/hamsterdb.h is required.])])],
-  [lmdb], [AC_SEARCH_LIBS([mdb_env_create], [lmdb], [],
-                          [AC_MSG_ERROR([liblmdb is required.])])
-           AC_CHECK_HEADER([lmdb.h], [], 
-                           [AC_MSG_ERROR([lmdb.h is required.])])],
-  [AC_MSG_ERROR([Invalid storage engine $STORAGE_ENGINE.])])
-
-AC_SUBST(GZOCHI_STORAGE_ENGINE)
-AM_CONDITIONAL([STORAGE_ENGINE_BDB], [test x$GZOCHI_STORAGE_ENGINE = xbdb])
-AM_CONDITIONAL([STORAGE_ENGINE_HDB], [test x$GZOCHI_STORAGE_ENGINE = xhdb])
-AM_CONDITIONAL([STORAGE_ENGINE_LMDB], [test x$GZOCHI_STORAGE_ENGINE = xlmdb])
 
 AC_SEARCH_LIBS([__gmpz_init], [gmp], [], [AC_MSG_ERROR([libgmp is required.])])
 AC_CHECK_HEADER([gmp.h], [], [AC_MSG_ERROR([gmp.h is required.])])

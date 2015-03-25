@@ -25,16 +25,6 @@ SUBDIRS = api auth scheme storage
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
-if STORAGE_ENGINE_BDB
-GZOCHID_STORAGE_SOURCES = storage-bdb.c
-endif
-if STORAGE_ENGINE_HDB
-GZOCHID_STORAGE_SOURCES = storage-hdb.c
-endif
-if STORAGE_ENGINE_LMDB
-GZOCHID_STORAGE_CFLAGS = -lpthread
-GZOCHID_STORAGE_SOURCES = storage-lmdb.c
-endif
 bin_PROGRAMS = gzochid gzochi-dump gzochi-load gzochi-migrate
 dist_noinst_DATA = dtd/game.dtd dtd/migration.dtd
 dist_sysconf_DATA = conf/gzochid.conf
@@ -52,15 +42,14 @@ noinst_LTLIBRARIES = libgzochid.la
 libgzochid_la_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_AUTH_PLUGIN_LOCATION=\"$(plugindir)\" @GUILE_CFLAGS@ \
 	@GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ @MICROHTTPD_CFLAGS@ \
-	@ZLIB_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) $(GZOCHID_STORAGE_CFLAGS) \
+	@ZLIB_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
 	-Wall -Werror
 
 libgzochid_la_SOURCES = admin.c app.c app-task.c auth.c callback.c channel.c \
 	config.c context.c data.c debug.c descriptor.c event.c fsm.c game.c \
 	guile.c httpd.c io.c lifecycle.c log.c protocol.c reloc.c schedule.c \
 	scheme.c scheme-task.c session.c socket.c stats.c storage.c \
-	storage-mem.c task.c threads.c tx.c txlog.c util.c \
-	$(GZOCHID_STORAGE_SOURCES)
+	storage-mem.c task.c threads.c tx.c txlog.c util.c
 
 libgzochid_la_LIBADD = api/libgzochid-api.la $(GZOCHI_COMMON_LIBS) \
 	@GUILE_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ \
@@ -69,14 +58,13 @@ libgzochid_la_LIBADD = api/libgzochid-api.la $(GZOCHI_COMMON_LIBS) \
 gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 	@GUILE_CFLAGS@ @GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ \
 	@MICROHTTPD_CFLAGS@ @ZLIB_CFLAGS@ \
-	$(GZOCHI_COMMON_CFLAGS) $(GZOCHID_STORAGE_CFLAGS) \
+	$(GZOCHI_COMMON_CFLAGS) \
 	-Wall -Werror
 
 gzochid_SOURCES = gzochid.c
 gzochid_LDADD = libgzochid.la
 
 gzochi_dump_CFLAGS = @CFLAGS@ \
-	$(GZOCHID_STORAGE_CFLAGS) \
 	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 	@GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 	-Wall -Werror
@@ -84,7 +72,6 @@ gzochi_dump_SOURCES = gzochi-dump.c toollib.c
 gzochi_dump_LDADD = libgzochid.la @GLIB_LIBS@ @GMODULE_LIBS@
 
 gzochi_load_CFLAGS = @CFLAGS@ \
-	$(GZOCHID_STORAGE_CFLAGS) \
 	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 	@GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 	-Wall -Werror
@@ -94,7 +81,6 @@ gzochi_load_LDADD = libgzochid.la @GLIB_LIBS@ @GMODULE_LIBS@
 gzochi_migrate_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
 	@GLIB_CFLAGS@ @GMODULE_CFLAGS@ @GUILE_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
-	$(GZOCHID_STORAGE_CFLAGS) \
 	-Wall -Werror
 gzochi_migrate_SOURCES = gzochi-migrate.c toollib.c
 gzochi_migrate_LDADD = libgzochid.la @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@

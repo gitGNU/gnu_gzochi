@@ -30,15 +30,6 @@ test_programs = \
 	test-task \
 	test-util
 
-if STORAGE_ENGINE_BDB
-test_programs += test-storage-bdb
-endif
-if STORAGE_ENGINE_HDB
-test_programs += test-storage-hdb
-endif
-if STORAGE_ENGINE_LMDB
-test_programs += test-storage-lmdb
-endif
 noinst_HEADERS = mock-data.h
 
 check_PROGRAMS = $(test_programs)
@@ -47,19 +38,19 @@ TESTS = $(test_programs)
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
 test_data_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
-test_data_SOURCES = mock-storage.c test-data.c
+test_data_SOURCES = test-data.c
 test_data_LDADD = $(top_builddir)/src/libgzochid.la \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_event_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
-test_event_SOURCES = mock-storage.c test-event.c
+test_event_SOURCES = test-event.c
 test_event_LDADD = $(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
 
 test_reloc_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
-test_reloc_SOURCES = test-reloc.c mock-storage.c
+test_reloc_SOURCES = test-reloc.c
 test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
@@ -94,31 +85,13 @@ test_scheme_task_SOURCES = test-scheme-task.c
 test_scheme_task_LDADD = $(top_builddir)/src/libgzochid.la \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
-test_storage_bdb_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
-test_storage_bdb_SOURCES = test-storage-bdb.c
-test_storage_bdb_LDADD =  $(top_builddir)/src/libgzochid_la-log.o \
-	$(top_builddir)/src/libgzochid_la-storage-bdb.o \
-	@GLIB_LIBS@
-
-test_storage_hdb_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
-test_storage_hdb_SOURCES = test-storage-hdb.c
-test_storage_hdb_LDADD =  $(top_builddir)/src/libgzochid_la-log.o \
-	$(top_builddir)/src/libgzochid_la-storage-hdb.o \
-	@GLIB_LIBS@
-
-test_storage_lmdb_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ -pthread
-test_storage_lmdb_SOURCES = test-storage-lmdb.c
-test_storage_lmdb_LDADD =  $(top_builddir)/src/libgzochid_la-log.o \
-	$(top_builddir)/src/libgzochid_la-storage-lmdb.o \
-	@GLIB_LIBS@
-
 test_storage_mem_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
 test_storage_mem_SOURCES = test-storage-mem.c
 test_storage_mem_LDADD = $(top_builddir)/src/libgzochid_la-storage-mem.o \
 	@GLIB_LIBS@
 
 test_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
-test_task_SOURCES = test-task.c mock-storage.c 
+test_task_SOURCES = test-task.c 
 test_task_LDADD = $(top_builddir)/src/libgzochid.la \
 	$(GZOCHI_COMMON_LIBS) @GMODULE_LIBS@ @GLIB_LIBS@ @GUILE_LIBS@
 

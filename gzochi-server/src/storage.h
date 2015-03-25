@@ -55,66 +55,12 @@ struct _gzochid_storage_transaction
 };
 
 typedef struct _gzochid_storage_transaction gzochid_storage_transaction;
-gzochid_storage_context *gzochid_storage_initialize (char *);
 
-/**
-   Close the specified storage context.
- */
-void 
-gzochid_storage_context_close (gzochid_storage_context *);
 
-/**
-   Destroy the storage context rooted at the specified path by removing all
-   associated files, including the path itself.
- */
-void 
-gzochid_storage_context_destroy (char *);
 
-gzochid_storage_store *gzochid_storage_open 
-(gzochid_storage_context *, char *, unsigned int);
-void gzochid_storage_close (gzochid_storage_store *);
 
-/**
-   Destroy the store rooted at the specified storage context and path by 
-   removing all associated files.
- */
-void 
-gzochid_storage_destroy (gzochid_storage_context *, char *);
 
-void gzochid_storage_lock (gzochid_storage_store *);
-void gzochid_storage_unlock (gzochid_storage_store *);
 
-char *gzochid_storage_get (gzochid_storage_store *, char *, size_t, size_t *);
-void gzochid_storage_put 
-(gzochid_storage_store *, char *, size_t, char *, size_t);
-int gzochid_storage_delete (gzochid_storage_store *, char *, size_t);
-char *gzochid_storage_first_key (gzochid_storage_store *, size_t *);
-char *gzochid_storage_next_key 
-(gzochid_storage_store *, char *, size_t, size_t *);
-
-gzochid_storage_transaction *gzochid_storage_transaction_begin
-(gzochid_storage_context *);
-gzochid_storage_transaction *gzochid_storage_transaction_begin_timed
-(gzochid_storage_context *, struct timeval);
-void gzochid_storage_transaction_commit (gzochid_storage_transaction *);
-void gzochid_storage_transaction_rollback (gzochid_storage_transaction *);
-void gzochid_storage_transaction_prepare (gzochid_storage_transaction *);
-char *gzochid_storage_transaction_get 
-(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t, 
- size_t *);
-char *gzochid_storage_transaction_get_for_update 
-(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t, 
- size_t *);
-void gzochid_storage_transaction_put 
-(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t, 
- char *, size_t);
-int gzochid_storage_transaction_delete 
-(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t);
-char *gzochid_storage_transaction_first_key 
-(gzochid_storage_transaction *, gzochid_storage_store *, size_t *);
-char *gzochid_storage_transaction_next_key 
-(gzochid_storage_transaction *, gzochid_storage_store *, char *, size_t, 
- size_t *);
 
 /* The interface provided by storage engine modules. */
 
