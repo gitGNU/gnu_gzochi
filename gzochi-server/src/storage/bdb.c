@@ -136,8 +136,7 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
   filename = strncat (filename, ".db", 3);
   
   assert (db_create (&db, db_env, 0) == 0);
-  db_flags = DB_MULTIVERSION
-    | DB_THREAD;
+  db_flags = DB_THREAD;
 
   if (flags & GZOCHID_STORAGE_CREATE)
     db_flags |= DB_CREATE;
