@@ -1530,6 +1530,9 @@ merge_borrow (btree_node *prev, btree_node *node, btree_node *next,
   btree_node *first_next_child = NULL;
   btree_node *last_prev_child = NULL;
 
+  gboolean borrowed_prev = FALSE;
+  gboolean borrowed_next = FALSE;
+
   first_child = tx_first_child (node, btx, &err);
   if (err == NULL)
     last_child = tx_last_child (node, btx, &err);
@@ -1546,6 +1549,17 @@ merge_borrow (btree_node *prev, btree_node *node, btree_node *next,
 
   /* Borrow children from the previous sibling. */
 
+  /* First, link the last child of the previous sibling to the first_child of
+     the borrowing node. */
+
+  if (spare_prev > 0)
+    {
+      if (!tx_set_next_sibling (last_prev_child, btx, first_child)
+	  || !tx_set_prev_sibling (first_child, btx, last_prev_child))
+	return FALSE;
+      else borrowed_prev = TRUE;
+    }
+    
   while (spare_prev > 0 && num_children < node->min_children)
     {
       btree_node *prev_last_prev_child =
@@ -1566,7 +1580,7 @@ merge_borrow (btree_node *prev, btree_node *node, btree_node *next,
       last_prev_child = prev_last_prev_child;
     }
 
-  if (last_prev_child != NULL)
+  if (borrowed_prev)
     {
       btree_node *prev_next = tx_next_sibling (last_prev_child, btx, &err);
 
@@ -1577,10 +1591,8 @@ merge_borrow (btree_node *prev, btree_node *node, btree_node *next,
 	}
 
       if (!tx_set_first_child (node, btx, prev_next)
-	  || !tx_set_prev_sibling (first_child, btx, prev_next)
-	  || !tx_set_prev_sibling (prev_next, btx, NULL)
 	  || !tx_set_next_sibling (last_prev_child, btx, NULL)
-	  || !tx_set_next_sibling (prev_next, btx, first_child))
+	  || !tx_set_prev_sibling (prev_next, btx, NULL))
 	return FALSE;
 
       /* Update the prev sibling's key, since its keyspace has been altered. */
@@ -1589,6 +1601,14 @@ merge_borrow (btree_node *prev, btree_node *node, btree_node *next,
     }
 
   /* Borrow children from the next sibling. */
+
+  if (spare_next > 0 && num_children < node->min_children)
+    {
+      if (!tx_set_next_sibling (last_child, btx, first_next_child)
+	  || !tx_set_prev_sibling (first_next_child, btx, last_child))
+	return FALSE;
+      else borrowed_next = TRUE;
+    }
 
   while (spare_next > 0 && num_children < node->min_children)
     {
@@ -1603,9 +1623,7 @@ merge_borrow (btree_node *prev, btree_node *node, btree_node *next,
 
       /* Set the new parent. */
 
-      if (!tx_set_next_sibling (last_child, btx, first_next_child)
-	  || !tx_set_prev_sibling (first_next_child, btx, last_child)
-	  || !tx_set_parent (first_next_child, btx, node))
+      if (!tx_set_parent (first_next_child, btx, node))
 	return FALSE;
 
       spare_next--;
@@ -1618,7 +1636,7 @@ merge_borrow (btree_node *prev, btree_node *node, btree_node *next,
   /* If any nodes were borrowed from the next sibling, update its first 
      child. */
 
-  if (first_next_child != NULL)
+  if (borrowed_next)
     {
       btree_node *next_prev = tx_prev_sibling (first_next_child, btx, &err);
 
@@ -1916,6 +1934,7 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
 	{
 	  /* Find the end of the list of children and get a write lock on it. */
 
+	  gboolean needs_merge = FALSE;
 	  btree_node *last_child = tx_last_child (parent, btx, &err);
 
 	  if (err != NULL)
@@ -1941,10 +1960,16 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
 	      tx_set_parent (new_node, btx, interstitial);
 
 	      new_node = interstitial;
+	      
+	      if (1 < MIN_INTERNAL_CHILDREN)
+		needs_merge = TRUE;
 	    }
 
 	  if (!tx_set_next_sibling (last_child, btx, new_node)
 	      || !tx_set_prev_sibling (new_node, btx, last_child))
+	    return FALSE;
+
+	  if (needs_merge && !merge (new_node, 1, btx))
 	    return FALSE;
 
 	  /* ...and then force a merge. */
@@ -2051,7 +2076,8 @@ split (btree_node *node, btree_transaction *btx)
       || !tx_set_next_sibling (new_node, btx, next)
       || !tx_set_next_sibling (node, btx, new_node)
       || !tx_set_parent (new_node, btx, parent)
-      || !tx_set_prev_sibling (new_node, btx, node))
+      || !tx_set_prev_sibling (new_node, btx, node)
+      || (next != NULL && !tx_set_prev_sibling (next, btx, new_node)))
     return NULL;
 
   /* Update the parent of all child nodes moved to the new sibling... */
@@ -2125,10 +2151,13 @@ maybe_split (btree_transaction *btx, btree *btree, btree_node *node)
 	  node->min_children = MIN_INTERNAL_CHILDREN;
 	  node->max_children = MAX_INTERNAL_CHILDREN;
 
-	  return tx_set_first_child (parent, btx, node)
-	    && tx_set_parent (node, btx, parent)
-	    && tx_set_parent (new_node, btx, parent)
-	    && tx_set_root (btree, btx, parent);
+	  if (!tx_set_first_child (parent, btx, node)
+	      || !tx_set_parent (node, btx, parent)
+	      || !tx_set_parent (new_node, btx, parent)
+	      || !tx_set_root (btree, btx, parent))
+	    return FALSE;
+
+	  return maybe_merge (btx, node);
 	}
       else node = parent;
 
