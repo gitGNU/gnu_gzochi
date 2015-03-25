@@ -2180,8 +2180,8 @@ maybe_split (btree_transaction *btx, btree *btree, btree_node *node)
 /* Create and return a new storage context in the form of a B+tree environment.
    The `path' argument is ignored. */
 
-gzochid_storage_context *
-gzochid_storage_initialize (char *path)
+static gzochid_storage_context *
+initialize (char *path)
 {
   gzochid_storage_context *context = malloc (sizeof (gzochid_storage_context));
 
@@ -2193,8 +2193,8 @@ gzochid_storage_initialize (char *path)
 /* Close and clean up the specified storage context (and its associated B+tree
    environment). */
 
-void
-gzochid_storage_context_close (gzochid_storage_context *context)
+static void
+close_context (gzochid_storage_context *context)
 {
   close_btree_environment (context->environment);
   free (context);
@@ -2202,8 +2202,8 @@ gzochid_storage_context_close (gzochid_storage_context *context)
 
 /* This function is a no-op. */
 
-void
-gzochid_storage_context_destroy (char *path)
+static void
+destroy_context (char *path)
 {
 }
 
@@ -2211,9 +2211,8 @@ gzochid_storage_context_destroy (char *path)
    B+tree environment enclosed by the specified storage context. The `name' and
    `flags' arguments are ignored. */
 
-gzochid_storage_store *
-gzochid_storage_open (gzochid_storage_context *context, char *name, 
-		      unsigned int flags)
+static gzochid_storage_store *
+open (gzochid_storage_context *context, char *name, unsigned int flags)
 {
   gzochid_storage_store *store = malloc (sizeof (gzochid_storage_store));
   btree_environment *btree_env = context->environment;
@@ -2227,8 +2226,8 @@ gzochid_storage_open (gzochid_storage_context *context, char *name,
 
 /* Close and clean up the specified store (and its associated B+tree). */
 
-void
-gzochid_storage_close (gzochid_storage_store *store)
+static void
+close_store (gzochid_storage_store *store)
 {
   close_btree (store->database);
   g_mutex_clear (&store->mutex);
@@ -2237,130 +2236,33 @@ gzochid_storage_close (gzochid_storage_store *store)
 
 /* This function is a no-op. */
 
-void
-gzochid_storage_destroy (gzochid_storage_context *context, char *path)
+static void
+destroy_store (gzochid_storage_context *context, char *path)
 {
 }
 
 /* Lock the store's mutex. */
 
-void
-gzochid_storage_lock (gzochid_storage_store *store)
+static void
+lock (gzochid_storage_store *store)
 {
   g_mutex_lock (&store->mutex);
 }
 
 /* Unlock the store's mutex. */
 
-void
-gzochid_storage_unlock (gzochid_storage_store *store)
+static void
+unlock (gzochid_storage_store *store)
 {
   g_mutex_unlock (&store->mutex);
-}
-
-/* Returns the value for the specified key or NULL if none exists. This 
-   function behaves identically to its transactional counterpart, but rolls
-   back its work immediately. 
-*/
-
-char *
-gzochid_storage_get (gzochid_storage_store *store, char *key, size_t key_len,
-		     size_t *value_len)
-{
-  char *value = NULL;
-
-  gzochid_storage_transaction *tx =
-    gzochid_storage_transaction_begin (store->context);
-  value = gzochid_storage_transaction_get (tx, store, key, key_len, value_len);
-  gzochid_storage_transaction_rollback (tx);
-
-  return value;
-}
-
-/* Inserts or updates the value for the specified key. This function behaves 
-   identically to its transactional counterpart, but commits its work 
-   immediately. 
-*/
-
-void
-gzochid_storage_put (gzochid_storage_store *store, char *key, size_t key_len, 
-		     char *value, size_t value_len)
-{
-  gzochid_storage_transaction *tx =
-    gzochid_storage_transaction_begin (store->context);
-  gzochid_storage_transaction_put (tx, store, key, key_len, value, value_len);
-  gzochid_storage_transaction_commit (tx);
-}
-
-/* Deletes the value for the specified key. Returns ENOTFOUND if no such value
-   exists, 0 otherwise. This function behaves identically to its transactional 
-   counterpart, but commits its work immediately. 
-*/
-
-int
-gzochid_storage_delete (gzochid_storage_store *store, char *key,
-                        size_t key_len)
-{
-  int ret = 0;
-  gzochid_storage_transaction *tx =
-    gzochid_storage_transaction_begin (store->context);
-
-  ret = gzochid_storage_transaction_delete (tx, store, key, key_len);
-
-  if (ret == 0)
-    gzochid_storage_transaction_commit (tx);
-  else
-    {
-      assert (ret != GZOCHID_STORAGE_ETXFAILURE);
-      gzochid_storage_transaction_rollback (tx);
-    }
-
-  return ret;
-}
-
-/* Returns the first key in the B+tree. This function behaves identically to 
-   its transactional counterpart, but rolls back its work immediately. 
-*/
-
-char *
-gzochid_storage_first_key (gzochid_storage_store *store, size_t *key_len)
-{
-  char *key = NULL;
-
-  gzochid_storage_transaction *tx =
-    gzochid_storage_transaction_begin (store->context);
-  key = gzochid_storage_transaction_first_key (tx, store, key_len);
-  gzochid_storage_transaction_commit (tx);
-
-  return key;
-}
-
-/* Returns the key in the B+tree immediately after the specified key. This 
-   function behaves identically to its transactional counterpart, but rolls back
-   its work immediately. 
-*/
-
-char *
-gzochid_storage_next_key (gzochid_storage_store *store, char *key, 
-			  size_t key_len, size_t *next_key_len)
-{
-  char *next_key = NULL;
-
-  gzochid_storage_transaction *tx =
-    gzochid_storage_transaction_begin (store->context);
-  next_key = gzochid_storage_transaction_next_key
-    (tx, store, key, key_len, next_key_len);
-  gzochid_storage_transaction_commit (tx);
-
-  return next_key;
 }
 
 /* Creates and returns a new transaction in the specified storage context, with
    a timeout equivalent to 2^64 - 1.
 */
 
-gzochid_storage_transaction *
-gzochid_storage_transaction_begin (gzochid_storage_context *context)
+static gzochid_storage_transaction *
+transaction_begin (gzochid_storage_context *context)
 {
   gzochid_storage_transaction *tx =
     calloc (1, sizeof (gzochid_storage_transaction));
@@ -2374,9 +2276,9 @@ gzochid_storage_transaction_begin (gzochid_storage_context *context)
    specified storage context.
 */
 
-gzochid_storage_transaction *
-gzochid_storage_transaction_begin_timed (gzochid_storage_context *context, 
-					 struct timeval timeout)
+static gzochid_storage_transaction *
+transaction_begin_timed (gzochid_storage_context *context, 
+			 struct timeval timeout)
 {
   gzochid_storage_transaction *tx = 
     calloc (1, sizeof (gzochid_storage_transaction));
@@ -2405,34 +2307,6 @@ check_tx (gzochid_storage_transaction *tx)
   else return TRUE;
 }
 
-/* Commits the specified transaction, which must not have been marked for
-   rollback. 
-*/
-
-void
-gzochid_storage_transaction_commit (gzochid_storage_transaction *tx)
-{
-  assert (!tx->rollback);
-  commit (tx->txn);
-  free (tx);
-}
-
-/* Rolls back the specified transaction. */
-
-void
-gzochid_storage_transaction_rollback (gzochid_storage_transaction *tx)
-{
-  rollback (tx->txn);
-  free (tx);
-}
-
-/* This function is a no-op. */
-
-void
-gzochid_storage_transaction_prepare (gzochid_storage_transaction *tx)
-{
-}
-
 /* Marks the specified transaction for rollback. Transactions marked for 
    rollback cannot be committed. 
 */
@@ -2452,8 +2326,8 @@ mark_for_rollback (gzochid_storage_transaction *tx, gboolean should_retry)
 */
 
 static char *
-get (gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key,
-     size_t key_len, size_t *value_len, gboolean update)
+get_internal (gzochid_storage_transaction *tx, gzochid_storage_store *store, 
+	      char *key, size_t key_len, size_t *value_len, gboolean update)
 {
   char *ret = NULL;
   btree_transaction *btx = tx->txn;
@@ -2487,39 +2361,66 @@ get (gzochid_storage_transaction *tx, gzochid_storage_store *store, char *key,
 
 /* Returns the value for the specified key or NULL if none exists. */
 
-char *
-gzochid_storage_transaction_get (gzochid_storage_transaction *tx, 
-				 gzochid_storage_store *store, char *key,
-				 size_t key_len, size_t *value_len)
+static char *
+transaction_get (gzochid_storage_transaction *tx, gzochid_storage_store *store,
+		 char *key, size_t key_len, size_t *value_len)
 {
   if (!check_tx (tx))
     return NULL;
 
-  return get (tx, store, key, key_len, value_len, FALSE);
+  return get_internal (tx, store, key, key_len, value_len, FALSE);
 }
 
-/* Returns the value for the specified key or NULL if none exists. If the key
-   is found, a write lock is established on it before this function returns. 
+/* Commits the specified transaction, which must not have been marked for
+   rollback. 
 */
 
-char *
-gzochid_storage_transaction_get_for_update (gzochid_storage_transaction *tx, 
-					    gzochid_storage_store *store, 
-					    char *key, size_t key_len, 
-					    size_t *value_len)
+static void
+transaction_commit (gzochid_storage_transaction *tx)
 {
-  if (!check_tx (tx))
-    return NULL;
+  assert (!tx->rollback);
+  commit (tx->txn);
+  free (tx);
+}
 
-  return get (tx, store, key, key_len, value_len, TRUE);
+/* Rolls back the specified transaction. */
+
+static void
+transaction_rollback (gzochid_storage_transaction *tx)
+{
+  rollback (tx->txn);
+  free (tx);
+}
+
+/* This function is a no-op. */
+
+static void
+transaction_prepare (gzochid_storage_transaction *tx)
+{
+}
+
+/* Returns the value for the specified key or NULL if none exists. This 
+   function behaves identically to its transactional counterpart, but rolls
+   back its work immediately. 
+*/
+
+static char *
+get (gzochid_storage_store *store, char *key, size_t key_len, size_t *value_len)
+{
+  char *value = NULL;
+
+  gzochid_storage_transaction *tx = transaction_begin (store->context);
+  value = transaction_get (tx, store, key, key_len, value_len);
+  transaction_rollback (tx);
+
+  return value;
 }
 
 /* Inserts or updates the value for the specified key. */
 
-void
-gzochid_storage_transaction_put (gzochid_storage_transaction *tx, 
-				 gzochid_storage_store *store, char *key,
-				 size_t key_len, char *value, size_t value_len)
+static void
+transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
+		 char *key, size_t key_len, char *value, size_t value_len)
 {
   btree_node *node = NULL;
   btree_transaction *btx = tx->txn;
@@ -2552,14 +2453,27 @@ gzochid_storage_transaction_put (gzochid_storage_transaction *tx,
   else mark_for_rollback (tx, TRUE);
 }
 
+/* Inserts or updates the value for the specified key. This function behaves 
+   identically to its transactional counterpart, but commits its work 
+   immediately. 
+*/
+
+static void
+put (gzochid_storage_store *store, char *key, size_t key_len, char *value, 
+     size_t value_len)
+{
+  gzochid_storage_transaction *tx = transaction_begin (store->context);
+  transaction_put (tx, store, key, key_len, value, value_len);
+  transaction_commit (tx);
+}
+
 /* Deletes the value for the specified key. Returns ENOTFOUND if no such value
    exists; ETXFAILURE if a lock could not be acquired; 0 otherwise.
 */
 
-int
-gzochid_storage_transaction_delete (gzochid_storage_transaction *tx, 
-				    gzochid_storage_store *store, char *key,
-				    size_t key_len)
+static int
+transaction_delete (gzochid_storage_transaction *tx, 
+		    gzochid_storage_store *store, char *key, size_t key_len)
 {
   int ret = 0;
   btree_node *node = NULL;
@@ -2598,6 +2512,30 @@ gzochid_storage_transaction_delete (gzochid_storage_transaction *tx,
 
   if (ret == GZOCHID_STORAGE_ETXFAILURE)
     mark_for_rollback (tx, TRUE);
+
+  return ret;
+}
+
+/* Deletes the value for the specified key. Returns ENOTFOUND if no such value
+   exists, 0 otherwise. This function behaves identically to its transactional 
+   counterpart, but commits its work immediately. 
+*/
+
+static int
+delete (gzochid_storage_store *store, char *key, size_t key_len)
+{
+  int ret = 0;
+  gzochid_storage_transaction *tx = transaction_begin (store->context);
+
+  ret = transaction_delete (tx, store, key, key_len);
+
+  if (ret == 0)
+    transaction_commit (tx);
+  else
+    {
+      assert (ret != GZOCHID_STORAGE_ETXFAILURE);
+      transaction_rollback (tx);
+    }
 
   return ret;
 }
@@ -2676,10 +2614,9 @@ find_key_gte (btree_transaction *btx, btree *bt, char *key, size_t key_len,
 
 /* Returns the first key in the B+tree. */
 
-char *
-gzochid_storage_transaction_first_key (gzochid_storage_transaction *tx, 
-				       gzochid_storage_store *store, 
-				       size_t *key_len)
+static char *
+transaction_first_key (gzochid_storage_transaction *tx, 
+		       gzochid_storage_store *store, size_t *key_len)
 {
   char *ret = NULL;
   GError *err = NULL;
@@ -2700,12 +2637,28 @@ gzochid_storage_transaction_first_key (gzochid_storage_transaction *tx,
   return ret;
 }
 
+/* Returns the first key in the B+tree. This function behaves identically to 
+   its transactional counterpart, but rolls back its work immediately. 
+*/
+
+static char *
+first_key (gzochid_storage_store *store, size_t *key_len)
+{
+  char *key = NULL;
+
+  gzochid_storage_transaction *tx = transaction_begin (store->context);
+  key = transaction_first_key (tx, store, key_len);
+  transaction_commit (tx);
+
+  return key;
+}
+
 /* Returns the key in the B+tree immediately after the specified key. */
 
-char *
-gzochid_storage_transaction_next_key (gzochid_storage_transaction *tx, 
-				      gzochid_storage_store *store, char *key,
-				      size_t key_len, size_t *next_key_len)
+static char *
+transaction_next_key (gzochid_storage_transaction *tx, 
+		      gzochid_storage_store *store, char *key, size_t key_len, 
+		      size_t *next_key_len)
 {
   GError *err = NULL;
   char *next_key = NULL;
@@ -2728,3 +2681,69 @@ gzochid_storage_transaction_next_key (gzochid_storage_transaction *tx,
 
   return ret;
 }
+
+/* Returns the key in the B+tree immediately after the specified key. This 
+   function behaves identically to its transactional counterpart, but rolls back
+   its work immediately. 
+*/
+
+static char *
+next_key (gzochid_storage_store *store, char *key, size_t key_len, 
+	  size_t *next_key_len)
+{
+  char *next_key = NULL;
+
+  gzochid_storage_transaction *tx = transaction_begin (store->context);
+  next_key = transaction_next_key (tx, store, key, key_len, next_key_len);
+  transaction_commit (tx);
+
+  return next_key;
+}
+
+/* Returns the value for the specified key or NULL if none exists. If the key
+   is found, a write lock is established on it before this function returns. 
+*/
+
+static char *
+transaction_get_for_update (gzochid_storage_transaction *tx, 
+			    gzochid_storage_store *store, char *key, 
+			    size_t key_len, size_t *value_len)
+{
+  if (!check_tx (tx))
+    return NULL;
+
+  return get_internal (tx, store, key, key_len, value_len, TRUE);
+}
+
+gzochid_storage_engine_interface gzochid_storage_engine_interface_mem = 
+  {
+    "mem",
+
+    initialize,
+    close_context,
+    destroy_context,
+    open,
+    close_store,
+    destroy_store,
+    lock,
+    unlock,
+
+    get,
+    put,
+    delete,
+    first_key,
+    next_key,
+    
+    transaction_begin,
+    transaction_begin_timed,
+    transaction_commit,
+    transaction_rollback,
+    transaction_prepare,
+    
+    transaction_get,
+    transaction_get_for_update,
+    transaction_put,
+    transaction_delete,
+    transaction_first_key,
+    transaction_next_key
+  };

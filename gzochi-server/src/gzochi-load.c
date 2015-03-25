@@ -33,6 +33,7 @@
 
 struct load_context
 {
+  gzochid_storage_engine *engine;
   gzochid_storage_context *storage_context;
   gzochid_storage_store *store;
 };
@@ -44,13 +45,15 @@ struct datum
 };
 
 static struct load_context *
-setup_load_context (char *data_dir, char *db, gboolean force)
+setup_load_context (gzochid_storage_engine *engine, char *data_dir, char *db, 
+		    gboolean force)
 {
   unsigned int flags = GZOCHID_STORAGE_CREATE | GZOCHID_STORAGE_EXCL;
   struct load_context *context = calloc (1, sizeof (struct load_context));
   char *path = g_strconcat (data_dir, "/", db, NULL);
  
-  context->storage_context = gzochid_storage_initialize (data_dir);
+  context->engine = engine;
+  context->storage_context = engine->interface->initialize (data_dir);
 
   if (context->storage_context == NULL)
     {
@@ -61,7 +64,8 @@ setup_load_context (char *data_dir, char *db, gboolean force)
   if (force)
     flags ^= GZOCHID_STORAGE_EXCL;
 
-  context->store = gzochid_storage_open (context->storage_context, path, flags);
+  context->store = engine->interface->open 
+    (context->storage_context, path, flags);
 
   if (context->store == NULL)
     {
@@ -117,19 +121,21 @@ read_line (char *line, size_t line_len, int line_num)
 static void
 cleanup_load_context (struct load_context *context)
 {
-  gzochid_storage_close (context->store);
-  gzochid_storage_context_close (context->storage_context);
+  context->engine->interface->close_store (context->store);
+  context->engine->interface->close_context (context->storage_context);
   
   free (context);
 }
 
 static void
-load_data (char *data_dir, char *db, gboolean force)
+load_data (gzochid_storage_engine *engine, char *data_dir, char *db, 
+	   gboolean force)
 {
   int line_num = 1;
   struct datum line = { NULL, 0 }, key, value;
   gboolean reading_key = TRUE;
-  struct load_context *context = setup_load_context (data_dir, db, force);
+  struct load_context *context = 
+    setup_load_context (engine, data_dir, db, force);
 
   while ((line.data_len = getline (&line.data, &line.data_len, stdin)) != -1 
 	 && strcmp (line.data, "HEADER=END\n") != 0)
@@ -160,7 +166,7 @@ load_data (char *data_dir, char *db, gboolean force)
       else 
 	{
 	  value = read_line (line.data, line.data_len, line_num++);
-	  gzochid_storage_put 
+	  context->engine->interface->put 
 	    (context->store, key.data, key.data_len, value.data, 
 	     value.data_len);
 
@@ -181,6 +187,7 @@ load_data (char *data_dir, char *db, gboolean force)
 static const struct option longopts[] =
   {
     { "config", required_argument, NULL, 'c' },
+    { "engine", required_argument, NULL, 'e' },
     { "force", no_argument, NULL, 'f' },
     { "help", no_argument, NULL, 'h' },
     { "version", no_argument, NULL, 'v' },
@@ -205,12 +212,14 @@ static void
 print_help (const char *program_name)
 {
   fprintf (stderr, _("\
-Usage: %s [-c <CONF>] [-f] <APP_NAME or DATA_DIRECTORY>:<DB>\n\
+Usage: %s [-c <CONF>] [-e <ENGINE>] [-f] <APP_NAME or DATA_DIR>:<DB>\n\
        %s [-h | -v]\n"), program_name, program_name);
 
   fputs ("", stderr);
   fputs (_("\
   -c, --config        full path to gzochid.conf\n\
+  -e, --engine        the name of the storage engine in use, as per\n\
+                      gzochid.conf (e.g., bdb)\n\
   -f, --force         force an import, even when the target already exists\n\
   -h, --help          display this help and exit\n\
   -v, --version       display version information and exit\n"), stderr);
@@ -236,17 +245,21 @@ main (int argc, char *argv[])
 {
   const char *program_name = argv[0];
   char *gzochid_conf_path = NULL;
+  char *storage_engine_name = NULL;
   gboolean force = FALSE;
   int optc = 0;
   
   setlocale (LC_ALL, "");
   
-  while ((optc = getopt_long (argc, argv, "+c:fhv", longopts, NULL)) != -1)
+  while ((optc = getopt_long (argc, argv, "+ce:fhv", longopts, NULL)) != -1)
     switch (optc)
       {
       case 'c':
 	gzochid_conf_path = strdup (optarg);
 	break;
+      case 'e':
+	storage_engine_name = strdup (optarg);
+	break;       
       case 'f':
 	force = TRUE;
 	break;
@@ -280,12 +293,15 @@ main (int argc, char *argv[])
 	(gzochid_conf, targets[0], TRUE);
       char *db = targets[1];
 
+      gzochid_storage_engine *engine = 
+	gzochid_tool_probe_storage_engine (gzochid_conf, storage_engine_name); 
+
       if (db == NULL)
 	{
 	  print_help (program_name);
 	  exit (EXIT_FAILURE);
 	}
-      else load_data (data_dir, db, force);
+      else load_data (engine, data_dir, db, force);
       g_strfreev (targets);
     }
 

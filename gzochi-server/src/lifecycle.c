@@ -107,6 +107,7 @@ initialize_data (int from_state, int to_state, gpointer user_data)
   char *names_db = g_strconcat (data_dir, "/names", NULL);
 
   gzochid_storage_context *storage_context = NULL;
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
 
   if (!g_file_test (data_dir, G_FILE_TEST_EXISTS))
     {
@@ -118,7 +119,7 @@ initialize_data (int from_state, int to_state, gpointer user_data)
   else if (!g_file_test (data_dir, G_FILE_TEST_IS_DIR))
     gzochid_err ("%s is not a directory.", data_dir);
 
-  storage_context = gzochid_storage_initialize (data_dir);
+  storage_context = iface->initialize (data_dir);
 
   if (storage_context == NULL)
     {
@@ -127,11 +128,11 @@ initialize_data (int from_state, int to_state, gpointer user_data)
     }
 
   app_context->storage_context = storage_context;
-  app_context->meta = gzochid_storage_open 
+  app_context->meta = iface->open 
     (storage_context, meta_db, GZOCHID_STORAGE_CREATE);
-  app_context->oids = gzochid_storage_open 
+  app_context->oids = iface->open 
     (storage_context, oids_db, GZOCHID_STORAGE_CREATE);
-  app_context->names = gzochid_storage_open 
+  app_context->names = iface->open 
     (storage_context, names_db, GZOCHID_STORAGE_CREATE);
 
   free (data_dir);
@@ -251,13 +252,14 @@ static void
 stop (int from_state, int to_state, gpointer user_data)
 {
   gzochid_application_context *context = user_data;
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (context);
 
   if (context->meta != NULL)
-    gzochid_storage_close (context->meta);
+    iface->close_store (context->meta);
   if (context->oids != NULL)
-    gzochid_storage_close (context->oids);
+    iface->close_store (context->oids);
   if (context->names != NULL)
-    gzochid_storage_close (context->names);  
+    iface->close_store (context->names);  
 }
 
 static void 

@@ -20,6 +20,7 @@
 #include <stdlib.h>
 
 #include "storage.h"
+#include "storage-mem.h"
 
 struct test_storage_fixture
 {
@@ -31,38 +32,42 @@ static void
 test_storage_fixture_setup
 (struct test_storage_fixture *fixture, gconstpointer user_data)
 {
-  fixture->context = gzochid_storage_initialize ("");
-  fixture->store = gzochid_storage_open (fixture->context, "", 0);
+  fixture->context = gzochid_storage_engine_interface_mem.initialize ("");
+  fixture->store = gzochid_storage_engine_interface_mem.open 
+    (fixture->context, "", 0);
 }
 
 static void
 test_storage_fixture_teardown
 (struct test_storage_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_storage_close (fixture->store);
-  gzochid_storage_context_close (fixture->context);
+  gzochid_storage_engine_interface_mem.close_store (fixture->store);
+  gzochid_storage_engine_interface_mem.close_context (fixture->context);
 }
 
 static void
 test_storage_mem_initialize ()
 {
-  gzochid_storage_context *context = gzochid_storage_initialize ("");
+  gzochid_storage_context *context = 
+    gzochid_storage_engine_interface_mem.initialize ("");
   
   g_assert_nonnull (context);
 
-  gzochid_storage_context_close (context);
+  gzochid_storage_engine_interface_mem.close_context (context);
 }
 
 static void 
 test_storage_mem_open ()
 {
-  gzochid_storage_context *context = gzochid_storage_initialize ("");
-  gzochid_storage_store *store = gzochid_storage_open (context, "", 0);
+  gzochid_storage_context *context = 
+    gzochid_storage_engine_interface_mem.initialize ("");
+  gzochid_storage_store *store = 
+    gzochid_storage_engine_interface_mem.open (context, "", 0);
   
   g_assert_nonnull (store);
 
-  gzochid_storage_close (store);
-  gzochid_storage_context_close (context);
+  gzochid_storage_engine_interface_mem.close_store (store);
+  gzochid_storage_engine_interface_mem.close_context (context);
 }
 
 static void
@@ -70,14 +75,16 @@ test_storage_mem_get
 (struct test_storage_fixture *fixture, gconstpointer user_data)
 {
   size_t value_len = 0;
-  char *value = gzochid_storage_get (fixture->store, "foo", 4, &value_len);
+  char *value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, "foo", 4, &value_len);
 
   g_assert_null (value);
   g_assert_cmpint (value_len, ==, 0);
   
-  gzochid_storage_put (fixture->store, "foo", 4, "bar", 4);
+  gzochid_storage_engine_interface_mem.put (fixture->store, "foo", 4, "bar", 4);
 
-  value = gzochid_storage_get (fixture->store, "foo", 4, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, "foo", 4, &value_len);
   
   g_assert_cmpstr (value, ==, "bar");
   g_assert_cmpint (value_len, ==, 4);
@@ -92,10 +99,11 @@ test_storage_mem_put
   char *value = NULL;
   size_t value_len = 0;
 
-  gzochid_storage_put (fixture->store, "foo", 4, "bar", 4);
-  gzochid_storage_put (fixture->store, "foo", 4, "baz", 4);
+  gzochid_storage_engine_interface_mem.put (fixture->store, "foo", 4, "bar", 4);
+  gzochid_storage_engine_interface_mem.put (fixture->store, "foo", 4, "baz", 4);
 
-  value = gzochid_storage_get (fixture->store, "foo", 4, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, "foo", 4, &value_len);
   
   g_assert_cmpstr (value, ==, "baz");
   g_assert_cmpint (value_len, ==, 4);
@@ -110,10 +118,11 @@ test_storage_mem_delete
   char *value = NULL;
   size_t value_len = 0;
 
-  gzochid_storage_put (fixture->store, "foo", 4, "bar", 4);
-  gzochid_storage_delete (fixture->store, "foo", 4);
+  gzochid_storage_engine_interface_mem.put (fixture->store, "foo", 4, "bar", 4);
+  gzochid_storage_engine_interface_mem.delete (fixture->store, "foo", 4);
 
-  value = gzochid_storage_get (fixture->store, "foo", 4, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, "foo", 4, &value_len);
   
   g_assert_null (value);
 }
@@ -123,15 +132,18 @@ test_storage_mem_first_key
 (struct test_storage_fixture *fixture, gconstpointer user_data)
 {
   size_t key_len = 0;
-  char *key = gzochid_storage_first_key (fixture->store, &key_len);
+  char *key = gzochid_storage_engine_interface_mem.first_key 
+    (fixture->store, &key_len);
 
   g_assert_null (key);
   g_assert_cmpint (key_len, ==, 0);
   
-  gzochid_storage_put (fixture->store, "foo", 4, "bar", 4);
-  gzochid_storage_put (fixture->store, "baz", 4, "quux", 5);
+  gzochid_storage_engine_interface_mem.put (fixture->store, "foo", 4, "bar", 4);
+  gzochid_storage_engine_interface_mem.put 
+    (fixture->store, "baz", 4, "quux", 5);
 
-  key = gzochid_storage_first_key (fixture->store, &key_len);
+  key = gzochid_storage_engine_interface_mem.first_key 
+    (fixture->store, &key_len);
   
   g_assert_cmpstr (key, ==, "baz");
   g_assert_cmpint (key_len, ==, 4);
@@ -146,17 +158,20 @@ test_storage_mem_next_key
   char *key = NULL;
   size_t key_len = 0;
 
-  gzochid_storage_put (fixture->store, "foo", 4, "bar", 4);
-  gzochid_storage_put (fixture->store, "baz", 4, "quux", 5);
+  gzochid_storage_engine_interface_mem.put (fixture->store, "foo", 4, "bar", 4);
+  gzochid_storage_engine_interface_mem.put 
+    (fixture->store, "baz", 4, "quux", 5);
 
-  key = gzochid_storage_next_key (fixture->store, "baz", 4, &key_len);
+  key = gzochid_storage_engine_interface_mem.next_key 
+    (fixture->store, "baz", 4, &key_len);
   
   g_assert_cmpstr (key, ==, "foo");
   g_assert_cmpint (key_len, ==, 4);
 
   free (key);
 
-  key = gzochid_storage_next_key (fixture->store, "foo", 4, &key_len);
+  key = gzochid_storage_engine_interface_mem.next_key 
+    (fixture->store, "foo", 4, &key_len);
 
   g_assert_null (key);
 }
@@ -169,19 +184,21 @@ test_storage_mem_tx_put_get_commit_get
   size_t value_len = 0;
 
   gzochid_storage_transaction *tx = 
-    gzochid_storage_transaction_begin (fixture->context);
-  gzochid_storage_transaction_put (tx, fixture->store, "foo", 4, "bar", 4);
-  value = gzochid_storage_transaction_get 
+    gzochid_storage_engine_interface_mem.transaction_begin (fixture->context);
+  gzochid_storage_engine_interface_mem.transaction_put 
+    (tx, fixture->store, "foo", 4, "bar", 4);
+  value = gzochid_storage_engine_interface_mem.transaction_get 
     (tx, fixture->store, "foo", 4, &value_len);
 
   g_assert_cmpstr (value, ==, "bar");
   g_assert_cmpint (value_len, ==, 4);
   free (value);
 
-  gzochid_storage_transaction_prepare (tx);
-  gzochid_storage_transaction_commit (tx);
+  gzochid_storage_engine_interface_mem.transaction_prepare (tx);
+  gzochid_storage_engine_interface_mem.transaction_commit (tx);
 
-  value = gzochid_storage_get (fixture->store, "foo", 4, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, "foo", 4, &value_len);
   g_assert_cmpstr (value, ==, "bar");
   g_assert_cmpint (value_len, ==, 4);  
   free (value);
@@ -195,17 +212,19 @@ test_storage_mem_tx_put_rollback_get
   size_t value_len = 0;
 
   gzochid_storage_transaction *tx = 
-    gzochid_storage_transaction_begin (fixture->context);
-  gzochid_storage_transaction_put (tx, fixture->store, "foo", 4, "bar", 4);
-  value = gzochid_storage_transaction_get 
+    gzochid_storage_engine_interface_mem.transaction_begin (fixture->context);
+  gzochid_storage_engine_interface_mem.transaction_put 
+    (tx, fixture->store, "foo", 4, "bar", 4);
+  value = gzochid_storage_engine_interface_mem.transaction_get 
     (tx, fixture->store, "foo", 4, &value_len);
 
   g_assert_cmpstr (value, ==, "bar");
   g_assert_cmpint (value_len, ==, 4);  
-  gzochid_storage_transaction_rollback (tx);
+  gzochid_storage_engine_interface_mem.transaction_rollback (tx);
   free (value);
 
-  value = gzochid_storage_get (fixture->store, "foo", 4, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, "foo", 4, &value_len);
   g_assert_null (value);
 }
 
@@ -218,19 +237,22 @@ test_storage_mem_tx_delete_get_commit_get
   size_t value_len = 0;
 
   gzochid_storage_transaction *tx = 
-    gzochid_storage_transaction_begin (fixture->context);
-  gzochid_storage_transaction_put (tx, fixture->store, "foo", 4, "bar", 4);
+    gzochid_storage_engine_interface_mem.transaction_begin (fixture->context);
+  gzochid_storage_engine_interface_mem.transaction_put 
+    (tx, fixture->store, "foo", 4, "bar", 4);
 
-  ret = gzochid_storage_transaction_delete (tx, fixture->store, "foo", 4);
+  ret = gzochid_storage_engine_interface_mem.transaction_delete 
+    (tx, fixture->store, "foo", 4);
   g_assert_cmpint (ret, ==, 0);
 
-  value = gzochid_storage_transaction_get 
+  value = gzochid_storage_engine_interface_mem.transaction_get 
     (tx, fixture->store, "foo", 4, &value_len);
   g_assert_null (value);
 
-  gzochid_storage_transaction_commit (tx);
+  gzochid_storage_engine_interface_mem.transaction_commit (tx);
 
-  value = gzochid_storage_get (fixture->store, "foo", 4, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, "foo", 4, &value_len);
   g_assert_null (value);
 }
 
@@ -242,13 +264,16 @@ test_storage_mem_tx_delete_rollback_get
   size_t value_len = 0;
   gzochid_storage_transaction *tx = NULL;
 
-  gzochid_storage_put (fixture->store, "foo", 4, "bar", 4);
+  gzochid_storage_engine_interface_mem.put (fixture->store, "foo", 4, "bar", 4);
 
-  tx = gzochid_storage_transaction_begin (fixture->context);
-  gzochid_storage_transaction_delete (tx, fixture->store, "foo", 4);
-  gzochid_storage_transaction_rollback (tx);
+  tx = gzochid_storage_engine_interface_mem.transaction_begin 
+    (fixture->context);
+  gzochid_storage_engine_interface_mem.transaction_delete 
+    (tx, fixture->store, "foo", 4);
+  gzochid_storage_engine_interface_mem.transaction_rollback (tx);
 
-  value = gzochid_storage_get (fixture->store, "foo", 4, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, "foo", 4, &value_len);
   g_assert_cmpstr (value, ==, "bar");
   g_assert_cmpint (value_len, ==, 4);
   free (value);
@@ -319,8 +344,9 @@ deadlock_simple_thread_1 (gpointer data)
 {
   struct test_storage_fixture_concurrent *fixture = data;
   gzochid_storage_transaction *tx1 = 
-    gzochid_storage_transaction_begin (fixture->base_fixture->context);
-  char *value1 = gzochid_storage_transaction_get 
+    gzochid_storage_engine_interface_mem.transaction_begin 
+    (fixture->base_fixture->context);
+  char *value1 = gzochid_storage_engine_interface_mem.transaction_get 
     (tx1, fixture->base_fixture->store, "foo", 4, NULL);
 
   free (value1);
@@ -328,13 +354,13 @@ deadlock_simple_thread_1 (gpointer data)
   decrement_latch (fixture);
   wait_latch_zero (fixture);
   
-  gzochid_storage_transaction_put 
+  gzochid_storage_engine_interface_mem.transaction_put 
     (tx1, fixture->base_fixture->store, "baz", 4, "quux2", 6);
 
   if (tx1->rollback)
     fixture->tx1_rollback = TRUE;
   
-  gzochid_storage_transaction_rollback (tx1);
+  gzochid_storage_engine_interface_mem.transaction_rollback (tx1);
 
   return NULL;
 }
@@ -344,8 +370,9 @@ deadlock_simple_thread_2 (gpointer data)
 {
   struct test_storage_fixture_concurrent *fixture = data;
   gzochid_storage_transaction *tx2 = 
-    gzochid_storage_transaction_begin (fixture->base_fixture->context);
-  char *value2 = gzochid_storage_transaction_get 
+    gzochid_storage_engine_interface_mem.transaction_begin 
+    (fixture->base_fixture->context);
+  char *value2 = gzochid_storage_engine_interface_mem.transaction_get 
     (tx2, fixture->base_fixture->store, "baz", 4, NULL);
 
   free (value2);
@@ -353,13 +380,13 @@ deadlock_simple_thread_2 (gpointer data)
   decrement_latch (fixture);
   wait_latch_zero (fixture);
 
-  gzochid_storage_transaction_put 
+  gzochid_storage_engine_interface_mem.transaction_put 
     (tx2, fixture->base_fixture->store, "foo", 4, "bar2", 5);
 
   if (tx2->rollback)
     fixture->tx2_rollback = TRUE;
 
-  gzochid_storage_transaction_rollback (tx2);
+  gzochid_storage_engine_interface_mem.transaction_rollback (tx2);
 
   return NULL;
 }
@@ -371,8 +398,10 @@ test_storage_mem_tx_deadlock_simple
   GThread *thread1 = NULL;
   GThread *thread2 = NULL;
 
-  gzochid_storage_put (fixture->base_fixture->store, "foo", 4, "bar", 4);
-  gzochid_storage_put (fixture->base_fixture->store, "baz", 4, "quux", 5);
+  gzochid_storage_engine_interface_mem.put 
+    (fixture->base_fixture->store, "foo", 4, "bar", 4);
+  gzochid_storage_engine_interface_mem.put 
+    (fixture->base_fixture->store, "baz", 4, "quux", 5);
 
   fixture->latch = 2;
 
@@ -397,18 +426,20 @@ test_storage_mem_tx_split_root
   char *value = NULL;
   size_t value_len = 0;
   gzochid_storage_transaction *tx = 
-    gzochid_storage_transaction_begin (fixture->context);
+    gzochid_storage_engine_interface_mem.transaction_begin (fixture->context);
 
   for (; i < 10; i++)
     {
       c = (char) i;
-      gzochid_storage_transaction_put (tx, fixture->store, &c, 1, &c, 1);
+      gzochid_storage_engine_interface_mem.transaction_put 
+	(tx, fixture->store, &c, 1, &c, 1);
     }
   
-  gzochid_storage_transaction_commit (tx);
+  gzochid_storage_engine_interface_mem.transaction_commit (tx);
 
   c = 0;
-  value = gzochid_storage_get (fixture->store, &c, 1, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, &c, 1, &value_len);
 
   g_assert_nonnull (value);
   g_assert_cmpint (*value, ==, 0);
@@ -416,7 +447,8 @@ test_storage_mem_tx_split_root
   free (value);
 
   c = 9;
-  value = gzochid_storage_get (fixture->store, &c, 1, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, &c, 1, &value_len);
 
   g_assert_nonnull (value);
   g_assert_cmpint (*value, ==, 9);
@@ -434,23 +466,26 @@ test_storage_mem_tx_split_internal
   char *value = NULL;
   size_t value_len = 0;
   gzochid_storage_transaction *tx = 
-    gzochid_storage_transaction_begin (fixture->context);
+    gzochid_storage_engine_interface_mem.transaction_begin (fixture->context);
 
   for (; i < 10; i++)
     {
       c = (char) i * 10;
-      gzochid_storage_transaction_put (tx, fixture->store, &c, 1, &c, 1);
+      gzochid_storage_engine_interface_mem.transaction_put 
+	(tx, fixture->store, &c, 1, &c, 1);
     }
   for (i = 1; i < 10; i++)
     {
       c = (char) i;
-      gzochid_storage_transaction_put (tx, fixture->store, &c, 1, &c, 1);
+      gzochid_storage_engine_interface_mem.transaction_put 
+	(tx, fixture->store, &c, 1, &c, 1);
     }
   
-  gzochid_storage_transaction_commit (tx);
+  gzochid_storage_engine_interface_mem.transaction_commit (tx);
 
   c = 1;
-  value = gzochid_storage_get (fixture->store, &c, 1, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, &c, 1, &value_len);
 
   g_assert_nonnull (value);
   g_assert_cmpint (*value, ==, 1);
@@ -458,7 +493,8 @@ test_storage_mem_tx_split_internal
   free (value);
 
   c = 90;
-  value = gzochid_storage_get (fixture->store, &c, 1, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, &c, 1, &value_len);
 
   g_assert_nonnull (value);
   g_assert_cmpint (*value, ==, 90);
@@ -476,26 +512,29 @@ test_storage_mem_tx_merge_internal
   char *value = NULL;
   size_t value_len = 0;
   gzochid_storage_transaction *tx = 
-    gzochid_storage_transaction_begin (fixture->context);
+    gzochid_storage_engine_interface_mem.transaction_begin (fixture->context);
 
   for (; i < 20; i++)
     {
       c = (char) i;
-      gzochid_storage_transaction_put (tx, fixture->store, &c, 1, &c, 1);
+      gzochid_storage_engine_interface_mem.transaction_put 
+	(tx, fixture->store, &c, 1, &c, 1);
     }
   for (i = 5; i < 15; i++)
     {
       int ret = 0;
       c = (char) i;
-      ret = gzochid_storage_transaction_delete (tx, fixture->store, &c, 1);
+      ret = gzochid_storage_engine_interface_mem.transaction_delete 
+	(tx, fixture->store, &c, 1);
 
       g_assert_cmpint (ret, ==, 0);
     }
   
-  gzochid_storage_transaction_commit (tx);
+  gzochid_storage_engine_interface_mem.transaction_commit (tx);
 
   c = 0;
-  value = gzochid_storage_get (fixture->store, &c, 1, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, &c, 1, &value_len);
 
   g_assert_nonnull (value);
   g_assert_cmpint (*value, ==, 0);
@@ -503,7 +542,8 @@ test_storage_mem_tx_merge_internal
   free (value);
 
   c = 19;
-  value = gzochid_storage_get (fixture->store, &c, 1, &value_len);
+  value = gzochid_storage_engine_interface_mem.get 
+    (fixture->store, &c, 1, &value_len);
 
   g_assert_nonnull (value);
   g_assert_cmpint (*value, ==, 19);

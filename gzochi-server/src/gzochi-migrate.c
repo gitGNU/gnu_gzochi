@@ -33,6 +33,7 @@
 #include "config.h"
 #include "data.h"
 #include "descriptor.h"
+#include "game.h"
 #include "guile.h"
 #include "reloc.h"
 #include "scheme.h"
@@ -348,9 +349,10 @@ initialize_scheme_bindings ()
 }
 
 static gzochid_storage_store *
-create_store (gzochid_storage_context *context, char *path)
+create_store (gzochid_storage_engine_interface *iface, 
+	      gzochid_storage_context *context, char *path)
 {
-  gzochid_storage_store *store = gzochid_storage_open 
+  gzochid_storage_store *store = iface->open 
     (context, path, GZOCHID_STORAGE_CREATE | GZOCHID_STORAGE_EXCL);
 
   if (store == NULL)
@@ -362,23 +364,25 @@ create_store (gzochid_storage_context *context, char *path)
 }
 
 static gzochid_storage_store *
-create_oid_scratch_storage (char *scratch_dir)
+create_oid_scratch_storage (gzochid_storage_engine_interface *iface, 
+			    char *scratch_dir)
 {
   gchar *filename = g_strconcat (scratch_dir, "/oids", NULL);
-  gzochid_storage_context *context = gzochid_storage_initialize (scratch_dir);
-  gzochid_storage_store *store = create_store (context, filename);
+  gzochid_storage_context *context = iface->initialize (scratch_dir);
+  gzochid_storage_store *store = create_store (iface, context, filename);
 
   g_free (filename);
   return store;
 }
 
 static void
-cleanup_oids_scratch_storage (gzochid_storage_store *s, char *scratch_dir)
+cleanup_oids_scratch_storage (gzochid_storage_engine_interface *iface, 
+			      gzochid_storage_store *s, char *scratch_dir)
 {
   gzochid_storage_context *context = s->context;
 
-  gzochid_storage_close (s);
-  gzochid_storage_destroy (context, scratch_dir);
+  iface->close_store (s);
+  iface->destroy_store (context, scratch_dir);
 }
 
 static SCM 
@@ -435,7 +439,8 @@ create_migration (gzochid_application_context *context,
   m->quiet = quiet;
   m->pending_oids = g_queue_new ();
   
-  m->visited_oids = create_oid_scratch_storage (scratch_dir);
+  m->visited_oids = create_oid_scratch_storage 
+    (APP_STORAGE_INTERFACE (context), scratch_dir);
   m->visited_oids_path = scratch_dir;
 
   m->callback = resolve_or_die (md->callback_module, md->callback_name);
@@ -472,9 +477,11 @@ create_migration (gzochid_application_context *context,
 static void 
 cleanup_application_context (gzochid_application_context *context)
 {
-  gzochid_storage_close (context->meta);
-  gzochid_storage_close (context->names);
-  gzochid_storage_close (context->oids);
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (context);
+
+  iface->close_store (context->meta);
+  iface->close_store (context->names);
+  iface->close_store (context->oids);
 
   gzochid_application_context_free (context);
 }
@@ -482,9 +489,10 @@ cleanup_application_context (gzochid_application_context *context)
 static void
 cleanup_migration (struct migration *m)
 {
+  cleanup_oids_scratch_storage 
+    (APP_STORAGE_INTERFACE (m->context), m->visited_oids, m->visited_oids_path);
   cleanup_application_context (m->context);
 
-  cleanup_oids_scratch_storage (m->visited_oids, m->visited_oids_path);
   free (m->visited_oids_path);
 
   g_queue_free (m->pending_oids);
@@ -503,10 +511,11 @@ cleanup_migration (struct migration *m)
 }
 
 static gzochid_storage_store *
-open_store (gzochid_storage_context *context, char *path, char *db)
+open_store (gzochid_application_context *context, char *path, char *db)
 {
   gchar *filename = g_strconcat (path, "/", db, NULL);
-  gzochid_storage_store *store = gzochid_tool_open_store (context, filename);
+  gzochid_storage_store *store = gzochid_tool_open_store 
+    (APP_STORAGE_INTERFACE (context), context->storage_context, filename);
 
   g_free (filename);
   return store;
@@ -539,7 +548,8 @@ create_application_context (char *gzochid_conf_path, char *app)
       exit (EXIT_FAILURE);
     }
 
-  context->storage_context = gzochid_storage_initialize (data_dir);
+  context->storage_context = 
+    APP_STORAGE_INTERFACE (context)->initialize (data_dir);
 
   if (context->storage_context == NULL)
     {
@@ -547,9 +557,9 @@ create_application_context (char *gzochid_conf_path, char *app)
       exit (EXIT_FAILURE);
     }
 
-  context->meta = open_store (context->storage_context, data_dir, "meta");
-  context->names = open_store (context->storage_context, data_dir, "names");
-  context->oids = open_store (context->storage_context, data_dir, "oids");
+  context->meta = open_store (context, data_dir, "meta");
+  context->names = open_store (context, data_dir, "names");
+  context->oids = open_store (context, data_dir, "oids");
 
   free (work_dir);
   free (data_dir);
@@ -706,12 +716,13 @@ migrate_object (struct migration *m, char *oid_str)
   args[1] = oid_str;
 
   size_t oid_len = strlen (oid_str);
-  char *val = gzochid_storage_get 
+  char *val = APP_STORAGE_INTERFACE (m->context)->get 
     (m->visited_oids, oid_str, oid_len, NULL);
       
   if (val == NULL)
     {
-      gzochid_storage_put (m->visited_oids, oid_str, oid_len, "", 1);
+      APP_STORAGE_INTERFACE (m->context)->put
+	(m->visited_oids, oid_str, oid_len, "", 1);
       if (gzochid_transaction_execute (migrate_object_tx, args) 
 	  != GZOCHID_TRANSACTION_SUCCESS && !m->explicit_rollback)
 	{
@@ -733,11 +744,11 @@ static struct datum
 next_key (struct migration *m, struct datum last_key)
 {
   struct datum key = { NULL, 0 };
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (m->context);
 
   if (last_key.data == NULL)
-    key.data = gzochid_storage_next_key 
-      (m->context->names, "o.", 2, &key.data_len);
-  else key.data = gzochid_storage_next_key 
+    key.data = iface->next_key (m->context->names, "o.", 2, &key.data_len);
+  else key.data = iface->next_key 
 	 (m->context->names, last_key.data, last_key.data_len, &key.data_len);
 
   if (key.data != NULL && strncmp ("o.", key.data, 2) != 0)
@@ -769,7 +780,7 @@ run_migration (struct migration *m)
 
 	  if (key.data == NULL)
 	    break;
-	  else oid_str = gzochid_storage_get 
+	  else oid_str = APP_STORAGE_INTERFACE (m->context)->get 
 		 (m->context->names, key.data, key.data_len, NULL);
 	}
 
@@ -862,7 +873,7 @@ Copyright (C) %s Julian Graham\n\
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\
 This is free software: you are free to change and redistribute it.\n\
 There is NO WARRANTY, to the extent permitted by law.\n"),
-          "2014");
+          "2015");
 }
 
 static void

@@ -1,5 +1,5 @@
 /* test-data.c: Test routines for data.c in gzochid.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,7 +22,9 @@
 #include <string.h>
 
 #include "data.h"
+#include "game.h"
 #include "io.h"
+#include "storage-mem.h"
 #include "tx.h"
 
 static gboolean serialized = FALSE;
@@ -89,12 +91,21 @@ fetch_reference (gpointer data)
 static void 
 application_context_init (gzochid_application_context *context)
 {
-  context->storage_context = gzochid_storage_initialize ("/dev/null");
-  context->meta = gzochid_storage_open
+  gzochid_context *base = (gzochid_context *) context;
+  gzochid_game_context *game_context = gzochid_game_context_new ();
+  base->parent = (gzochid_context *) game_context;
+
+  game_context->storage_engine = malloc (sizeof (gzochid_storage_engine));
+  game_context->storage_engine->interface = 
+    &gzochid_storage_engine_interface_mem;
+
+  context->storage_context = 
+    gzochid_storage_engine_interface_mem.initialize ("/dev/null");
+  context->meta = gzochid_storage_engine_interface_mem.open
     (context->storage_context, "/dev/null", 0);
-  context->oids = gzochid_storage_open 
+  context->oids = gzochid_storage_engine_interface_mem.open 
     (context->storage_context, "/dev/null", 0);
-  context->names = gzochid_storage_open 
+  context->names = gzochid_storage_engine_interface_mem.open 
     (context->storage_context, "/dev/null", 0);
 }
 
@@ -110,7 +121,7 @@ static void test_data_reference_finalize ()
   mpz_init (z);
   key = mpz_get_str (NULL, 16, z);
 
-  gzochid_storage_put 
+  gzochid_storage_engine_interface_mem.put 
     (context->oids, key, strlen (key) + 1, "foo", 4);
 
   free (key);

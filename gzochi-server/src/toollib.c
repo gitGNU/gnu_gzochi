@@ -54,9 +54,10 @@ gzochid_tool_load_game_config (const char *path)
 }
 
 gzochid_storage_store *
-gzochid_tool_open_store (gzochid_storage_context *context, char *path)
+gzochid_tool_open_store (gzochid_storage_engine_interface *iface, 
+			 gzochid_storage_context *context, char *path)
 {
-  gzochid_storage_store *store = gzochid_storage_open (context, path, 0);
+  gzochid_storage_store *store = iface->open (context, path, 0);
 
   if (store == NULL)
     {

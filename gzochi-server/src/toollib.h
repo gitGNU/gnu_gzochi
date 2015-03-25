@@ -33,12 +33,13 @@ GHashTable *gzochid_tool_load_game_config (const char *);
 
 /**
    Open the store with the specified filename template in the specified storage
-   context. (The actual name of the file backing the returned store is dependent
-   on the implementation of the storage engine.) If the store cannot be opened,
-   this function logs an error and causes the process to exit.
+   context using the specified storage engine_interface. (The actual name of the
+   file backing the returned store is dependent on the implementation of the 
+   storage engine.) If the store cannot be opened, this function logs an error 
+   and causes the process to exit.
  */
-gzochid_storage_store *
-gzochid_tool_open_store (gzochid_storage_context *, char *);
+gzochid_storage_store *gzochid_tool_open_store 
+(gzochid_storage_engine_interface *, gzochid_storage_context *, char *);
 
 /**
    Attempts to resolve a data directory from its arguments. The string 

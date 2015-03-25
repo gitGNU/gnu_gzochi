@@ -28,6 +28,8 @@
 #include "gzochid-auth.h"
 #include "io.h"
 #include "schedule.h"
+#include "storage.h"
+#include "storage-mem.h"
 #include "task.h"
 #include "threads.h"
 #include "tx.h"
@@ -137,12 +139,21 @@ test_periodic_cancel_inner1 (gpointer data)
 static void 
 application_context_init (gzochid_application_context *context)
 {
-  context->storage_context = gzochid_storage_initialize ("/dev/null");
-  context->meta = gzochid_storage_open
+  gzochid_context *base = (gzochid_context *) context;
+  gzochid_game_context *game_context = gzochid_game_context_new ();
+  base->parent = (gzochid_context *) game_context;
+
+  game_context->storage_engine = malloc (sizeof (gzochid_storage_engine));
+  game_context->storage_engine->interface = 
+    &gzochid_storage_engine_interface_mem;
+
+  context->storage_context = 
+    gzochid_storage_engine_interface_mem.initialize ("/dev/null");
+  context->meta = gzochid_storage_engine_interface_mem.open
     (context->storage_context, "/dev/null", 0);
-  context->oids = gzochid_storage_open 
+  context->oids = gzochid_storage_engine_interface_mem.open 
     (context->storage_context, "/dev/null", 0);
-  context->names = gzochid_storage_open 
+  context->names = gzochid_storage_engine_interface_mem.open 
     (context->storage_context, "/dev/null", 0);
 }
 
@@ -153,8 +164,7 @@ test_periodic_cancel ()
   gboolean submitted = FALSE, done = FALSE;
   gzochid_periodic_task_handle handle;
 
-  gzochid_game_context *game_context = 
-    calloc (1, sizeof (gzochid_game_context));
+  gzochid_game_context *game_context = NULL;
   gzochid_application_context *app_context = 
     gzochid_application_context_new ();
   gzochid_auth_identity *identity = malloc (sizeof (gzochid_auth_identity));
@@ -162,7 +172,8 @@ test_periodic_cancel ()
   application_context_init (app_context);
   identity->name = "test";
 
-  ((gzochid_context *) app_context)->parent = (gzochid_context *) game_context;
+  game_context = (gzochid_game_context *) 
+    ((gzochid_context *) app_context)->parent;
   game_context->task_queue = gzochid_schedule_task_queue_new 
     (gzochid_thread_pool_new (game_context, 1, TRUE, NULL));
   game_context->tx_timeout = (struct timeval) { INT_MAX, INT_MAX };

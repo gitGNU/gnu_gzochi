@@ -23,8 +23,11 @@
 
 #include "app.h"
 #include "app-task.h"
+#include "context.h"
+#include "game.h"
 #include "gzochid-auth.h"
 #include "scheme-task.h"
+#include "storage-mem.h"
 #include "session.h"
 #include "tx.h"
 
@@ -55,16 +58,25 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
     calloc (1, sizeof (gzochid_application_descriptor));
   gzochid_auth_identity *identity = calloc (1, sizeof (gzochid_auth_identity));
   gzochid_client_session *session = NULL;
-
+  gzochid_context *base_context = (gzochid_context *) context;
+  gzochid_game_context *game_context = gzochid_game_context_new ();
+  gzochid_storage_engine *storage_engine = 
+    malloc (sizeof (gzochid_storage_engine));
+  
   SCM module = scm_c_resolve_module ("test");
   SCM logged_in = scm_c_make_gsubr ("logged-in", 1, 0, 0, raise_condition);
 
-  context->storage_context = gzochid_storage_initialize ("/tmp");
-  context->meta = gzochid_storage_open
+  base_context->parent = (gzochid_context *) game_context;
+  game_context->storage_engine = storage_engine;
+  storage_engine->interface = &gzochid_storage_engine_interface_mem;
+
+  context->storage_context = 
+    gzochid_storage_engine_interface_mem.initialize ("/tmp");
+  context->meta = gzochid_storage_engine_interface_mem.open
     (context->storage_context, "/tmp/meta", GZOCHID_STORAGE_CREATE);
-  context->oids = gzochid_storage_open 
+  context->oids = gzochid_storage_engine_interface_mem.open
     (context->storage_context, "/tmp/oids", GZOCHID_STORAGE_CREATE);
-  context->names = gzochid_storage_open 
+  context->names = gzochid_storage_engine_interface_mem.open
     (context->storage_context, "/tmp/names", GZOCHID_STORAGE_CREATE);
 
   scm_c_module_define (module, "logged-in", logged_in);
@@ -88,7 +100,7 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
     mpz_set_ui (oid, 1);
     oid_str = mpz_get_str (NULL, 16, oid);
   
-    gzochid_storage_put 
+    gzochid_storage_engine_interface_mem.put
       (context->oids, oid_str, strlen (oid_str), out->str, out->len);
 
     mpz_clear (oid);

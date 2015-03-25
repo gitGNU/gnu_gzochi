@@ -120,14 +120,12 @@ AS_CASE([$GZOCHI_STORAGE_ENGINE],
                           [AC_MSG_ERROR([liblmdb is required.])])
            AC_CHECK_HEADER([lmdb.h], [], 
                            [AC_MSG_ERROR([lmdb.h is required.])])],
-  [mem], [],
   [AC_MSG_ERROR([Invalid storage engine $STORAGE_ENGINE.])])
 
 AC_SUBST(GZOCHI_STORAGE_ENGINE)
 AM_CONDITIONAL([STORAGE_ENGINE_BDB], [test x$GZOCHI_STORAGE_ENGINE = xbdb])
 AM_CONDITIONAL([STORAGE_ENGINE_HDB], [test x$GZOCHI_STORAGE_ENGINE = xhdb])
 AM_CONDITIONAL([STORAGE_ENGINE_LMDB], [test x$GZOCHI_STORAGE_ENGINE = xlmdb])
-AM_CONDITIONAL([STORAGE_ENGINE_MEM], [test x$GZOCHI_STORAGE_ENGINE = xmem])
 
 AC_SEARCH_LIBS([__gmpz_init], [gmp], [], [AC_MSG_ERROR([libgmp is required.])])
 AC_CHECK_HEADER([gmp.h], [], [AC_MSG_ERROR([gmp.h is required.])])

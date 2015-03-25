@@ -59,14 +59,15 @@ dump_key_value (char *k, size_t k_len, char *v, size_t v_len, FILE *to)
 }
 
 static void
-dump_store 
-(gzochid_storage_transaction *tx, gzochid_storage_store *store, FILE *to) 
+dump_store (gzochid_storage_engine_interface *iface, 
+	    gzochid_storage_transaction *tx, gzochid_storage_store *store, 
+	    FILE *to) 
 {
   size_t key_len = 0;
   char *key = NULL;
   
   dump_header (to);
-  key = gzochid_storage_transaction_first_key (tx, store, &key_len);
+  key = iface->transaction_first_key (tx, store, &key_len);
   
   while (key != NULL)
     {
@@ -74,16 +75,13 @@ dump_store
       size_t old_key_len = key_len;
 
       size_t value_len = 0;
-      char *value = gzochid_storage_transaction_get 
+      char *value = iface->transaction_get 
 	(tx, store, key, key_len, &value_len);
 
       dump_key_value (key, key_len, value, value_len, to);
-      
-      free (value);
-      
-      key = gzochid_storage_transaction_next_key 
-	(tx, store, key, old_key_len, &key_len);
+      key = iface->transaction_next_key (tx, store, key, old_key_len, &key_len);
 
+      free (value);
       free (old_key);
     }
   
@@ -92,22 +90,24 @@ dump_store
 
 static void
 dump_single_inner 
-(gzochid_storage_context *context, gzochid_storage_transaction *tx, 
- char *data_dir, char *db, FILE *to)
+(gzochid_storage_engine_interface *iface, gzochid_storage_context *context, 
+ gzochid_storage_transaction *tx, char *data_dir, char *db, FILE *to)
 {
   char *db_path = g_strconcat (data_dir, "/", db, NULL);
-  gzochid_storage_store *store = gzochid_tool_open_store (context, db_path);
+  gzochid_storage_store *store = 
+    gzochid_tool_open_store (iface, context, db_path);
 
-  dump_store (tx, store, to);
+  dump_store (iface, tx, store, to);
 
-  gzochid_storage_close (store);
+  iface->close_store (store);
   g_free (db_path);
 }
 
 static void
-dump_single (char *data_dir, char *db, FILE *to)
+dump_single (gzochid_storage_engine_interface *iface, char *data_dir, char *db,
+	     FILE *to)
 {
-  gzochid_storage_context *context = gzochid_storage_initialize (data_dir);
+  gzochid_storage_context *context = iface->initialize (data_dir);
 
   if (context == NULL)
     {
@@ -116,11 +116,10 @@ dump_single (char *data_dir, char *db, FILE *to)
     }
   else 
     {
-      gzochid_storage_transaction *tx = 
-	gzochid_storage_transaction_begin (context);
-      dump_single_inner (context, tx, data_dir, db, to);
-      gzochid_storage_transaction_rollback (tx);
-      gzochid_storage_context_close (context);
+      gzochid_storage_transaction *tx = iface->transaction_begin (context);
+      dump_single_inner (iface, context, tx, data_dir, db, to);
+      iface->transaction_rollback (tx);
+      iface->close_context (context);
     }
 }
 
@@ -143,9 +142,10 @@ open_dump_output_file (char *output_dir, char *file)
 }
 
 static void
-dump_all (char *data_dir, char *output_dir)
+dump_all (gzochid_storage_engine_interface *iface, char *data_dir, 
+	  char *output_dir)
 {
-  gzochid_storage_context *context = gzochid_storage_initialize (data_dir);
+  gzochid_storage_context *context = iface->initialize (data_dir);
 
   if (context == NULL)
     {
@@ -158,25 +158,25 @@ dump_all (char *data_dir, char *output_dir)
       FILE *oids_dump = open_dump_output_file (output_dir, "oids.dump");
       FILE *names_dump = open_dump_output_file (output_dir, "names.dump");
 
-      gzochid_storage_transaction *tx = 
-	gzochid_storage_transaction_begin (context);
+      gzochid_storage_transaction *tx = iface->transaction_begin (context);
 
-      dump_single_inner (context, tx, data_dir, "meta", meta_dump);
-      dump_single_inner (context, tx, data_dir, "oids", oids_dump);
-      dump_single_inner (context, tx, data_dir, "names", names_dump);
+      dump_single_inner (iface, context, tx, data_dir, "meta", meta_dump);
+      dump_single_inner (iface, context, tx, data_dir, "oids", oids_dump);
+      dump_single_inner (iface, context, tx, data_dir, "names", names_dump);
 
       fclose (meta_dump);
       fclose (oids_dump);
       fclose (names_dump);
 
-      gzochid_storage_transaction_rollback (tx);
-      gzochid_storage_context_close (context);
+      iface->transaction_rollback (tx);
+      iface->close_context (context);
     }
 }
 
 static const struct option longopts[] =
   {
     { "config", required_argument, NULL, 'c' },
+    { "engine", required_argument, NULL, 'e' },
     { "output", required_argument, NULL, 'o' },
     { "help", no_argument, NULL, 'h' },
     { "version", no_argument, NULL, 'v' },
@@ -201,12 +201,14 @@ static void
 print_help (const char *program_name)
 {
   fprintf (stderr, _("\
-Usage: %s [-c <CONF>] [-o <OUTPUT_DIR>] <APP_NAME or DATA_DIR>[:<DB>]\n\
+Usage: %s [-c <CONF>] [-e <ENGINE>] [-o <DIR>] <APP_NAME or DATA_DIR>[:<DB>]\n\
        %s [-h | -v]\n"), program_name, program_name);
   
   fputs ("", stderr);
   fputs (_("\
   -c, --config        full path to gzochid.conf\n\
+  -e, --engine        the name of the storage engine in use, as per\n\
+                      gzochid.conf (e.g., bdb)\n\
   -o, --output        the output directory, if dumping all databases; or\n\
                       the output file, if dumping a single database\n\
   -h, --help          display this help and exit\n\
@@ -233,16 +235,20 @@ main (int argc, char *argv[])
 {
   const char *program_name = argv[0];
   char *gzochid_conf_path = NULL;
+  char *storage_engine_name = NULL;
   char *output = NULL;
   int optc = 0;
   
   setlocale (LC_ALL, "");
   
-  while ((optc = getopt_long (argc, argv, "+c:o:hv", longopts, NULL)) != -1)
+  while ((optc = getopt_long (argc, argv, "+ce:o:hv", longopts, NULL)) != -1)
     switch (optc)
       {
       case 'c':
 	gzochid_conf_path = strdup (optarg);
+	break;
+      case 'e':
+	storage_engine_name = strdup (optarg);
 	break;
       case 'o':
 	output = strdup (optarg);
@@ -277,11 +283,14 @@ main (int argc, char *argv[])
 	(gzochid_conf, targets[0], FALSE);
       char *db = targets[1];
 
+      gzochid_storage_engine *engine = 
+	gzochid_tool_probe_storage_engine (gzochid_conf, storage_engine_name); 
+
       if (db == NULL)
 	{
 	  if (output == NULL)
 	    output = g_get_current_dir ();
-	  dump_all (data_dir, output);
+	  dump_all (engine->interface, data_dir, output);
 	  free (output);
 	}
       else 
@@ -302,7 +311,7 @@ main (int argc, char *argv[])
 	      free (output);
 	    }
 
-	  dump_single (data_dir, db, output_file);
+	  dump_single (engine->interface, data_dir, db, output_file);
 	}
 
       g_strfreev (targets);

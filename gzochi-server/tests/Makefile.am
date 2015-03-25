@@ -26,6 +26,7 @@ test_programs = \
 	test-reloc \
 	test-scheme \
 	test-scheme-task \
+	test-storage-mem \
 	test-task \
 	test-util
 
@@ -38,10 +39,6 @@ endif
 if STORAGE_ENGINE_LMDB
 test_programs += test-storage-lmdb
 endif
-if STORAGE_ENGINE_MEM
-test_programs += test-storage-mem
-endif
-
 noinst_HEADERS = mock-data.h
 
 check_PROGRAMS = $(test_programs)
@@ -51,16 +48,7 @@ GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
 test_data_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_data_SOURCES = mock-storage.c test-data.c
-test_data_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
-	$(top_builddir)/src/libgzochid_la-auth.o \
-	$(top_builddir)/src/libgzochid_la-context.o \
-	$(top_builddir)/src/libgzochid_la-data.o \
-	$(top_builddir)/src/libgzochid_la-event.o \
-	$(top_builddir)/src/libgzochid_la-fsm.o \
-	$(top_builddir)/src/libgzochid_la-io.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
-	$(top_builddir)/src/libgzochid_la-tx.o \
-	$(top_builddir)/src/libgzochid_la-util.o \
+test_data_LDADD = $(top_builddir)/src/libgzochid.la \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_event_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
@@ -131,20 +119,7 @@ test_storage_mem_LDADD = $(top_builddir)/src/libgzochid_la-storage-mem.o \
 
 test_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
 test_task_SOURCES = test-task.c mock-storage.c 
-test_task_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
-	$(top_builddir)/src/libgzochid_la-app-task.o \
-	$(top_builddir)/src/libgzochid_la-auth.o \
-	$(top_builddir)/src/libgzochid_la-context.o \
-	$(top_builddir)/src/libgzochid_la-data.o \
-	$(top_builddir)/src/libgzochid_la-event.o \
-	$(top_builddir)/src/libgzochid_la-fsm.o \
-	$(top_builddir)/src/libgzochid_la-task.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
-	$(top_builddir)/src/libgzochid_la-schedule.o \
-	$(top_builddir)/src/libgzochid_la-threads.o \
-	$(top_builddir)/src/libgzochid_la-tx.o \
-	$(top_builddir)/src/libgzochid_la-txlog.o \
-	$(top_builddir)/src/libgzochid_la-util.o \
+test_task_LDADD = $(top_builddir)/src/libgzochid.la \
 	$(GZOCHI_COMMON_LIBS) @GMODULE_LIBS@ @GLIB_LIBS@ @GUILE_LIBS@
 
 test_util_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@

@@ -1,5 +1,5 @@
 /* httpd.c: Embedded informational web server for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -63,7 +63,8 @@ struct data_state
   int current_line_length;
 };
 
-static void next_line (struct data_state *state)
+static void 
+next_line (struct data_state *state)
 {
   char *buf = NULL;
   int i = 0, remaining = state->data_length - state->data_offset,
@@ -140,10 +141,11 @@ static void next_line (struct data_state *state)
     }
 }
 
-static ssize_t write_data_line (void *cls, uint64_t pos, char *buf, size_t max)
+static ssize_t 
+write_data_line (void *cls, uint64_t pos, char *buf, size_t max)
 {
   int n = 0;
-  struct data_state *state = (struct data_state *) cls;
+  struct data_state *state = cls;
 
   if (state->current_line == NULL)
     next_line (state);
@@ -166,9 +168,10 @@ static ssize_t write_data_line (void *cls, uint64_t pos, char *buf, size_t max)
   return n;
 }
 
-static void free_data_state (void *ptr)
+static void 
+free_data_state (void *ptr)
 {
-  struct data_state *state = (struct data_state *) ptr;
+  struct data_state *state = ptr;
 
   free (state->data);
 
@@ -178,9 +181,9 @@ static void free_data_state (void *ptr)
   free (state);
 }
 
-static int not_found404 
-(struct MHD_Connection *connection, const char *page, 
- int must_free, int must_copy)
+static int 
+not_found404 (struct MHD_Connection *connection, const char *page, 
+	      int must_free, int must_copy)
 {
   struct MHD_Response *response = MHD_create_response_from_data 
     (strlen (page), (void *) page, must_free, must_copy);
@@ -191,19 +194,21 @@ static int not_found404
   return ret;
 }
 
-static int not_found404_default (struct MHD_Connection *connection)
+static int 
+not_found404_default (struct MHD_Connection *connection)
 {
   return not_found404 
     (connection, "<html><body>Not found.</body></html>", FALSE, FALSE);
 }
 
-static int dispatch_oid (struct MHD_Connection *connection, 
-			 gzochid_application_context *context, mpz_t oid)
+static int 
+dispatch_oid (struct MHD_Connection *connection, 
+	      gzochid_application_context *context, mpz_t oid)
 {
   int ret = 0;
   size_t data_length = 0;
   char *oid_str = mpz_get_str (NULL, 16, oid);
-  char *data = gzochid_storage_get 
+  char *data = APP_STORAGE_INTERFACE (context)->get
     (context->oids, oid_str, strlen (oid_str) + 1, &data_length);
   struct data_state *state = calloc (1, sizeof (struct data_state));
   struct MHD_Response *response = NULL;
@@ -220,9 +225,9 @@ static int dispatch_oid (struct MHD_Connection *connection,
   return ret;
 }
 
-static int dispatch_oids 
-(struct MHD_Connection *connection, const char *url,
- gzochid_application_context *context)
+static int 
+dispatch_oids (struct MHD_Connection *connection, const char *url,
+	       gzochid_application_context *context)
 {
   int ret = 0;
   if (strlen (url) == 0)
@@ -231,7 +236,8 @@ static int dispatch_oids
       struct MHD_Response *response = NULL;
       
       size_t klen = 0;
-      char *k = gzochid_storage_first_key (context->oids, &klen);
+      char *k = APP_STORAGE_INTERFACE (context)->first_key 
+	(context->oids, &klen);
       
       g_string_append (response_str, "<html>\n");
       g_string_append (response_str, "  <body>\n");
@@ -249,7 +255,8 @@ static int dispatch_oids
 	  g_string_append_len (response_str, k, klen - 1);
 	  g_string_append (response_str, "</a></li>\n");
 	  
-	  next_k = gzochid_storage_next_key (context->oids, k, klen, &klen);
+	  next_k = APP_STORAGE_INTERFACE (context)->next_key 
+	    (context->oids, k, klen, &klen);
 	  
 	  free (k);
 	  k = next_k;
@@ -285,15 +292,16 @@ static int dispatch_oids
     }
 }
 
-static int dispatch_names (struct MHD_Connection *connection, 
-			   gzochid_application_context *context)
+static int 
+dispatch_names (struct MHD_Connection *connection, 
+		gzochid_application_context *context)
 {
   int ret = 0;
   GString *response_str = g_string_new (NULL);
   struct MHD_Response *response = NULL;
   
   size_t klen = 0;
-  char *k = gzochid_storage_first_key (context->names, &klen);
+  char *k = APP_STORAGE_INTERFACE (context)->first_key (context->names, &klen);
 
   g_string_append (response_str, "<html>\n");
   g_string_append (response_str, "  <body>\n");
@@ -309,7 +317,8 @@ static int dispatch_names (struct MHD_Connection *connection,
       g_string_append_len (response_str, k, klen);
       g_string_append (response_str, "</li>\n");
       
-      next_k = gzochid_storage_next_key (context->names, k, klen, &klen);
+      next_k = APP_STORAGE_INTERFACE (context)->next_key 
+	(context->names, k, klen, &klen);
 
       free (k);
       k = next_k;
@@ -328,8 +337,9 @@ static int dispatch_names (struct MHD_Connection *connection,
   return ret;
 }
 
-static int list_apps 
-(struct MHD_Connection *connection, gzochid_game_context *game_context)
+static int 
+list_apps (struct MHD_Connection *connection, 
+	   gzochid_game_context *game_context)
 {
   struct MHD_Response *response = NULL;
   GList *apps = gzochid_game_context_get_applications (game_context);
@@ -349,8 +359,7 @@ static int list_apps
       
       while (apps_ptr != NULL)
 	{
-	  gzochid_application_context *app = 
-	    (gzochid_application_context *) apps_ptr->data;
+	  gzochid_application_context *app = apps_ptr->data;
 	  
   	  g_string_append_printf 
 	    (response_str, 
@@ -374,8 +383,9 @@ static int list_apps
     }
 }
 
-static int app_info 
-(struct MHD_Connection *connection, gzochid_application_context *app_context)
+static int 
+app_info (struct MHD_Connection *connection, 
+	  gzochid_application_context *app_context)
 {
   int ret = 0;
   struct MHD_Response *response = NULL;
@@ -467,8 +477,9 @@ static int app_info
   return ret;
 }
 
-static int dispatch_app (struct MHD_Connection *connection, const char *url,
-			 gzochid_game_context *game_context)
+static int 
+dispatch_app (struct MHD_Connection *connection, const char *url,
+	      gzochid_game_context *game_context)
 {
   gzochid_application_context *app_context = NULL;
   char *rest = strchr (url, '/');
@@ -497,22 +508,23 @@ static int dispatch_app (struct MHD_Connection *connection, const char *url,
   else return not_found404_default (connection);
 }
 
-static int dispatch_apps (struct MHD_Connection *connection, const char *url,
-			  gzochid_game_context *game_context)
+static int 
+dispatch_apps (struct MHD_Connection *connection, const char *url,
+	       gzochid_game_context *game_context)
 {
   if (strlen (url) == 0)
     return list_apps (connection, game_context);
   else return dispatch_app (connection, url, game_context);
 }
 
-static int dispatch (void *cls, struct MHD_Connection *connection, 
-		     const char *url, const char *method, const char *version, 
-		     const char *upload_data, size_t *upload_data_size, 
-		     void **con_cls)
+static int 
+dispatch (void *cls, struct MHD_Connection *connection, 
+	  const char *url, const char *method, const char *version, 
+	  const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
   int ret = 0;
   struct MHD_Response *response = NULL;
-  gzochid_httpd_context *context = (gzochid_httpd_context *) cls;
+  gzochid_httpd_context *context = cls;
 
   if (strcmp (method, "GET") != 0)
     return ret;
@@ -549,15 +561,17 @@ static int dispatch (void *cls, struct MHD_Connection *connection,
   return ret;
 }
 
-static void initialize_async (gpointer data, gpointer user_data)
+static void 
+initialize_async (gpointer data, gpointer user_data)
 {
-  gzochid_context *context = (gzochid_context *) data;
+  gzochid_context *context = data;
   gzochid_fsm_to_state (context->fsm, GZOCHID_HTTPD_STATE_RUNNING);
 }
 
-static void initialize (int from_state, int to_state, gpointer user_data)
+static void 
+initialize (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_context *context = user_data;
   gzochid_httpd_context *httpd_context = (gzochid_httpd_context *) context;
   gzochid_admin_context *admin_context = 
     (gzochid_admin_context *) context->parent;
@@ -572,19 +586,22 @@ static void initialize (int from_state, int to_state, gpointer user_data)
     (admin_context->pool, initialize_async, context, NULL);
 }
 
-gzochid_httpd_context *gzochid_httpd_context_new (void)
+gzochid_httpd_context *
+gzochid_httpd_context_new (void)
 {
   return calloc (1, sizeof (gzochid_httpd_context));
 }
 
-void gzochid_httpd_context_free (gzochid_httpd_context *context)
+void 
+gzochid_httpd_context_free (gzochid_httpd_context *context)
 {
   gzochid_context_free ((gzochid_context *) context);
   free (context);
 }
 
-void gzochid_httpd_context_init 
-(gzochid_httpd_context *context, gzochid_context *parent, int port)
+void 
+gzochid_httpd_context_init (gzochid_httpd_context *context, 
+			    gzochid_context *parent, int port)
 {
   gzochid_fsm *fsm = gzochid_fsm_new 
     ("httpd", GZOCHID_HTTPD_STATE_INITIALIZING, "INITIALIZING");

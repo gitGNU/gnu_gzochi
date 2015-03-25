@@ -35,6 +35,8 @@
 #include "scheme.h"
 #include "scheme-task.h"
 #include "socket.h"
+#include "storage.h"
+#include "storage-mem.h"
 #include "task.h"
 #include "threads.h"
 
@@ -111,9 +113,7 @@ initialize_async (gpointer data, gpointer user_data)
 static void 
 initialize_auth (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_game_context *context = (gzochid_game_context *) user_data;
-
-  gzochid_auth_init (context);
+  gzochid_auth_init (user_data);
 }
 
 static void 
@@ -258,6 +258,23 @@ gzochid_game_context_init (gzochid_game_context *context,
     (g_hash_table_lookup (config, "tx.timeout"), DEFAULT_TX_TIMEOUT_MS);
   context->tx_timeout.tv_sec = tx_timeout_ms / 1000;
   context->tx_timeout.tv_usec = (tx_timeout_ms % 1000) * 1000;
+
+  if (g_hash_table_contains (config, "storage.engine"))
+    context->storage_engine = gzochid_storage_load_engine 
+      (g_hash_table_lookup (config, "storage.engine"));
+  else gzochid_info 
+	 ("No durable storage engine configured; memory engine will be used.");
+
+  if (context->storage_engine == NULL)
+    {
+      gzochid_info ("\
+Using in-memory storage for application data. THIS CONFIGURATION IS NOT SAFE \
+FOR PRODUCTION USE.");
+
+      context->storage_engine = calloc (1, sizeof (gzochid_storage_engine));
+      context->storage_engine->interface = 
+	&gzochid_storage_engine_interface_mem;
+    }
 
   gzochid_fsm_add_transition 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, GZOCHID_GAME_STATE_RUNNING);

@@ -1,5 +1,5 @@
 /* data.c: Application data management routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -34,12 +34,14 @@
 
 #define NEXT_OID_KEY 0x00
 
-GQuark gzochid_data_error_quark (void)
+GQuark 
+gzochid_data_error_quark (void)
 {
   return g_quark_from_static_string ("gzochid-data-error-quark");
 }
 
-gzochid_oid_holder *gzochid_oid_holder_new (void)
+gzochid_oid_holder *
+gzochid_oid_holder_new (void)
 {
   gzochid_oid_holder *holder = malloc (sizeof (gzochid_oid_holder));
 
@@ -48,14 +50,16 @@ gzochid_oid_holder *gzochid_oid_holder_new (void)
   return holder;
 }
 
-void gzochid_oid_holder_free (gzochid_oid_holder *holder)
+void 
+gzochid_oid_holder_free (gzochid_oid_holder *holder)
 {
   mpz_clear (holder->oid);
   free (holder);
 }
 
-static gzochid_data_transaction_context *create_transaction_context 
-(gzochid_application_context *app_context, struct timeval *timeout)
+static gzochid_data_transaction_context *
+create_transaction_context (gzochid_application_context *app_context,
+			    struct timeval *timeout)
 {
   gzochid_data_transaction_context *tx_context = 
     calloc (1, sizeof (gzochid_data_transaction_context));
@@ -63,10 +67,10 @@ static gzochid_data_transaction_context *create_transaction_context
   tx_context->context = app_context;
 
   if (timeout != NULL)
-    tx_context->transaction = gzochid_storage_transaction_begin_timed 
-      (app_context->storage_context, *timeout);
-  else tx_context->transaction = gzochid_storage_transaction_begin 
-	 (app_context->storage_context);
+    tx_context->transaction = APP_STORAGE_INTERFACE (app_context)
+      ->transaction_begin_timed (app_context->storage_context, *timeout);
+  else tx_context->transaction = APP_STORAGE_INTERFACE (app_context)
+	 ->transaction_begin (app_context->storage_context);
 
   tx_context->oids_to_references = g_hash_table_new_full 
     (g_str_hash, g_str_equal, free, NULL);
@@ -76,9 +80,10 @@ static gzochid_data_transaction_context *create_transaction_context
   return tx_context;
 }
 
-static void free_oid_block (void *ptr)
+static void 
+free_oid_block (void *ptr)
 {
-  gzochid_data_oid_block *block = (gzochid_data_oid_block *) ptr;
+  gzochid_data_oid_block *block = ptr;
 
   mpz_clear (block->first);
   mpz_clear (block->next);
@@ -87,7 +92,8 @@ static void free_oid_block (void *ptr)
   free (block);
 } 
 
-static void transaction_context_free (gzochid_data_transaction_context *context)
+static void 
+transaction_context_free (gzochid_data_transaction_context *context)
 {  
   if (context->free_oids != NULL)
     free_oid_block (context->free_oids);
@@ -100,9 +106,9 @@ static void transaction_context_free (gzochid_data_transaction_context *context)
   free (context);
 }
 
-static gboolean flush_reference 
-(gzochid_data_managed_reference *reference,
- gzochid_data_transaction_context *context)
+static gboolean 
+flush_reference (gzochid_data_managed_reference *reference,
+		 gzochid_data_transaction_context *context)
 {
   gzochid_application_data_event *event = NULL;
   gzochid_application_event *base_event = NULL;
@@ -137,7 +143,7 @@ static gboolean flush_reference
 	  return FALSE;
 	}
 
-      gzochid_storage_transaction_put
+      APP_STORAGE_INTERFACE (context->context)->transaction_put
 	(context->transaction, context->context->oids, oid_str, 
 	 strlen (oid_str) + 1, out->str, out->len);
       free (oid_str);
@@ -164,16 +170,18 @@ static gboolean flush_reference
   return TRUE;
 }
 
-static int data_prepare (gpointer data)
+static int 
+data_prepare (gpointer data)
 {
-  gzochid_data_transaction_context *context = 
-    (gzochid_data_transaction_context *) data;
+  gzochid_data_transaction_context *context = data;
   GList *references = g_hash_table_get_values (context->oids_to_references);
   GList *reference_ptr = references;
   gboolean flush_failed = FALSE;
-  
-  gzochid_storage_lock (context->context->oids);
-  gzochid_storage_lock (context->context->names);
+  gzochid_storage_engine_interface *iface = 
+    APP_STORAGE_INTERFACE (context->context);
+
+  iface->lock (context->context->oids);
+  iface->lock (context->context->names);
 
   while (reference_ptr != NULL)
     {
@@ -190,31 +198,31 @@ static int data_prepare (gpointer data)
   if (flush_failed)
     return FALSE;
 
-  gzochid_storage_transaction_prepare (context->transaction);
+  iface->transaction_prepare (context->transaction);
   if (context->transaction->rollback)
     return FALSE;
 
   return TRUE;
 }
 
-static void free_reference (gpointer data)
+static void 
+free_reference (gpointer data)
 {
-  gzochid_data_managed_reference *reference = 
-    (gzochid_data_managed_reference *) data;
+  gzochid_data_managed_reference *reference = data;
 
   mpz_clear (reference->oid);
   free (data);
 }
 
-static void finalize_references (gzochid_data_transaction_context *context)
+static void 
+finalize_references (gzochid_data_transaction_context *context)
 {
   GList *references = g_hash_table_get_values (context->oids_to_references);
   GList *reference_ptr = references;
 
   while (reference_ptr != NULL)
     {
-      gzochid_data_managed_reference *reference =
-	(gzochid_data_managed_reference *) reference_ptr->data;
+      gzochid_data_managed_reference *reference = reference_ptr->data;
 
       if (reference->obj != NULL)
 	{
@@ -227,25 +235,27 @@ static void finalize_references (gzochid_data_transaction_context *context)
   g_list_free_full (references, free_reference);
 }
 
-static void data_commit (gpointer data)
+static void 
+data_commit (gpointer data)
 {
-  gzochid_data_transaction_context *context = 
-    (gzochid_data_transaction_context *) data;
+  gzochid_data_transaction_context *context = data;
+  gzochid_storage_engine_interface *iface = 
+    APP_STORAGE_INTERFACE (context->context);
 
-  gzochid_storage_transaction_commit (context->transaction);
+  iface->transaction_commit (context->transaction);
 
   finalize_references (context);
 
-  gzochid_storage_unlock (context->context->names);
-  gzochid_storage_unlock (context->context->oids);
+  iface->unlock (context->context->names);
+  iface->unlock (context->context->oids);
 
   transaction_context_free (context);
 }
 
-static void data_rollback (gpointer data)
+static void 
+data_rollback (gpointer data)
 {
-  gzochid_data_transaction_context *context = 
-    (gzochid_data_transaction_context *) data;
+  gzochid_data_transaction_context *context = data;
 
   /* The rollback may have been triggered by the data manager's failure to join
      the transaction - because of a timeout, for example - in which case the
@@ -253,12 +263,15 @@ static void data_rollback (gpointer data)
 
   if (context != NULL)
     {
-      gzochid_storage_transaction_rollback (context->transaction);
+      gzochid_storage_engine_interface *iface = 
+	APP_STORAGE_INTERFACE (context->context);
+
+      iface->transaction_rollback (context->transaction);
 
       finalize_references (context);
 
-      gzochid_storage_unlock (context->context->names);
-      gzochid_storage_unlock (context->context->oids);
+      iface->unlock (context->context->names);
+      iface->unlock (context->context->oids);
 
       transaction_context_free (context);
     }
@@ -267,22 +280,23 @@ static void data_rollback (gpointer data)
 static gzochid_transaction_participant data_participant = 
   { "data", data_prepare, data_commit, data_rollback };
 
-static gzochid_data_oid_block *create_oid_block 
-(gzochid_application_context *context)
+static gzochid_data_oid_block *
+create_oid_block (gzochid_application_context *context)
 {
   char next_oid_key[] = { NEXT_OID_KEY };
   char *next_oid_value = NULL;
   size_t next_oid_value_len = 0;
 
   gzochid_data_oid_block *block = calloc (1, sizeof (gzochid_data_oid_block));
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (context);
 
   mpz_init (block->first);
   mpz_init (block->next);
   mpz_init (block->last);
 
-  gzochid_storage_lock (context->meta);
+  iface->lock (context->meta);
 
-  next_oid_value = gzochid_storage_get 
+  next_oid_value = iface->get
     (context->meta, next_oid_key, 1, &next_oid_value_len);
 
   if (next_oid_value != NULL)
@@ -298,19 +312,19 @@ static gzochid_data_oid_block *create_oid_block
 
   next_oid_value = mpz_get_str (NULL, 16, block->last);
   next_oid_value_len = strlen (next_oid_value) + 1;
-  gzochid_storage_put 
+  iface->put 
     (context->meta, next_oid_key, 1, next_oid_value, next_oid_value_len);
   free (next_oid_value);
 
   mpz_sub_ui (block->last, block->last, 1);
   
-  gzochid_storage_unlock (context->meta);
+  iface->unlock (context->meta);
 
   return block;
 }
 
-static gzochid_data_oid_block *reserve_oids 
-(gzochid_application_context *context)
+static gzochid_data_oid_block *
+reserve_oids (gzochid_application_context *context)
 {
   gzochid_data_oid_block *block = NULL;
   
@@ -328,11 +342,11 @@ static gzochid_data_oid_block *reserve_oids
   return block;
 }
 
-static void get_binding 
-(gzochid_data_transaction_context *context, char *name, mpz_t oid, 
- GError **err)
+static void 
+get_binding (gzochid_data_transaction_context *context, char *name, mpz_t oid, 
+	     GError **err)
 {
-  char *oid_str = gzochid_storage_transaction_get 
+  char *oid_str = APP_STORAGE_INTERFACE (context->context)->transaction_get 
     (context->transaction, context->context->names, name, strlen (name) + 1, 
      NULL);
 
@@ -354,12 +368,13 @@ static void get_binding
 	 "No data found for binding '%s'.", name);
 }
 
-static void set_binding 
-(gzochid_data_transaction_context *context, char *name, mpz_t oid, 
- GError **err)
+static void 
+set_binding (gzochid_data_transaction_context *context, char *name, mpz_t oid, 
+	     GError **err)
 {
   char *oid_str = mpz_get_str (NULL, 16, oid);
-  gzochid_storage_transaction_put 
+
+  APP_STORAGE_INTERFACE (context->context)->transaction_put 
     (context->transaction, context->context->names, name, strlen (name) + 1, 
      oid_str, strlen (oid_str) + 1);
 
@@ -375,9 +390,9 @@ static void set_binding
     }
 }
 
-static gzochid_data_managed_reference *create_empty_reference
-(gzochid_application_context *context, mpz_t oid, 
- gzochid_io_serialization *serialization)
+static gzochid_data_managed_reference *
+create_empty_reference (gzochid_application_context *context, mpz_t oid, 
+			gzochid_io_serialization *serialization)
 {
   gzochid_data_managed_reference *reference = 
     calloc (1, sizeof (gzochid_data_managed_reference));
@@ -393,8 +408,8 @@ static gzochid_data_managed_reference *create_empty_reference
   return reference;
 }
 
-static int next_object_id 
-(gzochid_data_transaction_context *context, mpz_t oid)
+static int 
+next_object_id (gzochid_data_transaction_context *context, mpz_t oid)
 {
   if (context->free_oids == NULL)
     context->free_oids = reserve_oids (context->context);
@@ -412,9 +427,9 @@ static int next_object_id
   return 0;
 }
 
-gzochid_data_managed_reference *create_new_reference
-(gzochid_application_context *context, void *ptr, 
- gzochid_io_serialization *serialization)
+gzochid_data_managed_reference *
+create_new_reference (gzochid_application_context *context, void *ptr, 
+		      gzochid_io_serialization *serialization)
 {
   gzochid_data_transaction_context *tx_context = 
     gzochid_transaction_context (&data_participant);
@@ -433,9 +448,9 @@ gzochid_data_managed_reference *create_new_reference
   return reference;
 }
 
-static gzochid_data_managed_reference *get_reference_by_oid
-(gzochid_application_context *context, mpz_t oid, 
- gzochid_io_serialization *serialization)
+static gzochid_data_managed_reference *
+get_reference_by_oid (gzochid_application_context *context, mpz_t oid, 
+		      gzochid_io_serialization *serialization)
 {
   gzochid_data_transaction_context *tx_context = 
     gzochid_transaction_context (&data_participant);
@@ -453,9 +468,9 @@ static gzochid_data_managed_reference *get_reference_by_oid
   return reference;
 }
 
-static gzochid_data_managed_reference *get_reference_by_ptr
-(gzochid_application_context *context, void *ptr, 
- gzochid_io_serialization *serialization)
+static gzochid_data_managed_reference *
+get_reference_by_ptr (gzochid_application_context *context, void *ptr, 
+		      gzochid_io_serialization *serialization)
 {
   gzochid_data_transaction_context *tx_context = 
     gzochid_transaction_context (&data_participant);
@@ -481,9 +496,9 @@ static gzochid_data_managed_reference *get_reference_by_ptr
   return reference;
 }
 
-static void dereference 
-(gzochid_data_transaction_context *context, 
- gzochid_data_managed_reference *reference, GError **err)
+static void 
+dereference (gzochid_data_transaction_context *context, 
+	     gzochid_data_managed_reference *reference, GError **err)
 {
   size_t data_len = 0;
   char *oid_str = NULL; 
@@ -497,7 +512,7 @@ static void dereference
   oid_str = mpz_get_str (NULL, 16, reference->oid);
   gzochid_debug ("Retrieving data for reference '%s'.", oid_str);
 
-  data = gzochid_storage_transaction_get
+  data = APP_STORAGE_INTERFACE (context->context)->transaction_get
     (context->transaction, context->context->oids, oid_str, 
      strlen (oid_str) + 1, &data_len);
 
@@ -553,8 +568,9 @@ static void dereference
   return;
 }
 
-static void remove_object 
-(gzochid_data_transaction_context *context, mpz_t oid, GError **err)
+static void 
+remove_object (gzochid_data_transaction_context *context, mpz_t oid, 
+	       GError **err)
 {
   int ret = 0;
   char *oid_str = mpz_get_str (NULL, 16, oid);
@@ -565,7 +581,7 @@ static void remove_object
     gzochid_transaction_context (&data_participant);
 
   gzochid_debug ("Removing reference '%s'.", oid_str);      
-  ret = gzochid_storage_transaction_delete 
+  ret = APP_STORAGE_INTERFACE (context->context)->transaction_delete 
     (context->transaction, context->context->oids, oid_str, 
      strlen (oid_str) + 1);
 
@@ -585,9 +601,9 @@ static void remove_object
   return;
 }
 
-static void remove_reference 
-(gzochid_data_transaction_context *context, 
- gzochid_data_managed_reference *reference, GError **err)
+static void 
+remove_reference (gzochid_data_transaction_context *context, 
+		  gzochid_data_managed_reference *reference, GError **err)
 {
   switch (reference->state)
     {
@@ -611,8 +627,8 @@ static void remove_reference
   return;
 }
 
-static gzochid_data_transaction_context *join_transaction 
-(gzochid_application_context *context, GError **err)
+static gzochid_data_transaction_context *
+join_transaction (gzochid_application_context *context, GError **err)
 {
   gzochid_data_transaction_context *tx_context = NULL;
 
@@ -640,9 +656,9 @@ static gzochid_data_transaction_context *join_transaction
   return tx_context;
 }
 
-void *gzochid_data_get_binding
-(gzochid_application_context *context, char *name, 
- gzochid_io_serialization *serialization, GError **err)
+void *
+gzochid_data_get_binding (gzochid_application_context *context, char *name, 
+			  gzochid_io_serialization *serialization, GError **err)
 {
   mpz_t oid;
   gzochid_data_managed_reference *reference = NULL;
@@ -673,8 +689,9 @@ void *gzochid_data_get_binding
   return reference->obj;
 }
 
-void gzochid_data_set_binding_to_oid
-(gzochid_application_context *context, char *name, mpz_t oid, GError **err)
+void 
+gzochid_data_set_binding_to_oid (gzochid_application_context *context, 
+				 char *name, mpz_t oid, GError **err)
 {
   GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
@@ -685,13 +702,15 @@ void gzochid_data_set_binding_to_oid
   else set_binding (tx_context, name, oid, err);
 }
 
-char *gzochid_data_next_binding_oid
-(gzochid_application_context *context, char *key, mpz_t oid, GError **err)
+char *
+gzochid_data_next_binding_oid (gzochid_application_context *context, char *key,
+			       mpz_t oid, GError **err)
 {
   char *next_key = NULL;
   GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
     join_transaction (context, &local_err);
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (context);
 
   if (local_err != NULL)
     {
@@ -699,7 +718,7 @@ char *gzochid_data_next_binding_oid
       return NULL;
     }
 
-  next_key = gzochid_storage_transaction_next_key 
+  next_key = iface->transaction_next_key 
     (tx_context->transaction, tx_context->context->names, key, 
      strlen (key) + 1, NULL);
   if (tx_context->transaction->rollback)
@@ -708,7 +727,7 @@ char *gzochid_data_next_binding_oid
 
   if (next_key != NULL)
     {
-      char *next_value = gzochid_storage_transaction_get 
+      char *next_value = iface->transaction_get 
 	(tx_context->transaction, tx_context->context->names, next_key, 
 	 strlen (next_key) + 1, NULL);
       if (tx_context->transaction->rollback)
@@ -726,9 +745,10 @@ char *gzochid_data_next_binding_oid
   else return NULL;
 }
 
-void gzochid_data_set_binding 
-(gzochid_application_context *context, char *name, 
- gzochid_io_serialization *serialization, void *data, GError **err)
+void 
+gzochid_data_set_binding (gzochid_application_context *context, char *name, 
+			  gzochid_io_serialization *serialization, void *data, 
+			  GError **err)
 {
   GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
@@ -744,8 +764,9 @@ void gzochid_data_set_binding
     }
 }
 
-void gzochid_data_remove_binding
-(gzochid_application_context *context, char *name, GError **err)
+void 
+gzochid_data_remove_binding (gzochid_application_context *context, char *name, 
+			     GError **err)
 {
   int ret = 0;
   GError *local_err = NULL;
@@ -758,7 +779,7 @@ void gzochid_data_remove_binding
       return;
     }
 
-  ret = gzochid_storage_transaction_delete 
+  ret = APP_STORAGE_INTERFACE (context)->transaction_delete 
     (tx_context->transaction, tx_context->context->names, name, 
      strlen (name) + 1);
 
@@ -775,8 +796,9 @@ void gzochid_data_remove_binding
     }
 }
 
-gboolean gzochid_data_binding_exists
-(gzochid_application_context *context, char *name, GError **err)
+gboolean
+gzochid_data_binding_exists (gzochid_application_context *context, char *name, 
+			     GError **err)
 {
   mpz_t oid;
   gboolean ret = TRUE;
@@ -830,9 +852,10 @@ gzochid_data_managed_reference *gzochid_data_create_reference
   return get_reference_by_ptr (context, ptr, serialization);
 }
 
-gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
-(gzochid_application_context *context, 
- gzochid_io_serialization *serialization, mpz_t oid)
+gzochid_data_managed_reference *
+gzochid_data_create_reference_to_oid (gzochid_application_context *context, 
+				      gzochid_io_serialization *serialization, 
+				      mpz_t oid)
 {
   GError *err = NULL;
 
@@ -846,8 +869,9 @@ gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
   else return get_reference_by_oid (context, oid, serialization);
 }
 
-void gzochid_data_dereference 
-(gzochid_data_managed_reference *reference, GError **err)
+void 
+gzochid_data_dereference (gzochid_data_managed_reference *reference, 
+			  GError **err)
 {
   GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
@@ -858,8 +882,9 @@ void gzochid_data_dereference
   else dereference (tx_context, reference, err);
 }
 
-void gzochid_data_remove_object 
-(gzochid_data_managed_reference *reference, GError **err)
+void 
+gzochid_data_remove_object (gzochid_data_managed_reference *reference, 
+			    GError **err)
 {
   GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
@@ -870,9 +895,10 @@ void gzochid_data_remove_object
   else remove_reference (tx_context, reference, err);
 }
 
-void gzochid_data_mark 
-(gzochid_application_context *context, gzochid_io_serialization *serialization,
- void *ptr, GError **err)
+void 
+gzochid_data_mark (gzochid_application_context *context, 
+		   gzochid_io_serialization *serialization, void *ptr, 
+		   GError **err)
 {
   GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
@@ -896,7 +922,7 @@ void gzochid_data_mark
       reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
       gzochid_debug ("Marking reference '%s' for update.", oid_str);
 
-      data = gzochid_storage_transaction_get_for_update
+      data = APP_STORAGE_INTERFACE (context)->transaction_get_for_update
 	(tx_context->transaction, tx_context->context->oids, oid_str, 
 	 strlen (oid_str) + 1, NULL);
    
