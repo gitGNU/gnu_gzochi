@@ -18,7 +18,7 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-plugindir = $(libdir)/gzochid
+plugindir = $(libdir)/gzochid/auth
 
 plugin_LTLIBRARIES = \
 	password_file.la
