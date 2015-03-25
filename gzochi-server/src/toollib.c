@@ -1,5 +1,5 @@
 /* toollib.c: Assorted utility routines to support command-line tools
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -36,9 +36,11 @@ gzochid_tool_load_game_config (const char *path)
 {
   GKeyFile *key_file = g_key_file_new ();
   GHashTable *game_config = NULL;
+  const char *gzochid_conf_path = path ? path : QUOTE (GZOCHID_CONF_LOCATION);
   GError *err = NULL;
 
-  g_key_file_load_from_file (key_file, path, G_KEY_FILE_NONE, &err);
+  g_key_file_load_from_file 
+    (key_file, gzochid_conf_path, G_KEY_FILE_NONE, &err);
   
   if (err != NULL)
     {
@@ -66,7 +68,7 @@ gzochid_tool_open_store (gzochid_storage_context *context, char *path)
 
 char *
 gzochid_tool_probe_data_dir 
-(char *gzochid_conf_path, char *app_or_dir, gboolean create_data_dir)
+(GHashTable *gzochid_conf, char *app_or_dir, gboolean create_data_dir)
 {
   if (g_file_test (app_or_dir, G_FILE_TEST_IS_DIR))
     {
@@ -75,15 +77,9 @@ gzochid_tool_probe_data_dir
     }
   else
     {
-      GHashTable *config = NULL;
       char *work_dir = NULL, *data_dir = NULL;
-      char *conf_path = gzochid_conf_path 
-	? gzochid_conf_path : QUOTE (GZOCHID_CONF_LOCATION);
       
-      g_info ("Reading configuration from %s", conf_path);
-      config = gzochid_tool_load_game_config (conf_path);
-
-      if (! g_hash_table_contains (config, "server.fs.data"))
+      if (! g_hash_table_contains (gzochid_conf, "server.fs.data"))
 	{
 	  g_critical ("server.fs.data must be set.");
 	  exit (EXIT_FAILURE);
@@ -91,9 +87,8 @@ gzochid_tool_probe_data_dir
       
       g_debug ("Probing for an application with name %s.", app_or_dir);      
 
-      work_dir = g_hash_table_lookup (config, "server.fs.data");
+      work_dir = g_hash_table_lookup (gzochid_conf, "server.fs.data");
       data_dir = g_strconcat (work_dir, "/", app_or_dir, NULL);
-      g_hash_table_destroy (config);
 
       if (create_data_dir || g_file_test (data_dir, G_FILE_TEST_IS_DIR))
 	return data_dir;

@@ -1,5 +1,5 @@
 /* toollib.h: Prototypes and declarations for toollib.c
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,12 +24,12 @@
 
 /**
    Return a GHashTable containing the "game" section of the .INI file located at
-   the specified path (which is often '/etc/gzochid.conf'). If the file cannot
-   be opened for reading (because, e.g., it does not exist), this function logs
-   an error and causes the process to exit.
+   the specified path or in the default location (which is often 
+   '/etc/gzochid.conf') when the specified path is NULL. If the file cannot be 
+   opened for reading (because, e.g., it does not exist), this function logs an
+   error and causes the process to exit.
  */
-GHashTable *
-gzochid_tool_load_game_config (const char *);
+GHashTable *gzochid_tool_load_game_config (const char *);
 
 /**
    Open the store with the specified filename template in the specified storage
@@ -54,8 +54,7 @@ gzochid_tool_open_store (gzochid_storage_context *, char *);
 
    The returned string should be freed by the caller.
  */
-char *
-gzochid_tool_probe_data_dir (char *, char *, gboolean);
+char *gzochid_tool_probe_data_dir (GHashTable *, char *, gboolean);
 
 /**
    Attempts to parse a string of the form
@@ -69,7 +68,6 @@ gzochid_tool_probe_data_dir (char *, char *, gboolean);
 
    The returned string vector should be freed by the caller using g_strfreev.
  */
-char **
-gzochid_tool_parse_targets (char *);
+char **gzochid_tool_parse_targets (char *);
 
 #endif /* GZOCHID_TOOLLIB_H */
