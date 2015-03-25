@@ -58,7 +58,7 @@ AC_ARG_WITH([bdb],
 AS_IF([test "x$with_bdb" != xno],
   [AC_PROBE_LIBS([db_create], [db], 
     [AC_CHECK_HEADER([db.h],
-      [AC_SUBST([BDB_LIBS], $ac_cv_search_db_create)
+      [AC_SUBST([BDB_LIBS], $ac_cv_probe_db_create)
        AC_SUBST([BDB_CFLAGS])
        have_bdb=true],
       [])],
@@ -76,7 +76,7 @@ AC_ARG_WITH([hdb],
 AS_IF([test "x$with_hdb" != xno],
   [AC_PROBE_LIBS([ham_env_create], [hamsterdb], 
     [AC_CHECK_HEADER([ham/hamsterdb.h],
-      [AC_SUBST([HDB_LIBS], $ac_cv_search_ham_env_create)
+      [AC_SUBST([HDB_LIBS], $ac_cv_probe_ham_env_create)
        AC_SUBST([HDB_CFLAGS])
        have_hdb=true],
       [])],
@@ -94,7 +94,7 @@ AC_ARG_WITH([lmdb],
 AS_IF([test "x$with_mdb" != xno],
   [AC_PROBE_LIBS([mdb_env_create], [lmdb], 
     [AC_CHECK_HEADER([lmdb.h],
-      [AC_SUBST([LMDB_LIBS], $ac_cv_search_mdb_env_create)
+      [AC_SUBST([LMDB_LIBS], $ac_cv_probe_mdb_env_create)
        AC_SUBST([LMDB_CFLAGS])
        have_lmdb=true],
       [])],
