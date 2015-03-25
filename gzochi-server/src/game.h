@@ -1,5 +1,5 @@
 /* game.h: Prototypes and declarations for game.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include "event.h"
 #include "schedule.h"
 #include "socket.h"
+#include "storage.h"
 
 enum gzochid_game_state 
   {
@@ -34,7 +35,7 @@ enum gzochid_game_state
     GZOCHID_GAME_STATE_STOPPED
   };
 
-typedef struct _gzochid_game_context 
+struct _gzochid_game_context 
 {
   gzochid_context base;
   GThreadPool *pool;
@@ -47,20 +48,26 @@ typedef struct _gzochid_game_context
 
   GHashTable *applications;
   GHashTable *auth_plugins;
+
+  /* The storage engine loaded by the game manager. */
+
+  gzochid_storage_engine *storage_engine; 
   gzochid_socket_server_context *server;
 
   GMainLoop *event_loop;
-} gzochid_game_context;
+};
+
+typedef struct _gzochid_game_context gzochid_game_context;
 
 gzochid_game_context *gzochid_game_context_new (void);
 void gzochid_game_context_free (gzochid_game_context *);
-void gzochid_game_context_init 
-(gzochid_game_context *, gzochid_context *, GHashTable *);
+void gzochid_game_context_init (gzochid_game_context *, gzochid_context *, 
+				GHashTable *);
 
-void gzochid_game_context_register_application
-(gzochid_game_context *, char *, gzochid_application_context *);
-void gzochid_game_context_unregister_application
-(gzochid_game_context *, char *);
+void gzochid_game_context_register_application (gzochid_game_context *, char *,
+						gzochid_application_context *);
+void gzochid_game_context_unregister_application (gzochid_game_context *, 
+						  char *);
 gzochid_application_context *gzochid_game_context_lookup_application
 (gzochid_game_context *, char *);
 GList *gzochid_game_context_get_applications (gzochid_game_context *);

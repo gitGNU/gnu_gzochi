@@ -83,6 +83,19 @@ struct _gzochid_application_context
 
 typedef struct _gzochid_application_context gzochid_application_context;
 
+/* A helper macro to simplify access to the storage interface of the storage 
+   engine loaded by the game manager that owns the specified application 
+   context.
+
+   Needless to say, this macro assumes that the application context is attached
+   to a properly configured game manager. 
+*/
+
+#define APP_STORAGE_INTERFACE(app_context) \
+  ((gzochid_game_context *) \
+   ((gzochid_context *) (app_context))->parent) \
+  ->storage_engine->interface
+
 gzochid_application_context *gzochid_application_context_new (void);
 
 void gzochid_application_context_free (gzochid_application_context *);

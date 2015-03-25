@@ -199,4 +199,15 @@ typedef struct _gzochid_storage_engine gzochid_storage_engine;
     return 0;					   \
   }
 
+/* Attempts to load the storage engine module with the specified name, which
+   should be the basename of a the module file, with no extension or path
+   prefix. If a storage engine module is present in the storage directory, it
+   will be opened, loaded, and initialized.
+
+   This function returns a pointer to a newly-allocated 
+   `gzochid_storage_engine' structure (which should be freed with `free') on 
+   success, or NULL on failure. 
+*/
+gzochid_storage_engine *gzochid_storage_load_engine (const char *);
+
 #endif /* GZOCHID_STORAGE_H */

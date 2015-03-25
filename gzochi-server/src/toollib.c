@@ -102,6 +102,35 @@ gzochid_tool_probe_data_dir
     }
 }
 
+gzochid_storage_engine *
+gzochid_tool_probe_storage_engine (GHashTable *gzochid_conf, char *name)
+{
+  gzochid_storage_engine *engine = NULL;
+
+  /* Get the name from the configuration table if `name' is NULL. */
+
+  char *engine_name = name != NULL ? name 
+    : g_hash_table_lookup (gzochid_conf, "storage.engine");
+
+  if (engine_name == NULL)
+    {
+      g_critical ("Failed to resolve storage engine name.");
+      exit (EXIT_FAILURE);
+    }
+
+  /* Attempt to load the engine. */
+
+  engine = gzochid_storage_load_engine (engine_name);
+
+  if (engine == NULL)
+    {
+      g_critical ("Failed to load storage engine with name '%s'.", name);
+      exit (EXIT_FAILURE);
+    }
+
+  return engine;
+}
+
 char **
 gzochid_tool_parse_targets (char *target)
 {

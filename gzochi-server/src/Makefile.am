@@ -62,8 +62,8 @@ libgzochid_la_CFLAGS = @CFLAGS@ \
 libgzochid_la_SOURCES = admin.c app.c app-task.c auth.c callback.c channel.c \
 	config.c context.c data.c debug.c descriptor.c event.c fsm.c game.c \
 	guile.c httpd.c io.c lifecycle.c log.c protocol.c reloc.c schedule.c \
-	scheme.c scheme-task.c session.c socket.c stats.c task.c threads.c \
-	tx.c txlog.c util.c \
+	scheme.c scheme-task.c session.c socket.c stats.c storage.c task.c \
+	threads.c tx.c txlog.c util.c \
 	$(GZOCHID_STORAGE_SOURCES)
 
 libgzochid_la_LIBADD = api/libgzochid-api.la $(GZOCHI_COMMON_LIBS) \

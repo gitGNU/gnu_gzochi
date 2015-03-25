@@ -41,20 +41,38 @@ gzochid_storage_store *
 gzochid_tool_open_store (gzochid_storage_context *, char *);
 
 /**
-   Attempts to resolve a data directory from its argument, which may be the name
-   of an application or the directory itself. If the specified string names an
-   existing directory, that directory is returned; otherwise, the "gzochid.conf"
-   file is consulted to find the server's data directory, which is scanned for
-   a matching application name. The location of gzochid.conf can be overridden
-   by passing a non-NULL value for the `gzochid_conf_path' argument. The 
-   `create_data_dir' flag indicates that the data directory for the resolved 
-   application need not exist yet; otherwise, if neither of these strategies 
+   Attempts to resolve a data directory from its arguments. The string 
+   `app_or_dir', which may be the name of an application or the directory 
+   itself. If the specified string names an existing directory, that directory 
+   is returned; otherwise, the specified hash table - which should in most cases
+   be the result of calling `gzochid_tool_load_game_config' - is consulted, 
+   using the key `server.fs.data'.
+   
+   The `create_data_dir' flag indicates that the data directory for the resolved
+   application need not exist yet; otherwise, if neither of these strategies
    produces a directory, this function logs an error and causes the process to 
    exit.
 
    The returned string should be freed by the caller.
  */
 char *gzochid_tool_probe_data_dir (GHashTable *, char *, gboolean);
+
+/**
+   Attempts to resolve the name of a storage engine module from its arguments,
+   and load that module. The string `name', if given, should be the unqualified
+   name of a storage engine module, e.g., `bdb'. If this argument is NULL, the
+   specified hash table - which should in most cases be the result of calling
+   `gzochid_tool_load_game_config' - is consulted, using the key 
+   `storage.engine'. 
+
+   If neither of these strategies produces a usable storage engine, this 
+   function logs an error and causes the process to exit.
+
+   The returned struct should be freed by the caller after its associated module
+   handle is closed.
+ */
+gzochid_storage_engine *gzochid_tool_probe_storage_engine 
+(GHashTable *, char *);
 
 /**
    Attempts to parse a string of the form
