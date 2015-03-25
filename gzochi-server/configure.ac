@@ -49,6 +49,59 @@ AM_CONDITIONAL([BUILD_KRB5_AUTH], [test x$KRB5_CFLAGS != "x" ])
 GUILE_PROGS
 GUILE_SITE_DIR
 
+AC_ARG_WITH([bdb],
+  [AS_HELP_STRING([--with-bdb],
+    [support for Berkeley DB @<:@default=check@:>@])],
+  [],
+  [with_bdb=check])
+
+AS_IF([test "x$with_bdb" != xno],
+  [AC_PROBE_LIBS([db_create], [db], 
+    [AC_CHECK_HEADER([db.h],
+      [AC_SUBST([BDB_LIBS], $ac_cv_search_db_create)
+       AC_SUBST([BDB_CFLAGS])
+       have_bdb=true],
+      [])],
+    [])],
+  []) 
+
+AM_CONDITIONAL([HAVE_BDB], [test x$have_bdb = xtrue])
+
+AC_ARG_WITH([hdb],
+  [AS_HELP_STRING([--with-hdb],
+    [support for hamsterdb @<:@default=check@:>@])],
+  [],
+  [with_hdb=check])
+
+AS_IF([test "x$with_hdb" != xno],
+  [AC_PROBE_LIBS([ham_env_create], [hamsterdb], 
+    [AC_CHECK_HEADER([ham/hamsterdb.h],
+      [AC_SUBST([HDB_LIBS], $ac_cv_search_ham_env_create)
+       AC_SUBST([HDB_CFLAGS])
+       have_hdb=true],
+      [])],
+    [])],
+  [])
+
+AM_CONDITIONAL([HAVE_HDB], [test x$have_hdb = xtrue])
+
+AC_ARG_WITH([lmdb],
+  [AS_HELP_STRING([--with-lmdb],
+    [support for MDB @<:@default=check@:>@])],
+  [],
+  [with_lmdb=check])
+
+AS_IF([test "x$with_mdb" != xno],
+  [AC_PROBE_LIBS([mdb_env_create], [lmdb], 
+    [AC_CHECK_HEADER([lmdb.h],
+      [AC_SUBST([LMDB_LIBS], $ac_cv_search_mdb_env_create)
+       AC_SUBST([LMDB_CFLAGS])
+       have_lmdb=true],
+      [])],
+    [])],
+  []) 
+
+AM_CONDITIONAL([HAVE_LMDB], [test x$have_lmdb = xtrue])
 AC_ARG_WITH([storage-engine],
   [AS_HELP_STRING([--with-storage-engine=ENGINE],
     [storage engine ENGINE [bdb]])],
@@ -88,9 +141,11 @@ AC_CONFIG_FILES([Makefile
 		 src/api/Makefile
 		 src/auth/Makefile
 		 src/scheme/Makefile
+		 src/storage/Makefile
 		 tests/Makefile
 		 tests/api/Makefile
 		 tests/auth/Makefile
-		 tests/scheme/Makefile])
+		 tests/scheme/Makefile
+		 tests/storage/Makefile])
 
 AC_OUTPUT

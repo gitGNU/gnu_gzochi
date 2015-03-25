@@ -20,7 +20,7 @@
 
 plugindir = $(libdir)/gzochid
 
-SUBDIRS = api auth scheme
+SUBDIRS = api auth scheme storage
 
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
