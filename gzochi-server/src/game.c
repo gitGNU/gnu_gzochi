@@ -48,12 +48,16 @@
 #define SERVER_FS_DATA_DEFAULT "/var/gzochid/data"
 
 static void 
-initialize_application (gzochid_game_context *context, 
+initialize_application (gzochid_game_context *context, const char *dir,
 			gzochid_application_descriptor *descriptor)
 {
   gzochid_application_context *application_context =
     gzochid_application_context_new ();
   
+  application_context->deployment_root = strdup (dir);
+  application_context->load_paths = g_list_prepend 
+    (g_list_copy (descriptor->load_paths), strdup (dir));
+
   gzochid_application_context_init
     (application_context, (gzochid_context *) context, descriptor);
   g_source_attach ((GSource *) application_context->event_source, 
@@ -61,29 +65,32 @@ initialize_application (gzochid_game_context *context,
 }
 
 static void 
-scan_app_dir (gzochid_game_context *context, char *dir)
+scan_app_dir (gzochid_game_context *context, const char *dir)
 {
-  char *descriptor_file = g_strconcat (dir, "/", GAME_DESCRIPTOR_XML, NULL);
+  FILE *descriptor_file = NULL;
+  char *descriptor_filename = g_strconcat (dir, "/", GAME_DESCRIPTOR_XML, NULL);
 
   gzochid_application_descriptor *descriptor = NULL;
 
-  if (!g_file_test (descriptor_file, G_FILE_TEST_IS_REGULAR))
+  if (!g_file_test (descriptor_filename, G_FILE_TEST_IS_REGULAR))
     {
       gzochid_warning 
-	("%s does not exist or is not a regular file.", descriptor_file);
-      g_free (descriptor_file);
+	("%s does not exist or is not a regular file.", descriptor_filename);
+      g_free (descriptor_filename);
       return;
     }
 
+  descriptor_file = fopen (descriptor_filename, "r");
   descriptor = gzochid_config_parse_application_descriptor (descriptor_file);
+  fclose (descriptor_file);
 
   if (g_hash_table_contains (context->applications, descriptor->name))
     gzochid_warning
       ("Application in %s with name '%s' already exists; skipping.", 
        descriptor_file, descriptor->name);
-  else initialize_application (context, descriptor);
+  else initialize_application (context, dir, descriptor);
 
-  g_free (descriptor_file);
+  g_free (descriptor_filename);
 }
 
 static void 

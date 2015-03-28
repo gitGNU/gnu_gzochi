@@ -429,7 +429,7 @@ create_migration (gzochid_application_context *context,
   assert (md->callback_name != NULL && strlen (md->callback_name) > 0);
   assert (md->callback_module != NULL && strlen (md->callback_module) > 0);
 
-  append_load_paths (context->descriptor->load_paths);
+  append_load_paths (context->load_paths);
   append_load_paths (md->load_paths);
 
   m->context = context;
@@ -524,6 +524,7 @@ open_store (gzochid_application_context *context, char *path, char *db)
 static gzochid_application_context *
 create_application_context (char *gzochid_conf_path, char *app)
 {
+  FILE *descriptor_file = NULL;
   GHashTable *config = gzochid_tool_load_game_config 
     (gzochid_conf_path ? gzochid_conf_path : QUOTE (GZOCHID_CONF_LOCATION));
   gzochid_application_context *context = gzochid_application_context_new ();
@@ -540,7 +541,17 @@ create_application_context (char *gzochid_conf_path, char *app)
   deploy_dir = strdup (g_hash_table_lookup (config, "server.fs.apps"));
   app_dir = g_strconcat (deploy_dir, "/", app, "/", GAME_DESCRIPTOR_XML, NULL);
 
-  context->descriptor = gzochid_config_parse_application_descriptor (app_dir);
+  descriptor_file = fopen (app_dir, "r");
+  if (descriptor_file == NULL)
+    {
+      g_critical ("Failed to open application descriptor in %s", app_dir);
+      exit (EXIT_FAILURE);
+    }
+  
+  context->descriptor =
+    gzochid_config_parse_application_descriptor (descriptor_file);
+
+  fclose (descriptor_file);
 
   if (context->descriptor == NULL)
     {
@@ -548,6 +559,8 @@ create_application_context (char *gzochid_conf_path, char *app)
       exit (EXIT_FAILURE);
     }
 
+  context->load_paths = g_list_prepend 
+    (g_list_copy (context->descriptor->load_paths), strdup (app_dir));
   context->storage_context = 
     APP_STORAGE_INTERFACE (context)->initialize (data_dir);
 

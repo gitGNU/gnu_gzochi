@@ -40,9 +40,8 @@ struct _gzochid_application_descriptor
 {
   char *name;
   char *description;
-  char *deployment_root;
 
-  GList *load_paths;
+  GList *load_paths; /* Descriptor-specified module load paths. */
  
   gzochid_application_callback *initialized;
   gzochid_application_callback *logged_in;
@@ -59,7 +58,13 @@ struct _gzochid_application_context
 {
   gzochid_context base;
 
-  gzochid_application_descriptor *descriptor;
+  /* The directory containing the application descriptor. Used to resolve
+     relative load paths. */
+
+  char *deployment_root;
+  gzochid_application_descriptor *descriptor;  
+
+  GList *load_paths; /* Complete set of module load paths. */
 
   gzochid_auth_identity *(*authenticator) 
     (unsigned char *, short, gpointer, GError **);

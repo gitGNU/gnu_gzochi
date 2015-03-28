@@ -315,7 +315,7 @@ inner_main (void *data, int argc, char *argv[])
   t.app_context = gzochid_application_context_new ();
   t.app_context->descriptor = 
     calloc (1, sizeof (gzochid_application_descriptor));
-  t.app_context->descriptor->deployment_root = "";
+  t.app_context->deployment_root = "";
 
   t.identity = calloc (1, sizeof (gzochid_auth_identity));
   t.identity->name = "[TEST]";

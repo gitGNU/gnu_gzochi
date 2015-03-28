@@ -83,7 +83,7 @@ gzochid_with_application_context (gzochid_application_context *context,
       
       scm_fluid_set_x
 	(application_root_fluid, 
-	 scm_from_locale_string (context->descriptor->deployment_root));
+	 scm_from_locale_string (context->deployment_root));
     }
   
   ret = worker (data);

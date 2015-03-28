@@ -1,5 +1,5 @@
 /* descriptor.h: Prototypes and declarations for descriptor.c
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,9 +18,11 @@
 #ifndef GZOCHID_DESCRIPTOR_H
 #define GZOCHID_DESCRIPTOR_H
 
+#include <stdio.h>
+
 #include "app.h"
 
 gzochid_application_descriptor *gzochid_config_parse_application_descriptor 
-(char *);
+(FILE *);
 
 #endif /* GZOCHID_DESCRIPTOR_H */

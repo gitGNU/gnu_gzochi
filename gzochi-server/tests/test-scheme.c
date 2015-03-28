@@ -33,7 +33,7 @@ test_serialization ()
   gpointer data = NULL;
 
   context->descriptor = calloc (1, sizeof (gzochid_application_descriptor));
-  context->descriptor->deployment_root = "/";
+  context->deployment_root = "/";
 
   gzochid_util_serialize_string ("test-unknown-type", str);
   data = gzochid_scheme_data_serialization.deserializer (context, str, &err);

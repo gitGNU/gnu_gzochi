@@ -163,8 +163,7 @@ initialize_load_paths (int from_state, int to_state, gpointer user_data)
     (gzochid_application_context *) context;
   
   G_LOCK (load_path);
-  scm_with_guile 
-    (initialize_load_paths_guile_worker, app_context->descriptor->load_paths);
+  scm_with_guile (initialize_load_paths_guile_worker, app_context->load_paths);
   G_UNLOCK (load_path);
 }
 
