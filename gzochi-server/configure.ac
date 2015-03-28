@@ -106,6 +106,8 @@ AM_CONDITIONAL([HAVE_LMDB], [test x$have_lmdb = xtrue])
 AC_SEARCH_LIBS([__gmpz_init], [gmp], [], [AC_MSG_ERROR([libgmp is required.])])
 AC_CHECK_HEADER([gmp.h], [], [AC_MSG_ERROR([gmp.h is required.])])
 
+AC_CHECK_FUNCS([fmemopen])
+
 GZOCHI_COMMON="$PWD/../gzochi-common"
 AC_SUBST(GZOCHI_COMMON)
 
