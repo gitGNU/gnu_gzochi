@@ -183,7 +183,7 @@ initialize_complete (int from_state, int to_state, gpointer user_data)
 }
 
 static void 
-run_async_transactional (gpointer data)
+initialize_async_transactional (gpointer data)
 {
   GError *err = NULL;
   gzochid_application_context *context = data;
@@ -219,11 +219,34 @@ run_async_transactional (gpointer data)
     }
 }
 
+static gboolean
+ready_async (gzochid_application_context *context)
+{
+  GError *tmp_err = NULL;
+  gzochid_auth_identity *system_identity = calloc 
+    (1, sizeof (gzochid_auth_identity));
+  system_identity->name = "[SYSTEM]";
+
+  if (context->descriptor->ready != NULL)
+    gzochid_scheme_application_ready (context, system_identity, &tmp_err);
+  
+  if (tmp_err != NULL)
+    {
+      g_clear_error (&tmp_err);
+      return FALSE;
+    }
+  else return TRUE;
+}
+
 static void *
 run_async_guile (void *data)
 {
+  if (!ready_async (data))
+    return NULL;
+
   gzochid_application_transaction_execute 
-    ((gzochid_application_context *) data, run_async_transactional, data);
+    (data, initialize_async_transactional, data);
+
   return NULL;
 }
 

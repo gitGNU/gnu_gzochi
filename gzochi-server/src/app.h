@@ -45,6 +45,7 @@ struct _gzochid_application_descriptor
  
   gzochid_application_callback *initialized;
   gzochid_application_callback *logged_in;
+  gzochid_application_callback *ready;
 
   char *auth_type;
   GHashTable *auth_properties;

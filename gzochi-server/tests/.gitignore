@@ -1,6 +1,7 @@
 *.log
 *.trs
 test-data
+test-descriptor
 test-event
 test-reloc
 test-scheme

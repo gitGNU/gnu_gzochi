@@ -1,5 +1,5 @@
 ;; gzochi/private/test-app.scm: Scheme unit tests for private app support module
-;; Copyright (C) 2014 Julian Graham
+;; Copyright (C) 2015 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -18,9 +18,17 @@
 
 (library (gzochi private test-app)
   (export)
-  (import (gzochi app) (rnrs base) (srfi :64))
+  (import (gzochi app) 
+	  (gzochi private app) 
+	  (rnrs base) 
+	  (rnrs hashtables) 
+	  (srfi :64))
 
 (define (false-handler) #f)
+
+(define ready-counter 0)
+(define (clear-ready-counter!) (set! ready-counter 0))
+(define (ready-handler properties) (set! ready-counter (+ ready-counter 1)))
 
 (test-begin "gzochi:execute-logged-in")
 
@@ -28,5 +36,14 @@
   (test-eqv #f (gzochi:execute-logged-in (g:@ false-handler) 'session)))
 
 (test-end "gzochi:execute-logged-in")
+
+(test-begin "gzochi:execute-ready")
+
+(test-group "execute"
+  (clear-ready-counter!)
+  (gzochi:execute-ready (g:@ ready-handler) (make-eq-hashtable))
+  (test-eqv 1 ready-counter))
+
+(test-end "gzochi:execute-ready")
 
 )

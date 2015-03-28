@@ -135,7 +135,9 @@ descriptor_start_element (GMarkupParseContext *context,
 	}
     }
   else if (strcmp (element_name, "initialized") == 0
-	   || strcmp (element_name, "logged-in") == 0)
+	   || strcmp (element_name, "logged-in") == 0
+	   || strcmp (element_name, "ready") == 0)
+    
     {
       if (parent == NULL || strcmp (parent, "game") != 0)
 	*error = g_error_new 
@@ -162,6 +164,9 @@ descriptor_start_element (GMarkupParseContext *context,
 	      (strdup (procedure), module_name, scm_oid);
 	  else if (strcmp (parent, "logged-in") == 0)
 	    descriptor->logged_in = gzochid_application_callback_new 
+	      (strdup (procedure), module_name, scm_oid);
+	  else if (strcmp (parent, "ready") == 0)
+	    descriptor->ready = gzochid_application_callback_new
 	      (strdup (procedure), module_name, scm_oid);
 	  else *error = g_error_new 
 		 (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
@@ -226,6 +231,13 @@ descriptor_end_element (GMarkupParseContext *context, const gchar *element_name,
 	*error = g_error_new
 	  (G_MARKUP_ERROR, G_MARKUP_ERROR_UNKNOWN_ELEMENT, 
 	   "Missing callback definition for element 'logged-in'.");
+    }
+  else if (strcmp (element_name, "ready") == 0)
+    {
+      if (descriptor->ready == NULL)
+	*error = g_error_new
+	  (G_MARKUP_ERROR, G_MARKUP_ERROR_UNKNOWN_ELEMENT,
+	   "Missing callback definition for element 'ready'.");
     }
 }
 

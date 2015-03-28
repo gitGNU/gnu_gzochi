@@ -22,6 +22,7 @@ SUBDIRS = api auth scheme storage
 
 test_programs = \
 	test-data \
+	test-descriptor \
 	test-event \
 	test-reloc \
 	test-scheme \
@@ -33,6 +34,8 @@ test_programs = \
 noinst_HEADERS = mock-data.h
 
 check_PROGRAMS = $(test_programs)
+AM_TESTS_ENVIRONMENT = GUILE_LOAD_PATH='$(top_srcdir)/src/scheme'; \
+	export GUILE_LOAD_PATH;
 TESTS = $(test_programs)
 
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
@@ -41,6 +44,15 @@ test_data_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_data_SOURCES = test-data.c
 test_data_LDADD = $(top_builddir)/src/libgzochid.la \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+test_descriptor_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
+test_descriptor_SOURCES = test-descriptor.c
+test_descriptor_LDADD = $(top_builddir)/src/libgzochid_la-callback.o \
+	$(top_builddir)/src/libgzochid_la-descriptor.o \
+	$(top_builddir)/src/libgzochid_la-fmemopen.o \
+	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-util.o \
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
 
 test_event_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
 test_event_SOURCES = test-event.c

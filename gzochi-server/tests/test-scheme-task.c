@@ -26,6 +26,7 @@
 #include "context.h"
 #include "game.h"
 #include "gzochid-auth.h"
+#include "scheme.h"
 #include "scheme-task.h"
 #include "storage-mem.h"
 #include "session.h"
@@ -117,6 +118,34 @@ test_logged_in_worker_throws_exception ()
     (test_logged_in_worker_throws_exception_inner, NULL);
 }
 
+static void 
+test_ready_throws_exception ()
+{
+  gzochid_application_context *context = gzochid_application_context_new ();
+  gzochid_application_descriptor *descriptor = 
+    calloc (1, sizeof (gzochid_application_descriptor));
+  gzochid_auth_identity *identity = calloc (1, sizeof (gzochid_auth_identity));
+  
+  SCM module = scm_c_resolve_module ("test");
+  SCM ready = scm_c_make_gsubr ("ready", 1, 0, 0, raise_condition);
+
+  GError *tmp_err = NULL;
+
+  scm_c_module_define (module, "ready", ready);
+
+  descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);
+  descriptor->ready = make_callback ("ready", g_list_append (NULL, "test"));
+
+  context->deployment_root = "/";
+  context->descriptor = descriptor;
+
+  identity->name = "[TEST]";
+
+  gzochid_scheme_application_ready (context, identity, &tmp_err);
+
+  g_assert_error (tmp_err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_FAILED);
+}
+
 void gzochid_api_channel_init () { }
 void gzochid_api_data_init () { }
 void gzochid_api_log_init () { }
@@ -132,9 +161,11 @@ inner_main (void *data, int argc, char *argv[])
 
   g_test_add_func ("/scheme/worker/logged-in/exception", 
 		   test_logged_in_worker_throws_exception);
+  g_test_add_func ("/scheme/ready/exception", test_ready_throws_exception);
 
   gzochid_guile_init ();
   gzochid_scheme_initialize_bindings ();
+  gzochid_scheme_task_initialize_bindings ();
   exit (g_test_run ());
 }
 

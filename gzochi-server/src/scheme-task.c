@@ -47,6 +47,9 @@
 static SCM gzochid_scheme_string_hash;
 static SCM gzochid_scheme_string_equiv;
 
+static GList *gzochi_private_app;
+static GList *gzochi_private_task;
+
 static int scheme_prepare (gpointer data) { return TRUE; }
 static void scheme_commit (gpointer data) { }
 static void scheme_rollback (gpointer data) { }
@@ -87,8 +90,6 @@ gzochid_scheme_application_task_worker (gzochid_application_context *context,
 					gpointer task)
 {
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *args = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "task");
 
   gzochid_transaction_join (&scheme_participant, NULL);
 
@@ -96,11 +97,9 @@ gzochid_scheme_application_task_worker (gzochid_application_context *context,
     (context, 
      identity,
      "gzochi:run-task", 
-     args,
+     gzochi_private_task,
      scm_list_1 (task), 
      exception_var);
-
-  g_list_free (args);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
 
@@ -123,8 +122,6 @@ gzochid_scheme_application_initialized_worker
   SCM callback = gzochid_scheme_create_callback 
     (context->descriptor->initialized, NULL);
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *args = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
 
   callback_reference = gzochid_data_create_reference 
     (context, &gzochid_scheme_data_serialization, callback);
@@ -132,10 +129,7 @@ gzochid_scheme_application_initialized_worker
   gzochid_transaction_join (&scheme_participant, NULL);
 
   gzochid_scheme_invoke_callback 
-    (context,
-     identity,
-     "gzochi:execute-initialized",
-     args,
+    (context, identity, "gzochi:execute-initialized", gzochi_private_app,
      scm_list_2 (callback,
 		 gzochid_scheme_ghashtable_to_hashtable 
 		 (properties, 
@@ -144,8 +138,6 @@ gzochid_scheme_application_initialized_worker
 		  (SCM (*) (gpointer)) scm_from_locale_string,
 		  (SCM (*) (gpointer)) scm_from_locale_string)),
      exception_var);
-
-  g_list_free (args);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
@@ -218,7 +210,6 @@ gzochid_scheme_application_logged_in_worker
 
   SCM handler = SCM_BOOL_F;
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *args = NULL;
     
   mpz_init (session_oid);
   mpz_set_str (session_oid, session_oid_str, 16);
@@ -234,9 +225,6 @@ gzochid_scheme_application_logged_in_worker
       return;
     }
 
-  args = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
-
   session = session_reference->obj;
 
   scm_session = gzochid_scheme_create_client_session 
@@ -249,14 +237,8 @@ gzochid_scheme_application_logged_in_worker
   gzochid_transaction_join (&scheme_participant, NULL);
 
   handler = gzochid_scheme_invoke_callback 
-    (context,
-     identity,
-     "gzochi:execute-logged-in",
-     args,
-     scm_list_2 (callback_reference->obj, scm_session), 
-     exception_var);
-  
-  g_list_free (args);
+    (context, identity, "gzochi:execute-logged-in", gzochi_private_app,
+     scm_list_2 (callback_reference->obj, scm_session), exception_var);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
@@ -308,8 +290,6 @@ gzochid_scheme_application_received_message_worker
 
   SCM bv = SCM_BOOL_F;
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *gpa = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
 
   unsigned char *message = NULL;
   short *message_len_ptr = NULL;
@@ -352,11 +332,8 @@ gzochid_scheme_application_received_message_worker
     }
       
   gzochid_scheme_invoke_callback
-    (context, 
-     identity,
-     "gzochi:execute-received-message", gpa,
-     scm_list_2 (callback_reference->obj, bv),
-     exception_var);
+    (context, identity, "gzochi:execute-received-message", gzochi_private_app,
+     scm_list_2 (callback_reference->obj, bv), exception_var);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
@@ -370,8 +347,6 @@ gzochid_scheme_application_received_message_worker
 	     (scm_variable_ref (exception_var)));
 	}
     }
-
-  g_list_free (gpa);
 }
 
 void 
@@ -385,7 +360,6 @@ gzochid_scheme_application_disconnected_worker
   gzochid_data_managed_reference *callback_reference = NULL;
 
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *gpa = NULL;
   char *oid_str = ptr;
   mpz_t session_oid;
 
@@ -421,8 +395,6 @@ gzochid_scheme_application_disconnected_worker
       gzochid_tx_warning 
 	(context, "Session '%s' disconnected after incomplete login.", ptr);
 
-      g_list_free (gpa);
-
       gzochid_client_session_disconnected_worker (context, identity, oid_str);
       return;
     }
@@ -449,15 +421,9 @@ gzochid_scheme_application_disconnected_worker
       return;
     }
 
-  gpa = g_list_append
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
-
   gzochid_scheme_invoke_callback
-    (context, 
-     identity,
-     "gzochi:execute-disconnected", gpa,
-     scm_list_1 (callback_reference->obj),
-     exception_var);
+    (context, identity, "gzochi:execute-disconnected", gzochi_private_app,
+     scm_list_1 (callback_reference->obj), exception_var);
 
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
@@ -473,7 +439,35 @@ gzochid_scheme_application_disconnected_worker
     }
 
   gzochid_client_session_disconnected_worker (context, identity, oid_str);
-  g_list_free (gpa);
+}
+
+void
+gzochid_scheme_application_ready (gzochid_application_context *context, 
+				  gzochid_auth_identity *identity, GError **err)
+{
+  SCM callback = gzochid_scheme_create_callback 
+    (context->descriptor->ready, NULL);
+  SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
+
+  /* This handler is called with a "current application" and identity, but isn't
+     called within a transaction and doesn't attempt to join one. */
+     
+  gzochid_scheme_invoke_callback 
+    (context, identity, "gzochi:execute-ready", gzochi_private_app,
+     scm_list_2 (callback,
+		 gzochid_scheme_ghashtable_to_hashtable 
+		 (context->descriptor->properties, 
+		  gzochid_scheme_string_hash,
+		  gzochid_scheme_string_equiv,
+		  (SCM (*) (gpointer)) scm_from_locale_string,
+		  (SCM (*) (gpointer)) scm_from_locale_string)),
+     exception_var);
+
+  /* Bridge any exception raised to the `GError' argument. */
+
+  if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
+    g_set_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_FAILED,
+		 "Failed to invoke ready handler.");
 }
 
 static void 
@@ -556,5 +550,10 @@ initialize_bindings (void *ptr)
 void 
 gzochid_scheme_task_initialize_bindings (void)
 {
+  gzochi_private_app = g_list_append
+    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "app");
+  gzochi_private_task = g_list_append
+    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "task");
+
   scm_with_guile (initialize_bindings, NULL);
 }

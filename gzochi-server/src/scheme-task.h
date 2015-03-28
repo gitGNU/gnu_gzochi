@@ -39,6 +39,11 @@ void gzochid_scheme_application_received_message_worker
 void gzochid_scheme_application_disconnected_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
+/* Called to invoke an application's optional "ready" lifecycle handler. */
+
+void gzochid_scheme_application_ready (gzochid_application_context *, 
+				       gzochid_auth_identity *, GError **);
+
 extern gzochid_application_task_serialization
 gzochid_scheme_task_serialization;
 

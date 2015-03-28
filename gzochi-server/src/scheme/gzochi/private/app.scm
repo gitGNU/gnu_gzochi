@@ -1,5 +1,5 @@
 ;; gzochi/private/app.scm: Private infrastructure for application support
-;; Copyright (C) 2014 Julian Graham
+;; Copyright (C) 2015 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
   (export gzochi:execute-disconnected
 	  gzochi:execute-initialized
 	  gzochi:execute-logged-in
+	  gzochi:execute-ready
 	  gzochi:execute-received-message
 	  
 	  gzochi:make-callback
@@ -96,6 +97,15 @@
 		      (gzochi:callback-module callback)))
 	  (data (gzochi:callback-data callback)))
       (if data (procedure data) (procedure))))
+
+  (define (gzochi:execute-ready callback properties)
+    (or (gzochi:callback? callback)
+	(raise (make-assertion-violation)))
+
+    (let ((procedure (gzochi:resolve-procedure
+		      (gzochi:callback-procedure callback)
+		      (gzochi:callback-module callback))))
+      (procedure properties)))
 
   (define (gzochi:execute-received-message callback msg)
     (or (gzochi:callback? callback)
