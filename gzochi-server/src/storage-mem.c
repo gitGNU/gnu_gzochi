@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "storage.h"
+#include "gzochid-storage.h"
 
 /* 
    The following data structures and functions provide transactional access to

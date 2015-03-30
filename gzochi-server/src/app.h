@@ -24,8 +24,8 @@
 #include "context.h"
 #include "event.h"
 #include "gzochid-auth.h"
+#include "gzochid-storage.h"
 #include "stats.h"
-#include "storage.h"
 #include "tx.h"
 
 enum gzochid_application_state 

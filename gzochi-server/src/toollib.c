@@ -22,6 +22,7 @@
 #include <strings.h>
 
 #include "config.h"
+#include "gzochid-storage.h"
 #include "storage.h"
 
 #define Q(x) #x

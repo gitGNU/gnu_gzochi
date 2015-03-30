@@ -20,7 +20,7 @@
 
 #include <glib.h>
 
-#include "storage.h"
+#include "gzochid-storage.h"
 
 /**
    Return a GHashTable containing the "game" section of the .INI file located at

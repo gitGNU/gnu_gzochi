@@ -24,9 +24,9 @@
 #include "app.h"
 #include "context.h"
 #include "event.h"
+#include "gzochid-storage.h"
 #include "schedule.h"
 #include "socket.h"
-#include "storage.h"
 
 enum gzochid_game_state 
   {

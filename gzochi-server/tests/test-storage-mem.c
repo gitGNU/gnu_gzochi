@@ -19,7 +19,7 @@
 #include <glib.h>
 #include <stdlib.h>
 
-#include "storage.h"
+#include "gzochid-storage.h"
 #include "storage-mem.h"
 
 struct test_storage_fixture

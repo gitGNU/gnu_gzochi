@@ -22,7 +22,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-#include "storage.h"
+#include "gzochid-storage.h"
 
 #define Q(x) #x
 #define QUOTE(x) Q(x)

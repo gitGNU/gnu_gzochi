@@ -23,8 +23,8 @@
 
 #include "app.h"
 #include "gzochid-auth.h"
+#include "gzochid-storage.h"
 #include "io.h"
-#include "storage.h"
 
 #ifdef __GNUC__
 #define WARN_UNUSED_RESULT __attribute__ ((warn_unused_result))

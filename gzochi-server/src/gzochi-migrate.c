@@ -35,10 +35,10 @@
 #include "descriptor.h"
 #include "game.h"
 #include "guile.h"
+#include "gzochid-storage.h"
 #include "reloc.h"
 #include "scheme.h"
 #include "scheme-task.h"
-#include "storage.h"
 #include "toollib.h"
 #include "tx.h"
 

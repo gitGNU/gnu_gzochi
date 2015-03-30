@@ -25,7 +25,7 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "../storage.h"
+#include "../gzochid-storage.h"
 
 #define GZOCHID_STORAGE_HDB_META 1
 #define GZOCHID_STORAGE_HDB_NAMES 2

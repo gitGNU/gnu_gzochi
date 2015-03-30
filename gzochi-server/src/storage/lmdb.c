@@ -25,7 +25,7 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "../storage.h"
+#include "../gzochid-storage.h"
 
 static gboolean 
 retryable (int ret)

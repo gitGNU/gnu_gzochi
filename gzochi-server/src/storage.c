@@ -22,6 +22,7 @@
 #include <strings.h>
 
 #include "game.h"
+#include "gzochid-storage.h"
 #include "storage.h"
 #include "log.h"
 

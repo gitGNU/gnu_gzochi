@@ -25,9 +25,9 @@
 #include "app.h"
 #include "data.h"
 #include "game.h"
+#include "gzochid-storage.h"
 #include "io.h"
 #include "log.h"
-#include "storage.h"
 #include "tx.h"
 
 #define ALLOCATION_BLOCK_SIZE 100

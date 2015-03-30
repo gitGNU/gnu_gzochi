@@ -31,6 +31,7 @@
 #include "descriptor.h"
 #include "fsm.h"
 #include "game.h"
+#include "gzochid-storage.h"
 #include "log.h"
 #include "scheme.h"
 #include "scheme-task.h"

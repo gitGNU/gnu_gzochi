@@ -30,6 +30,7 @@ dist_noinst_DATA = dtd/game.dtd dtd/migration.dtd
 dist_sysconf_DATA = conf/gzochid.conf
 
 dist_include_HEADERS = gzochid-auth.h
+dist_include_HEADERS = gzochid-auth.h gzochid-storage.h
 
 noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
 	config.h context.h data.h debug.h descriptor.h event.h fmemopen.h \

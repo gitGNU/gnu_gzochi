@@ -35,10 +35,10 @@
 #include "fsm.h"
 #include "game.h"
 #include "gzochid.h"
+#include "gzochid-storage.h"
 #include "log.h"
 #include "httpd.h"
 #include "stats.h"
-#include "storage.h"
 #include "threads.h"
 
 #define OID_PREFIX_LEN 26

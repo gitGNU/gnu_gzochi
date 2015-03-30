@@ -26,7 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "storage.h"
+#include "gzochid-storage.h"
 #include "toollib.h"
 
 #define _(String) gettext (String)
