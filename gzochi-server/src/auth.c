@@ -31,9 +31,9 @@
 
 #define PLUGIN_INFO_FUNCTION "gzochid_auth_init_plugin"
 
-#ifndef GZOCHID_AUTH_PLUGIN_LOCATION
-#define GZOCHID_AUTH_PLUGIN_LOCATION "./auth"
-#endif /* GZOCHID_AUTH_PLUGIN_LOCATION */
+#ifndef GZOCHID_AUTH_PLUGIN_DIR
+#define GZOCHID_AUTH_PLUGIN_DIR "./auth"
+#endif /* GZOCHID_AUTH_PLUGIN_DIR */
 
 GQuark gzochid_auth_plugin_error_quark (void)
 {
@@ -189,7 +189,7 @@ static void probe_auth_plugins
 
 void gzochid_auth_init (gzochid_game_context *context)
 {
-  char *plugin_search_path = GZOCHID_AUTH_PLUGIN_LOCATION;
+  char *plugin_search_path = GZOCHID_AUTH_PLUGIN_DIR;
 
   if (g_module_supported ())
     probe_auth_plugins (context, plugin_search_path);

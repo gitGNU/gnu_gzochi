@@ -29,7 +29,6 @@ bin_PROGRAMS = gzochid gzochi-dump gzochi-load gzochi-migrate
 dist_noinst_DATA = dtd/game.dtd dtd/migration.dtd
 dist_sysconf_DATA = conf/gzochid.conf
 
-dist_include_HEADERS = gzochid-auth.h
 dist_include_HEADERS = gzochid-auth.h gzochid-storage.h
 
 noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
@@ -42,7 +41,7 @@ noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
 noinst_LTLIBRARIES = libgzochid.la
 
 libgzochid_la_CFLAGS = @CFLAGS@ \
-	-DGZOCHID_AUTH_PLUGIN_LOCATION=\"$(plugindir)\" @GUILE_CFLAGS@ \
+	-DGZOCHID_AUTH_PLUGIN_DIR=\"$(plugindir)/auth\" @GUILE_CFLAGS@ \
 	@GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ @MICROHTTPD_CFLAGS@ \
 	@ZLIB_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
 	-Wall -Werror
