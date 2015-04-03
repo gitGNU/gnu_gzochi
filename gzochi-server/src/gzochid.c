@@ -1,5 +1,5 @@
 /* gzochid.c: Main server bootstrapping routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -52,9 +52,10 @@ static const struct option longopts[] =
     { NULL, 0, NULL, 0 }
   };
 
-static void initialize_async (gpointer data, gpointer user_data)
+static void 
+initialize_async (gpointer data, gpointer user_data)
 {
-  gzochid_context *context = (gzochid_context *) user_data;
+  gzochid_context *context = user_data;
   gzochid_server_context *server_context = (gzochid_server_context *) context;
 
   GKeyFile *key_file = g_key_file_new ();
@@ -133,29 +134,34 @@ static void initialize_async (gpointer data, gpointer user_data)
   gzochid_fsm_to_state (context->fsm, GZOCHID_STATE_RUNNING);
 }
 
-static void initialize (int from_state, int to_state, gpointer user_data)
+static void 
+initialize (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_server_context *context = (gzochid_server_context *) user_data;
+  gzochid_server_context *context = user_data;
   gzochid_thread_pool_push (context->pool, initialize_async, NULL, NULL);
 }
 
-static void *initialize_guile_inner (void *ptr)
+static void *
+initialize_guile_inner (void *ptr)
 {
   gzochid_guile_init ();
   return NULL;
 }
 
-static void initialize_guile (int from_state, int to_state, gpointer user_data)
+static void 
+initialize_guile (int from_state, int to_state, gpointer user_data)
 {
   scm_with_guile (initialize_guile_inner, NULL);
 }
 
-gzochid_server_context *gzochid_server_context_new (void)
+gzochid_server_context *
+gzochid_server_context_new (void)
 {
   return calloc (1, sizeof (gzochid_server_context));
 }
 
-void gzochid_server_context_init (gzochid_server_context *context)
+void 
+gzochid_server_context_init (gzochid_server_context *context)
 {
   gzochid_fsm *fsm = gzochid_fsm_new 
     ("main", GZOCHID_STATE_INITIALIZING, "INITIALIZING");
@@ -178,7 +184,8 @@ void gzochid_server_context_init (gzochid_server_context *context)
   gzochid_context_init ((gzochid_context *) context, NULL, fsm);
 }
 
-void gzochid_server_context_free (gzochid_server_context *context)
+void 
+gzochid_server_context_free (gzochid_server_context *context)
 {
   gzochid_context *root_context = (gzochid_context *) context;
   gzochid_fsm_free (root_context->fsm);
@@ -228,7 +235,8 @@ There is NO WARRANTY, to the extent permitted by law.\n"),
 	  "2011");
 }
 
-int main (int argc, char *argv[])
+int 
+main (int argc, char *argv[])
 {
   gzochid_server_context *context = NULL;
   const char *program_name = argv[0];
@@ -256,7 +264,10 @@ int main (int argc, char *argv[])
       }
 
   if (context->gzochid_conf_path == NULL)
-    context->gzochid_conf_path = QUOTE(GZOCHID_CONF_LOCATION);
+    {
+      const char *env = getenv ("GZOCHID_CONF_LOCATION");
+      context->gzochid_conf_path = env ? env : QUOTE(GZOCHID_CONF_LOCATION);
+    }
 
   g_info ("Reading configuration from %s", context->gzochid_conf_path);
   

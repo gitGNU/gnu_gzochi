@@ -39,17 +39,24 @@
 GHashTable *
 gzochid_tool_load_game_config (const char *path)
 {
+  const char *env = getenv ("GZOCHID_CONF_LOCATION");
+  const char *gzochid_conf = NULL;
+
   GKeyFile *key_file = g_key_file_new ();
   GHashTable *game_config = NULL;
-  const char *gzochid_conf_path = path ? path : QUOTE (GZOCHID_CONF_LOCATION);
   GError *err = NULL;
 
-  g_key_file_load_from_file 
-    (key_file, gzochid_conf_path, G_KEY_FILE_NONE, &err);
+  if (path != NULL)
+    gzochid_conf = path;
+  else if (env != NULL)
+    gzochid_conf = env;
+  else gzochid_conf = QUOTE (GZOCHID_CONF_LOCATION);
+
+  g_key_file_load_from_file (key_file, gzochid_conf, G_KEY_FILE_NONE, &err);
   
   if (err != NULL)
     {
-      g_critical ("Failed to open %s: %s", path, err->message);
+      g_critical ("Failed to open %s: %s", gzochid_conf, err->message);
       exit (EXIT_FAILURE);
     }
 

@@ -522,13 +522,24 @@ open_store (gzochid_application_context *context, char *path, char *db)
 }
 
 static gzochid_application_context *
-create_application_context (char *gzochid_conf_path, char *app)
+create_application_context (char *path, char *app)
 {
+  GHashTable *config = NULL; 
   FILE *descriptor_file = NULL;
-  GHashTable *config = gzochid_tool_load_game_config 
-    (gzochid_conf_path ? gzochid_conf_path : QUOTE (GZOCHID_CONF_LOCATION));
+
+  const char *env = getenv ("GZOCHID_CONF_LOCATION");
+  const char *gzochid_conf = NULL;
+
   gzochid_application_context *context = gzochid_application_context_new ();
   char *work_dir = NULL, *data_dir = NULL, *deploy_dir = NULL, *app_dir = NULL;
+
+  if (path != NULL)
+    gzochid_conf = path;
+  else if (env != NULL)
+    gzochid_conf = env;
+  else gzochid_conf = QUOTE (GZOCHID_CONF_LOCATION);
+
+  config = gzochid_tool_load_game_config (gzochid_conf);
 
   if (! g_hash_table_contains (config, "server.fs.data"))
     {
