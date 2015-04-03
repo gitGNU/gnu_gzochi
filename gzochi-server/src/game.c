@@ -48,6 +48,10 @@
 #define SERVER_FS_APPS_DEFAULT "/var/gzochid/deploy"
 #define SERVER_FS_DATA_DEFAULT "/var/gzochid/data"
 
+#ifndef GZOCHID_AUTH_PLUGIN_DIR
+#define GZOCHID_AUTH_PLUGIN_DIR "./auth"
+#endif /* GZOCHID_AUTH_PLUGIN_DIR */
+
 static void 
 initialize_application (gzochid_game_context *context, const char *dir,
 			gzochid_application_descriptor *descriptor)
@@ -262,12 +266,11 @@ gzochid_game_context_init (gzochid_game_context *context,
     context->work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
   else context->work_dir = strdup (SERVER_FS_DATA_DEFAULT);
 
-  tx_timeout_ms = gzochid_config_to_long 
-    (g_hash_table_lookup (config, "tx.timeout"), DEFAULT_TX_TIMEOUT_MS);
-  context->tx_timeout.tv_sec = tx_timeout_ms / 1000;
-  context->tx_timeout.tv_usec = (tx_timeout_ms % 1000) * 1000;
+  if (g_hash_table_contains (config, "server.auth.plugin.dir"))
+    context->auth_plugin_dir = 
+      strdup (g_hash_table_lookup (config, "server.auth.plugin.dir"));
+  else context->auth_plugin_dir = GZOCHID_AUTH_PLUGIN_DIR;
 
-  if (g_hash_table_contains (config, "storage.engine"))
     context->storage_engine = gzochid_storage_load_engine 
       (g_hash_table_lookup (config, "storage.engine"));
   else gzochid_info 
@@ -283,6 +286,11 @@ FOR PRODUCTION USE.");
       context->storage_engine->interface = 
 	&gzochid_storage_engine_interface_mem;
     }
+
+  tx_timeout_ms = gzochid_config_to_long 
+    (g_hash_table_lookup (config, "tx.timeout"), DEFAULT_TX_TIMEOUT_MS);
+  context->tx_timeout.tv_sec = tx_timeout_ms / 1000;
+  context->tx_timeout.tv_usec = (tx_timeout_ms % 1000) * 1000;
 
   gzochid_fsm_add_transition 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, GZOCHID_GAME_STATE_RUNNING);

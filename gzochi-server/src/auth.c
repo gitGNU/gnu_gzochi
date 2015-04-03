@@ -31,10 +31,6 @@
 
 #define PLUGIN_INFO_FUNCTION "gzochid_auth_init_plugin"
 
-#ifndef GZOCHID_AUTH_PLUGIN_DIR
-#define GZOCHID_AUTH_PLUGIN_DIR "./auth"
-#endif /* GZOCHID_AUTH_PLUGIN_DIR */
-
 GQuark gzochid_auth_plugin_error_quark (void)
 {
   return g_quark_from_static_string ("gzochid-auth-plugin-error-quark");
@@ -189,9 +185,7 @@ static void probe_auth_plugins
 
 void gzochid_auth_init (gzochid_game_context *context)
 {
-  char *plugin_search_path = GZOCHID_AUTH_PLUGIN_DIR;
-
   if (g_module_supported ())
-    probe_auth_plugins (context, plugin_search_path);
+    probe_auth_plugins (context, context->auth_plugin_dir);
   else gzochid_info ("Plugins not supported; skipping auth plugin probe.");
 }

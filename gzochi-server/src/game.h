@@ -44,6 +44,7 @@ struct _gzochid_game_context
   int port;
   char *apps_dir;
   char *work_dir;
+  char *auth_plugin_dir;
   struct timeval tx_timeout;
 
   GHashTable *applications;
