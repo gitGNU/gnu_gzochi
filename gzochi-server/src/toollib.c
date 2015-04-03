@@ -32,6 +32,10 @@
 #define GZOCHID_CONF_LOCATION "/etc/gzochid.conf"
 #endif /* GZOCHID_CONF_LOCATION */
 
+#ifndef GZOCHID_STORAGE_ENGINE_DIR
+#define GZOCHID_STORAGE_ENGINE_DIR "./storage"
+#endif /* GZOCHID_STORAGE_ENGINE_DIR */
+
 GHashTable *
 gzochid_tool_load_game_config (const char *path)
 {
@@ -107,12 +111,23 @@ gzochid_tool_probe_data_dir
 gzochid_storage_engine *
 gzochid_tool_probe_storage_engine (GHashTable *gzochid_conf, char *name)
 {
+  char *dir = NULL;
+  char *env = getenv ("GZOCHID_STORAGE_ENGINE_DIR");
   gzochid_storage_engine *engine = NULL;
 
   /* Get the name from the configuration table if `name' is NULL. */
 
   char *engine_name = name != NULL ? name 
-    : g_hash_table_lookup (gzochid_conf, "storage.engine");
+    : g_hash_table_lookup (gzochid_conf, "server.storage.engine");
+      
+  if (env != NULL)
+    dir = env;
+  else 
+    {
+      char *conf_dir = g_hash_table_lookup 
+	(gzochid_conf, "server.storage.engine.dir");
+      dir = conf_dir == NULL ? GZOCHID_STORAGE_ENGINE_DIR : conf_dir;
+    }
 
   if (engine_name == NULL)
     {
@@ -122,7 +137,7 @@ gzochid_tool_probe_storage_engine (GHashTable *gzochid_conf, char *name)
 
   /* Attempt to load the engine. */
 
-  engine = gzochid_storage_load_engine (engine_name);
+  engine = gzochid_storage_load_engine (dir, engine_name);
 
   if (engine == NULL)
     {

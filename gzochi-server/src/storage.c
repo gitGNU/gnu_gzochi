@@ -28,10 +28,6 @@
 
 #define ENGINE_INTERFACE_FUNCTION "gzochid_storage_init_engine"
 
-#ifndef GZOCHID_STORAGE_ENGINE_LOCATION
-#define GZOCHID_STORAGE_ENGINE_LOCATION "./storage"
-#endif /* GZOCHID_STORAGE_ENGINE_LOCATION */
-
 /* The initialization process for storage engine modules is similar to the
    process for loading authentication plugins, except that no probing is done.
    GLib's module load is used to open and load a named storage engine, which is
@@ -40,12 +36,11 @@
    engine. If any of these steps fail, this function returns NULL. */
 
 gzochid_storage_engine *
-gzochid_storage_load_engine (const char *name)
+gzochid_storage_load_engine (const char *dir, const char *name)
 {
   if (g_module_supported ())
     {
-      gchar *path = g_strconcat 
-	(GZOCHID_STORAGE_ENGINE_LOCATION, "/", name, NULL);
+      gchar *path = g_strconcat (dir, "/", name, NULL);
       GModule *engine_handle = g_module_open (path, G_MODULE_BIND_LOCAL);
       int (*engine_interface) (gzochid_storage_engine *);
 

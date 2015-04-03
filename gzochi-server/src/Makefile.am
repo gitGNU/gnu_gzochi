@@ -41,7 +41,8 @@ noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
 noinst_LTLIBRARIES = libgzochid.la
 
 libgzochid_la_CFLAGS = @CFLAGS@ \
-	-DGZOCHID_AUTH_PLUGIN_DIR=\"$(plugindir)/auth\" @GUILE_CFLAGS@ \
+	-DGZOCHID_AUTH_PLUGIN_DIR=\"$(plugindir)/auth\" \
+	-DGZOCHID_STORAGE_ENGINE_DIR=\"$(plugindir)/storage\" @GUILE_CFLAGS@ \
 	@GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ @MICROHTTPD_CFLAGS@ \
 	@ZLIB_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
 	-Wall -Werror
@@ -67,6 +68,7 @@ gzochid_LDADD = libgzochid.la
 
 gzochi_dump_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
+	-DGZOCHID_STORAGE_ENGINE_DIR=\"$(plugindir)/storage\" \
 	@GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 	-Wall -Werror
 gzochi_dump_SOURCES = gzochi-dump.c toollib.c
@@ -74,6 +76,7 @@ gzochi_dump_LDADD = libgzochid.la @GLIB_LIBS@ @GMODULE_LIBS@
 
 gzochi_load_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
+	-DGZOCHID_STORAGE_ENGINE_DIR=\"$(plugindir)/storage\" \
 	@GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 	-Wall -Werror
 gzochi_load_SOURCES = gzochi-load.c toollib.c
@@ -81,6 +84,7 @@ gzochi_load_LDADD = libgzochid.la @GLIB_LIBS@ @GMODULE_LIBS@
 
 gzochi_migrate_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
+	-DGZOCHID_STORAGE_ENGINE_DIR=\"$(plugindir)/storage\" \
 	@GLIB_CFLAGS@ @GMODULE_CFLAGS@ @GUILE_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) \
 	-Wall -Werror
 gzochi_migrate_SOURCES = gzochi-migrate.c toollib.c
