@@ -68,7 +68,9 @@ initialize (int from_state, int to_state, gpointer user_data)
        (admin_context->config, "module.httpd.enabled"), FALSE))
     {
       int port = gzochid_config_to_int 
-	(g_hash_table_lookup (admin_context->config, "module.httpd.port"), 0);
+	(g_hash_table_lookup (admin_context->config, "module.httpd.port"), 
+	 8000);
+
       gzochid_httpd_context *httpd_context = gzochid_httpd_context_new ();
       gzochid_httpd_context_init (httpd_context, context, port);
     }
@@ -77,7 +79,9 @@ initialize (int from_state, int to_state, gpointer user_data)
        (admin_context->config, "module.debug.enabled"), FALSE))
     {
       int port = gzochid_config_to_int 
-	(g_hash_table_lookup (admin_context->config, "module.debug.port"), 0);
+	(g_hash_table_lookup (admin_context->config, "module.debug.port"), 
+	 37146);
+
       gzochid_debug_context *debug_context = gzochid_debug_context_new ();
       gzochid_debug_context_init (debug_context, context, port);
     }
