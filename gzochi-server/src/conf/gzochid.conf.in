@@ -41,20 +41,20 @@ server.port = 8001
 # The root locations for various game application-related files. See the manual
 # for more information.
 
-server.fs.data = /var/gzochid/data
-server.fs.apps = /var/gzochid/deploy
+server.fs.data = @localstatedir@/gzochid/data
+server.fs.apps = @datarootdir@/gzochid/deploy
 
 # The directory to probe for application authentication plugins. Every regular 
 # file in this directory will be examined, and an attempt will be made to load
 # each as a dynamic library and initialize the authentication plugin interface.
 
-auth.plugin.dir = /usr/local/lib/gzochid/auth
+auth.plugin.dir = @libdir@/gzochid/auth
 
 # The parent directory for storage engine libraries. This path is used to 
 # resolve the absolute location of the storage engine specified by 
 # 'storage.engine.name' (see below).
 
-storage.engine.dir = /usr/local/lib/gzochid/storage
+storage.engine.dir = @libdir@/gzochid/storage
 
 # The name of the storage engine to use to store game application data. Must be
 # one of bdb, hdb, lmdb, and mem; which correspond to Berkeley DB, hamsterdb, 
