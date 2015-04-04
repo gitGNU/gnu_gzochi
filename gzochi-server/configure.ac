@@ -113,6 +113,7 @@ AC_SUBST(GZOCHI_COMMON)
 
 AC_CONFIG_FILES([Makefile
 		 doc/Makefile
+		 meta/Makefile
                  src/Makefile
 		 src/api/Makefile
 		 src/auth/Makefile

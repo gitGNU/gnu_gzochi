@@ -1,0 +1,18 @@
+# 
+# A minimal version of gzochid.conf, the gzochi server configuration file;
+# intended for use running gzochid and related programs from the build tree.
+#
+
+[admin]
+
+context.enabled = true
+module.debug.enabled = true
+module.httpd.enabled = true
+
+[game]
+
+server.fs.data = @abs_top_builddir@/meta/data
+server.fs.apps = @abs_top_builddir@/meta/deploy
+
+storage.engine.dir = @abs_top_builddir@/src/storage
+auth.plugin.dir = @abs_top_builddir@/src/auth
