@@ -34,11 +34,16 @@ test_programs = \
 noinst_HEADERS = mock-data.h
 
 check_PROGRAMS = $(test_programs)
+check_LTLIBRARIES = treefile.la
 AM_TESTS_ENVIRONMENT = GUILE_LOAD_PATH='$(top_srcdir)/src/scheme'; \
 	export GUILE_LOAD_PATH;
-TESTS = $(test_programs)
-
+TESTS = $(test_programs) test-gzochi-dump.sh test-gzochi-load.sh
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
+
+treefile_la_SOURCES = treefile.c
+treefile_la_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ -Wall -Werror
+treefile_la_LIBADD = @GLIB_LIBS@
+treefile_la_LDFLAGS = -module -avoid-version -rpath $(abs_srcdir)
 
 test_data_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_data_SOURCES = test-data.c
