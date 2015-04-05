@@ -1,4 +1,4 @@
-.TH GZOCHID 8 "January 15, 2012"
+.TH GZOCHID 8 "April 4, 2015"
 .SH NAME
 .Nm gzochid - the gzochi server
 .SH SYNOPSIS
@@ -20,12 +20,13 @@ The \fBgzochid\fR program has many options that can be specified at
 startup. For a complete list of options, run this command:
 .IP
 shell> \fBgzochid \-\-help\fR
-.SH COPYRIGHT
-Copyright \(co 2012 Julian Graham. License GPLv3+: GNU GPL version 3
-or later <http://gnu.org/licenses/gpl.html>.
-.br
-This is free software: you are free to change and redistribute it.
-There is NO WARRANTY, to the extent permitted by law.
+.SH ENVIRONMENT
+.TP
+.B GZOCHID_CONF_LOCATION
+If \fB$GZOCHID_CONF_LOCATION\fR is set before \fBgzochid\fR is started, its 
+value is used as the full path to the server configuration file. This variable 
+will be overriden by a command-line argument giving the location of the file, if
+present.
 .SH SEE ALSO
 .P
 The full documentation for \fBgzochid\fR is maintained as a Texinfo
@@ -35,5 +36,11 @@ installed at your site, the command
 .B info gzochid
 .P
 should give you access to the complete manual.
+.SH COPYRIGHT
+Copyright \(co 2015 Julian Graham. License GPLv3+: GNU GPL version 3
+or later <http://gnu.org/licenses/gpl.html>.
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
 .SH AUTHOR
 Julian Graham (julian@member.fsf.org)

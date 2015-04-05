@@ -1,4 +1,4 @@
-.TH GZOCHI-LOAD 1 "July 12, 2014"
+.TH GZOCHI-LOAD 1 "April 4, 2015"
 .SH NAME
 gzochi-load \- Load exported gzochi databases
 .SH SYNOPSIS
@@ -32,8 +32,8 @@ The command:
 gzochi-load /var/gzochid/data/mygame2:meta < meta.dump
 .PP
 
-...will load the contents of the file \"meta.dump\" into the \"meta\" database
-in the specified directory. All three databases are necessary to fully 
+will load the contents of the file \(dqmeta.dump\(dq into the \(dqmeta\(dq 
+database in the specified directory. All three databases are necessary to fully 
 reconstitute the state of a gzochi game application. For example, the commands:
 
 .IP
@@ -59,6 +59,20 @@ the dump file to the target database without truncating it. Use with care!
 Write usage information to standard error, and exit.
 .IP \fB\-v,\ \-\-version\fR
 Write version information to standard error, and exit.
+
+.SH ENVIRONMENT
+.TP
+.B GZOCHID_CONF_LOCATION
+If \fB$GZOCHID_CONF_LOCATION\fR is set before \fBgzochi-load\fR is started, its
+value is used as the full path to the server configuration file. This variable 
+will be overriden by a command-line argument giving the location of the file, if
+present.
+.TP
+.B GZOCHID_STORAGE_ENGINE_DIR
+If \fB$GZOCHID_STORAGE_ENGINE_DIR\fR is set before \fBgzochi-load\fR is started,
+its value is used as the base path for resolving storage engine modules. This
+value takes precedence over the \(dqserver.storage.engine.dir\(dq setting in the
+server configuration file.
 
 .SH AUTHOR
 Julian Graham (joolean@undecidable.net)

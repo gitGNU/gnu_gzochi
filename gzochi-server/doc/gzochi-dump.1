@@ -1,4 +1,4 @@
-.TH GZOCHI-DUMP 1 "July 8, 2014"
+.TH GZOCHI-DUMP 1 "April 4, 2015"
 .SH NAME
 gzochi-dump \- Write gzochi databases to flat-text format
 .SH SYNOPSIS
@@ -28,7 +28,7 @@ the database name as a suffix of the target. For example, the command:
 gzochi-dump /var/gzochid/data/mygame:meta
 .PP
 
-...will dump the contents of the \"meta\" database to standard output. More 
+will dump the contents of the \(dqmeta\(dq database to standard output. More 
 usefully, however, gzochi-dump can dump all three databases to external files in
 a single, consistent transaction, enabling online backups of all game data. For
 example, the command:
@@ -55,6 +55,19 @@ standard output; the complete set of game database dump files will be writtento 
 Write usage information to standard error, and exit.
 .IP \fB\-v,\ \-\-version\fR
 Write version information to standard error, and exit.
+.SH ENVIRONMENT
+.TP
+.B GZOCHID_CONF_LOCATION
+If \fB$GZOCHID_CONF_LOCATION\fR is set before \fBgzochi-dump\fR is started, its
+value is used as the full path to the server configuration file. This variable 
+will be overriden by a command-line argument giving the location of the file, if
+present.
+.TP
+.B GZOCHID_STORAGE_ENGINE_DIR
+If \fB$GZOCHID_STORAGE_ENGINE_DIR\fR is set before \fBgzochi-dump\fR is started,
+its value is used as the base path for resolving storage engine modules. This
+value takes precedence over the \(dqserver.storage.engine.dir\(dq setting in the
+server configuration file.
 
 .SH AUTHOR
 Julian Graham (joolean@undecidable.net)

@@ -1,4 +1,4 @@
-.TH GZOCHI-MIGRATE 1 "July 27, 2014"
+.TH GZOCHI-MIGRATE 1 "April 4, 2015"
 .SH NAME
 gzochi-migrate \- Transform the contents of a gzochi database
 .SH SYNOPSIS
@@ -62,6 +62,20 @@ to make permanent changes to data.
 Suppress the display of log messages and post-migration stats reporting.
 .IP \fB\-v,\ \-\-version\fR
 Write version information to standard error, and exit.
+
+.SH ENVIRONMENT
+.TP
+.B GZOCHID_CONF_LOCATION
+If \fB$GZOCHID_CONF_LOCATION\fR is set before \fBgzochi-migrate\fR is started, 
+its value is used as the full path to the server configuration file. This 
+variable will be overriden by a command-line argument giving the location of the
+file, if present.
+.TP
+.B GZOCHID_STORAGE_ENGINE_DIR
+If \fB$GZOCHID_STORAGE_ENGINE_DIR\fR is set before \fBgzochi-migrate\fR is 
+started, its value is used as the base path for resolving storage engine 
+modules. This value takes precedence over the \(dqserver.storage.engine.dir\(dq
+setting in the server configuration file.
 
 .SH AUTHOR
 Julian Graham (joolean@undecidable.net)
