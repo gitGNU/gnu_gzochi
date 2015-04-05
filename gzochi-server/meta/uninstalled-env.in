@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# Copyright (C) 2015 Julian Graham
+#
+# gzochi is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Usage: uninstalled-env [ARGS]
+
+# This script arranges for the environment to support running gzochid and 
+# related programs from the build tree. The following env vars may be modified 
+# (but not clobbered): GZOCHID_CONF_LOCATION and GZOCHID_STORAGE_ENGINE_DIR.
+
+# Example: ./uninstalled-env ../src/gzochid
+
+if test -z "$GZOCHID_CONF_LOCATION"; then
+    export GZOCHID_CONF_LOCATION="@abs_top_builddir@/meta/conf/gzochid.conf"
+fi
+
+if test -z "$GZOCHID_STORAGE_ENGINE_DIR"; then
+    export GZOCHID_STORAGE_ENGINE_DIR="@abs_top_builddir@/src/storage"
+fi
+
+exec "$@"
