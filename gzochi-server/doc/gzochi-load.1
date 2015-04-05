@@ -3,7 +3,7 @@
 gzochi-load \- Load exported gzochi databases
 .SH SYNOPSIS
 .B gzochi-load
-[-c <conf>] [-f] <app_name or data_dir>:<db>
+[-c <conf>] [-e <engine>] [-f] <app_name or data_dir>:<db>
 .br
 .B gzochi-load
 [-h | -v]
@@ -51,6 +51,11 @@ already exists.
 .SH OPTIONS
 .IP \fB\-c,\ \-\-config\fR
 Specify an alternate path to the gzochid.conf file.
+.IP \fB\-e,\ \-\-engine\fR
+Specify the name of the storage engine to use to load data into the target 
+database. The format of this argument is the same as for the 
+\(dqserver.store.engine.dir\(dq setting in gzochid.conf: the basename of the 
+module file, minus the extension. (E.g., bdb.)
 .IP \fB\-f,\ \-\-force\fR
 Disable the safeguards that prevent pre-existing database files from being
 written to. If this flag is specified, gzochi-load will add the contents of
