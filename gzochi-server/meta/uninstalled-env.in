@@ -19,7 +19,8 @@
 
 # This script arranges for the environment to support running gzochid and 
 # related programs from the build tree. The following env vars may be modified 
-# (but not clobbered): GZOCHID_CONF_LOCATION and GZOCHID_STORAGE_ENGINE_DIR.
+# (but not clobbered): GUILE_LOAD_PATH, GZOCHID_CONF_LOCATION, and 
+# GZOCHID_STORAGE_ENGINE_DIR.
 
 # Example: ./uninstalled-env ../src/gzochid
 
@@ -30,5 +31,7 @@ fi
 if test -z "$GZOCHID_STORAGE_ENGINE_DIR"; then
     export GZOCHID_STORAGE_ENGINE_DIR="@abs_top_builddir@/src/storage"
 fi
+
+export GUILE_LOAD_PATH="@abs_top_builddir@/src/scheme/:$GUILE_LOAD_PATH"
 
 exec "$@"
