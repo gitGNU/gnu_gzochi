@@ -83,10 +83,10 @@
 	   (handler (procedure client-session)))
       (cond ((not handler) #f)
 	    ((gzochi:client-session-listener? handler) handler)
-	    (raise (condition
-		    (make-assertion-violation)
-		    (make-message-condition
-		     "logged-in callback must return a session listener"))))))
+	    (else (raise (condition
+			  (make-assertion-violation)
+			  (make-message-condition
+			   "Invalid type returned by logged-in callback.")))))))
 
   (define (gzochi:execute-disconnected callback)
     (or (gzochi:callback? callback)

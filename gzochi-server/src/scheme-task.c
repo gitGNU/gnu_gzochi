@@ -47,6 +47,8 @@
 static SCM gzochid_scheme_string_hash;
 static SCM gzochid_scheme_string_equiv;
 
+static SCM scm_client_session_listener_p;
+
 static GList *gzochi_private_app;
 static GList *gzochi_private_task;
 
@@ -192,6 +194,12 @@ unpack_handler (gpointer data)
   return session_handler;
 }
 
+static gboolean
+is_client_session_listener (SCM obj)
+{
+  return scm_is_true (scm_call_1 (scm_client_session_listener_p, obj));
+}
+
 void 
 gzochid_scheme_application_logged_in_worker 
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
@@ -254,6 +262,12 @@ gzochid_scheme_application_logged_in_worker
     {
       gzochid_client_session_send_login_failure (context, session);
       gzochid_client_session_disconnect (context, session);
+    }
+  else if (! is_client_session_listener (handler))
+    {
+      gzochid_warning ("Invalid type returned by logged-in callback.");
+      gzochid_transaction_mark_for_rollback
+	(&scheme_participant, FALSE);
     }
   else
     {
@@ -533,8 +547,11 @@ bind_scm (char *module, SCM *binding, char *name)
 static void *
 initialize_bindings (void *ptr)
 {
-  bind_scm ("rnrs hashtables", &gzochid_scheme_string_hash, "string-hash");
+  bind_scm ("gzochi session", &scm_client_session_listener_p, 
+	    "gzochi:client-session-listener?");
+
   bind_scm ("rnrs base", &gzochid_scheme_string_equiv, "equal?");
+  bind_scm ("rnrs hashtables", &gzochid_scheme_string_hash, "string-hash");
 
   gzochid_api_channel_init ();
   gzochid_api_data_init ();

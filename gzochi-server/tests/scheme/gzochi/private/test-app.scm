@@ -18,13 +18,20 @@
 
 (library (gzochi private test-app)
   (export)
-  (import (gzochi app) 
-	  (gzochi private app) 
+  (import (only (guile) *unspecified*)
+	  (gzochi app) 
+	  (gzochi private app)
+	  (gzochi srfi-64-support)
 	  (rnrs base) 
+	  (rnrs conditions)
+	  (rnrs exceptions)
 	  (rnrs hashtables) 
 	  (srfi :64))
 
+(test-runner-current (gzochi:test-runner))
+
 (define (false-handler) #f)
+(define (unspecified-handler) *unspecified*)
 
 (define ready-counter 0)
 (define (clear-ready-counter!) (set! ready-counter 0))
@@ -34,6 +41,10 @@
 
 (test-group "#f"
   (test-eqv #f (gzochi:execute-logged-in (g:@ false-handler) 'session)))
+(test-group "unspecified"
+  (test-assert (guard (ex ((assertion-violation? ex) #t))
+		 (gzochi:execute-logged-in (g:@ unspecified-handler) 'session)
+		 #f)))
 
 (test-end "gzochi:execute-logged-in")
 

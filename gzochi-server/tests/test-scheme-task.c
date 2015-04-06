@@ -39,6 +39,12 @@ raise_condition (SCM session)
   return SCM_BOOL_F;
 }
 
+static SCM 
+return_unspecified (SCM session)
+{
+  return SCM_UNSPECIFIED;
+}
+
 static gzochid_application_callback *
 make_callback (char *name, GList *module)
 {
@@ -65,7 +71,8 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
     malloc (sizeof (gzochid_storage_engine));
   
   SCM module = scm_c_resolve_module ("test");
-  SCM logged_in = scm_c_make_gsubr ("logged-in", 1, 0, 0, raise_condition);
+  SCM logged_in = scm_c_make_gsubr 
+    ("logged-in-exception", 1, 0, 0, raise_condition);
 
   base_context->parent = (gzochid_context *) game_context;
   game_context->storage_engine = storage_engine;
@@ -80,10 +87,10 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
   context->names = gzochid_storage_engine_interface_mem.open
     (context->storage_context, "/tmp/names", GZOCHID_STORAGE_CREATE);
 
-  scm_c_module_define (module, "logged-in", logged_in);
+  scm_c_module_define (module, "logged-in-exception", logged_in);
 
   descriptor->logged_in = make_callback 
-    ("logged-in", g_list_append (NULL, "test"));
+    ("logged-in-exception", g_list_append (NULL, "test"));
   context->descriptor = descriptor;
 
   identity->name = "[TEST]";
@@ -116,6 +123,74 @@ test_logged_in_worker_throws_exception ()
 {
   gzochid_transaction_execute 
     (test_logged_in_worker_throws_exception_inner, NULL);
+}
+
+static void 
+test_logged_in_worker_returns_unspecified_inner (gpointer data)
+{
+  gzochid_application_context *context = gzochid_application_context_new ();
+  gzochid_application_descriptor *descriptor = 
+    calloc (1, sizeof (gzochid_application_descriptor));
+  gzochid_auth_identity *identity = calloc (1, sizeof (gzochid_auth_identity));
+  gzochid_client_session *session = NULL;
+  gzochid_context *base_context = (gzochid_context *) context;
+  gzochid_game_context *game_context = gzochid_game_context_new ();
+  gzochid_storage_engine *storage_engine = 
+    malloc (sizeof (gzochid_storage_engine));
+  
+  SCM module = scm_c_resolve_module ("test");
+  SCM logged_in = scm_c_make_gsubr 
+    ("logged-in-unspecified", 1, 0, 0, return_unspecified);
+
+  base_context->parent = (gzochid_context *) game_context;
+  game_context->storage_engine = storage_engine;
+  storage_engine->interface = &gzochid_storage_engine_interface_mem;
+
+  context->storage_context = 
+    gzochid_storage_engine_interface_mem.initialize ("/tmp");
+  context->meta = gzochid_storage_engine_interface_mem.open
+    (context->storage_context, "/tmp/meta", GZOCHID_STORAGE_CREATE);
+  context->oids = gzochid_storage_engine_interface_mem.open
+    (context->storage_context, "/tmp/oids", GZOCHID_STORAGE_CREATE);
+  context->names = gzochid_storage_engine_interface_mem.open
+    (context->storage_context, "/tmp/names", GZOCHID_STORAGE_CREATE);
+
+  scm_c_module_define (module, "logged-in-unspecified", logged_in);
+
+  descriptor->logged_in = make_callback 
+    ("logged-in-unspecified", g_list_append (NULL, "test"));
+  context->descriptor = descriptor;
+
+  identity->name = "[TEST]";
+  session = gzochid_client_session_new (identity);
+
+  char *oid_str = NULL;
+
+  { mpz_t oid;
+    GString *out = g_string_new (NULL);
+  
+    gzochid_client_session_serialization.serializer 
+      (context, session, out, NULL);
+
+    mpz_init (oid);
+    mpz_set_ui (oid, 1);
+    oid_str = mpz_get_str (NULL, 16, oid);
+  
+    gzochid_storage_engine_interface_mem.put
+      (context->oids, oid_str, strlen (oid_str), out->str, out->len);
+
+    mpz_clear (oid);
+    g_string_free (out, FALSE);
+  }
+  
+  gzochid_scheme_application_logged_in_worker (context, identity, oid_str);
+}
+
+static void 
+test_logged_in_worker_returns_unspecified ()
+{
+  gzochid_transaction_execute 
+    (test_logged_in_worker_returns_unspecified_inner, NULL);
 }
 
 static void 
@@ -161,6 +236,8 @@ inner_main (void *data, int argc, char *argv[])
 
   g_test_add_func ("/scheme/worker/logged-in/exception", 
 		   test_logged_in_worker_throws_exception);
+  g_test_add_func ("/scheme/worker/logged-in/unspecified", 
+		   test_logged_in_worker_returns_unspecified);
   g_test_add_func ("/scheme/ready/exception", test_ready_throws_exception);
 
   gzochid_guile_init ();
