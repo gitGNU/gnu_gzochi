@@ -283,6 +283,8 @@ gzochid_api_tx_init (void)
   /* Save the current module... */
 
   SCM current_module = scm_current_module ();
+  SCM gzochi_tx = scm_c_resolve_module ("gzochi tx");
+  scm_set_current_module (gzochi_tx);
 
   #include "tx.x"
   
