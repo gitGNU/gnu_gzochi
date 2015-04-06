@@ -2283,8 +2283,10 @@ transaction_begin_timed (gzochid_storage_context *context,
   gzochid_storage_transaction *tx = 
     calloc (1, sizeof (gzochid_storage_transaction));
 
-  tx->txn = create_transaction 
-    (context->environment, timeout.tv_sec *1000000 + timeout.tv_usec);
+  gint64 now = g_get_monotonic_time ();
+  gint64 duration_usec = timeout.tv_sec * 1000000 + timeout.tv_usec;
+
+  tx->txn = create_transaction (context->environment, now + duration_usec);
 
   return tx;
 }
