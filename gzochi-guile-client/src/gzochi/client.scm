@@ -1,5 +1,5 @@
 ;; gzochi/client.scm: The Scheme gzochi reference client library
-;; Copyright (C) 2014 Julian Graham
+;; Copyright (C) 2015 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -124,7 +124,8 @@
       (if (> bytes-read 0)
 	  (begin
 	    (bytevector-copy! chunk 0 buffer offset bytes-read)
-	    (gzochi:client-buffer-offset-set! client (+ offset bytes-read))))
+	    (gzochi:client-buffer-offset-set! client (+ offset bytes-read)))
+	  (gzochi:client-connected-set! client #f))
       bytes-read))
 
   (define (bytevector-shift! bv from to len fill)
