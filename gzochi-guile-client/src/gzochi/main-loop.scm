@@ -1,5 +1,5 @@
 ;; gzochi/main-loop.scm: A main loop implementation
-;; Copyright (C) 2014 Julian Graham
+;; Copyright (C) 2015 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -391,12 +391,13 @@
 	    (let-values
 		(((dispatchable-sources non-dispatchable-sources)
 		  (partition gzochi:prepared-source-dispatchable?
-			   prepared-sources)))
-	      (let ((pollable (map (lambda (prepared-source)
-				     (gzochi:source-selector
-				      (gzochi:prepared-source-source 
-				       prepared-source)))
-				   non-dispatchable-sources)))
+			     prepared-sources)))
+
+	      (let ((pollable (filter-map (lambda (prepared-source)
+					    (gzochi:source-selector
+					     (gzochi:prepared-source-source 
+					      prepared-source)))
+					  non-dispatchable-sources)))
 
 		(if (not (null? pollable))
 		    (let* ((sorted-sources 
