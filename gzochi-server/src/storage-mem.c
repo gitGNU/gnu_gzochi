@@ -1251,7 +1251,8 @@ apply_modification (gpointer data, gpointer user_data)
   btree_node *node = data;
   btree_transaction *btx = user_data;
 
-  assert (node->lock.writer == btx);
+  if (! is_new (node))
+    assert (node->lock.writer == btx);
 
   if (is_deleted (node))
     {
@@ -1889,7 +1890,7 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
 	      size_t key_len, unsigned char *value, size_t value_len)
 {
   GError *err = NULL;
-  btree_node *new_node = create_btree_node (parent, 0, 0, key, key_len);
+  btree_node *new_node = NULL;
   btree_node *first_child = tx_first_child (parent, btx, &err);
   btree_node *next = first_child;
 
@@ -1899,8 +1900,10 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
       return FALSE;
     }
 
-  assert (tx_lock (&new_node->lock, btx, TRUE, NULL));
+  new_node = create_btree_node (parent, 0, 0, key, key_len);
   mark_modification (new_node, btx);
+  if (! tx_lock (&new_node->lock, btx, TRUE, NULL))
+    return FALSE;
 
   write_datum (&new_node->value, value, value_len);
 
@@ -1955,6 +1958,9 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
 		 interstitial_key, key_len + 1);
 
 	      free (interstitial_key);
+	      mark_modification (interstitial, btx);
+	      if (! tx_lock (&interstitial->lock, btx, TRUE, NULL))
+		return FALSE;
 
 	      tx_set_first_child (interstitial, btx, new_node);
 	      tx_set_parent (new_node, btx, interstitial);
@@ -2036,8 +2042,9 @@ split (btree_node *node, btree_transaction *btx)
   btree_node *split_point = NULL;
   btree_node *pre_split_point = NULL;
 
-  assert (tx_lock (&new_node->lock, btx, TRUE, NULL));
   mark_modification (new_node, btx);
+  if (! tx_lock (&new_node->lock, btx, TRUE, NULL))
+    return NULL;
 
   next = tx_next_sibling (node, btx, &err);
   if (err == NULL)
@@ -2145,8 +2152,10 @@ maybe_split (btree_transaction *btx, btree *btree, btree_node *node)
 	  /* We just split the root. */
 
 	  parent = create_btree_node (NULL, 1, BRANCHING_FACTOR - 1, NULL, 0);
-	  assert (tx_lock (&parent->lock, btx, TRUE, NULL));
+
 	  mark_modification (parent, btx);
+	  if (! tx_lock (&parent->lock, btx, TRUE, NULL))
+	    return FALSE;
 
 	  node->min_children = MIN_INTERNAL_CHILDREN;
 	  node->max_children = MAX_INTERNAL_CHILDREN;
