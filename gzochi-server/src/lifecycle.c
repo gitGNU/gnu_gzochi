@@ -396,7 +396,6 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
 	      g_mutex_lock (&context->client_mapping_lock);
 	      g_hash_table_remove (context->oids_to_clients, session_oid_str);
 	      g_hash_table_remove (context->clients_to_oids, client);
-	      free (session_oid_str);
 	      g_mutex_unlock (&context->client_mapping_lock);
 
 	      gzochid_protocol_client_disconnect (client);

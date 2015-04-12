@@ -398,7 +398,7 @@ remove_session (gzochid_application_context *context, const char *oid_str,
 	      if (local_err->message != NULL)
 		gzochid_info 
 		  ("Unable to remove Scheme object for session '%s': %s",
-		   local_err->message);
+		   oid_str, local_err->message);
 
 	      g_clear_error (&local_err);
 	    }
@@ -422,6 +422,7 @@ gzochid_client_session_disconnected_worker
  gpointer data)
 {
   remove_session (context, data, NULL);
+  free (data);
 }
 
 gzochid_client_session *
