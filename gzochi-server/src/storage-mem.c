@@ -1345,12 +1345,9 @@ rollback_modification (gpointer data, gpointer user_data)
   assert (node->lock.writer ==  btx);
 
   if (is_new (node))
-    {
-      /* Remove any newly created nodes. */
+    /* Remove any newly created nodes. */
       
-      assert (unlink_node (node, btx));
-      delete_node (node, btx);
-    }
+    delete_node (node, btx);
   else
     {
       if (node->new_key.data != NULL)
