@@ -1158,22 +1158,40 @@ unlink_node (btree_node *node, btree_transaction *btx)
   next = tx_next_sibling (node, btx, &err);
   if (err == NULL)
     prev = tx_prev_sibling (node, btx, &err);
-  if (err == NULL)
-    parent = tx_parent (node, btx, &err); 
-  if (err == NULL)
+  if (err == NULL && prev == NULL)
     {
-      assert (parent != NULL);
-      first_child = tx_first_child (parent, btx, &err);
+      btree_node *parent_first_child = NULL;
+      
+      parent = tx_parent (node, btx, &err); 
+      parent_first_child = tx_first_child (parent, btx, &err);
+
+      if (err == NULL && node == parent_first_child)
+	if (! tx_set_first_child (parent, btx, next))
+	  return FALSE;
     }
+
+  if (err == NULL && first_child != NULL)
+
+    /* If the node being unlinked has children, those children are surely going
+       to be unlinked as well. No other fixups are necessary here, but they 
+       should not attempt to dereference their parent. */
+    
+    if (! tx_set_parent (first_child, btx, NULL))
+      return FALSE;
+
+  if (err == NULL && next != NULL)
+    if (! tx_set_prev_sibling (next, btx, prev))
+      return FALSE;
+  if (err == NULL && prev != NULL)
+    if (! tx_set_next_sibling (prev, btx, next))
+      return FALSE;
+  
   if (err != NULL)
     {
       g_error_free (err);
       return FALSE;
     }
-  
-  return (next == NULL || tx_set_prev_sibling (next, btx, prev))
-    && (prev == NULL || tx_set_next_sibling (prev, btx, next))
-    && (node != first_child || tx_set_first_child (parent, btx, next));
+  else return TRUE;
 }
 
 /* Destructively removes a node from the specified B+tree and frees its 
@@ -1758,9 +1776,7 @@ merge_distribute (btree_node *prev, btree_node *node, btree_node *next,
   
   /* ...and delete it. */
   
-  mark_node_deleted (btx, node);
-
-  return TRUE;
+  return mark_node_deleted (btx, node);
 }
 
 /* Performs a merge on the specified node which has fewer than its minimum
