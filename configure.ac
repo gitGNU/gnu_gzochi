@@ -21,7 +21,8 @@ AC_INIT([gzochi], [0.7], [joolean@undecidable.net], [],
 
 AM_INIT_AUTOMAKE(1.6)
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile
+                 examples/tx/Makefile])
 
 AC_CONFIG_SUBDIRS([gzochi-common])
 AC_CONFIG_SUBDIRS([gzochi-server])
