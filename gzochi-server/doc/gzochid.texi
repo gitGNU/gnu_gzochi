@@ -543,9 +543,10 @@ Game applications hosted by gzochid are discovered by the server
 when it scans its deployment directory for sub-directories 
 containing game application descriptor files, which are discussed in
 the following section. If gzochid's game deployment directory is 
-``/var/gzochid/deploy'' (the default), then the server will scan
-and discover the game descriptor file
-``/var/gzochid/deploy/my-game/game.xml'' on startup.
+``/usr/local/share/gzochid/deploy'' (the default if installing from 
+the source distribution), then the server will scan and discover the 
+game descriptor file 
+``/usr/local/share/gzochid/deploy/my-game/game.xml'' on startup.
 
 The other required components of a game application are the Guile
 Scheme modules that contain the game logic and callbacks. These are 
@@ -1348,7 +1349,8 @@ was created without any.
 @defvr {Scheme Variable} %gzochi:application-root
 The value of this fluid is set to the root deployment directory of 
 the application to which the currently executing code belongs. (By
-default, this is ``/var/gzochid/deploy/[application name]''.)
+default, if you are installing from the source distribution, this is 
+``/usr/local/share/gzochid/deploy/[application name]''.)
 @end defvr
 
 @node gzochi channel
@@ -2275,9 +2277,9 @@ To launch this application, copy and paste the code above into a
 file named ``hello-world.scm'' and copy it to a sub-directory named
 ``hello-world/gzochi/example'' below your gzochid application 
 deployment root directory. For example, the default deployment root
-is ``/var/gzochid/deploy,'' so the full path in the default case 
-would be 
-``/var/gzochid/deploy/hello-world/gzochi/example/hello-world.scm.''
+is ``/usr/local/share/gzochid/deploy,'' so the full path in the 
+default case would be 
+``/usr/local/share/gzochid/deploy/hello-world/gzochi/example/hello-world.scm.''
 You'll also need to copy and paste the following game descriptor XML
 to a file named ``game.xml'' in the top-level ``hello-world''
 directory.
@@ -2376,7 +2378,7 @@ just give it the name of the application, and it will ``guess'' its
 data directory based on the server's storage configuration.
 
 @example
-gzochi-dump /var/gzochid/data/mygame
+gzochi-dump /usr/local/var/gzochid/data/mygame
 @end example
 
 The files @file{names.dump}, @file{oids.dump}, and @file{meta.dump}
@@ -2385,7 +2387,7 @@ database, qualify the target (path or application name) with the
 name of the database.
 
 @example
-gzochi-dump /var/gzochid/data/mygame:names
+gzochi-dump /usr/local/var/gzochid/data/mygame:names
 @end example 
 
 The contents of the specified database will be written to standard
