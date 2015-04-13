@@ -1,0 +1,62 @@
+The gzochi external transaction example application is an implementation of a
+trivial use case for integrating an external data store with the lifecycle of
+transactions executed by the gzochid container. 
+
+In this case, a relational database is used to record statistics about client 
+interactions with the application. The server-side implementation of this 
+example registers hooks with the container that correspond to the `prepare',
+`commit', and `rollback' phases of the server's transaction, and which invoke
+the external store's native handlers for each event. The result is that the
+transaction semantics of the gzochid container are extended to include the 
+external store as well: The "message count" column in the database is 
+incremented if and only if a message is received from a client and a response is
+sent back from the server.
+
+To run the example, first choose the relational database (MySQL, PostgreSQL, or
+SQLite) you wish to use as the external data store, and modify the "game.xml" 
+descriptor file in the "server/" directory to reflect your choice. Use the 
+"create_table.sql" script in this directory to create the table to store the 
+user statistics for the application. 
+
+Install the server-side implementation in the usual way, then use the 
+`tx-client.sh' script to run the client:
+
+  $ ./tx-client.sh
+  Connecting... OK
+  test
+  Received: test
+
+Please send bug reports to gzochi-devel@nongnu.org.
+
+Additional INSTALL instructions ============================================
+
+The server-side implementation of the external transaction example application
+depends on the following external libraries.
+- (dbi dbi)
+
+- libguile-dbd-mysql OR 
+- libguile-dbd-postgresql OR 
+- libguile-dbd-sqlite3
+
+Required External Packages =================================================
+
+The server-side implementation of the external transaction example application
+requires the following external packages:
+
+  - Guile DBI, at least version 2.1.5
+
+    Guile DBI is used for initiating and executing transactions against external
+    databases. It is available from http://home.gna.org/guile-dbi/.
+
+    Guile DBI in turn requires at least one DBD module, in order to provide
+    support for specific database implementations. This example is tested with
+    the modules for MySQL, PostgreSQL, and SQLite. They are available from
+    http://download.gna.org/guile-dbi/ .
+
+About This Distribution ====================================================
+
+Interesting files include:
+
+- COPYING, which contains the terms of the GNU General Public License.
+- NEWS, which describes user-visible changes since the last release of the
+  external transaction example application.

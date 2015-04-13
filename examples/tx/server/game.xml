@@ -1,0 +1,38 @@
+<?xml version="1.0" ?>
+<game name="tx-example">
+  <description>gzochi External Transaction Example</description>
+  <load-paths />
+
+  <initialized>
+    <callback module="gzochi example tx" procedure="initialized" />
+  </initialized>
+  
+  <logged-in>
+    <callback module="gzochi example tx" procedure="logged-in" />
+  </logged-in>
+
+  <ready>
+    <callback module="gzochi example tx" procedure="ready" />
+  </ready>
+
+  <!-- 
+       The configuration properties for the different supported database 
+       backends. Uncomment the one to be used by the application.
+  -->
+
+  <!--
+      <property name="database-backend" value="mysql" />
+      <property name="connection-string" 
+                value="gzochi:password:gzochi_tx_example:tcp:localhost:3306" />
+  -->
+
+  <!--
+      <property name="database-backend" value="postgresql" />
+      <property name="connection-string" 
+                value="gzochi:password:gzochi_tx_example:tcp:localhost:5432" />
+  -->
+
+  <property name="database-backend" value="sqlite3" />
+  <property name="connection-string" value="gzochi_tx_example" />
+
+</game>
