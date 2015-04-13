@@ -489,6 +489,14 @@ The user associated with the gzochid process must have read and
 execute access to this directory---but it does not need to be able
 to write files here.
 
+@item auth.plugin.dir
+The filesystem directory to probe for application authentication 
+plugin modules. Every regular file in this directory will be 
+examined, and an attempt will be made to load each as a dynamic 
+library and initialize the authentication plugin interface. The user
+associated with the gzochid process must have read access to this 
+directory.
+
 @item tx.timeout
 The maximum duration, in milliseconds, for time-limited transactions
 executed on behalf of a game application. Any task or callback whose
@@ -923,14 +931,17 @@ uninterpreted to a handler registered by game code.
 gzochid employs a pluggable authentication mechanism to allow each
 game application endpoint to specify an authentication scheme that
 meets its security requirements. Authentication plugins are built
-and distributed as shared libraries and installed to the ``gzochid'' 
-directory under the library directory of the installation prefix;
-for example, @samp{/usr/local/lib/gzochid}. This directory is
-scanned on server startup and any discovered plugins are dynamically 
-loaded. Plugins are configured for use by individual game 
-applications via the @code{auth} element in the game descriptor 
-file. Nested @code{property} elements can be used pass 
-application-specific configuration to the plugin like so:
+and distributed as shared libraries and should be installed to the
+directory specified by ``auth.plugin.dir'' in the 
+@file{gzochid.conf} file. (By default, this location is the 
+``gzochid/auth'' directory under the library directory of the 
+installation prefix; for example, 
+@samp{/usr/local/lib/gzochid/auth}. This directory is scanned on 
+server startup and any discovered plugins are dynamically loaded. 
+Plugins are configured for use by individual game applications via 
+the @code{auth} element in the game descriptor file. Nested 
+@code{property} elements can be used pass application-specific 
+configuration to the plugin like so:
 
 @example
   <auth type="password_file">
