@@ -32,6 +32,12 @@ if test -z "$GZOCHID_STORAGE_ENGINE_DIR"; then
     export GZOCHID_STORAGE_ENGINE_DIR="@abs_top_builddir@/src/storage"
 fi
 
-export GUILE_LOAD_PATH="@abs_top_builddir@/src/scheme/:$GUILE_LOAD_PATH"
+if test -z "$GUILE_LOAD_PATH"; then
+    GUILE_LOAD_PATH="@abs_top_builddir@/src/scheme/"
+else
+    GUILE_LOAD_PATH="@abs_top_builddir@/src/scheme/:$GUILE_LOAD_PATH"
+fi
+export GUILE_LOAD_PATH
+
 
 exec "$@"
