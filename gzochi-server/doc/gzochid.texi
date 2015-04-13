@@ -497,6 +497,28 @@ library and initialize the authentication plugin interface. The user
 associated with the gzochid process must have read access to this 
 directory.
 
+@item storage.engine.dir
+The parent directory for storage engine libraries. This path is used
+to resolve the absolute location of the storage engine module 
+specified by ``storage.engine'' (see below). The user associated 
+with the gzochid process must have read access to this directory.
+
+@item storage.engine
+The name of the storage engine to use to store game application data.
+If the value of this setting is given as ``mem'' then gzochid's 
+built-in B*tree-based storage engine will be used (note that this is
+a transient data store, not suitable for production deployments); 
+otherwise, this name is used in conjunction with the value of 
+``storage.engine.dir'' to resolve the absolute location of a dynamic
+library file that exports the gzochid storage engine interface.
+
+In contrast with the authentication plugin load process, which 
+examines all files in the plugin directory; only the library file 
+that corresponds to the named storage engine will be loaded and 
+inspected and boot time. All applications running within the 
+container share the same storage engine, although each maintains its
+own databases.
+
 @item tx.timeout
 The maximum duration, in milliseconds, for time-limited transactions
 executed on behalf of a game application. Any task or callback whose
@@ -2569,8 +2591,8 @@ The migration descriptor's document element is @code{migration}, and
 it must include a @code{target} attribute giving the name of the 
 deployed game application to be migrated. (The directories 
 containing the game database files are computed using the 
-gzochid.conf file and the conventions of the storage engine against 
-which the server and database toolchain were built.)
+gzochid.conf file and the conventions of the storage engine 
+specified in that file via the ``storage.engine'' setting.)
 
 The @code{input-registry} and @code{output-registry} elements 
 specify managed record type registries to push onto the type
