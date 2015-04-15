@@ -1,6 +1,6 @@
 dnl configure.ac --- food for -*-autoconf-*- et al
 dnl
-dnl Copyright (C) 2014 Julian Graham
+dnl Copyright (C) 2015 Julian Graham
 dnl
 dnl This is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -33,8 +33,8 @@ LT_INIT
 
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
 
-GZOCHI_CLIENT_COMMON="$PWD/../gzochi-client-common"
-AC_SUBST(GZOCHI_CLIENT_COMMON)
+GZOCHI_COMMON="$PWD/../gzochi-common"
+AC_SUBST(GZOCHI_COMMON)
 
 GZOCHI_VERSION="$PACKAGE_VERSION"
 AC_CONFIG_FILES([meta/gzochi-glib.pc])

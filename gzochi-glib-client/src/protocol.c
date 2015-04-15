@@ -1,5 +1,5 @@
-/* protocol.c: Client-side protocol I/O routines for libgzochi
- * Copyright (C) 2014 Julian Graham
+/* protocol.c: Client-side protocol I/O routines for libgzochi-glib
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -35,7 +35,8 @@
 #define SEND_FLAGS MSG_NOSIGNAL
 #endif
 
-static int send_fully (int sock, unsigned char *data, int len)
+static int 
+send_fully (int sock, unsigned char *data, int len)
 {
   int total_sent = 0;
   fd_set wfds;
@@ -62,8 +63,9 @@ static int send_fully (int sock, unsigned char *data, int len)
   return total_sent;
 }
 
-static int send_protocol_message 
-(int sock, unsigned char opcode, unsigned char *message, short len)
+static int 
+send_protocol_message (int sock, unsigned char opcode, unsigned char *message, 
+		       short len)
 {
   unsigned char len_bytes[2] = { 0, 0 };
   gzochi_common_io_write_short (len, len_bytes, 0);
@@ -76,7 +78,8 @@ static int send_protocol_message
   else return 0;
 }
 
-int gzochi_client_protocol_send_login_request 
+int 
+gzochi_client_protocol_send_login_request 
 (gzochi_client_common_session *session, char *endpoint, 
  unsigned char *credentials, int len)
 {
@@ -94,14 +97,15 @@ int gzochi_client_protocol_send_login_request
   return ret;
 }
 
-int gzochi_client_protocol_send_disconnect 
-(gzochi_client_common_session *session)
+int 
+gzochi_client_protocol_send_disconnect (gzochi_client_common_session *session)
 {
   return send_protocol_message 
     (session->socket, GZOCHI_COMMON_PROTOCOL_LOGOUT_REQUEST, NULL, 0);
 }
 
-int gzochi_client_protocol_send_session_message 
+int 
+gzochi_client_protocol_send_session_message 
 (gzochi_client_common_session *session, unsigned char *msg, short len)
 {
   return send_protocol_message
@@ -109,16 +113,17 @@ int gzochi_client_protocol_send_session_message
      (unsigned char *) msg, len);
 }
 
-static void dispatch_session_message 
-(gzochi_client_common_session *session, unsigned char *message, short len)
+static void 
+dispatch_session_message (gzochi_client_common_session *session, 
+			  unsigned char *message, short len)
 {
   if (session->received_message_callback != NULL)
     session->received_message_callback 
       (session, message, len, session->received_message_user_data);
 }
 
-static void dispatch_session_disconnected 
-(gzochi_client_common_session *session)
+static void 
+dispatch_session_disconnected (gzochi_client_common_session *session)
 {
   session->connected = FALSE;
   if (! session->disconnect_acknowledged)
@@ -130,9 +135,9 @@ static void dispatch_session_disconnected
     }
 }
 
-static void dispatch 
-(gzochi_client_common_session *session, int opcode, unsigned char *payload, 
- short len)
+static void 
+dispatch (gzochi_client_common_session *session, int opcode, 
+	  unsigned char *payload, short len)
 {
   switch (opcode)
     {
@@ -146,7 +151,8 @@ static void dispatch
     }
 }
 
-static int attempt_dispatch (gzochi_client_common_session *session, int limit)
+static int 
+attempt_dispatch (gzochi_client_common_session *session, int limit)
 {
   int remaining = limit;
   int offset = 0;
@@ -190,17 +196,20 @@ static int attempt_dispatch (gzochi_client_common_session *session, int limit)
   return dispatched;
 }
 
-int gzochi_client_protocol_dispatch_all (gzochi_client_common_session *session)
+int 
+gzochi_client_protocol_dispatch_all (gzochi_client_common_session *session)
 {
   return attempt_dispatch (session, 0);
 }
 
-int gzochi_client_protocol_dispatch (gzochi_client_common_session *session)
+int 
+gzochi_client_protocol_dispatch (gzochi_client_common_session *session)
 {
   return attempt_dispatch (session, 1);
 }
 
-int gzochi_client_protocol_read (gzochi_client_common_session *session)
+int 
+gzochi_client_protocol_read (gzochi_client_common_session *session)
 {
   char chunk[CHUNK_SIZE];
   int available_buffer = GZOCHI_CLIENT_MAX_BUFFER_SIZE - session->buffer_length;

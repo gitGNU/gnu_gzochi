@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2014 Julian Graham
+# Copyright (C) 2015 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,21 +18,25 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AUTOMAKE_OPTIONS = subdir-objects
+GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
+GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
 check_PROGRAMS = $(test_programs)
 
 test_programs = \
-	test-client
+	test-client \
+	test-session
 
 TESTS = $(test_programs)
 
-GZOCHI_CLIENT_COMMON_CFLAGS = -I@GZOCHI_CLIENT_COMMON@/src
-GZOCHI_CLIENT_COMMON_LIBS = \
-	@GZOCHI_CLIENT_COMMON@/src/libgzochi-client-common.la
-
-test_client_CFLAGS = -I$(top_builddir)/src \
-	$(GLIB_CFLAGS) $(GZOCHI_CLIENT_COMMON_CFLAGS)
 test_client_SOURCES = test-client.c 
+test_client_CFLAGS = -I$(top_builddir)/src \
+	$(GLIB_CFLAGS) $(GZOCHI_COMMON_CFLAGS) -Wall -Werror
 test_client_LDADD = $(top_builddir)/src/client.o \
-	$(GLIB_LIBS) $(GZOCHI_CLIENT_COMMON_LIBS)
+	$(top_builddir)/src/protocol.o $(top_builddir)/src/session.o \
+	$(GLIB_LIBS) $(GZOCHI_COMMON_LIBS)
+
+test_session_SOURCES = test-session.c 
+test_session_CFLAGS = -I$(top_builddir)/src \
+	$(GZOCHI_COMMON_CFLAGS) -Wall -Werror
+test_session_LDADD = $(top_builddir)/src/session.o $(GZOCHI_COMMON_LIBS)

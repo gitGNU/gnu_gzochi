@@ -1,5 +1,5 @@
 /* test-client.c: Test routines for client.c in libgzochi-glib-client.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,11 +16,12 @@
  */
 
 #include <glib.h>
-#include <gzochi-client-common.h>
 
 #include "libgzochi-glib.h"
+#include "session.h"
 
-static void test_client_check ()
+static void 
+test_client_check ()
 {
   gzochi_glib_client_session *session = 
     (gzochi_glib_client_session *) gzochi_client_common_session_new ();
@@ -42,10 +43,11 @@ static void test_client_check ()
   g_assert (g_main_context_check (context, priority, pollfds, 1));
 
   g_main_context_unref (context);
-  gzochi_client_common_session_free (session);
+  gzochi_client_common_session_free ((gzochi_client_common_session *) session);
 }
 
-int main (int argc, char *argv[])
+int 
+main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 

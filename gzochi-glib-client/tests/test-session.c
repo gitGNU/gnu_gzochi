@@ -27,7 +27,8 @@
 #define TRUE 1
 #endif /* TRUE */
 
-static void test_gzochi_client_common_session_is_dispatchable ()
+static void 
+test_gzochi_client_common_session_is_dispatchable ()
 {
   gzochi_client_common_session *session = gzochi_client_common_session_new ();
   
@@ -65,7 +66,8 @@ static void test_gzochi_client_common_session_is_dispatchable ()
   gzochi_client_common_session_free (session);
 }
 
-int main (int argc, char *argv[])
+int 
+main (int argc, char *argv[])
 {
   test_gzochi_client_common_session_is_dispatchable ();
 

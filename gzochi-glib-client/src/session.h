@@ -1,5 +1,5 @@
 /* session.h: Prototypes and declarations for session.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,12 +15,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LIBGZOCHI_CLIENT_COMMON_SESSION_H
-#define LIBGZOCHI_CLIENT_COMMON_SESSION_H
+#ifndef LIBGZOCHI_GLIB_SESSION_H
+#define LIBGZOCHI_GLIB_SESSION_H
 
 #define GZOCHI_CLIENT_MAX_BUFFER_SIZE 65538
 
-typedef struct _gzochi_client_common_session
+struct _gzochi_client_common_session
 {
   char *hostname;
   char *endpoint;
@@ -33,13 +33,15 @@ typedef struct _gzochi_client_common_session
   unsigned char buffer[GZOCHI_CLIENT_MAX_BUFFER_SIZE];
   int buffer_length;
   
-  void (*disconnected_callback) 
-  (struct _gzochi_client_common_session *, void *);
+  void (*disconnected_callback) (struct _gzochi_client_common_session *, 
+				 void *);
   void *disconnected_user_data;
-  void (*received_message_callback)
-  (struct _gzochi_client_common_session *, unsigned char *, short, void *);
+  void (*received_message_callback) (struct _gzochi_client_common_session *, 
+				     unsigned char *, short, void *);
   void *received_message_user_data;
-} gzochi_client_common_session;
+};
+
+typedef struct _gzochi_client_common_session gzochi_client_common_session;
 
 gzochi_client_common_session *gzochi_client_common_session_new (void);
 void gzochi_client_common_session_free (gzochi_client_common_session *);
@@ -68,4 +70,4 @@ void gzochi_client_common_session_set_received_message_callback
  gzochi_client_common_session_received_message_callback,
  void *);
 
-#endif /* LIBGZOCHI_CLIENT_COMMON_SESSION_H */
+#endif /* LIBGZOCHI_GLIB_SESSION_H */

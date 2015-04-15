@@ -17,7 +17,6 @@
 
 #include <fcntl.h>
 #include <glib.h>
-#include <gzochi-client-common.h>
 #include <stdlib.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -27,6 +26,9 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
+#include "protocol.h"
+#include "session.h"
 
 #ifndef TRUE
 #define TRUE 1

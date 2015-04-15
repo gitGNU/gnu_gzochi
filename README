@@ -14,8 +14,6 @@ component of the distribution:
 * gzochi-common/ - the static utility library shared between the server and 
   client modules
 * gzochi-server/ - gzochid, the server for the gzochi framework
-* gzochi-client-common/ - the static utility library shared between the two 
-  reference client implementations
 * gzochi-glib-client/ - libgzochi-glib, the GLib reference client library 
   implementation
 * gzochi-guile-client/ - (gzochi client), the GNU Guile reference client library

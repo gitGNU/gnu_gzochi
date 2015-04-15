@@ -1,5 +1,5 @@
 /* protocol.h: Prototypes and declarations for protocol.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef LIBGZOCHI_CLIENT_COMMON_PROTOCOL_H
-#define LIBGZOCHI_CLIENT_COMMON_PROTOCOL_H
+#ifndef LIBGZOCHI_GLIB_PROTOCOL_H
+#define LIBGZOCHI_GLIB_PROTOCOL_H
 
 #include "session.h"
 
@@ -30,4 +30,4 @@ int gzochi_client_protocol_dispatch_all (gzochi_client_common_session *);
 int gzochi_client_protocol_dispatch (gzochi_client_common_session *);
 int gzochi_client_protocol_read (gzochi_client_common_session *);
 
-#endif /* LIBGZOCHI_CLIENT_COMMON_PROTOCOL_H */
+#endif /* LIBGZOCHI_GLIB_PROTOCOL_H */
