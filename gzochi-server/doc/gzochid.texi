@@ -689,6 +689,47 @@ queue of items eligible for execution. A transactional unit of work
 that fails in a ``retryable'' way will be retried up to a configured 
 maximum number of times (3, by default) before being abandoned.
 
+@menu
+* External transactions::
+@end menu
+
+@node External transactions
+@subsection External transactions
+
+In some cases, an application running inside the gzochid container 
+may be merely one part of a larger application deployment that
+includes other services that need access to events that originate
+within code running within the container. One example of this is a
+web ``leaderboard'' that reports the points scored by players in a
+gzochi game application. The web server serving this leaderboard
+needs access to data (the ``points'') that results from transactions
+within the game application, but it is neither practical nor 
+efficient to provide this information directly from the game data 
+store. It would be convenient to allow this data to be written to a
+more appropriate store (such as a flat file or relational 
+database) but none of the transactional game APIs---task scheduling,
+channel or session management---offer a promising mechanism for 
+``leaking'' transactional events from the container.
+
+To serve use cases like the one described above, the the gzochid 
+container provides an SPI for integrating external systems with the
+lifecycle of a transaction within the container. Game application
+code may use this SPI to register a proxy (or ``participant'') with
+a gzochid transaction such that procedures attached to the proxy are
+invoked when during the `prepare' and `commit' or `rollback' phases.
+Game application code may also signal through the participant that 
+the external transaction must be rolled back, in turn triggering a 
+rollback of the container's transaction. 
+
+Note that the implementation of the participant's transaction 
+lifecycle handlers must observe the rules of the transaction: If the
+`prepare' handler is called and returns @code{#t}, the `commit'
+handler must commit the work of the transaction successfully; the
+`rollback' handler may be called whether or not the `prepare'
+handler is called first, and must completely roll back the work of 
+the transaction. @xref{gzochi tx}, for more information on the 
+external transaction SPI. 
+
 @node Managed records
 @section Managed records
 
@@ -1268,6 +1309,7 @@ that can be imported independently or all together via the
 * gzochi io::
 * gzochi log::
 * gzochi task::
+* gzochi tx::
 
 * gzochi::
 @end menu
@@ -2244,13 +2286,113 @@ After this procedure returns, @var{handle} will be removed from the
 data store.
 @end deffn
 
+@node gzochi tx
+@section gzochi tx
+The @code{(gzochi tx)} library provides an SPI for integrating 
+external transactional processes with the lifecycle of a gzochid
+container transaction, such that their transactional semantics can 
+be synchronized with those of the container. Use this library, for 
+example, to ensure that a row in a relational database is updated 
+if and only if a modification to a managed record in a game 
+application is performed successfully.
+
+The @code{gzochi:transaction-participant} record brokers the
+relationship between the gzochid container and an external 
+transaction by allowing application code to register Scheme handler
+functions for the three transaction lifecycle events: @code{prepare},
+@code{commit}, and @code{rollback}. The participant bundles these 
+handler functions and registers with the container to be notified
+as these events occur within the scope of the current transaction.
+
+When the @code{prepare} handler is invoked, the transaction 
+participant should attempt to ensure that all operations bound to 
+the current transaction can be committed without error. If this is 
+possible, @code{prepare} should return @code{#t}; if not---because 
+of a failure or inconsistency---@code{prepare} should return 
+@code{#f} to indicate that the entire transaction should be rolled 
+back. Note that the time spent in the @code{prepare} phase is 
+counted against the duration of the entire transaction. If all 
+participants in the transaction prepare successfully but exceed the
+maximum transaction duration, the container will roll back the
+transaction.
+
+When the @code{commit} handler is invoked, the transaction 
+participant must make permanent or finalize all changes associated
+with the transaction. The @code{commit} handler should not exit 
+non-locally.
+
+When the @code{rollback} handler is invoked, the transaction
+participant must undo all changes associated with the transaction. 
+The @code{rollback} handler should not exit non-locally.
+
+The possible sequences of handler invocations are:
+@itemize @bullet
+@item
+prepare, commit
+@item
+prepare, rollback
+@item
+rollback
+@end itemize
+
+After @code{commit} or @code{rollback} the transaction is complete.
+The participant is no longer bound to it and no further calls will 
+be made to the handler functions.
+
+
+@deffn {Scheme Procedure} gzochi:make-transaction-participant prepare commit rollback
+@deffnx {Scheme Procedure} gzochi:transaction-participant? obj
+@deffnx {Scheme Procedure} gzochi:transaction-participant-prepare participant
+@deffnx {Scheme Procedure} gzochi:transaction-participant-commit participant
+@deffnx {Scheme Procedure} gzochi:transaction-participant-rollback participant
+The transaction particpant constructor, predicate, and field 
+accessors.
+
+The @var{prepare}, @var{commit}, and @var{rollback} handlers must be 
+``thunks''---procedures that accept no arguments. @var{prepare} 
+should return a boolean value.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:join-transaction participant
+Joins @var{participant}, which must be a 
+@code{gzochi:transaction-participant} record, to the current gzochid
+container transaction. 
+
+If this procedure returns locally, then a combination of the 
+participant's `prepare', `commit', and `rollback' handlers 
+corresponding to the container transaction's lifecycle transitions
+will be invoked.
+
+Calling this procedure multiple times with the same participant 
+record within the scope of a single transaction has no effect.
+@end deffn
+
+@deffn {Scheme Procedure} gzochi:abort-transaction participant . retryable? 
+Marks the current gzochid container transaction as ``rollback-only''
+on behalf of the @var{participant}, which must be a 
+@code{gzochi:transaction-participant} record. All transaction-aware
+API functions called subsequent to aborting the transaction will 
+raise @code{&gzochi:transaction-aborted}, and the transaction will
+be rolled back once the current callback execution exits.
+
+Use the optional @var{retryable?} argument to indicate the 
+transaction is a candidate for retry. (Whether the transaction is 
+actually rescheduled depends on the disposition of the other 
+participants.)
+
+Calling this procedure with a participant that has not previously
+been joined to the current container transaction (via 
+@code{gzochi:join-transaction}) will cause an error to be raised.
+@end deffn
+
+
 @node gzochi
 @section gzochi
 
 The @code{(gzochi)} library is a composite of all of the other
-public gzochi libraries, with the exception of `(gzochi admin)'. It 
-imports and re-exports all of their exported procedures and syntactic 
-forms.
+public gzochi libraries, with the exception of `(gzochi admin)' and
+`(gzochi tx)'. It imports and re-exports all of their exported 
+procedures and syntactic forms.
 
 @node An example application
 @chapter An example application
