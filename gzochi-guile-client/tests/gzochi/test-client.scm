@@ -98,7 +98,10 @@
       (thread-start! thread))))
 
 (define (stop-server server)
-  (shutdown (test-server-socket server) 2)
+  (catch #t
+	 (lambda ()
+	   (shutdown (test-server-socket server) 2))
+	 (lambda (key . args) *unspecified*))
   (thread-terminate! (test-server-thread server)))
 
 (test-begin "gzochi:client")
