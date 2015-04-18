@@ -22,12 +22,12 @@ can be found below.
 
 libgzochi-glib depends on the following external libraries.
 - libg
-- libgzochi-client-common
+- libgzochi-common
 
 The dependency on libg is configured using `pkg-config'.
 
-libgzochi-client-common is provided as part of the gzochi distribution and is 
-assumed to have been built in a directory adjacent to the directory in which 
+libgzochi-common is provided as part of the gzochi distribution and is assumed 
+to have been built in a directory adjacent to the directory in which 
 libgzochi-glib is being configured and built.
 
 

@@ -11,14 +11,14 @@ can be found below.
 
 The gzochi mazewar example client depends on the following external libraries.
 - libg
-- libgzochi
+- libgzochi-glib
 - libSDL
 
 You can use the `--with-SDL-prefix' option when invoking ./configure, if you
 have libSDL installed to a location other than the standard place (/usr or
 /usr/local).
 
-The dependencies on libg and libgzochi are configured using `pkg-config'.
+The dependencies on libg and libgzochi-glib are configured using `pkg-config'.
 
 
 Required External Packages =================================================

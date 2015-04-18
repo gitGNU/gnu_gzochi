@@ -10,12 +10,22 @@ found in the INSTALL file. More specific information and configure options
 can be found below.
 
 The gzochi abermud example client depends on the following external libraries.
+- libg
+- libgzochi-glib
 - libncurses
+
+The dependencies on libg and libgzochi-glib are configured using `pkg-config'.
 
 
 Required External Packages =================================================
 
 The abermud client requires the following external packages:
+
+  - GNU GLib, at least version 2.28
+
+    GLib is used in several places in the client for its general-purpose 
+    utility functions and data structures. It is available from 
+    http://www.gtk.org/ .
 
   - GNU Ncurses, at least version 5.9
 
