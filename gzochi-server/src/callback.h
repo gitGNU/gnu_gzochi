@@ -32,7 +32,7 @@ struct _gzochid_application_callback
 
 typedef struct _gzochid_application_callback gzochid_application_callback;
 
-gzochid_io_serialization gzochid_application_callback_serialization;
+extern gzochid_io_serialization gzochid_application_callback_serialization;
 
 gzochid_application_callback *gzochid_application_callback_new 
 (char *, GList *, mpz_t);

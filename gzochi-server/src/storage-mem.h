@@ -26,6 +26,6 @@
    container in the event that an external storage engine module implementation
    is unavailable or undesirable. */
 
-gzochid_storage_engine_interface gzochid_storage_engine_interface_mem;
+extern gzochid_storage_engine_interface gzochid_storage_engine_interface_mem;
 
 #endif /* GZOCHID_STORAGE_MEM_H */
