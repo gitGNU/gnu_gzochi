@@ -1,9 +1,83 @@
 gzochid NEWS -- history of user-visible changes
-Copyright (C) 2014 Julian Graham
+Copyright (C) 2015 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.8 (since 0.7):
+
+* Changes to the distribution
+
+** Storage engines build as modules
+
+The data storage subsystem in gzochid chooses the storage engine to use at boot
+time. Storage engines are now built (and loaded) as dynamic modules - installed 
+independently from the server - which allows multiple engines to be enabled at 
+the time `configure' is run. The storage engine interface is now installed as a
+header file (`gzochid-storage.h') under the installation prefix, to make it 
+available for custom implementations. See "The server configuration file" in the
+manual for more information on storage engine selection.
+
+** GNU Serveez no longer required
+
+The server's dependency on libserveez has been removed; the server now includes
+a socket server based on GLib's IO channels and main loop functionality.
+
+** Pre-installation environment
+
+The new `meta' folder at the top level of the `gzochi-server' source 
+distribution includes a set of scripts that make it easier to launch the gzochid
+server and the database management tools after running `make' but before running
+`make install'.
+
+* Notable changes
+
+** New storage engine: Memory
+
+Experimental support for a new storage engine based on an in-memory B*-tree has
+been added. Unlike the durable, third-party storage engines, which are now built
+as dynamic modules, the memory storage engine is compiled directly into gzochid,
+and is always available. This storage engine does not persist anything to disk,
+and thus is not safe for use in a production environment; it is intended 
+primarily as a failsafe or quick-start option. (In the future, it may have 
+additional uses!)
+
+** New configuration options
+
+Some options previously configurable only at build time are now exposed by
+gzochid.conf, the server configuration file: `auth.plugin.dir', 
+`storage.engine', `storage.engine.dir'. See commentary in `gzochid.conf' and 
+"The server configuration file" in the manual for more information on these
+settings and their default values.
+
+** External transactions
+
+Transactions coordinated by the gzochid container on behalf of a gzochi game 
+application can now be integrated with external transaction-aware processes, 
+such as relational databases. This functionality is exposed via the 
+`(gzochi tx)' SPI. An example application that demonstrates a simple case of an
+integration of an external transaction via Guile DBI has been added to the 
+distribution. See "External transactions" in the manual for more information on
+external transaction participants.
+
+** New application lifecycle event
+
+gzochid applications can define a callback handler for a new event (`ready') to
+be called whenever the application is launched by the gzochid container -
+effectively, a variant of the `initialized' event that is fired whenever the
+server starts.
+
+** New application statistics
+
+The internal statistics capture module now publishes the following aggregates
+via the administrative web interface: Average, minimum, and maximum transaction
+duration.
+
+* Bug fixes
+
+** Conditions raised from debugging context lose their stack context
+
+
 Changes in 0.7 (since 0.6):
 
 * Incompatible changes
@@ -345,7 +419,7 @@ API counterparts) from the `(gzochi data)' and `(gzochi)' libraries:
 
 Copyright information:
 
-Copyright (C) 2014 Julian Graham
+Copyright (C) 2015 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the

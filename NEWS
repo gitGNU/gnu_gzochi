@@ -1,9 +1,36 @@
 gzochi NEWS -- history of user-visible changes
-Copyright (C) 2014 Julian Graham
+Copyright (C) 2015 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.8 (since 0.7)
+
+* Changes to the distribution
+
+** Removed deprecated synchronous client (libgzochi)
+
+libgzochi, the synchronous reference client implementation included with earlier
+versions of the gzochi framework, has been removed from the distribution. The
+client was deprecated in an earlier release, since the concurrency strategy
+suggested by its API was undesirable. Application developers are encouraged to
+use libgzochi-glib instead.
+
+** Removed client support static library (libgzochi-client-common)
+
+libgzochi-client-common, the static library that facilitated sharing of code
+between libgzochi and libgzochi-glib, has been merged with libgzochi-glib and no
+longer exists as an independent build target within the gzochi framework source
+distribution.
+
+** New example: External transactions
+
+Client and server code for a new example application has been added to the 
+source distribution under the "examples/" tree. This example demonstrates 
+techniques for synchronizing a transaction executed within the gzochid container
+with an external transaction-aware process, such as a relational database.
+
+
 Changes in 0.7 (since 0.6)
 
 * Changes to the distribution
@@ -68,7 +95,7 @@ in which state is shared between multiple players.
 
 Copyright information:
 
-Copyright (C) 2014 Julian Graham
+Copyright (C) 2015 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the

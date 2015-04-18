@@ -1,13 +1,31 @@
 gzochi mazewar NEWS -- history of user-visible changes
-Copyright (C) 2012 Julian Graham
+Copyright (C) 2015 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.8 (since 0.7)
+
+* Notable changes
+
+** Switch to asynchronous reference client implementation
+
+The gzochi mazewar client now depends on the libgzochi-glib reference client 
+library instead of libgzochi (which has been removed from the distribution). The
+resulting client application is now single-threaded. Commentary in the example
+source code has been updated to explain main loop-based execution.
+
+* Compatibility
+
+** Support for additional platforms
+
+As a result of the change described above, gzochi mazewar now builds and runs
+properly for the first time on Mac OS X.
+
 
 Copyright information:
 
-Copyright (C) 2012 Julian Graham
+Copyright (C) 2015 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the
