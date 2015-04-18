@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2014 Julian Graham
+# Copyright (C) 2015 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,5 +18,5 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SUBDIRS = gzochi-common gzochi-server gzochi-client-common gzochi-glib-client \
-	gzochi-guile-client examples/abermud examples/mazewar
+SUBDIRS = gzochi-common gzochi-server gzochi-glib-client gzochi-guile-client \
+	examples/abermud examples/mazewar

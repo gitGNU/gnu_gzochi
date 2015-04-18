@@ -37,12 +37,6 @@ if [ $? != 0 ]; then
     exit 1
 fi
 
-./gzochi-client-common/autogen.sh
-if [ $? != 0 ]; then
-    cd $OLDDIR
-    exit 1
-fi
-
 ./gzochi-glib-client/autogen.sh
 if [ $? != 0 ]; then
     cd $OLDDIR
