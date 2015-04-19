@@ -31,9 +31,10 @@ test_programs = \
 	test-task \
 	test-util
 
-noinst_HEADERS = mock-data.h
+dist_noinst_HEADERS = mock-data.h
+dist_noinst_SCRIPTS = test-gzochi-dump.sh test-gzochi-load.sh
 
-check_PROGRAMS = $(test_programs)
+check_PROGRAMS = $(test_programs) 
 check_LTLIBRARIES = treefile.la
 AM_TESTS_ENVIRONMENT = GUILE_LOAD_PATH='$(top_srcdir)/src/scheme'; \
 	export GUILE_LOAD_PATH;
