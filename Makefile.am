@@ -19,4 +19,4 @@
 #
 
 SUBDIRS = gzochi-common gzochi-server gzochi-glib-client gzochi-guile-client \
-	examples/abermud examples/mazewar
+	examples/abermud examples/mazewar examples/tx
