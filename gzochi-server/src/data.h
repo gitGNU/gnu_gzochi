@@ -84,23 +84,6 @@ struct _gzochid_data_oid_block
 
 typedef struct _gzochid_data_oid_block gzochid_data_oid_block;
 
-struct _gzochid_data_transaction_context
-{
-  gzochid_application_context *context;
-
-  gzochid_data_oid_block *free_oids;
-  GList *used_oid_blocks;
-
-  gzochid_storage_transaction *transaction;
-
-  GHashTable *oids_to_references;
-  GHashTable *ptrs_to_references;
-
-};
-
-typedef struct _gzochid_data_transaction_context
-gzochid_data_transaction_context;
-
 struct _gzochid_data_managed_reference_holder
 {
   gzochid_application_context *context;

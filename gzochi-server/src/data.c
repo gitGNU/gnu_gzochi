@@ -34,6 +34,24 @@
 
 #define NEXT_OID_KEY 0x00
 
+struct _gzochid_data_transaction_context
+{
+  gzochid_application_context *context;
+
+  gzochid_data_oid_block *free_oids;
+  GList *used_oid_blocks;
+
+  gzochid_storage_transaction *transaction;
+
+  GHashTable *oids_to_references;
+  GHashTable *ptrs_to_references;
+
+  gboolean needs_unlock;
+};
+
+typedef struct _gzochid_data_transaction_context
+gzochid_data_transaction_context;
+
 GQuark 
 gzochid_data_error_quark (void)
 {
@@ -183,6 +201,8 @@ data_prepare (gpointer data)
   iface->lock (context->context->oids);
   iface->lock (context->context->names);
 
+  context->needs_unlock = TRUE;
+  
   while (reference_ptr != NULL)
     {
       if (!flush_reference (reference_ptr->data, context))
@@ -270,9 +290,12 @@ data_rollback (gpointer data)
 
       finalize_references (context);
 
-      iface->unlock (context->context->names);
-      iface->unlock (context->context->oids);
-
+      if (context->needs_unlock)
+	{
+	  iface->unlock (context->context->names);
+	  iface->unlock (context->context->oids);
+	}
+      
       transaction_context_free (context);
     }
 }
