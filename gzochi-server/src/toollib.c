@@ -125,14 +125,14 @@ gzochid_tool_probe_storage_engine (GHashTable *gzochid_conf, char *name)
   /* Get the name from the configuration table if `name' is NULL. */
 
   char *engine_name = name != NULL ? name 
-    : g_hash_table_lookup (gzochid_conf, "server.storage.engine");
+    : g_hash_table_lookup (gzochid_conf, "storage.engine");
       
   if (env != NULL)
     dir = env;
   else 
     {
       char *conf_dir = g_hash_table_lookup 
-	(gzochid_conf, "server.storage.engine.dir");
+	(gzochid_conf, "storage.engine.dir");
       dir = conf_dir == NULL ? GZOCHID_STORAGE_ENGINE_DIR : conf_dir;
     }
 

@@ -270,12 +270,12 @@ gzochid_game_context_init (gzochid_game_context *context,
     context->work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
   else context->work_dir = strdup (SERVER_FS_DATA_DEFAULT);
 
-  if (g_hash_table_contains (config, "server.auth.plugin.dir"))
+  if (g_hash_table_contains (config, "auth.plugin.dir"))
     context->auth_plugin_dir = 
-      strdup (g_hash_table_lookup (config, "server.auth.plugin.dir"));
+      strdup (g_hash_table_lookup (config, "auth.plugin.dir"));
   else context->auth_plugin_dir = GZOCHID_AUTH_PLUGIN_DIR;
 
-  if (g_hash_table_contains (config, "server.storage.engine"))
+  if (g_hash_table_contains (config, "storage.engine"))
     {
       char *dir = NULL;
       char *env = getenv ("GZOCHID_STORAGE_ENGINE_DIR");
@@ -285,12 +285,12 @@ gzochid_game_context_init (gzochid_game_context *context,
       else 
 	{
 	  char *conf_dir = g_hash_table_lookup 
-	    (config, "server.storage.engine.dir");
+	    (config, "storage.engine.dir");
 	  dir = conf_dir == NULL ? GZOCHID_STORAGE_ENGINE_DIR : conf_dir;
 	}
 
       context->storage_engine = gzochid_storage_load_engine 
-	(dir, g_hash_table_lookup (config, "server.storage.engine"));
+	(dir, g_hash_table_lookup (config, "storage.engine"));
     }
   else gzochid_info 
 	 ("No durable storage engine configured; memory engine will be used.");

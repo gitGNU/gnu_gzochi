@@ -1,4 +1,4 @@
-.TH GZOCHI-DUMP 1 "April 4, 2015"
+.TH GZOCHI-DUMP 1 "May 4, 2015"
 .SH NAME
 gzochi-dump \- Write gzochi databases to flat-text format
 .SH SYNOPSIS
@@ -45,7 +45,7 @@ in the current directory.
 Specify an alternate path to the gzochid.conf file.
 .IP \fB\-e,\ \-\-engine\fR
 Specify the name of the storage engine that created the target database. The
-format of this argument is the same as for the \(dqserver.store.engine.dir\(dq
+format of this argument is the same as for the \(dqstore.engine.dir\(dq
 setting in gzochid.conf: the basename of the module file, minus the extension.
 (E.g., bdb.)
 .IP \fB\-o,\ \-\-output\fR
@@ -71,8 +71,8 @@ present.
 .B GZOCHID_STORAGE_ENGINE_DIR
 If \fB$GZOCHID_STORAGE_ENGINE_DIR\fR is set before \fBgzochi-dump\fR is started,
 its value is used as the base path for resolving storage engine modules. This
-value takes precedence over the \(dqserver.storage.engine.dir\(dq setting in the
-server configuration file.
+value takes precedence over the \(dqstorage.engine.dir\(dq setting in the server
+configuration file.
 
 .SH AUTHOR
 Julian Graham (joolean@undecidable.net)
