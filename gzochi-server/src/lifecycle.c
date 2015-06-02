@@ -114,10 +114,16 @@ initialize_data (int from_state, int to_state, gpointer user_data)
       gzochid_notice 
 	("Work directory %s does not exist; creating...", data_dir);
       if (g_mkdir_with_parents (data_dir, 493) != 0)
-	gzochid_err ("Unable to create work directory %s.", data_dir);
+	{
+	  gzochid_err ("Unable to create work directory %s.", data_dir);
+	  exit (EXIT_FAILURE);
+	}
     }
   else if (!g_file_test (data_dir, G_FILE_TEST_IS_DIR))
-    gzochid_err ("%s is not a directory.", data_dir);
+    {
+      gzochid_err ("%s is not a directory.", data_dir);
+      exit (EXIT_FAILURE);
+    }
 
   storage_context = iface->initialize (data_dir);
 

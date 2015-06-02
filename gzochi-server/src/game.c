@@ -155,16 +155,29 @@ initialize_apps (int from_state, int to_state, gpointer user_data)
 	("Work directory %s does not exist; creating...", 
 	 context->work_dir);
       if (g_mkdir_with_parents (context->work_dir, 493) != 0)
-	gzochid_err ("Unable to create work directory %s.", context->work_dir);
+	{
+	  gzochid_err
+	    ("Unable to create work directory %s.", context->work_dir);
+	  exit (EXIT_FAILURE);
+	}
     }
   else if (!g_file_test (context->work_dir, G_FILE_TEST_IS_DIR))
-    gzochid_err ("%s is not a directory.", context->work_dir);
+    {
+      gzochid_err ("%s is not a directory.", context->work_dir);
+      exit (EXIT_FAILURE);
+    }
   
   if (!g_file_test (context->apps_dir, G_FILE_TEST_EXISTS))
-    gzochid_err 
-      ("Application directory %s does not exist.", context->apps_dir); 
+    {
+      gzochid_err 
+	("Application directory %s does not exist.", context->apps_dir);
+      exit (EXIT_FAILURE);
+    }
   else if (!g_file_test (context->apps_dir, G_FILE_TEST_IS_DIR))
-    gzochid_err ("%s is not a directory.", context->apps_dir); 
+    {
+      gzochid_err ("%s is not a directory.", context->apps_dir);
+      exit (EXIT_FAILURE);
+    }
 
   scan_apps_dir (context);
 }
