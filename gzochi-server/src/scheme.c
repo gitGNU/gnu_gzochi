@@ -566,7 +566,8 @@ gzochid_scheme_create_periodic_task_handle (mpz_t oid)
 static void 
 bind_scm (char *module, SCM *binding, char *name)
 {
-  SCM var = scm_c_public_variable (module, name);
+  SCM var = scm_module_variable
+    (scm_c_resolve_module (module), scm_from_locale_symbol (name));
 
   if (scm_is_false (var))
     g_error ("Missing Scheme binding for `%s'. Aborting...", name);
