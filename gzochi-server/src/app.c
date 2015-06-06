@@ -59,7 +59,6 @@ gzochid_application_context_free (gzochid_application_context *app_context)
   gzochid_application_event_source_free (app_context->event_source);
   free (app_context->stats);
 
-  free (context->fsm->name);
   free (context);
 }
 

@@ -17,50 +17,65 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "fsm.h"
 #include "log.h"
 
-typedef struct _gzochid_fsm_state 
+struct _gzochid_fsm_state 
 {
   int state;
   char *description;
 
   GList *enter_functions;
   GList *exit_functions;
-} gzochid_fsm_state;
+};
 
-typedef struct _gzochid_fsm_enter_function_registration 
+typedef struct _gzochid_fsm_state gzochid_fsm_state;
+
+struct _gzochid_fsm_enter_function_registration 
 {
   gzochid_fsm_enter_function function;
   gpointer data;
-} gzochid_fsm_enter_function_registration;
+};
 
-typedef struct _gzochid_fsm_exit_function_registration 
+typedef struct _gzochid_fsm_enter_function_registration
+gzochid_fsm_enter_function_registration;
+
+struct _gzochid_fsm_exit_function_registration 
 {
   gzochid_fsm_enter_function function;
   gpointer data;
-} gzochid_fsm_exit_function_registration;
+};
 
-static gzochid_fsm_state *gzochid_fsm_state_new (int state, char *description)
+typedef struct _gzochid_fsm_exit_function_registration
+gzochid_fsm_exit_function_registration;
+
+static gzochid_fsm_state *
+gzochid_fsm_state_new (int state, char *description)
 {
   gzochid_fsm_state *s = calloc (1, sizeof (gzochid_fsm_state));
 
+  assert (description != NULL);
+  
   s->state = state;
-  s->description = description;
+  s->description = strdup (description);
 
   return s;
 }
 
-static void gzochid_fsm_state_free (gzochid_fsm_state *state)
+static void
+gzochid_fsm_state_free (gzochid_fsm_state *state)
 {
   g_list_free_full (state->enter_functions, free);
   g_list_free_full (state->exit_functions, free);
+  free (state->description);
   free (state);
 }
 
-void gzochid_fsm_on_enter
-(gzochid_fsm *fsm, int state, gzochid_fsm_enter_function func, gpointer data)
+void
+gzochid_fsm_on_enter (gzochid_fsm *fsm, int state,
+		      gzochid_fsm_enter_function func, gpointer data)
 {
   gzochid_fsm_state *s = g_hash_table_lookup (fsm->states, &state);
   gzochid_fsm_enter_function_registration *registration = calloc 
@@ -74,8 +89,9 @@ void gzochid_fsm_on_enter
   s->enter_functions = g_list_append (s->enter_functions, registration);
 }
 
-void gzochid_fsm_on_exit
-(gzochid_fsm *fsm, int state, gzochid_fsm_exit_function func, gpointer data)
+void
+gzochid_fsm_on_exit (gzochid_fsm *fsm, int state,
+		     gzochid_fsm_exit_function func, gpointer data)
 {
   gzochid_fsm_state *s = g_hash_table_lookup (fsm->states, &state);
   gzochid_fsm_exit_function_registration *registration = calloc 
@@ -89,12 +105,15 @@ void gzochid_fsm_on_exit
   s->exit_functions = g_list_append (s->exit_functions, registration);
 }
 
-gzochid_fsm *gzochid_fsm_new (char *name, int state, char *description)
+gzochid_fsm *
+gzochid_fsm_new (char *name, int state, char *description)
 {
   gzochid_fsm *fsm = calloc (1, sizeof (gzochid_fsm));
   gzochid_fsm_state *s = gzochid_fsm_state_new (state, description);
 
-  fsm->name = name;
+  assert (name != NULL);
+  
+  fsm->name = strdup (name);
   fsm->states = g_hash_table_new_full 
     (g_int_hash, g_int_equal, NULL, (GDestroyNotify) gzochid_fsm_state_free);
   fsm->transitions = g_hash_table_new_full 
@@ -109,7 +128,8 @@ gzochid_fsm *gzochid_fsm_new (char *name, int state, char *description)
   return fsm;
 }
 
-void gzochid_fsm_add_state (gzochid_fsm *fsm, int state, char *description)
+void
+gzochid_fsm_add_state (gzochid_fsm *fsm, int state, char *description)
 {
   gzochid_fsm_state *s = NULL;
 
@@ -119,8 +139,8 @@ void gzochid_fsm_add_state (gzochid_fsm *fsm, int state, char *description)
   g_hash_table_insert (fsm->states, &s->state, s);
 }
 
-void gzochid_fsm_add_transition 
-(gzochid_fsm *fsm, int from_state, int to_state)
+void
+gzochid_fsm_add_transition (gzochid_fsm *fsm, int from_state, int to_state)
 {
   gzochid_fsm_state *from_s = NULL;
   gzochid_fsm_state *to_s = NULL;
@@ -140,25 +160,26 @@ void gzochid_fsm_add_transition
   else transitions = g_list_append (transitions, to_s);
 }
 
-static void call_enter_function (gpointer d, gpointer ud)
+static void
+call_enter_function (gpointer d, gpointer ud)
 {
-  gzochid_fsm_enter_function_registration *registration = 
-    (gzochid_fsm_enter_function_registration *) d;
-  int *transition = (int *) ud;
+  gzochid_fsm_enter_function_registration *registration = d;
+  int *transition = ud;
 
   registration->function (transition[0], transition[1], registration->data);
 }
 
-static void call_exit_function (gpointer d, gpointer ud)
+static void
+call_exit_function (gpointer d, gpointer ud)
 {
-  gzochid_fsm_exit_function_registration *registration = 
-    (gzochid_fsm_exit_function_registration *) d;
-  int *transition = (int *) ud;
+  gzochid_fsm_exit_function_registration *registration = d;
+  int *transition = ud;
 
   registration->function (transition[0], transition[1], registration->data);
 }
 
-void gzochid_fsm_start (gzochid_fsm *fsm)
+void
+gzochid_fsm_start (gzochid_fsm *fsm)
 {
   gzochid_fsm_state *state = g_hash_table_lookup 
     (fsm->states, &fsm->current_state);
@@ -180,7 +201,8 @@ void gzochid_fsm_start (gzochid_fsm *fsm)
   g_mutex_unlock (&fsm->mutex);
 }
 
-void gzochid_fsm_to_state (gzochid_fsm *fsm, int state)
+void
+gzochid_fsm_to_state (gzochid_fsm *fsm, int state)
 {
   gzochid_fsm_state *old_state = NULL;
   gzochid_fsm_state *new_state = NULL;
@@ -218,7 +240,8 @@ void gzochid_fsm_to_state (gzochid_fsm *fsm, int state)
   g_mutex_unlock (&fsm->mutex);
 }
 
-void gzochid_fsm_until (gzochid_fsm *fsm, int state)
+void
+gzochid_fsm_until (gzochid_fsm *fsm, int state)
 {
   g_mutex_lock (&fsm->mutex);
   assert (fsm->started);
@@ -229,8 +252,10 @@ void gzochid_fsm_until (gzochid_fsm *fsm, int state)
   g_mutex_unlock (&fsm->mutex);
 }
 
-void gzochid_fsm_free (gzochid_fsm *fsm)
+void
+gzochid_fsm_free (gzochid_fsm *fsm)
 {
+  free (fsm->name);
   g_cond_clear (&fsm->cond);
   g_mutex_clear (&fsm->mutex);
   g_hash_table_destroy (fsm->states);
