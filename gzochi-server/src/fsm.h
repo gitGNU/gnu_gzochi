@@ -23,18 +23,7 @@
 typedef void (*gzochid_fsm_enter_function)(int, int, gpointer);
 typedef void (*gzochid_fsm_exit_function)(int, int, gpointer);
 
-typedef struct _gzochid_fsm {
-  char *name;
-  
-  GHashTable *states;
-  GHashTable *transitions;
-
-  int current_state;
-  int started;
-
-  GMutex mutex;
-  GCond cond;
-} gzochid_fsm;
+typedef struct _gzochid_fsm gzochid_fsm;
 
 void gzochid_fsm_on_enter 
 (gzochid_fsm *, int, gzochid_fsm_enter_function, gpointer);

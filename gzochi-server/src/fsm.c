@@ -22,6 +22,20 @@
 #include "fsm.h"
 #include "log.h"
 
+struct _gzochid_fsm
+{
+  char *name;
+  
+  GHashTable *states;
+  GHashTable *transitions;
+
+  int current_state;
+  int started;
+
+  GMutex mutex;
+  GCond cond;
+};
+
 struct _gzochid_fsm_state 
 {
   int state;
