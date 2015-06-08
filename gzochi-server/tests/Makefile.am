@@ -24,6 +24,7 @@ test_programs = \
 	test-data \
 	test-descriptor \
 	test-event \
+	test-fsm \
 	test-reloc \
 	test-scheme \
 	test-scheme-task \
@@ -66,6 +67,12 @@ test_event_LDADD = $(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
+
+test_fsm_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
+test_fsm_SOURCES = test-fsm.c
+test_fsm_LDADD = $(top_builddir)/src/libgzochid_la-fsm.o \
+	$(top_builddir)/src/libgzochid_la-log.o \
+	@GLIB_LIBS@
 
 test_reloc_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_reloc_SOURCES = test-reloc.c
