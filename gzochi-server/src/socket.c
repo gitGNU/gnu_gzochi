@@ -44,6 +44,7 @@ struct _gzochid_client_socket
   
   GIOChannel *channel;
   char *connection_description;
+  GSource *read_source; /* The client's read source. */
   GSource *write_source;
 };
 
@@ -107,8 +108,23 @@ static gboolean
 dispatch_client_error (gzochid_client_socket *sock)
 {
   gzochid_debug ("Socket disconnected.");
-  gzochid_protocol_client_disconnected (sock->client);
-  gzochid_protocol_client_free (sock->client);
+
+  /* 
+     It's actually not possible for the client's read source to produce an
+     error between the source being added to the main loop and the call to
+     `gzochid_protocol_client_accept', which is what's used to set the `client'
+     field of the socket struct; the accept dispatch should be running in the
+     same thread as the error dispatch.
+
+     Nonetheless, it seems like good hygiene to check this field before using
+     it.
+  */
+ 
+  if (sock->client != NULL)
+    {
+      gzochid_protocol_client_disconnected (sock->client);
+      gzochid_protocol_client_free (sock->client);
+    }
 
   return FALSE;
 }
@@ -206,6 +222,23 @@ create_client_socket (GIOChannel *channel)
   return sock;
 }
 
+/* Free the client socket and all of its non-GSource members. (Those get freed
+   asynchronously via the source destroy functions in 
+   `gzochid_client_socket_free'. */
+
+static void
+free_socket (gpointer data)
+{
+  gzochid_client_socket *sock = data;
+
+  g_io_channel_unref (sock->channel);
+  g_mutex_clear (&sock->sock_mutex);
+  g_array_unref (sock->recv_buffer);
+  g_array_unref (sock->send_buffer);
+  g_free (sock->connection_description);
+  free (sock);
+}
+
 static gboolean
 dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
 {
@@ -220,9 +253,8 @@ dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
     {
       GIOChannel *channel = g_io_channel_unix_new (client_fd);
       gzochid_client_socket *sock = create_client_socket (channel);
-      gzochid_protocol_client *client =
-	gzochid_protocol_client_accept (sock);
-      GSource *client_read_source = g_io_create_watch 
+
+      sock->read_source = g_io_create_watch 
 	(channel, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP);
 
       setsockopt (client_fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof (int));
@@ -231,7 +263,15 @@ dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
       g_io_channel_set_flags (channel, G_IO_FLAG_NONBLOCK, NULL);
       g_io_channel_set_buffered (channel, FALSE);
 
-      sock->client = client;
+      /* Set the read callback for the socket. `free_socket' is used as a
+	 `GDestroyNotify' callback for the socket when this source is 
+	 destroyed. */
+      
+      g_source_set_callback
+	(sock->read_source, (GSourceFunc) dispatch_client, sock, free_socket);
+      g_source_attach (sock->read_source, server_context->main_context);
+      
+      sock->client = gzochid_protocol_client_accept (sock);
       sock->connection_description = g_strdup_printf 
 	("%d.%d.%d.%d:%d",
 	 client_addr.sin_addr.s_addr & 0xff,
@@ -241,10 +281,6 @@ dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
 	 client_addr.sin_port);
 
       sock->context = server_context;
-      
-      g_source_set_callback
-	(client_read_source, (GSourceFunc) dispatch_client, sock, NULL);
-      g_source_attach (client_read_source, server_context->main_context);
     }
 
   return TRUE;
@@ -382,10 +418,12 @@ gzochid_client_socket_write
 void
 gzochid_client_socket_free (gzochid_client_socket *sock)
 {
-  g_io_channel_unref (sock->channel);
-  g_mutex_clear (&sock->sock_mutex);
-  g_array_unref (sock->recv_buffer);
-  g_array_unref (sock->send_buffer);
-  g_free (sock->connection_description);
-  free (sock);
+  /* It's not safe to free the socket synchronously, because another thread may
+     be in the process of dispatching a read or a write and the caller has no
+     way of knowing that. Instead, destroy both sources and let the 
+     `GDestroyNotify' attached to the read source take care of the cleanup. */
+
+  if (sock->write_source != NULL)
+    g_source_destroy (sock->write_source);
+  g_source_destroy (sock->read_source);
 }
