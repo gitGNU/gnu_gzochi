@@ -39,7 +39,6 @@
 #include "log.h"
 #include "httpd.h"
 #include "stats.h"
-#include "threads.h"
 
 #define OID_PREFIX_LEN 26
 #define OID_SUFFIX_LEN 29
@@ -562,28 +561,18 @@ dispatch (void *cls, struct MHD_Connection *connection,
 }
 
 static void 
-initialize_async (gpointer data, gpointer user_data)
-{
-  gzochid_context *context = data;
-  gzochid_fsm_to_state (context->fsm, GZOCHID_HTTPD_STATE_RUNNING);
-}
-
-static void 
 initialize (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = user_data;
   gzochid_httpd_context *httpd_context = (gzochid_httpd_context *) context;
-  gzochid_admin_context *admin_context = 
-    (gzochid_admin_context *) context->parent;
 
   httpd_context->daemon = MHD_start_daemon 
     (MHD_USE_SELECT_INTERNALLY, httpd_context->port, NULL, NULL, dispatch, 
      httpd_context, MHD_OPTION_END);
 
   gzochid_notice ("HTTP server listening on port %d", httpd_context->port);
-
-  gzochid_thread_pool_push 
-    (admin_context->pool, initialize_async, context, NULL);
+  
+  gzochid_fsm_to_state (context->fsm, GZOCHID_HTTPD_STATE_RUNNING);
 }
 
 gzochid_httpd_context *

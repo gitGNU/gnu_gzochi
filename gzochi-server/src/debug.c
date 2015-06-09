@@ -25,16 +25,8 @@
 #include "fsm.h"
 #include "guile.h"
 #include "log.h"
-#include "threads.h"
 
 static SCM scm_run_repl_server;
-
-static void 
-initialize_async (gpointer data, gpointer user_data)
-{
-  gzochid_context *context = data;
-  gzochid_fsm_to_state (context->fsm, GZOCHID_DEBUG_STATE_RUNNING);
-}
 
 static void *
 initialize_guile (void *data)
@@ -53,13 +45,9 @@ static void
 initialize (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = user_data;
-  gzochid_admin_context *admin_context =
-    (gzochid_admin_context *) context->parent;
 
   scm_with_guile (initialize_guile, NULL);
-
-  gzochid_thread_pool_push
-    (admin_context->pool, initialize_async, context, NULL);
+  gzochid_fsm_to_state (context->fsm, GZOCHID_DEBUG_STATE_RUNNING);
 }
 
 static void *
@@ -77,10 +65,10 @@ run_repl_server (void *data)
   return NULL;
 }
 
-static void 
-run_async (gpointer data, gpointer user_data)
+static gpointer
+run_async (gpointer data)
 {
-  scm_with_guile (run_repl_server, data);
+  return scm_with_guile (run_repl_server, data);
 }
 
 static void 
@@ -88,11 +76,9 @@ run (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = user_data;
   gzochid_debug_context *debug_context = (gzochid_debug_context *) context;
-  gzochid_admin_context *admin_context =
-    (gzochid_admin_context *) context->parent;
 
   gzochid_notice ("Debug server listening on port %d", debug_context->port);
-  gzochid_thread_pool_push (admin_context->pool, run_async, user_data, NULL);  
+  g_thread_new ("repl-server", run_async, user_data);
 }
 
 static void 

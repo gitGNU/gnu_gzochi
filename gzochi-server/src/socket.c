@@ -251,13 +251,6 @@ dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
 }
 
 static void 
-initialize_async (gpointer data, gpointer user_data)
-{
-  gzochid_context *context = (gzochid_context *) data;
-  gzochid_fsm_to_state (context->fsm, GZOCHID_SOCKET_SERVER_STATE_RUNNING);
-}
-
-static void 
 initialize (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = (gzochid_context *) user_data;
@@ -290,25 +283,21 @@ initialize (int from_state, int to_state, gpointer user_data)
     (server_source, (GSourceFunc) dispatch_accept, server_context, NULL);
   g_source_attach (server_source, server_context->main_context);
   
-  gzochid_thread_pool_push 
-    (game_context->pool, initialize_async, context, NULL);  
+  gzochid_fsm_to_state (context->fsm, GZOCHID_SOCKET_SERVER_STATE_RUNNING);
 }
 
-static void 
-run_async (gpointer data, gpointer user_data)
+static gpointer 
+run_async (gpointer data)
 {
   gzochid_socket_server_context *server = data;
   g_main_loop_run (server->main_loop);
+  return NULL;
 }
 
 static void 
 run (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_context *context = user_data;
-  gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
-
-  gzochid_thread_pool_push
-    (game_context->pool, run_async, user_data, NULL);
+  g_thread_new ("socket-server", run_async, user_data);
 }
 
 static void 

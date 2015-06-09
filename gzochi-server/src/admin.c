@@ -30,13 +30,6 @@
 
 #include "api/admin.h"
 
-static void 
-initialize_async (gpointer data, gpointer user_data)
-{
-  gzochid_context *context = user_data;
-  gzochid_fsm_to_state (context->fsm, GZOCHID_ADMIN_STATE_RUNNING);
-}
-
 static void *
 initialize_guile (void *data)
 {
@@ -87,7 +80,7 @@ initialize (int from_state, int to_state, gpointer user_data)
     }
   
   scm_with_guile (initialize_guile, context);
-  gzochid_thread_pool_push (admin_context->pool, initialize_async, NULL, NULL);
+  gzochid_fsm_to_state (context->fsm, GZOCHID_ADMIN_STATE_RUNNING);
 }
 
 gzochid_admin_context *

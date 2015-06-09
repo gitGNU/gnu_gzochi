@@ -120,13 +120,6 @@ scan_apps_dir (gzochid_game_context *context)
 }
 
 static void 
-initialize_async (gpointer data, gpointer user_data)
-{
-  gzochid_context *context = user_data;
-  gzochid_fsm_to_state (context->fsm, GZOCHID_GAME_STATE_RUNNING);
-}
-
-static void 
 initialize_auth (int from_state, int to_state, gpointer user_data)
 {
   gzochid_auth_init (user_data);
@@ -214,8 +207,8 @@ initialize_client_received_message_task_serialization (int from_state,
 static void 
 initialize_complete (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_game_context *context = user_data;
-  gzochid_thread_pool_push (context->pool, initialize_async, NULL, NULL);  
+  gzochid_context *context = user_data;
+  gzochid_fsm_to_state (context->fsm, GZOCHID_GAME_STATE_RUNNING);
 }
 
 static gpointer 
