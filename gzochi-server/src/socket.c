@@ -277,7 +277,25 @@ initialize (int from_state, int to_state, gpointer user_data)
     gzochid_err ("Failed to bind server to port %d", game_context->port);
   if (listen (fd, 128) != 0)
     gzochid_err ("Failed to listen on port %d", game_context->port);
-  else gzochid_notice ("Game server listening on port %d", game_context->port);
+  else
+    {
+      /* To enable the server to bind to an arbitrary port - i.e., to allow
+	 game_context->port to be zero - we need a way to figure out which port
+	 was actually selected by the network subsystem. Call `getsockname' on 
+	 the server socket after a successful `listen' to figure this out. */
+      
+      struct sockaddr_in *bound_addr = NULL;
+      
+      server_context->addr = malloc (sizeof (struct sockaddr_in));
+      server_context->addrlen = sizeof (struct sockaddr_in);
+
+      bound_addr = (struct sockaddr_in *) server_context->addr;
+
+      if (getsockname (fd, server_context->addr, &server_context->addrlen) != 0)
+	gzochid_err ("Failed to get name of bound socket");
+      else gzochid_notice
+	     ("Game server listening on port %d", ntohs (bound_addr->sin_port));
+    }
 
   g_source_set_callback 
     (server_source, (GSourceFunc) dispatch_accept, server_context, NULL);

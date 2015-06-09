@@ -1,5 +1,5 @@
 /* socket.h: Prototypes and declarations for socket.c
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 #define GZOCHID_SOCKET_H
 
 #include <glib.h>
+#include <sys/socket.h>
 
 #include "context.h"
 
@@ -29,13 +30,18 @@ enum gzochid_socket_server_state
     GZOCHID_SOCKET_SERVER_STATE_STOPPED
   };
 
-typedef struct _gzochid_socket_server_context
+struct _gzochid_socket_server_context
 {
   gzochid_context base;
 
   GMainContext *main_context;
   GMainLoop *main_loop;
-} gzochid_socket_server_context;
+
+  struct sockaddr *addr; /* The actual address of the server socket. */
+  socklen_t addrlen; /* The length of `addr'. */
+};
+
+typedef struct _gzochid_socket_server_context gzochid_socket_server_context;
 
 typedef struct _gzochid_client_socket gzochid_client_socket;
 
