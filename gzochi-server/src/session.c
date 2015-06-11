@@ -422,7 +422,6 @@ gzochid_client_session_disconnected_worker
  gpointer data)
 {
   remove_session (context, data, NULL);
-  free (data);
 }
 
 gzochid_client_session *

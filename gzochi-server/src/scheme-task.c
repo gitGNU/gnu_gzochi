@@ -408,8 +408,6 @@ gzochid_scheme_application_disconnected_worker
     {
       gzochid_tx_warning 
 	(context, "Session '%s' disconnected after incomplete login.", ptr);
-
-      gzochid_client_session_disconnected_worker (context, identity, oid_str);
       return;
     }
 
@@ -431,7 +429,6 @@ gzochid_scheme_application_disconnected_worker
 	      oid_str);
 
       g_error_free (err);      
-      gzochid_client_session_disconnected_worker (context, identity, oid_str);
       return;
     }
 
@@ -451,8 +448,15 @@ gzochid_scheme_application_disconnected_worker
 	     (scm_variable_ref (exception_var)));
 	}
     }
+}
 
-  gzochid_client_session_disconnected_worker (context, identity, oid_str);
+void 
+gzochid_scheme_application_disconnected_cleanup_worker 
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gpointer ptr)
+{
+  gzochid_client_session_disconnected_worker (context, identity, ptr);
+  free (ptr);
 }
 
 void

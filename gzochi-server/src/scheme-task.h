@@ -39,6 +39,14 @@ void gzochid_scheme_application_received_message_worker
 void gzochid_scheme_application_disconnected_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
+/* Transactional application worker to be used as a cleanup mechanism if 
+   `gzochid_scheme_application_disconnected_worker' cannot commit its 
+   transaction. Invokes `gzochid_client_session_disconnected_worker' and frees
+   the session key. */
+
+void gzochid_scheme_application_disconnected_cleanup_worker
+(gzochid_application_context *, gzochid_auth_identity *, gpointer);
+
 /* Called to invoke an application's optional "ready" lifecycle handler. */
 
 void gzochid_scheme_application_ready (gzochid_application_context *, 

@@ -400,7 +400,8 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
 	      
 	      transactional_task.worker = 
 		gzochid_client_session_disconnected_worker;
-	      gzochid_schedule_run_task (game_context->task_queue, &task);      
+	      gzochid_schedule_run_task (game_context->task_queue, &task);
+	      free (session_oid_str);
 	    }
 	    break;
 	}
@@ -433,7 +434,8 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
       gzochid_application_task *cleanup_task = 
 	gzochid_application_task_new
 	(context, gzochid_protocol_client_get_identity (client), 
-	 gzochid_client_session_disconnected_worker, session_oid_str);
+	 gzochid_scheme_application_disconnected_cleanup_worker,
+	 session_oid_str);
       gzochid_transactional_application_task_execution *execution = 
 	gzochid_transactional_application_task_execution_new 
 	(callback_task, NULL, cleanup_task);
