@@ -117,7 +117,7 @@ gzochid_task_make_transactional_application_task
     gzochid_application_task_new (context, identity, worker, data);
   gzochid_transactional_application_task_execution *execution = 
     gzochid_transactional_application_task_execution_new 
-    (transactional_task, NULL);
+    (transactional_task, NULL, NULL);
   gzochid_application_task *application_task = 
     gzochid_application_task_new 
     (context, identity, 
@@ -299,7 +299,7 @@ wrap_durable_task (gzochid_application_context *context, mpz_t oid,
   gzochid_auth_identity *cloned_identity = NULL;
 
   gzochid_application_task *transactional_task = NULL;
-  gzochid_application_task *cleanup_task = NULL;
+  gzochid_application_task *catch_task = NULL;
   gzochid_transactional_application_task_execution *execution = NULL;
 
   gzochid_application_task *application_task = NULL;
@@ -325,11 +325,11 @@ wrap_durable_task (gzochid_application_context *context, mpz_t oid,
 
   transactional_task = gzochid_application_task_new
     (context, cloned_identity, durable_task_application_worker, durable_task);
-  cleanup_task = gzochid_application_task_new
+  catch_task = gzochid_application_task_new
     (context, cloned_identity, durable_task_cleanup_worker, 
      mpz_get_str (NULL, 16, oid));
   execution = gzochid_transactional_application_task_timed_execution_new 
-    (transactional_task, cleanup_task, game_context->tx_timeout);
+    (transactional_task, catch_task, NULL, game_context->tx_timeout);
 
   application_task = gzochid_application_task_new
     (context, cloned_identity,

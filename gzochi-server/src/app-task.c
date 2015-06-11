@@ -83,13 +83,15 @@ gzochid_serialize_application_task
 }
 
 static gzochid_transactional_application_task_execution *
-execution_new (gzochid_application_task *task, 
+execution_new (gzochid_application_task *task,
+	       gzochid_application_task *catch_task,
 	       gzochid_application_task *cleanup_task, struct timeval *timeout)
 {
   gzochid_transactional_application_task_execution *execution = 
     malloc (sizeof (gzochid_transactional_application_task_execution));
 
   execution->task = task;
+  execution->catch_task = catch_task;
   execution->cleanup_task = cleanup_task;
 
   if (timeout != NULL)
@@ -108,17 +110,18 @@ execution_new (gzochid_application_task *task,
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_execution_new 
-(gzochid_application_task *task, gzochid_application_task *cleanup_task)
+(gzochid_application_task *task, gzochid_application_task *catch_task,
+ gzochid_application_task *cleanup_task)
 {
-  return execution_new (task, cleanup_task, NULL);
+  return execution_new (task, catch_task, cleanup_task, NULL);
 }
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_timed_execution_new 
-(gzochid_application_task *task, gzochid_application_task *cleanup_task,
- struct timeval timeout)
+(gzochid_application_task *task, gzochid_application_task *catch_task,
+ gzochid_application_task *cleanup_task, struct timeval timeout)
 {
-  return execution_new (task, cleanup_task, &timeout);
+  return execution_new (task, catch_task, cleanup_task, &timeout);
 }
 
 void 
@@ -286,49 +289,59 @@ gzochid_application_resubmitting_transactional_task_worker
 (gzochid_application_context *app_context, gzochid_auth_identity *identity, 
  gpointer data)
 {
+  struct timeval now;
+  gzochid_task *task = NULL;
+  gzochid_application_task *application_task = NULL;
+
+  gzochid_context *context = (gzochid_context *) app_context;
+  gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
+
   gzochid_transactional_application_task_execution *execution = data;
 
   gzochid_application_transactional_task_worker 
     (app_context, identity, execution);
   
-  if (execution->result != GZOCHID_TRANSACTION_SUCCESS)
+  if (gzochid_application_should_retry (execution))
+    {	  
+      execution->result = GZOCHID_TRANSACTION_PENDING;
+      
+      application_task = gzochid_application_task_new
+	(app_context, identity,
+	 gzochid_application_resubmitting_transactional_task_worker, 
+	 execution);	  
+    }
+  else if (execution->result != GZOCHID_TRANSACTION_SUCCESS
+	   && execution->catch_task != NULL)
     {
-      struct timeval now;
-      gzochid_context *context = (gzochid_context *) app_context;
-      gzochid_game_context *game_context = 
-	(gzochid_game_context *) context->parent;
-      gzochid_application_task *application_task = NULL;
-      gzochid_task *task = NULL;
+      gzochid_transactional_application_task_execution *catch_execution = 
+	gzochid_transactional_application_task_execution_new
+	(execution->catch_task, NULL, execution->cleanup_task);
+      
+      application_task = gzochid_application_task_new
+	(app_context, identity,
+	 gzochid_application_resubmitting_transactional_task_worker,
+	 catch_execution);
+    }
+  else if (execution->cleanup_task != NULL)
+    {
+      gzochid_transactional_application_task_execution *cleanup_execution = 
+	gzochid_transactional_application_task_execution_new
+	(execution->cleanup_task, NULL, NULL);
+      
+      application_task = gzochid_application_task_new
+	(app_context, identity,
+	 gzochid_application_resubmitting_transactional_task_worker,
+	 cleanup_execution);
+    }
 
-      if (gzochid_application_should_retry (execution))
-	{	  	  
-	  execution->result = GZOCHID_TRANSACTION_PENDING;
-	  
-	  application_task = gzochid_application_task_new
-	    (app_context, identity,
-	     gzochid_application_resubmitting_transactional_task_worker, 
-	     execution);	  
-	}
-      else if (execution->cleanup_task != NULL)
-	{
-	  gzochid_transactional_application_task_execution *cleanup_execution = 
-	    gzochid_transactional_application_task_execution_new
-	    (execution->cleanup_task, NULL);
-
-	  application_task = gzochid_application_task_new
-	    (app_context, identity,
-	     gzochid_application_transactional_task_worker, cleanup_execution);
-	}
-
-      if (application_task != NULL)
-	{
-	  gettimeofday (&now, NULL);
-	  
-	  task = gzochid_task_new
-	    (gzochid_application_task_thread_worker, application_task, now);
-	  
-	  gzochid_schedule_submit_task (game_context->task_queue, task);
-	}
+  if (application_task != NULL)
+    {
+      gettimeofday (&now, NULL);
+      
+      task = gzochid_task_new
+	(gzochid_application_task_thread_worker, application_task, now);
+      
+      gzochid_schedule_submit_task (game_context->task_queue, task);
     }
 }
 

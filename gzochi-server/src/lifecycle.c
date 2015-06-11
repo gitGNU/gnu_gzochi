@@ -349,7 +349,7 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   gzochid_application_task application_task;
   gzochid_transactional_application_task_execution *execution =
     gzochid_transactional_application_task_timed_execution_new 
-    (&transactional_task, NULL, game_context->tx_timeout);
+    (&transactional_task, NULL, NULL, game_context->tx_timeout);
 
   gzochid_task task;
 
@@ -436,7 +436,7 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
 	 gzochid_client_session_disconnected_worker, session_oid_str);
       gzochid_transactional_application_task_execution *execution = 
 	gzochid_transactional_application_task_execution_new 
-	(callback_task, cleanup_task);
+	(callback_task, NULL, cleanup_task);
       gzochid_application_task *application_task = gzochid_application_task_new 
 	(context, gzochid_protocol_client_get_identity (client),
 	 gzochid_application_resubmitting_transactional_task_worker, execution);
@@ -481,7 +481,7 @@ gzochid_application_session_received_message
       gzochid_application_task application_task;
       gzochid_transactional_application_task_execution *execution =
 	gzochid_transactional_application_task_timed_execution_new
-	(&transactional_task, NULL, game_context->tx_timeout);
+	(&transactional_task, NULL, NULL, game_context->tx_timeout);
       gzochid_task task;
 
       data[0] = session_oid_str;

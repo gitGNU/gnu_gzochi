@@ -21,6 +21,7 @@
 SUBDIRS = api auth scheme storage
 
 test_programs = \
+	test-app-task \
 	test-data \
 	test-descriptor \
 	test-event \
@@ -47,6 +48,11 @@ treefile_la_SOURCES = treefile.c
 treefile_la_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ -Wall -Werror
 treefile_la_LIBADD = @GLIB_LIBS@
 treefile_la_LDFLAGS = -module -avoid-version -rpath $(abs_srcdir)
+
+test_app_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_app_task_SOURCES = test-app-task.c
+test_app_task_LDADD = $(top_builddir)/src/libgzochid.la \
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_data_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_data_SOURCES = test-data.c

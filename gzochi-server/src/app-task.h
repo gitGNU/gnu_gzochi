@@ -62,7 +62,20 @@ gzochid_application_task_serialization;
 
 struct _gzochid_transactional_application_task_execution
 {
+  /* The main task to execute. */
+  
   gzochid_application_task *task;
+
+  /* An optional "catch" task to be executed if and only if the main task's
+     transaction is marked for rollback and cannot be retried. This task is
+     executed in a separate transaction. */
+  
+  gzochid_application_task *catch_task;
+
+  /* An optional "cleanup" task that is always executed after the main task's
+     final attempt - and after the catch task, if one is present. This task is
+     executed in a separate transaction. */
+  
   gzochid_application_task *cleanup_task;
 
   struct timeval *timeout;
@@ -79,13 +92,22 @@ gzochid_transaction_result gzochid_application_transaction_execute
 gzochid_transaction_result gzochid_application_transaction_execute_timed 
 (gzochid_application_context *, void (*) (gpointer), gpointer, struct timeval);
 
+/* Create a new transactional application task execution context with the
+   specified main task and optional catch and cleanup tasks. */
+
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_execution_new 
-(gzochid_application_task *, gzochid_application_task *);
+(gzochid_application_task *, gzochid_application_task *,
+ gzochid_application_task *);
+
+/* Create a new transactional application task execution context with the
+   specified main task, optional catch and cleanup tasks, a timeval giving an
+   upper bound on the main task's allowed execution time. */
 
 gzochid_transactional_application_task_execution *
 gzochid_transactional_application_task_timed_execution_new 
-(gzochid_application_task *, gzochid_application_task *, struct timeval);
+(gzochid_application_task *, gzochid_application_task *,
+ gzochid_application_task *, struct timeval);
 
 void gzochid_transactional_application_task_execution_free
 (gzochid_transactional_application_task_execution *);
