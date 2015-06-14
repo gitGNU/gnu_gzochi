@@ -1115,6 +1115,7 @@ tx_set_parent (btree_node *node, btree_transaction *btx, btree_node *parent)
     }
 
   header->parent = parent;
+  mark_modification (node, btx);
   return TRUE;
 }
 
@@ -1914,11 +1915,11 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
     }
 
   new_node = create_btree_node (parent, 0, 0, key, key_len);
-  mark_modification (new_node, btx);
   if (! tx_lock (&new_node->lock, btx, TRUE, NULL))
     return FALSE;
 
   write_datum (&new_node->value, value, value_len);
+  mark_modification (new_node, btx);
 
   while (next != NULL)
     {
@@ -1971,7 +1972,6 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
 		 interstitial_key, key_len + 1);
 
 	      free (interstitial_key);
-	      mark_modification (interstitial, btx);
 	      if (! tx_lock (&interstitial->lock, btx, TRUE, NULL))
 		return FALSE;
 
@@ -2055,7 +2055,6 @@ split (btree_node *node, btree_transaction *btx)
   btree_node *split_point = NULL;
   btree_node *pre_split_point = NULL;
 
-  mark_modification (new_node, btx);
   if (! tx_lock (&new_node->lock, btx, TRUE, NULL))
     return NULL;
 
@@ -2166,7 +2165,6 @@ maybe_split (btree_transaction *btx, btree *btree, btree_node *node)
 
 	  parent = create_btree_node (NULL, 1, BRANCHING_FACTOR - 1, NULL, 0);
 
-	  mark_modification (parent, btx);
 	  if (! tx_lock (&parent->lock, btx, TRUE, NULL))
 	    return FALSE;
 
