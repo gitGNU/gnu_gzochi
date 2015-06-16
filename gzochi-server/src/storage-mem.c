@@ -1248,6 +1248,14 @@ mark_node_deleted (btree_transaction *btx, btree_node *node)
       mark_deleted (node);
       mark_modification (node, btx);
 
+      if (node->new_key.data != NULL)
+
+	/* We're deleting a structural node that we modified earlier during this
+	   transaction - possibly because of a split / adjacent insertion. Clean
+	   up its previous key. */
+	
+	clear_datum (&node->new_key);
+      
       if (node->new_value.data != NULL)
 
 	/* We're deleting a leaf node that we modified earlier during this
@@ -1273,13 +1281,10 @@ apply_modification (gpointer data, gpointer user_data)
   if (! is_new (node))
     assert (node->lock.writer == btx);
 
-  if (is_deleted (node))
-    {
-      /* Perform the deletion of a node with a tombstone marker. */
+  /* Perform the deletion of a node with a tombstone marker. */
 
-      assert (unlink_node (node, btx));
-      delete_node (node, btx);
-    }
+  if (is_deleted (node))
+    delete_node (node, btx);
   else
     {
       if (node->new_key.data != NULL)
