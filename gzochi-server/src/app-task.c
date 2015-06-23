@@ -57,6 +57,21 @@ gzochid_client_received_message_task_serialization =
   };
 
 gzochid_application_task *
+gzochid_application_task_new (gzochid_application_context *context,
+			      gzochid_auth_identity *identity, 
+			      gzochid_application_worker worker, gpointer data)
+{
+  gzochid_application_task *task = malloc (sizeof (gzochid_application_task));
+
+  task->context = context;
+  task->identity = identity;
+  task->worker = worker;
+  task->data = data;
+
+  return task;
+}
+
+gzochid_application_task *
 gzochid_deserialize_application_task 
 (gzochid_application_context *context, 
  gzochid_application_task_serialization *serialization, GString *in)

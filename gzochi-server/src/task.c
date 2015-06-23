@@ -92,21 +92,6 @@ cleanup_transaction (gzochid_task_transaction_context *tx_context)
   free (tx_context);
 }
 
-gzochid_application_task *
-gzochid_application_task_new (gzochid_application_context *context,
-			      gzochid_auth_identity *identity, 
-			      gzochid_application_worker worker, gpointer data)
-{
-  gzochid_application_task *task = malloc (sizeof (gzochid_application_task));
-
-  task->context = context;
-  task->identity = identity;
-  task->worker = worker;
-  task->data = data;
-
-  return task;
-}
-
 gzochid_task *
 gzochid_task_make_transactional_application_task
 (gzochid_application_context *context, gzochid_auth_identity *identity,

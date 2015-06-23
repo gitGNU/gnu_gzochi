@@ -92,6 +92,10 @@ gzochid_transaction_result gzochid_application_transaction_execute
 gzochid_transaction_result gzochid_application_transaction_execute_timed 
 (gzochid_application_context *, void (*) (gpointer), gpointer, struct timeval);
 
+gzochid_application_task *gzochid_application_task_new 
+(gzochid_application_context *, gzochid_auth_identity *, 
+ gzochid_application_worker, gpointer);
+
 /* Create a new transactional application task execution context with the
    specified main task and optional catch and cleanup tasks. */
 
