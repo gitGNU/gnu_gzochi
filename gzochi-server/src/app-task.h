@@ -129,7 +129,6 @@ void gzochid_application_transactional_task_worker
 void gzochid_application_resubmitting_transactional_task_worker 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
-void gzochid_application_task_worker (gpointer);
 void gzochid_application_task_thread_worker (gpointer, gpointer);
 
 gboolean gzochid_application_should_retry 

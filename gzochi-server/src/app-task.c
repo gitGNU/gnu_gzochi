@@ -361,16 +361,11 @@ gzochid_application_resubmitting_transactional_task_worker
 }
 
 void 
-gzochid_application_task_worker (gpointer data)
+gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
 {
   gzochid_application_task *task = data;
   task->worker (task->context, task->identity, task->data);
-}
 
-void 
-gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
-{
-  gzochid_application_task_worker (data);
 }
 
 gboolean 
