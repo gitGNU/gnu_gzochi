@@ -264,7 +264,6 @@ gzochid_application_resubmitting_transactional_task_worker
 (gzochid_application_context *app_context, gzochid_auth_identity *identity, 
  gpointer data)
 {
-  struct timeval now;
   gzochid_task *task = NULL;
   gzochid_application_task *application_task = NULL;
 
@@ -311,10 +310,8 @@ gzochid_application_resubmitting_transactional_task_worker
 
   if (application_task != NULL)
     {
-      gettimeofday (&now, NULL);
-      
-      task = gzochid_task_new
-	(gzochid_application_task_thread_worker, application_task, now);
+      task = gzochid_task_immediate_new
+	(gzochid_application_task_thread_worker, application_task);
       
       gzochid_schedule_submit_task (game_context->task_queue, task);
     }
