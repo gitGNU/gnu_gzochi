@@ -22,7 +22,9 @@
 #include <libguile.h>
 
 #include "app.h"
+#include "app-task.h"
 #include "callback.h"
+#include "durable-task.h"
 #include "gzochid-auth.h"
 #include "io.h"
 

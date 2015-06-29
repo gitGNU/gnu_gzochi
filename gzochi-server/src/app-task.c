@@ -42,20 +42,6 @@ struct _gzochid_event_transaction_context
 typedef struct _gzochid_event_transaction_context
 gzochid_event_transaction_context;
 
-gzochid_application_worker_serialization 
-received_message_worker_serialization = { NULL, NULL };
-
-gzochid_io_serialization 
-received_message_data_serialization = { NULL, NULL, NULL };
-
-gzochid_application_task_serialization 
-gzochid_client_received_message_task_serialization = 
-  { 
-    "received-message",
-    &received_message_worker_serialization, 
-    &received_message_data_serialization 
-  };
-
 gzochid_application_task *
 gzochid_application_task_new (gzochid_application_context *context,
 			      gzochid_auth_identity *identity, 
@@ -69,32 +55,6 @@ gzochid_application_task_new (gzochid_application_context *context,
   task->data = data;
 
   return task;
-}
-
-gzochid_application_task *
-gzochid_deserialize_application_task 
-(gzochid_application_context *context, 
- gzochid_application_task_serialization *serialization, GString *in)
-{
-  gzochid_auth_identity *identity = 
-    gzochid_auth_identity_deserializer (context, in, NULL);
-  gzochid_application_worker worker = 
-    serialization->worker_serialization->deserializer (context, in);
-  gpointer data = serialization->data_serialization->deserializer 
-    (context, in, NULL);
-  return gzochid_application_task_new (context, identity, worker, data);
-}
-
-void 
-gzochid_serialize_application_task 
-(gzochid_application_context *context,
- gzochid_application_task_serialization *serialization, 
- gzochid_application_task *task, GString *out)
-{
-  gzochid_auth_identity_serializer (context, task->identity, out, NULL);
-  serialization->worker_serialization->serializer (context, task->worker, out);
-  serialization->data_serialization->serializer 
-    (context, task->data, out, NULL);
 }
 
 static gzochid_transactional_application_task_execution *
@@ -366,6 +326,25 @@ gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
   gzochid_application_task *task = data;
   task->worker (task->context, task->identity, task->data);
 
+gzochid_task *
+gzochid_task_make_transactional_application_task
+(gzochid_application_context *context, gzochid_auth_identity *identity,
+ gzochid_application_worker worker, gpointer data, 
+ struct timeval target_execution_time)
+{
+  gzochid_application_task *transactional_task = 
+    gzochid_application_task_new (context, identity, worker, data);
+  gzochid_transactional_application_task_execution *execution = 
+    gzochid_transactional_application_task_execution_new 
+    (transactional_task, NULL, NULL);
+  gzochid_application_task *application_task = 
+    gzochid_application_task_new 
+    (context, identity, 
+     gzochid_application_resubmitting_transactional_task_worker, execution);
+  
+  return gzochid_task_new 
+    (gzochid_application_task_thread_worker, application_task, 
+     target_execution_time);
 }
 
 gboolean 
@@ -376,9 +355,3 @@ gzochid_application_should_retry
     && execution->attempts < GZOCHID_APPLICATION_MAX_ATTEMPTS_DEFAULT;
 }
 
-void 
-gzochid_register_client_received_message_task_serialization (void)
-{
-  gzochid_task_register_serialization 
-    (&gzochid_client_received_message_task_serialization);
-}

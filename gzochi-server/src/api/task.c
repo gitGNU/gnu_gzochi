@@ -18,13 +18,16 @@
 #include <glib.h>
 #include <gmp.h>
 #include <libguile.h>
+#include <stddef.h>
+#include <sys/time.h>
 
 #include "../app.h"
+#include "../app-task.h"
 #include "../auth_int.h"
+#include "../durable-task.h"
 #include "../gzochid-auth.h"
 #include "../scheme.h"
 #include "../scheme-task.h"
-#include "../task.h"
 
 #include "task.h"
 #include "util.h"

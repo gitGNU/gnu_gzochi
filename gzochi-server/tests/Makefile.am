@@ -24,6 +24,7 @@ test_programs = \
 	test-app-task \
 	test-data \
 	test-descriptor \
+	test-durable-task \
 	test-event \
 	test-fsm \
 	test-reloc \
@@ -67,6 +68,11 @@ test_descriptor_LDADD = $(top_builddir)/src/libgzochid_la-callback.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@
+
+test_durable_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
+test_durable_task_SOURCES = test-durable-task.c
+test_durable_task_LDADD = $(top_builddir)/src/libgzochid.la \
+	$(GZOCHI_COMMON_LIBS) @GMODULE_LIBS@ @GLIB_LIBS@ @GUILE_LIBS@
 
 test_event_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
 test_event_SOURCES = test-event.c
@@ -130,10 +136,10 @@ test_storage_mem_SOURCES = test-storage-mem.c
 test_storage_mem_LDADD = $(top_builddir)/src/libgzochid_la-storage-mem.o \
 	@GLIB_LIBS@
 
-test_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
+test_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
 test_task_SOURCES = test-task.c 
-test_task_LDADD = $(top_builddir)/src/libgzochid.la \
-	$(GZOCHI_COMMON_LIBS) @GMODULE_LIBS@ @GLIB_LIBS@ @GUILE_LIBS@
+test_task_LDADD = $(top_builddir)/src/libgzochid_la-task.o \
+	@GLIB_LIBS@
 
 test_util_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
 test_util_SOURCES = test-util.c

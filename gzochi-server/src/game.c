@@ -29,6 +29,7 @@
 #include "config.h"
 #include "context.h"
 #include "descriptor.h"
+#include "durable-task.h"
 #include "fsm.h"
 #include "game.h"
 #include "gzochid-storage.h"

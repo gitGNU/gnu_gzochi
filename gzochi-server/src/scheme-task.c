@@ -26,6 +26,7 @@
 #include "app-task.h"
 #include "callback.h"
 #include "data.h"
+#include "durable-task.h"
 #include "guile.h"
 #include "gzochid-auth.h"
 #include "io.h"

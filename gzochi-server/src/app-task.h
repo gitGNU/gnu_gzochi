@@ -24,7 +24,18 @@
 #include "app.h"
 #include "gzochid-auth.h"
 #include "io.h"
+#include "task.h"
 #include "tx.h"
+
+struct _gzochid_task_transaction_context
+{
+  gzochid_application_context *context;
+  gzochid_auth_identity *identity;
+  GList *scheduled_tasks;
+};
+
+typedef struct _gzochid_task_transaction_context
+gzochid_task_transaction_context;
 
 typedef void (*gzochid_application_worker) 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
@@ -38,27 +49,6 @@ struct _gzochid_application_task
 };
 
 typedef struct _gzochid_application_task gzochid_application_task;
-
-struct _gzochid_application_worker_serialization
-{
-  void (*serializer) 
-  (gzochid_application_context *, gzochid_application_worker, GString *);
-  gzochid_application_worker (*deserializer) 
-  (gzochid_application_context *, GString *);
-};
-
-typedef struct _gzochid_application_worker_serialization
-gzochid_application_worker_serialization;
-
-struct _gzochid_application_task_serialization
-{
-  char *name;
-  gzochid_application_worker_serialization *worker_serialization;
-  gzochid_io_serialization *data_serialization;
-};
-
-typedef struct _gzochid_application_task_serialization
-gzochid_application_task_serialization;
 
 struct _gzochid_transactional_application_task_execution
 {
@@ -116,14 +106,6 @@ gzochid_transactional_application_task_timed_execution_new
 void gzochid_transactional_application_task_execution_free
 (gzochid_transactional_application_task_execution *);
 
-gzochid_application_task *gzochid_deserialize_application_task 
-(gzochid_application_context *, gzochid_application_task_serialization *, 
- GString *);
-
-void gzochid_serialize_application_task 
-(gzochid_application_context *, gzochid_application_task_serialization *, 
- gzochid_application_task *, GString *);
-
 void gzochid_application_transactional_task_worker 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 void gzochid_application_resubmitting_transactional_task_worker 
@@ -134,6 +116,8 @@ void gzochid_application_task_thread_worker (gpointer, gpointer);
 gboolean gzochid_application_should_retry 
 (gzochid_transactional_application_task_execution *);
 
-void gzochid_register_client_received_message_task_serialization (void);
+gzochid_task *gzochid_task_make_transactional_application_task
+(gzochid_application_context *, gzochid_auth_identity *,
+ gzochid_application_worker, gpointer, struct timeval);
 
 #endif /* GZOCHID_APP_TASK_H */

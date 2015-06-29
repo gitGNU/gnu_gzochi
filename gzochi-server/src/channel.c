@@ -23,6 +23,7 @@
 #include <sys/time.h>
 
 #include "app.h"
+#include "app-task.h"
 #include "channel.h"
 #include "game.h"
 #include "io.h"
@@ -30,6 +31,7 @@
 #include "protocol.h"
 #include "scheme.h"
 #include "session.h"
+#include "task.h"
 #include "tx.h"
 #include "util.h"
 

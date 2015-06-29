@@ -22,33 +22,10 @@
 #include <sys/time.h>
 
 #include "app.h"
-#include "app-task.h"
 #include "data.h"
 #include "gzochid-auth.h"
 #include "io.h"
 #include "threads.h"
-
-struct _gzochid_durable_application_task_handle
-{
-  gzochid_application_task_serialization *serialization;
-
-  gzochid_application_worker task_worker;
-  gzochid_data_managed_reference *task_data_reference;
-
-  gzochid_auth_identity *identity;
-  
-  gboolean repeats;
-  struct timeval period;
-  struct timeval target_execution_time;
-};
-
-typedef struct _gzochid_durable_application_task_handle
-gzochid_durable_application_task_handle;
-
-typedef gzochid_durable_application_task_handle gzochid_periodic_task_handle;
-
-extern gzochid_io_serialization 
-gzochid_durable_application_task_handle_serialization;
 
 struct _gzochid_task
 {
@@ -59,45 +36,22 @@ struct _gzochid_task
 
 typedef struct _gzochid_task gzochid_task;
 
-struct _gzochid_task_transaction_context
-{
-  gzochid_application_context *context;
-  gzochid_auth_identity *identity;
-  GList *scheduled_tasks;
-};
+/* Construct a new task with specified worker and data, to be executed at some
+   time after the specified timeout has elapsed. */
 
-typedef struct _gzochid_task_transaction_context
-gzochid_task_transaction_context;
-
-gzochid_task *gzochid_task_new 
+gzochid_task *gzochid_task_new
 (gzochid_thread_worker, gpointer, struct timeval);
+
+/* Construct a new task with specified worker and data, to be executed as soon
+   as possible. The `GDestroyNotify' argument gives a finalization function to 
+   be called on the data argument when `gzochid_task_free' is called on the 
+   task. */
+
 gzochid_task *gzochid_task_immediate_new (gzochid_thread_worker, gpointer);
 
+/* Free the specified task, invoking its finalizer (if one was specified at the
+   time the task was constructed) on the task data. */
 
-gzochid_task *gzochid_task_make_transactional_application_task
-(gzochid_application_context *, gzochid_auth_identity *,
- gzochid_application_worker, gpointer, struct timeval);
-
-void gzochid_schedule_durable_task
-(gzochid_application_context *, gzochid_auth_identity *, 
- gzochid_application_task *, gzochid_application_task_serialization *);
-
-void gzochid_schedule_delayed_durable_task 
-(gzochid_application_context *, gzochid_auth_identity *, 
- gzochid_application_task *, gzochid_application_task_serialization *, 
- struct timeval);
-
-gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task 
-(gzochid_application_context *, gzochid_auth_identity *, 
- gzochid_application_task *, gzochid_application_task_serialization *, 
- struct timeval, struct timeval);
-
-void gzochid_cancel_periodic_task 
-(gzochid_application_context *, gzochid_periodic_task_handle *);
-
-void gzochid_task_initialize_serialization_registry (void);
-void gzochid_task_register_serialization 
-(gzochid_application_task_serialization *);
-void gzochid_restart_tasks (gzochid_application_context *);
+void gzochid_task_free (gzochid_task *);
 
 #endif /* GZOCHID_TASK_H */
