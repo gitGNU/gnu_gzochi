@@ -636,9 +636,15 @@ gzochid_data_prefix_binding_persistence_task_new
   gzochid_transactional_application_task_execution *execution = 
     gzochid_transactional_application_task_execution_new 
     (transactional_task, NULL, NULL);
+
+  /* This task uses the re-executing task worker (in concert with 
+     `gzochid_schedule_run_task' below) to ensure that the full transactional
+     execution lifecycle - including retries - is completed before the oid 
+     holder is freed. */
+
   gzochid_application_task *application_task = gzochid_application_task_new 
-    (context, identity, 
-     gzochid_application_resubmitting_transactional_task_worker, execution);
+    (context, identity,
+     gzochid_application_reexecuting_transactional_task_worker, execution);
 
   return gzochid_task_immediate_new 
     (gzochid_application_task_thread_worker, application_task);
