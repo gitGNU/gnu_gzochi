@@ -52,7 +52,17 @@ treefile_la_LDFLAGS = -module -avoid-version -rpath $(abs_srcdir)
 
 test_app_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_app_task_SOURCES = test-app-task.c
-test_app_task_LDADD = $(top_builddir)/src/libgzochid.la \
+test_app_task_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
+	$(top_builddir)/src/libgzochid_la-app-task.o \
+	$(top_builddir)/src/libgzochid_la-auth.o \
+	$(top_builddir)/src/libgzochid_la-context.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochid_la-fsm.o \
+	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-task.o \
+	$(top_builddir)/src/libgzochid_la-tx.o \
+	$(top_builddir)/src/libgzochid_la-txlog.o \
+	$(top_builddir)/src/libgzochid_la-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_data_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@

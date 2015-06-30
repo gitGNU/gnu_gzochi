@@ -33,6 +33,12 @@ gzochid_schedule_submit_task (gzochid_task_queue *task_queue,
   return NULL;
 }
 
+void
+gzochid_schedule_execute_task (gzochid_task *task)
+{
+  task->worker (task->data, NULL);
+}
+
 struct _app_task_fixture
 {
   int task_attempts;
@@ -145,7 +151,44 @@ app_task_fixture_tear_down (app_task_fixture *fixture, gconstpointer user_data)
 }
 
 static void
-test_task_execution_success (app_task_fixture *fixture, gconstpointer user_data)
+test_task_execution_reexecute_success (app_task_fixture *fixture,
+				       gconstpointer user_data)
+{
+  gzochid_transactional_application_task_execution *execution =
+    gzochid_transactional_application_task_execution_new
+    (fixture->success_task, fixture->catch_task, fixture->cleanup_task);
+  
+  gzochid_application_reexecuting_transactional_task_worker
+    (fixture->context, fixture->identity, execution);
+
+  g_assert_cmpint (fixture->task_attempts, ==, 1);
+  g_assert_cmpint (fixture->catch_invocations, ==, 0);
+  g_assert_cmpint (fixture->cleanup_invocations, ==, 1);
+
+  gzochid_transactional_application_task_execution_free (execution);
+}
+
+static void
+test_task_execution_reexecute_failure (app_task_fixture *fixture,
+				       gconstpointer user_data)
+{
+  gzochid_transactional_application_task_execution *execution =
+    gzochid_transactional_application_task_execution_new
+    (fixture->failure_task, fixture->catch_task, fixture->cleanup_task);
+  
+  gzochid_application_reexecuting_transactional_task_worker
+    (fixture->context, fixture->identity, execution);
+
+  g_assert_cmpint (fixture->task_attempts, ==, 3);
+  g_assert_cmpint (fixture->catch_invocations, ==, 1);
+  g_assert_cmpint (fixture->cleanup_invocations, ==, 1);
+
+  gzochid_transactional_application_task_execution_free (execution);
+}
+
+static void
+test_task_execution_resubmit_success (app_task_fixture *fixture,
+				      gconstpointer user_data)
 {
   gzochid_transactional_application_task_execution *execution =
     gzochid_transactional_application_task_execution_new
@@ -160,7 +203,8 @@ test_task_execution_success (app_task_fixture *fixture, gconstpointer user_data)
 }
 
 static void
-test_task_execution_failure (app_task_fixture *fixture, gconstpointer user_data)
+test_task_execution_resubmit_failure (app_task_fixture *fixture,
+				      gconstpointer user_data)
 {
   gzochid_transactional_application_task_execution *execution =
     gzochid_transactional_application_task_execution_new
@@ -179,12 +223,17 @@ main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
-  g_test_add ("/task-execution/success", app_task_fixture, NULL,
-	      app_task_fixture_set_up, test_task_execution_success,
+  g_test_add ("/task-execution/reexecute/success", app_task_fixture, NULL,
+	      app_task_fixture_set_up, test_task_execution_reexecute_success,
 	      app_task_fixture_tear_down);
-
-  g_test_add ("/task-execution/failure", app_task_fixture, NULL,
-	      app_task_fixture_set_up, test_task_execution_failure,
+  g_test_add ("/task-execution/reexecute/failure", app_task_fixture, NULL,
+	      app_task_fixture_set_up, test_task_execution_reexecute_failure,
+	      app_task_fixture_tear_down);
+  g_test_add ("/task-execution/resubmit/success", app_task_fixture, NULL,
+	      app_task_fixture_set_up, test_task_execution_resubmit_success,
+	      app_task_fixture_tear_down);
+  g_test_add ("/task-execution/resubmit/failure", app_task_fixture, NULL,
+	      app_task_fixture_set_up, test_task_execution_resubmit_failure,
 	      app_task_fixture_tear_down);
   
   return g_test_run ();

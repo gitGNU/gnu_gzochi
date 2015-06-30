@@ -108,6 +108,22 @@ void gzochid_transactional_application_task_execution_free
 
 void gzochid_application_transactional_task_worker 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
+
+/* A `gzochid_application_worker' implementation that synchronously executes the
+   transactional application task wrapped by the specified 
+   `gzochid_transactional_application_task_execution', synchronously retrying on
+   transaction failure up to the task retry maximum; and runs the wrapped
+   catch and cleanup handler tasks as appropriate. */
+
+void gzochid_application_reexecuting_transactional_task_worker 
+(gzochid_application_context *, gzochid_auth_identity *, gpointer);
+
+/* A `gzochid_application_worker' implementation that asynchronously executes
+   the transactional application task wrapped by the specified
+   `gzochid_transactional_application_task_execution', resubmitting the task on
+   transaction failure up to the task retry maximum; and submits the wrapped
+   catch and cleanup handler tasks as appropriate. */
+
 void gzochid_application_resubmitting_transactional_task_worker 
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 

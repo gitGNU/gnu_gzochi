@@ -259,6 +259,39 @@ gzochid_application_transaction_execute_timed
   return gzochid_transaction_execute_timed (event_func_wrapper, args, timeout);
 }
 
+static void
+wrap_and_execute (gzochid_application_context *app_context,
+		  gzochid_auth_identity *identity,
+		  gzochid_application_task *inner)
+{
+  gzochid_transactional_application_task_execution *execution = 
+    gzochid_transactional_application_task_execution_new (inner, NULL, NULL);
+
+  gzochid_application_reexecuting_transactional_task_worker
+    (app_context, identity, execution);
+  
+  gzochid_transactional_application_task_execution_free (execution);
+}
+
+void 
+gzochid_application_reexecuting_transactional_task_worker 
+(gzochid_application_context *app_context, gzochid_auth_identity *identity, 
+ gpointer data)
+{
+  gzochid_transactional_application_task_execution *execution = data;
+
+  do gzochid_application_transactional_task_worker 
+       (app_context, identity, execution);
+  while (gzochid_application_should_retry (execution));
+
+  if (execution->result != GZOCHID_TRANSACTION_SUCCESS
+      && execution->catch_task != NULL)
+    wrap_and_execute (app_context, identity, execution->catch_task);
+
+  if (execution->cleanup_task != NULL)
+    wrap_and_execute (app_context, identity, execution->cleanup_task);
+}
+
 void 
 gzochid_application_resubmitting_transactional_task_worker 
 (gzochid_application_context *app_context, gzochid_auth_identity *identity, 
