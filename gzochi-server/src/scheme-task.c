@@ -165,12 +165,7 @@ scm_to_callback (gzochid_application_context *context, SCM scm_callback)
     gzochid_data_create_reference 
     (context, &gzochid_scheme_data_serialization, scm_callback);
 
-  mpz_t oid;
-  
-  mpz_init (oid);
-  mpz_set (oid, reference->oid);      
-    
-  return gzochid_application_callback_new (procedure, module, oid);
+  return gzochid_application_callback_new (procedure, module, reference->oid);
 }
 
 static gpointer 
