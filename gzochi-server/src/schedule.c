@@ -47,6 +47,10 @@ struct _gzochid_pending_task
 
   gzochid_task *task; /* The task to be executed. */
 
+  /* Whether to free this structure on task completion or to allow some other 
+     party - e.g., `gzochid_schedule_run_task' - to handle destruction. */
+
+  gboolean destroy_on_execute; 
 };
 
 typedef struct _gzochid_pending_task gzochid_pending_task;
@@ -100,8 +104,17 @@ pending_task_executor (gpointer data, gpointer user_data)
   scm_with_guile (pending_task_executor_inner, args);
 
   pending_task->state = GZOCHID_PENDING_TASK_STATE_COMPLETED;
-  g_cond_broadcast (&pending_task->cond);
-  g_mutex_unlock (&pending_task->mutex);
+
+  if (pending_task->destroy_on_execute)
+    {
+      g_mutex_unlock (&pending_task->mutex);
+      free_pending_task (pending_task);
+    }
+  else
+    {
+      g_cond_broadcast (&pending_task->cond);
+      g_mutex_unlock (&pending_task->mutex);
+    }
 }
 
 gpointer 
@@ -157,13 +170,15 @@ gzochid_schedule_task_queue_start (gzochid_task_queue *task_queue)
       ("task-consumer", gzochid_schedule_task_executor, task_queue);
 }
 
-gzochid_pending_task *
-gzochid_pending_task_new (gzochid_task *task)
+static gzochid_pending_task *
+gzochid_pending_task_new (gzochid_task *task, gboolean destroy_on_execute)
 {
   gzochid_pending_task *pending_task = malloc (sizeof (gzochid_pending_task));
 
   pending_task->task = task;
   pending_task->state = GZOCHID_PENDING_TASK_STATE_PENDING;
+  pending_task->destroy_on_execute = destroy_on_execute;
+  
   g_cond_init (&pending_task->cond);
   g_mutex_init (&pending_task->mutex);
  
@@ -221,9 +236,11 @@ gzochid_schedule_submit_task_chain (gzochid_task_queue *task_queue,
 }
 
 static gzochid_pending_task *
-submit_task (gzochid_task_queue *task_queue, gzochid_task *task)
+submit_task (gzochid_task_queue *task_queue, gzochid_task *task,
+	     gboolean destroy_on_execute)
 {
-  gzochid_pending_task *pending_task = gzochid_pending_task_new (task);
+  gzochid_pending_task *pending_task =
+    gzochid_pending_task_new (task, destroy_on_execute);
   
   g_mutex_lock (&task_queue->mutex);
   g_queue_insert_sorted 
@@ -238,13 +255,13 @@ void
 gzochid_schedule_submit_task (gzochid_task_queue *task_queue,
 			      gzochid_task *task)
 {
-  submit_task (task_queue, task);
+  submit_task (task_queue, task, TRUE);
 }
 
 void 
 gzochid_schedule_run_task (gzochid_task_queue *task_queue, gzochid_task *task)
 {
-  gzochid_pending_task *pending_task = submit_task (task_queue, task);
+  gzochid_pending_task *pending_task = submit_task (task_queue, task, FALSE);
 
   g_mutex_lock (&pending_task->mutex);
   while (pending_task->state == GZOCHID_PENDING_TASK_STATE_PENDING)
