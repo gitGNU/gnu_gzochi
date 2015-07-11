@@ -51,6 +51,9 @@ gzochid_application_context_free (gzochid_application_context *app_context)
   gzochid_context *context = (gzochid_context *) app_context;
   gzochid_context_free (context);
 
+  g_hash_table_destroy (app_context->oids_to_clients);
+  g_hash_table_destroy (app_context->clients_to_oids);
+  
   g_list_free (app_context->free_oid_blocks);
 
   g_mutex_clear (&app_context->free_oids_lock);
