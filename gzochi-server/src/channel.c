@@ -738,9 +738,9 @@ static gpointer
 deserialize_channel (gzochid_application_context *context, GString *in,
 		     GError **err)
 {
-  gzochid_channel *channel = gzochid_channel_new 
-    (gzochid_util_deserialize_string (in));
+  gzochid_channel *channel = calloc (1, sizeof (gzochid_channel));
 
+  channel->name = gzochid_util_deserialize_string (in);
   channel->id = gzochid_util_deserialize_bytes (in, (int *) &channel->id_len);
 
   channel->sessions = gzochid_util_deserialize_sequence 
