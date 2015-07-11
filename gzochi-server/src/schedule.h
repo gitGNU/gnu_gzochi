@@ -1,5 +1,5 @@
 /* schedule.h: Prototypes and declarations for schedule.c
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,13 +22,7 @@
 
 #include "task.h"
 
-enum gzochid_pending_task_state
-  {
-    GZOCHID_PENDING_TASK_STATE_PENDING,
-    GZOCHID_PENDING_TASK_STATE_COMPLETED
-  };
-
-typedef struct _gzochid_task_queue
+struct _gzochid_task_queue
 {
   GCond cond;
   GMutex mutex;
@@ -36,30 +30,39 @@ typedef struct _gzochid_task_queue
 
   GQueue *queue;
   GThreadPool *pool;
-} gzochid_task_queue;
+};
 
-typedef struct _gzochid_pending_task
-{
-  GCond cond;
-  GMutex mutex;
-  
-  struct timeval scheduled_execution_time;
-  enum gzochid_pending_task_state state;
-
-  gzochid_task *task;
-} gzochid_pending_task;
+typedef struct _gzochid_task_queue gzochid_task_queue;
 
 gpointer gzochid_schedule_task_executor (gpointer);
 
 gzochid_task_queue *gzochid_schedule_task_queue_new (GThreadPool *);
 void gzochid_schedule_task_queue_start (gzochid_task_queue *);
 
-gzochid_pending_task *gzochid_schedule_submit_task 
-(gzochid_task_queue *, gzochid_task *);
-gzochid_pending_task *gzochid_schedule_submit_task_chain 
-(gzochid_task_queue *, GList *);
+/* Submits the specified task for execution in the specified task queue and 
+   returns immediately. The task will be executed no earlier than its configured
+   execution time. */
+
+void gzochid_schedule_submit_task (gzochid_task_queue *, gzochid_task *);
+
+/* Submits the specified list of tasks for execution in the specified task 
+   queue and returns immediately. Each task is submitted in the order specified
+   in the queue once the previous task has executed; each task will be executed
+   no earlier than its configured execution time. 
+
+   The task execution code operates on a shallow copy of the specified 
+   `GList'. */
+
+void gzochid_schedule_submit_task_chain (gzochid_task_queue *, GList *);
+
+/* Submits the specified tasks for execution in the specified task queue and 
+   waits until it has been executed before returning. The task will be executed
+   no earlier than its configured execution time. */
 
 void gzochid_schedule_run_task (gzochid_task_queue *, gzochid_task *);
+
+/* Synchronously executes the specified task in the calling thread. */
+
 void gzochid_schedule_execute_task (gzochid_task *);
 
 #endif /* GZOCHID_SCHEDULE_H */

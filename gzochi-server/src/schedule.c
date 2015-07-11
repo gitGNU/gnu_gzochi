@@ -22,6 +22,35 @@
 #include "schedule.h"
 #include "task.h"
 
+/* The enumeration of possible states for submitted tasks. */
+
+enum gzochid_pending_task_state
+  {
+    GZOCHID_PENDING_TASK_STATE_PENDING,
+    GZOCHID_PENDING_TASK_STATE_COMPLETED
+  };
+
+/* The pending task structure. Represents the status of a task submitted to a
+   task execution queue. */
+
+struct _gzochid_pending_task
+{
+  GCond cond; /* A condition variable to signal when the task state changes. */
+  GMutex mutex; /* The accompanying mutex. */
+
+  /* This task's scheduled execution time. Task execution is "best effort" with
+     respect to this time; this value is used to order the task queue such that
+     the task will never execute before this timestamp. */
+  
+  struct timeval scheduled_execution_time;
+  enum gzochid_pending_task_state state; /* The task state. */
+
+  gzochid_task *task; /* The task to be executed. */
+
+};
+
+typedef struct _gzochid_pending_task gzochid_pending_task;
+
 gzochid_task_queue *
 gzochid_schedule_task_queue_new (GThreadPool *pool)
 {
@@ -47,6 +76,14 @@ pending_task_executor_inner (void *data)
   pending_task->task->worker (pending_task->task->data, user_data);
 
   return NULL;
+}
+
+static void 
+free_pending_task (gzochid_pending_task *pending_task)
+{
+  g_mutex_clear (&pending_task->mutex);
+  g_cond_clear (&pending_task->cond);
+  free (pending_task);
 }
 
 static void 
@@ -166,7 +203,7 @@ task_chain_worker (gpointer data, gpointer user_data)
   g_list_free (tasks);
 }
 
-gzochid_pending_task *
+void
 gzochid_schedule_submit_task_chain (gzochid_task_queue *task_queue, 
 				    GList *tasks)
 {
@@ -180,12 +217,11 @@ gzochid_schedule_submit_task_chain (gzochid_task_queue *task_queue,
   task->target_execution_time = 
     ((gzochid_task *) tasks_copy->data)->target_execution_time;
 
-  return gzochid_schedule_submit_task (task_queue, task);
+  gzochid_schedule_submit_task (task_queue, task);
 }
 
-gzochid_pending_task *
-gzochid_schedule_submit_task (gzochid_task_queue *task_queue, 
-			      gzochid_task *task)
+static gzochid_pending_task *
+submit_task (gzochid_task_queue *task_queue, gzochid_task *task)
 {
   gzochid_pending_task *pending_task = gzochid_pending_task_new (task);
   
@@ -198,19 +234,17 @@ gzochid_schedule_submit_task (gzochid_task_queue *task_queue,
   return pending_task;
 }
 
-static void 
-free_pending_task (gzochid_pending_task *pending_task)
+void
+gzochid_schedule_submit_task (gzochid_task_queue *task_queue,
+			      gzochid_task *task)
 {
-  g_mutex_clear (&pending_task->mutex);
-  g_cond_clear (&pending_task->cond);
-  free (pending_task);
+  submit_task (task_queue, task);
 }
 
 void 
 gzochid_schedule_run_task (gzochid_task_queue *task_queue, gzochid_task *task)
 {
-  gzochid_pending_task *pending_task = 
-    gzochid_schedule_submit_task (task_queue, task);
+  gzochid_pending_task *pending_task = submit_task (task_queue, task);
 
   g_mutex_lock (&pending_task->mutex);
   while (pending_task->state == GZOCHID_PENDING_TASK_STATE_PENDING)

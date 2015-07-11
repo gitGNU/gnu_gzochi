@@ -25,12 +25,11 @@
 #include "task.h"
 #include "tx.h"
 
-gzochid_pending_task *
+void
 gzochid_schedule_submit_task (gzochid_task_queue *task_queue,
 			      gzochid_task *task)
 {
   task->worker (task->data, NULL);
-  return NULL;
 }
 
 void
