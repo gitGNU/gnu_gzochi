@@ -176,10 +176,13 @@ static void probe_auth_plugins
 	      == NULL)
 	    g_sequence_insert_sorted 
 	      (plugin_queue, path, gzochid_util_string_data_compare, NULL);
+	  else g_free (path);
 	}
       
       g_sequence_foreach (plugin_queue, probe_auth_plugin, context);
       g_sequence_free (plugin_queue);
+
+      g_dir_close (plugin_dir);
     }
 }
 
