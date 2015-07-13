@@ -16,9 +16,12 @@
 
 #!r6rs
 
+(import (gzochi srfi-64-support))
 (import (gzochi tx))
 (import (rnrs))
 (import (srfi :64))
+
+(test-runner-current (gzochi:test-runner))
 
 (test-begin "gzochi:transaction-participant")
 

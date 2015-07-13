@@ -21,6 +21,7 @@
 (import (gzochi io))
 (import (gzochi mock-data))
 (import (gzochi private data))
+(import (gzochi srfi-64-support))
 (import (rnrs io ports))
 (import (srfi :64))
 
@@ -36,6 +37,8 @@
 (define read-str (gzochi:make-callback 'gzochi:read-string '(gzochi io)))
 
 (define default-max-bucket-size 10)
+
+(test-runner-current (gzochi:test-runner))
 
 (test-begin "gzochi:managed-sequence")
 
