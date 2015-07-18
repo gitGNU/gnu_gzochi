@@ -22,10 +22,11 @@ pkgguile_sitedir = ${GUILE_SITE}/${PACKAGENAME}
 
 nobase_dist_pkgguile_site_DATA = gzochi.scm \
 	gzochi/admin.scm gzochi/app.scm gzochi/channel.scm \
-	gzochi/conditions.scm gzochi/data.scm gzochi/io.scm gzochi/log.scm \
-	gzochi/session.scm gzochi/task.scm gzochi/tx.scm \
-	gzochi/private/app.scm gzochi/private/channel.scm \
-	gzochi/private/data.scm gzochi/private/data/migration.scm \
-	gzochi/private/debug.scm gzochi/private/guile.scm \
-	gzochi/private/log.scm gzochi/private/reflect.scm \
-	gzochi/private/session.scm gzochi/private/task.scm
+	gzochi/conditions.scm gzochi/data.scm gzochi/data/mock.scm \
+	gzochi/io.scm gzochi/log.scm gzochi/mock.scm gzochi/session.scm \
+	gzochi/task.scm gzochi/tx.scm gzochi/private/app.scm \
+	gzochi/private/channel.scm gzochi/private/data.scm \
+	gzochi/private/data/migration.scm gzochi/private/debug.scm \
+	gzochi/private/guile.scm gzochi/private/log.scm \
+	gzochi/private/reflect.scm gzochi/private/session.scm \
+	gzochi/private/task.scm
