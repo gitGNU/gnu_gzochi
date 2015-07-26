@@ -72,6 +72,13 @@ dispatch_client_write (GIOChannel *channel, GIOCondition cond, gpointer data)
   GIOStatus status;
   gzochid_client_socket *sock = data;
 
+  /* It's possible that a dangling write may be dispatched to a destroyed 
+     source, which may already have been finalized. So check the destroyed
+     status before doing anything else. */
+  
+  if (g_source_is_destroyed (g_main_current_source ()))
+    return FALSE;
+  
   g_mutex_lock (&sock->sock_mutex);
 
   do
