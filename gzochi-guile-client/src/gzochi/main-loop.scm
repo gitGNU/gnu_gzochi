@@ -40,6 +40,7 @@
 	  gzochi:main-loop?
 	  gzochi:make-main-loop
 	  gzochi:main-loop-add-source!
+	  gzochi:main-loop-remove-source!
 	  gzochi:main-loop-run
 	  gzochi:main-loop-stop)
 
@@ -244,6 +245,26 @@
 				  (gzochi:selector-port/fd
 				   (gzochi:source-selector source))
 				  source)))))))
+
+;; Remove the specified source from the specified main loop, if it is found to
+;; be `eq?' to a source that was previously added to the loop. This procedure
+;; may be called while the main loop is running; the source will be removed from
+;; a future iteration of the loop.  
+  
+  (define (gzochi:main-loop-remove-source! main-loop source)
+    (check-argument gzochi:main-loop? main-loop #f)
+    (check-argument gzochi:source? source #f)
+
+    (with-mutex (gzochi:main-loop-sources-mutex main-loop)
+      (let ((sources (gzochi:main-loop-sources main-loop)))
+	(if (memq source sources)
+	    (begin
+	      (gzochi:main-loop-sources-set! main-loop (remq source sources))
+	      (if (gzochi:source-selector source)
+		  (hashtable-delete!
+		   (gzochi:main-loop-port/fd->source main-loop)
+		   (gzochi:selector-port/fd
+		    (gzochi:source-selector source)))))))))
 
   (define-record-type (gzochi:prepared-source 
 		       gzochi:make-prepared-source
