@@ -34,7 +34,7 @@
 	  (srfi :18))
 
 ;; This is a reference implementation of a client for the gzochi game
-;; development frameework. It handles the connection lifecycle and network
+;; development framework. It handles the connection lifecycle and network
 ;; communication for the client side of your game application. Use the client's
 ;; API to send messages to the server and register callbacks for messages sent
 ;; from the server to the client. This implementation is designed to take
@@ -62,9 +62,9 @@
 ;;   (gzochi:set-client-received-message!
 ;;    client (lambda (msg) (display (utf8->string msg)) (newline)))
 ;;
-;;   (gzochi:main-loop-add-source! client)
-;;   (gzochi:main-loop-add-source! console)
-;;     (gzochi:main-loop-run))
+;;   (gzochi:main-loop-add-source! main-loop client)
+;;   (gzochi:main-loop-add-source! main-loop console)
+;;   (gzochi:main-loop-run main-loop))
 ;;
 ;;
 ;; If your client application is naturally multi-threaded or if the client is
