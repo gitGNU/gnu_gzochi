@@ -297,6 +297,8 @@ gzochid_application_context_init (gzochid_application_context *context,
   gzochid_fsm *fsm = gzochid_fsm_new 
     (fsm_name, GZOCHID_APPLICATION_STATE_INITIALIZING, "INITIALIZING");
 
+  free (fsm_name);
+  
   gzochid_fsm_add_state (fsm, GZOCHID_APPLICATION_STATE_PAUSED, "PAUSED");
   gzochid_fsm_add_state (fsm, GZOCHID_APPLICATION_STATE_RUNNING, "RUNNING");
   gzochid_fsm_add_state (fsm, GZOCHID_APPLICATION_STATE_STOPPED, "STOPPED");
