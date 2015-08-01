@@ -27,6 +27,7 @@ test_programs = \
 	test-durable-task \
 	test-event \
 	test-fsm \
+	test-lrucache \
 	test-reloc \
 	test-scheme \
 	test-scheme-task \
@@ -96,6 +97,10 @@ test_fsm_SOURCES = test-fsm.c
 test_fsm_LDADD = $(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	@GLIB_LIBS@
+
+test_lrucache_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
+test_lrucache_SOURCES = test-lrucache.c
+test_lrucache_LDADD = $(top_builddir)/src/libgzochid_la-lrucache.o @GLIB_LIBS@
 
 test_reloc_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_reloc_SOURCES = test-reloc.c
