@@ -168,6 +168,9 @@ static void
 cleanup_transaction (gzochid_client_session_transaction_context *tx_context)
 {
   g_list_free_full (tx_context->operations, free_operation);
+
+  if (tx_context->login_operation != NULL)
+    free_operation (tx_context->login_operation);
   
   free (tx_context);
 }
