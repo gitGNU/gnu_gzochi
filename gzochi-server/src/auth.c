@@ -31,7 +31,10 @@
 
 #define PLUGIN_INFO_FUNCTION "gzochid_auth_init_plugin"
 
-GQuark gzochid_auth_plugin_error_quark (void)
+#define GZOCHID_AUTH_IDENTITY_CACHE_DEFAULT_MAX_SIZE 1024
+
+GQuark
+gzochid_auth_plugin_error_quark (void)
 {
   return g_quark_from_static_string ("gzochid-auth-plugin-error-quark");
 }
@@ -88,12 +91,49 @@ void gzochid_auth_identity_finalizer
 (gzochid_application_context *context, void *ptr)
 {
   gzochid_auth_identity *identity = (gzochid_auth_identity *) ptr;
+struct _gzochid_auth_identity_cache
+{
+  gzochid_lru_cache *cache;
+};
 
-  free (identity->name);
-  free (identity);
+static gpointer
+identity_new_func (gpointer key, gpointer *key_copy)
+{
+  *key_copy = strdup (key);
+  return gzochid_auth_identity_new (key);
 }
 
-static gchar *remove_extension (const gchar *filename)
+gzochid_auth_identity_cache *
+gzochid_auth_identity_cache_new ()
+{
+  gzochid_auth_identity_cache *cache;
+
+  cache = malloc (sizeof (gzochid_auth_identity_cache));
+  cache->cache = gzochid_lru_cache_new_full
+    (g_str_hash, g_str_equal, identity_new_func,
+     GZOCHID_AUTH_IDENTITY_CACHE_DEFAULT_MAX_SIZE, (GDestroyNotify) free,
+     (GDestroyNotify) gzochid_auth_identity_unref);
+  
+  return cache;
+}
+
+void
+gzochid_auth_identity_cache_destroy (gzochid_auth_identity_cache *cache)
+{
+  gzochid_lru_cache_destroy (cache->cache);
+  free (cache);
+}
+
+gzochid_auth_identity *
+gzochid_auth_identity_from_name (gzochid_auth_identity_cache *cache, char *name)
+{
+  return gzochid_lru_cache_lookup (cache->cache, name);
+}
+
+}
+
+static gchar *
+remove_extension (const gchar *filename)
 {
   char *dot = rindex (filename, '.');
 
@@ -102,7 +142,8 @@ static gchar *remove_extension (const gchar *filename)
   else return g_strndup (filename, dot - filename);
 }
 
-static void probe_auth_plugin (gpointer data, gpointer user_data)
+static void
+probe_auth_plugin (gpointer data, gpointer user_data)
 {
   const gchar *path = (const gchar *) data;
   gzochid_game_context *context = (gzochid_game_context *) user_data;
@@ -140,8 +181,8 @@ static void probe_auth_plugin (gpointer data, gpointer user_data)
     }
 }
 
-static void probe_auth_plugins 
-(gzochid_game_context *context, const char *search_path)
+static void
+probe_auth_plugins (gzochid_game_context *context, const char *search_path)
 {
   GDir *plugin_dir = g_dir_open (search_path, 0, NULL);
   const gchar *file = NULL;
@@ -186,7 +227,8 @@ static void probe_auth_plugins
     }
 }
 
-void gzochid_auth_init (gzochid_game_context *context)
+void
+gzochid_auth_init (gzochid_game_context *context)
 {
   if (g_module_supported ())
     probe_auth_plugins (context, context->auth_plugin_dir);

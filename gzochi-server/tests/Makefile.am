@@ -22,6 +22,7 @@ SUBDIRS = api auth scheme storage
 
 test_programs = \
 	test-app-task \
+	test-auth \
 	test-data \
 	test-descriptor \
 	test-durable-task \
@@ -60,11 +61,20 @@ test_app_task_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-task.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-txlog.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+test_auth_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
+test_auth_SOURCES = test-auth.c
+test_auth_LDADD = $(top_builddir)/src/libgzochid_la-auth.o \
+	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-lrucache.o \
+	$(top_builddir)/src/libgzochid_la-util.o \
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@
 
 test_data_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_data_SOURCES = test-data.c
@@ -127,6 +137,7 @@ test_scheme_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-reloc.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \

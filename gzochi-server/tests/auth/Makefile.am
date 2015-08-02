@@ -41,6 +41,7 @@ test_krb5_SOURCES = test-krb5.c mock-krb5.c
 test_krb5_LDADD = $(top_builddir)/src/auth/krb5.la \
 	$(top_builddir)/src/libgzochid_la-auth.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GMODULE_LIBS@ $(GZOCHI_COMMON_LIBS)
 
@@ -48,6 +49,7 @@ test_password_file_SOURCES = test-password_file.c
 test_password_file_LDADD = $(top_builddir)/src/auth/password_file.la \
 	$(top_builddir)/src/libgzochid_la-auth.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GMODULE_LIBS@ $(GZOCHI_COMMON_LIBS)
 

@@ -21,6 +21,7 @@
 #include <glib.h>
 
 #include "gzochid-auth.h"
+#include "lrucache.h"
 
 struct _gzochid_application_context;
 struct _gzochid_game_context;
@@ -33,6 +34,31 @@ void *gzochid_auth_identity_deserializer
 (struct _gzochid_application_context *, GString *, GError **);
 void gzochid_auth_identity_finalizer
 (struct _gzochid_application_context *, void *);
+
+/* The identity cache struct typedef. (The contents of the struct are private.) 
+   
+   The identity cahce stores recently-used instances of `gzochid_auth_identity'
+   to avoid unnecessary re-allocation and provide a single point of access for
+   non-plugin-originated identities. */
+
+typedef struct _gzochid_auth_identity_cache gzochid_auth_identity_cache;
+
+/* Create and return a new identity cache. */
+
+gzochid_auth_identity_cache *gzochid_auth_identity_cache_new ();
+
+/* Destroy the specified identity cache, decreasing the reference count for (but
+   not necessarily freeing) all currently-cached identities. */
+
+void gzochid_auth_identity_cache_destroy (gzochid_auth_identity_cache *);
+
+/* Look up and return from the cache an identity corresponding to the specified
+   name. If an existing identity with this name is not already cached, a new one
+   will be constructed and added to the cache, possibly triggering the eviction
+   of a less recently accessed identity from the cache. */
+
+gzochid_auth_identity *gzochid_auth_identity_from_name
+(gzochid_auth_identity_cache *, char *);
 
 void gzochid_auth_init (struct _gzochid_game_context *);
 
