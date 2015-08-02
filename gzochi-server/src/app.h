@@ -20,6 +20,7 @@
 
 #include <glib.h>
 
+#include "auth_int.h"
 #include "callback.h"
 #include "context.h"
 #include "event.h"
@@ -70,6 +71,8 @@ struct _gzochid_application_context
   gzochid_auth_identity *(*authenticator) 
     (unsigned char *, short, gpointer, GError **);
   gpointer auth_data;
+
+  gzochid_auth_identity_cache *identity_cache;
   
   GList *free_oid_blocks;
   GMutex free_oids_lock;

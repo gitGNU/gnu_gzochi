@@ -33,39 +33,55 @@
 
 #define GZOCHID_AUTH_IDENTITY_CACHE_DEFAULT_MAX_SIZE 1024
 
+struct _gzochid_auth_identity
+{
+  char *name;
+  guint ref_count;
+};
+
 GQuark
 gzochid_auth_plugin_error_quark (void)
 {
   return g_quark_from_static_string ("gzochid-auth-plugin-error-quark");
 }
 
-gzochid_auth_identity *gzochid_auth_identity_new (char *name)
+gzochid_auth_identity *
+gzochid_auth_identity_new (char *name)
 {
   gzochid_auth_identity *identity = calloc (1, sizeof (gzochid_auth_identity));
 
-  identity->name = name;
+  identity->name = strdup (name);
+  identity->ref_count = 1;
 
   return identity;
 }
 
-void gzochid_auth_identity_free (gzochid_auth_identity *identity)
+char *
+gzochid_auth_identity_name (gzochid_auth_identity *identity)
 {
-  free (identity->name);
-  free (identity);
+  return identity->name;
 }
 
-gzochid_auth_identity *gzochid_auth_function_pass_thru 
-(unsigned char *cred, short cred_len, gpointer auth_data, GError **error)
+void
+gzochid_auth_identity_free (gzochid_auth_identity *identity)
 {
+}
+
+gzochid_auth_identity *
+gzochid_auth_function_pass_thru (unsigned char *cred, short cred_len,
+				 gpointer auth_data, GError **error)
+{
+  char *name = NULL;
+  gzochid_auth_identity *identity = NULL;
+  
   if (cred_len <= 0)
     return NULL;
-  return gzochid_auth_identity_new (strndup ((char *) cred, cred_len));
-}
 
-gzochid_auth_identity *gzochid_auth_identity_clone
-(gzochid_auth_identity *identity)
-{
-  return gzochid_auth_identity_new (strdup (identity->name));
+  name = strndup ((char *) cred, cred_len);
+  identity = gzochid_auth_identity_new (name);
+  free (name);
+
+  return identity;
 }
 
 void 
@@ -81,16 +97,23 @@ gzochid_auth_identity_deserializer
 (gzochid_application_context *context, GString *in, GError **err)
 {
   char *name = strndup (in->str, in->len);
-  gzochid_auth_identity *identity = gzochid_auth_identity_new (name);
-
+  gzochid_auth_identity *identity =
+    gzochid_auth_identity_from_name (context->identity_cache, name);
+  
   g_string_erase (in, 0, strlen (name) + 1);
+
+  free (name);
+
   return identity;
 }
 
-void gzochid_auth_identity_finalizer
-(gzochid_application_context *context, void *ptr)
+void
+gzochid_auth_identity_finalizer (gzochid_application_context *context,
+				 void *ptr)
 {
-  gzochid_auth_identity *identity = (gzochid_auth_identity *) ptr;
+  gzochid_auth_identity_unref (ptr);
+}
+
 struct _gzochid_auth_identity_cache
 {
   gzochid_lru_cache *cache;
@@ -127,9 +150,24 @@ gzochid_auth_identity_cache_destroy (gzochid_auth_identity_cache *cache)
 gzochid_auth_identity *
 gzochid_auth_identity_from_name (gzochid_auth_identity_cache *cache, char *name)
 {
-  return gzochid_lru_cache_lookup (cache->cache, name);
+  return gzochid_auth_identity_ref
+    (gzochid_lru_cache_lookup (cache->cache, name));
 }
 
+gzochid_auth_identity *
+gzochid_auth_identity_ref (gzochid_auth_identity *identity)
+{
+  g_atomic_int_inc (&identity->ref_count);
+  return identity;
+}
+
+void
+gzochid_auth_identity_unref (gzochid_auth_identity *identity)
+{
+  if (g_atomic_int_dec_and_test (&identity->ref_count)) {
+    free (identity->name);
+    free (identity);
+  }
 }
 
 static gchar *

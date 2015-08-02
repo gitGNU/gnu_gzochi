@@ -137,8 +137,7 @@ authenticate (unsigned char *credentials, short len, gpointer auth_data,
     }
   else
     {
-      identity = malloc (sizeof (gzochid_auth_identity));
-      identity->name = strdup (name);
+      identity = gzochid_auth_identity_new (name);
       krb5_free_unparsed_name (context->context, name);
       return identity;
     }

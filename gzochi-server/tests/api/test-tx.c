@@ -313,12 +313,12 @@ inner_main (void *data, int argc, char *argv[])
 	    "gzochi:make-transaction-participant");
   
   t.app_context = gzochid_application_context_new ();
+  t.app_context->identity_cache = gzochid_auth_identity_cache_new ();
   t.app_context->descriptor = 
     calloc (1, sizeof (gzochid_application_descriptor));
   t.app_context->deployment_root = "";
 
-  t.identity = calloc (1, sizeof (gzochid_auth_identity));
-  t.identity->name = "[TEST]";
+  t.identity = gzochid_auth_identity_new ("[TEST]");
   
   g_test_add_data_func ("/api/tx/primitive-join-transaction", &t,
 			test_primitive_join_transaction);
@@ -332,7 +332,10 @@ inner_main (void *data, int argc, char *argv[])
 
   g_test_run ();
 
-  free (t.identity);
+  gzochid_auth_identity_unref (t.identity);
+  free (t.app_context->descriptor);
+  gzochid_auth_identity_cache_destroy (t.app_context->identity_cache);
+  gzochid_application_context_free (t.app_context);
 }
 
 int

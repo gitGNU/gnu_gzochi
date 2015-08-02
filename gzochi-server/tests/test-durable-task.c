@@ -151,6 +151,14 @@ application_context_init (gzochid_application_context *context)
     (context->storage_context, "/dev/null", 0);
   context->names = gzochid_storage_engine_interface_mem.open 
     (context->storage_context, "/dev/null", 0);
+
+  context->identity_cache = gzochid_auth_identity_cache_new ();
+}
+
+static void
+application_context_clear (gzochid_application_context *context)
+{
+  gzochid_auth_identity_cache_destroy (context->identity_cache);
 }
 
 static void 
@@ -163,10 +171,9 @@ test_periodic_cancel ()
   gzochid_game_context *game_context = NULL;
   gzochid_application_context *app_context = 
     gzochid_application_context_new ();
-  gzochid_auth_identity *identity = malloc (sizeof (gzochid_auth_identity));
+  gzochid_auth_identity *identity = gzochid_auth_identity_new ("test");
 
   application_context_init (app_context);
-  identity->name = "test";
 
   game_context = (gzochid_game_context *) 
     ((gzochid_context *) app_context)->parent;
@@ -202,7 +209,10 @@ test_periodic_cancel ()
     }
 
   g_assert_cmpint (test_worker_counter, <=, 4);
+
   mpz_clear (context.handle_oid);
+  application_context_clear (app_context);
+  gzochid_auth_identity_unref (identity);  
 }
 
 int

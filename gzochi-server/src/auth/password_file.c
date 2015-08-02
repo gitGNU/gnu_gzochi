@@ -18,7 +18,6 @@
 #include <glib.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "../gzochid-auth.h"
@@ -45,7 +44,7 @@ initialize (GHashTable *properties, GError **error)
       return NULL;
     }
   
-  path = (gchar *) g_hash_table_lookup (properties, PATH_PROPERTY);
+  path = g_hash_table_lookup (properties, PATH_PROPERTY);
   channel = g_io_channel_new_file (path, "r", &channel_error);
   
   if (channel == NULL)
@@ -77,7 +76,7 @@ static gzochid_auth_identity *
 authenticate (unsigned char *credentials, short len, gpointer auth_data, 
 	      GError **error)
 {
-  GHashTable *passwords = (GHashTable *) auth_data;
+  GHashTable *passwords = auth_data;
   unsigned char *pivot = (unsigned char *) memchr (credentials, '\0', len);
 
   if (pivot == NULL)
@@ -97,13 +96,7 @@ authenticate (unsigned char *credentials, short len, gpointer auth_data,
       int cmplen = MIN (len - (pivot - credentials), strlen (password));
 
       if (strncmp (password, (char *) pivot + 1, cmplen) == 0)
-	{
-	  gzochid_auth_identity *identity = 
-	    malloc (sizeof (gzochid_auth_identity));
-
-	  identity->name = strdup ((char *) credentials);
-	  return identity;
-	}
+	return gzochid_auth_identity_new (strdup ((char *) credentials));
       else return NULL;
     }
   else return NULL;

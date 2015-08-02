@@ -122,7 +122,7 @@ app_task_fixture_set_up (app_task_fixture *fixture, gconstpointer user_data)
   fixture->cleanup_invocations = 0;
 
   fixture->context = gzochid_application_context_new ();
-  fixture->identity = calloc (1, sizeof (gzochid_auth_identity));
+  fixture->identity = gzochid_auth_identity_new ("[TEST]");
   
   fixture->success_task = gzochid_application_task_new
     (fixture->context, fixture->identity, execute_success, fixture);
@@ -140,12 +140,15 @@ app_task_fixture_set_up (app_task_fixture *fixture, gconstpointer user_data)
 static void
 app_task_fixture_tear_down (app_task_fixture *fixture, gconstpointer user_data)
 {
+  gzochid_context *base = (gzochid_context *) fixture->context;
+
   free (fixture->success_task);
   free (fixture->failure_task);
   free (fixture->catch_task);
   free (fixture->cleanup_task);
 
-  free (fixture->identity);
+  gzochid_auth_identity_unref (fixture->identity);
+  free (base->parent);
   gzochid_application_context_free (fixture->context);
 }
 

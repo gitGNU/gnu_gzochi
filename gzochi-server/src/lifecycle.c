@@ -43,6 +43,8 @@ initialize_auth (int from_state, int to_state, gpointer user_data)
     (gzochid_application_context *) context;
   gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
 
+  app_context->identity_cache = gzochid_auth_identity_cache_new ();
+  
   if (app_context->descriptor->auth_type != NULL)
     {
       if (g_hash_table_contains 
@@ -188,9 +190,8 @@ initialize_async_transactional (gpointer data)
   gboolean initialized = gzochid_data_binding_exists 
     (context, "s.initializer", &err);
 
-  gzochid_auth_identity *system_identity = calloc 
-    (1, sizeof (gzochid_auth_identity));
-  system_identity->name = "[SYSTEM]";
+  gzochid_auth_identity *system_identity =
+    gzochid_auth_identity_from_name (context->identity_cache, "[SYSTEM]");
 
   assert (err == NULL);
 
@@ -221,12 +222,13 @@ static gboolean
 ready_async (gzochid_application_context *context)
 {
   GError *tmp_err = NULL;
-  gzochid_auth_identity *system_identity = calloc 
-    (1, sizeof (gzochid_auth_identity));
-  system_identity->name = "[SYSTEM]";
+  gzochid_auth_identity *system_identity =
+    gzochid_auth_identity_from_name (context->identity_cache, "[SYSTEM]");
 
   if (context->descriptor->ready != NULL)
     gzochid_scheme_application_ready (context, system_identity, &tmp_err);
+
+  gzochid_auth_identity_unref (system_identity);
   
   if (tmp_err != NULL)
     {

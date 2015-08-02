@@ -63,7 +63,7 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
   gzochid_application_context *context = gzochid_application_context_new ();
   gzochid_application_descriptor *descriptor = 
     calloc (1, sizeof (gzochid_application_descriptor));
-  gzochid_auth_identity *identity = calloc (1, sizeof (gzochid_auth_identity));
+  gzochid_auth_identity *identity = gzochid_auth_identity_new ("[TEST]");
   gzochid_client_session *session = NULL;
   gzochid_context *base_context = (gzochid_context *) context;
   gzochid_game_context *game_context = gzochid_game_context_new ();
@@ -93,7 +93,6 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
     ("logged-in-exception", g_list_append (NULL, "test"));
   context->descriptor = descriptor;
 
-  identity->name = "[TEST]";
   session = gzochid_client_session_new (identity);
 
   char *oid_str = NULL;
@@ -116,6 +115,7 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
   }
   
   gzochid_scheme_application_logged_in_worker (context, identity, oid_str);
+  gzochid_auth_identity_unref (identity);
 }
 
 static void 
@@ -131,7 +131,7 @@ test_logged_in_worker_returns_unspecified_inner (gpointer data)
   gzochid_application_context *context = gzochid_application_context_new ();
   gzochid_application_descriptor *descriptor = 
     calloc (1, sizeof (gzochid_application_descriptor));
-  gzochid_auth_identity *identity = calloc (1, sizeof (gzochid_auth_identity));
+  gzochid_auth_identity *identity = gzochid_auth_identity_new ("[TEST]");
   gzochid_client_session *session = NULL;
   gzochid_context *base_context = (gzochid_context *) context;
   gzochid_game_context *game_context = gzochid_game_context_new ();
@@ -161,7 +161,6 @@ test_logged_in_worker_returns_unspecified_inner (gpointer data)
     ("logged-in-unspecified", g_list_append (NULL, "test"));
   context->descriptor = descriptor;
 
-  identity->name = "[TEST]";
   session = gzochid_client_session_new (identity);
 
   char *oid_str = NULL;
@@ -184,6 +183,7 @@ test_logged_in_worker_returns_unspecified_inner (gpointer data)
   }
   
   gzochid_scheme_application_logged_in_worker (context, identity, oid_str);
+  gzochid_auth_identity_unref (identity);
 }
 
 static void 
@@ -199,7 +199,7 @@ test_ready_throws_exception ()
   gzochid_application_context *context = gzochid_application_context_new ();
   gzochid_application_descriptor *descriptor = 
     calloc (1, sizeof (gzochid_application_descriptor));
-  gzochid_auth_identity *identity = calloc (1, sizeof (gzochid_auth_identity));
+  gzochid_auth_identity *identity = gzochid_auth_identity_new ("[TEST]");
   
   SCM module = scm_c_resolve_module ("test");
   SCM ready = scm_c_make_gsubr ("ready", 1, 0, 0, raise_condition);
@@ -213,8 +213,6 @@ test_ready_throws_exception ()
 
   context->deployment_root = "/";
   context->descriptor = descriptor;
-
-  identity->name = "[TEST]";
 
   gzochid_scheme_application_ready (context, identity, &tmp_err);
 

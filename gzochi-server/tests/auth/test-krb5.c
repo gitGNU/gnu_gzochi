@@ -55,7 +55,7 @@ test_authenticate ()
 
   g_assert (identity != NULL);
   g_assert_no_error (error);
-  g_assert_cmpstr (identity->name, ==, "DEF");
+  g_assert_cmpstr (gzochid_auth_identity_name (identity), ==, "DEF");
 
   free (identity);
   free (plugin);

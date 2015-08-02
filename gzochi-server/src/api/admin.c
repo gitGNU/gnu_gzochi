@@ -89,13 +89,13 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
     (scm_call_1 (scm_application_context_name, context));
   gzochid_application_context *app_context = 
     gzochid_game_context_lookup_application (game_context, name);
-  gzochid_auth_identity debug_identity;
+  gzochid_auth_identity *debug_identity =
+    gzochid_auth_identity_from_name (app_context->identity_cache, "[DEBUG]");
   gzochid_transaction_timing timing;
   SCM ret = SCM_BOOL_F;
 
   free (name);
-	    
-  debug_identity.name = "[DEBUG]";
+
   timing.timeout = NULL;
 
   scm_dynwind_begin (0);
@@ -108,7 +108,7 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
     (with_application_unwind_handler, NULL, SCM_F_WIND_EXPLICITLY);
 
   gzochid_with_application_context 
-    (app_context, &debug_identity, (void * (*) (void *)) scm_call_0, thunk);
+    (app_context, debug_identity, (void * (*) (void *)) scm_call_0, thunk);
   scm_dynwind_end ();
 
   if (gzochid_transaction_active ())

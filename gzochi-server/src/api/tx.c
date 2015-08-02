@@ -21,6 +21,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include "../auth_int.h"
 #include "../guile.h"
 #include "../gzochid-auth.h"
 #include "../scheme.h"
@@ -110,7 +111,7 @@ free_transaction_context (gzochid_api_tx_context *tx_context)
       participants = SCM_CDR (participants);
     }
 
-  free (tx_context->identity);
+  gzochid_auth_identity_unref (tx_context->identity);
   free (tx_context);
 }
 
@@ -195,8 +196,8 @@ SCM_DEFINE (primitive_join_transaction, "primitive-join-transaction", 1, 0, 0,
       tx_context = malloc (sizeof (gzochid_api_tx_context));
 
       tx_context->context = gzochid_api_ensure_current_application_context ();
-      tx_context->identity = calloc (1, sizeof (gzochid_auth_identity));
-      tx_context->identity->name = "[SYSTEM]";
+      tx_context->identity = gzochid_auth_identity_from_name
+	(tx_context->context->identity_cache, "[SYSTEM]");
       tx_context->participants = SCM_EOL;
 
       gzochid_transaction_join (&tx_participant, tx_context);

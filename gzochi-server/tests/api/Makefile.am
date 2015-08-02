@@ -28,18 +28,22 @@ TESTS = $(test_programs)
 
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
-test_tx_CFLAGS = -I$(top_builddir)/src/api @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_tx_CFLAGS = -I$(top_builddir)/src/api @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
+	@GUILE_CFLAGS@
 test_tx_SOURCES = test-tx.c
 test_tx_LDADD = $(top_builddir)/src/api/tx.o \
 	$(top_builddir)/src/api/util.o \
 	\
 	$(top_builddir)/src/libgzochid_la-app.o \
+	$(top_builddir)/src/libgzochid_la-auth.o \
 	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
+	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-reloc.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GUILE_LIBS@
+	$(top_builddir)/src/libgzochid_la-util.o \
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@

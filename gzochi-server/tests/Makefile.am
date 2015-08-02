@@ -112,20 +112,23 @@ test_lrucache_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
 test_lrucache_SOURCES = test-lrucache.c
 test_lrucache_LDADD = $(top_builddir)/src/libgzochid_la-lrucache.o @GLIB_LIBS@
 
-test_reloc_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_reloc_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
+	@GUILE_CFLAGS@
 test_reloc_SOURCES = test-reloc.c
 test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
+	$(top_builddir)/src/libgzochid_la-auth.o \
 	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
+	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-reloc.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GUILE_LIBS@
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_scheme_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_scheme_SOURCES = test-scheme.c mock-data.c

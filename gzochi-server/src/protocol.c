@@ -93,7 +93,7 @@ dispatch_login_request
     {
       gzochid_warning
 	("Client with identity %s attempted to re-authenticate", 
-	 client->identity->name);
+	 gzochid_auth_identity_name (client->identity));
       return;
     }
 
@@ -128,7 +128,7 @@ dispatch_login_request
       gzochid_info
 	("Client at %s authenticated to endpoint %s as %s",
 	 gzochid_socket_get_connection_description (client->sock), endpoint, 
-	 client->identity->name);
+	 gzochid_auth_identity_name (client->identity));
       gzochid_application_client_logged_in (client->context, client);
     }
 }

@@ -291,6 +291,8 @@ deserialize_client_session (gzochid_application_context *context, GString *in,
   if (gzochid_util_deserialize_boolean (in))
     session->handler = deserialize_handler (context, in, NULL);
 
+  gzochid_auth_identity_unref (identity);
+  
   return session;
 }
 
@@ -433,7 +435,7 @@ gzochid_client_session_new (gzochid_auth_identity *identity)
   gzochid_client_session *session = (gzochid_client_session *)
     calloc (1, sizeof (gzochid_client_session));
 
-  session->identity = gzochid_auth_identity_clone (identity);
+  session->identity = gzochid_auth_identity_ref (identity);
   session->channels = g_sequence_new (NULL);
   mpz_init (session->scm_oid);
 

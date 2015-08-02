@@ -22,6 +22,17 @@
 #include "gzochid-auth.h"
 
 static void
+test_identity_ref ()
+{
+  gzochid_auth_identity *identity = gzochid_auth_identity_new ("[TEST]");
+
+  g_assert (identity == gzochid_auth_identity_ref (identity));
+
+  gzochid_auth_identity_unref (identity);
+  gzochid_auth_identity_unref (identity);
+}
+
+static void
 test_identity_cache_lookup ()
 {
   gzochid_auth_identity_cache *cache = gzochid_auth_identity_cache_new ();
@@ -37,6 +48,7 @@ main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
+  g_test_add_func ("/auth/identity/ref", test_identity_ref);
   g_test_add_func ("/auth/identity/cache/lookup", test_identity_cache_lookup);
   
   return g_test_run ();

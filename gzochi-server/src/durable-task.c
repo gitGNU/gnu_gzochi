@@ -205,7 +205,7 @@ create_durable_task_handle
 
   durable_task_handle->task_data_reference = task_data_reference;
   durable_task_handle->serialization = serialization;
-  durable_task_handle->identity = gzochid_auth_identity_clone (identity);
+  durable_task_handle->identity = gzochid_auth_identity_ref (identity);
   durable_task_handle->repeats = FALSE;
   durable_task_handle->period = immediate;
   durable_task_handle->target_execution_time = target_execution_time;
@@ -351,8 +351,7 @@ wrap_durable_task (gzochid_application_context *context, mpz_t oid,
   
   durable_task_handle = (gzochid_durable_application_task_handle *)
     durable_task_handle_reference->obj;
-  cloned_identity = 
-    gzochid_auth_identity_clone (durable_task_handle->identity);
+  cloned_identity = gzochid_auth_identity_ref (durable_task_handle->identity);
 
   transactional_task = gzochid_application_task_new
     (context, cloned_identity, durable_task_application_worker, durable_task);

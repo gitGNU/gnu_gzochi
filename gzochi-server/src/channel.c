@@ -24,8 +24,10 @@
 
 #include "app.h"
 #include "app-task.h"
+#include "auth_int.h"
 #include "channel.h"
 #include "game.h"
+#include "gzochid-auth.h"
 #include "io.h"
 #include "log.h"
 #include "protocol.h"
@@ -568,8 +570,8 @@ create_channel_operation_task
 
   struct timeval now;
 
-  gzochid_auth_identity *identity = calloc (1, sizeof (gzochid_auth_identity));
-  identity->name = "[SYSTEM]";
+  gzochid_auth_identity *identity = gzochid_auth_identity_from_name
+    (context->identity_cache, "[SYSTEM]");
 
   gettimeofday (&now, NULL);
 
