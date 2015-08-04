@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <gmp.h>
 #include <libguile.h>
@@ -195,18 +196,31 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
   char *prefixed_name = prefix_name (cname);
+  gboolean exists = gzochid_data_binding_exists (context, prefixed_name, &err);
   
-  if (! gzochid_data_binding_exists (context, prefixed_name, &err))
+  if (! exists)
     {
-      SCM cond = gzochid_scheme_make_name_not_bound_condition (cname);
+      SCM cond = SCM_BOOL_F;
+      
+      if (! g_error_matches
+	  (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION))
+
+	cond = gzochid_scheme_make_name_not_bound_condition (cname);
 
       free (cname);
       free (prefixed_name);
-
-      gzochid_guile_r6rs_raise (cond);
+      g_error_free (err);
+      
+      if (scm_is_true (cond))
+	gzochid_guile_r6rs_raise (cond);
     }
-  else if (err == NULL)
+  else
     {
+      /* `gzochid_data_binding_exists' should never return TRUE if there was
+	 an GError. */
+      
+      assert (err == NULL);
+      
       gzochid_data_remove_binding (context, prefixed_name, NULL);
 
       free (cname);
