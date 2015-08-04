@@ -78,6 +78,7 @@ execution_new (gzochid_application_task *task,
   else execution->timeout = NULL;
 
   execution->attempts = 0;
+  execution->max_attempts = GZOCHID_APPLICATION_MAX_ATTEMPTS_DEFAULT;
   execution->result = GZOCHID_TRANSACTION_PENDING;
 
   return execution;
@@ -289,7 +290,8 @@ gzochid_application_reexecuting_transactional_task_worker
     wrap_and_execute (app_context, identity, execution->catch_task);
 
   if (execution->cleanup_task != NULL)
-    wrap_and_execute (app_context, identity, execution->cleanup_task);
+    execution->cleanup_task->worker
+      (app_context, identity, execution->cleanup_task->data);
 }
 
 void 
@@ -323,6 +325,8 @@ gzochid_application_resubmitting_transactional_task_worker
       gzochid_transactional_application_task_execution *catch_execution = 
 	gzochid_transactional_application_task_execution_new
 	(execution->catch_task, NULL, execution->cleanup_task);
+
+      catch_execution->max_attempts = 1;
       
       application_task = gzochid_application_task_new
 	(app_context, identity,
@@ -330,16 +334,7 @@ gzochid_application_resubmitting_transactional_task_worker
 	 catch_execution);
     }
   else if (execution->cleanup_task != NULL)
-    {
-      gzochid_transactional_application_task_execution *cleanup_execution = 
-	gzochid_transactional_application_task_execution_new
-	(execution->cleanup_task, NULL, NULL);
-      
-      application_task = gzochid_application_task_new
-	(app_context, identity,
-	 gzochid_application_resubmitting_transactional_task_worker,
-	 cleanup_execution);
-    }
+    application_task = execution->cleanup_task;
 
   if (application_task != NULL)
     {
@@ -382,6 +377,5 @@ gzochid_application_should_retry
 (gzochid_transactional_application_task_execution *execution)
 {
   return execution->result == GZOCHID_TRANSACTION_SHOULD_RETRY
-    && execution->attempts < GZOCHID_APPLICATION_MAX_ATTEMPTS_DEFAULT;
+    && execution->attempts < execution->max_attempts;
 }
-

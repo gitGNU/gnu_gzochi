@@ -52,24 +52,26 @@ typedef struct _gzochid_application_task gzochid_application_task;
 
 struct _gzochid_transactional_application_task_execution
 {
-  /* The main task to execute. */
+  /* The main task to execute. This task is attempted up to the maximum number 
+     of retries, in separate transactions. */
   
   gzochid_application_task *task;
 
   /* An optional "catch" task to be executed if and only if the main task's
      transaction is marked for rollback and cannot be retried. This task is
-     executed in a separate transaction. */
+     attempted once, in a separate transaction. */
   
   gzochid_application_task *catch_task;
 
   /* An optional "cleanup" task that is always executed after the main task's
      final attempt - and after the catch task, if one is present. This task is
-     executed in a separate transaction. */
+     executed once, outside of a transaction. */
   
   gzochid_application_task *cleanup_task;
 
   struct timeval *timeout;
   unsigned int attempts;
+  unsigned int max_attempts;
   gzochid_transaction_result result;
 };
 
