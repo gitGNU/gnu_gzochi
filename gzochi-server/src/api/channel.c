@@ -1,5 +1,5 @@
 /* channel.c: Primitive functions for user-facing gzochid channel API
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -140,6 +140,9 @@ SCM_DEFINE (primitive_leave_channel, "primitive-leave-channel", 2, 0, 0,
   
   gzochid_data_dereference (channel_reference, &err);
 
+  mpz_clear (session_oid);
+  mpz_clear (channel_oid);
+  
   if (err == NULL)
     {
       gzochid_data_dereference (session_reference, &err);
