@@ -317,6 +317,8 @@ gzochid_durable_application_task_handle_serialization =
 
 static void durable_task_application_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
+static void durable_task_catch_worker
+(gzochid_application_context *, gzochid_auth_identity *, gpointer);
 static void durable_task_cleanup_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
@@ -324,6 +326,7 @@ static gzochid_task *
 wrap_durable_task (gzochid_application_context *context, mpz_t oid,
 		   GError **err)
 {
+  char *oid_str = NULL;
   GError *local_err = NULL;
   gzochid_game_context *game_context = (gzochid_game_context *) 
     ((gzochid_context *) context)->parent;
@@ -331,6 +334,7 @@ wrap_durable_task (gzochid_application_context *context, mpz_t oid,
 
   gzochid_application_task *transactional_task = NULL;
   gzochid_application_task *catch_task = NULL;
+  gzochid_application_task *cleanup_task = NULL;
   gzochid_transactional_application_task_execution *execution = NULL;
 
   gzochid_application_task *application_task = NULL;
@@ -349,17 +353,22 @@ wrap_durable_task (gzochid_application_context *context, mpz_t oid,
       return NULL;
     }
   
-  durable_task_handle = (gzochid_durable_application_task_handle *)
-    durable_task_handle_reference->obj;
+  durable_task_handle = durable_task_handle_reference->obj;
   cloned_identity = gzochid_auth_identity_ref (durable_task_handle->identity);
 
   transactional_task = gzochid_application_task_new
     (context, cloned_identity, durable_task_application_worker, durable_task);
+
+  /* The memory allocated for this string is freed by the cleanup task. */
+  
+  oid_str = mpz_get_str (NULL, 16, oid);
+
   catch_task = gzochid_application_task_new
-    (context, cloned_identity, durable_task_cleanup_worker, 
-     mpz_get_str (NULL, 16, oid));
+    (context, cloned_identity, durable_task_catch_worker, oid_str);
+  cleanup_task = gzochid_application_task_new
+    (context, cloned_identity, durable_task_cleanup_worker, oid_str);
   execution = gzochid_transactional_application_task_timed_execution_new 
-    (transactional_task, catch_task, NULL, game_context->tx_timeout);
+    (transactional_task, catch_task, cleanup_task, game_context->tx_timeout);
 
   application_task = gzochid_application_task_new
     (context, cloned_identity,
@@ -610,19 +619,24 @@ durable_task_application_worker (gzochid_application_context *context,
 }
 
 static void 
-durable_task_cleanup_worker (gzochid_application_context *context, 
-			     gzochid_auth_identity *identity, gpointer data)
+durable_task_catch_worker (gzochid_application_context *context, 
+			   gzochid_auth_identity *identity, gpointer data)
 {
-  char *oid_str = (char *) data;
   mpz_t oid;
 
   mpz_init (oid);
-  mpz_set_str (oid, oid_str, 16);
+  mpz_set_str (oid, data, 16);
   
   remove_durable_task (context, oid, NULL);
 
   mpz_clear (oid);
-  free (oid_str);
+}
+
+static void
+durable_task_cleanup_worker (gzochid_application_context *context,
+			     gzochid_auth_identity *identity, gpointer data)
+{
+  free (data);
 }
 
 void 

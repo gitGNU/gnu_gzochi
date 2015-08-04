@@ -435,6 +435,10 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
 	gzochid_application_task_new
 	(context, gzochid_protocol_client_get_identity (client),
 	 gzochid_scheme_application_disconnected_worker, session_oid_str);
+      gzochid_application_task *catch_task =
+	gzochid_application_task_new
+	(context, gzochid_protocol_client_get_identity (client),
+	 gzochid_client_session_disconnected_worker, session_oid_str);
       gzochid_application_task *cleanup_task = 
 	gzochid_application_task_new
 	(context, gzochid_protocol_client_get_identity (client), 
@@ -442,7 +446,7 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
 	 session_oid_str);
       gzochid_transactional_application_task_execution *execution = 
 	gzochid_transactional_application_task_execution_new 
-	(callback_task, NULL, cleanup_task);
+	(callback_task, catch_task, cleanup_task);
       gzochid_application_task *application_task = gzochid_application_task_new 
 	(context, gzochid_protocol_client_get_identity (client),
 	 gzochid_application_resubmitting_transactional_task_worker, execution);
