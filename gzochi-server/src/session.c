@@ -408,11 +408,18 @@ remove_session (gzochid_application_context *context, const char *oid_str,
 		gzochid_info 
 		  ("Unable to remove Scheme object for session '%s': %s",
 		   oid_str, local_err->message);
-
-	      g_clear_error (&local_err);
 	    }
-	    
-	    gzochid_data_remove_object (session_reference, &local_err);
+
+	  /* Don't attempt to remove the object if the transaction is in a
+	     failed state - it's a waste of time and tends to irritate the 
+	     storage engine. */
+	  
+	  if (!g_error_matches
+	      (local_err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION))
+	    {
+	      g_clear_error (&local_err);
+	      gzochid_data_remove_object (session_reference, &local_err);
+	    }
 	  
 	  if (local_err != NULL)
 	    g_propagate_error (err, local_err);	  
