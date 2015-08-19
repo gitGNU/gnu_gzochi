@@ -96,6 +96,7 @@ dispatch_client_write (GIOChannel *channel, GIOCondition cond, gpointer data)
       if (error != NULL)
 	{
 	  g_error_free (error);
+	  g_mutex_unlock (&sock->sock_mutex);
 	  return FALSE;
 	}
     }
