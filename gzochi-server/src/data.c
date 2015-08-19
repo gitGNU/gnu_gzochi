@@ -128,9 +128,6 @@ static gboolean
 flush_reference (gzochid_data_managed_reference *reference,
 		 gzochid_data_transaction_context *context)
 {
-  gzochid_application_data_event *event = NULL;
-  gzochid_application_event *base_event = NULL;
-
   char *oid_str = NULL;
   GString *out = NULL;
   GError *err = NULL;
@@ -166,15 +163,9 @@ flush_reference (gzochid_data_managed_reference *reference,
 	 strlen (oid_str) + 1, out->str, out->len);
       free (oid_str);
 
-      event = malloc (sizeof (gzochid_application_data_event));
-      base_event = (gzochid_application_event *) event;
-
-      base_event->type = BYTES_WRITTEN;
-      gettimeofday (&base_event->timestamp, NULL);
-      event->bytes = out->len;
-
       gzochid_application_event_dispatch
-	(context->context->event_source, base_event);
+	(context->context->event_source,
+	 gzochid_application_data_event_new (BYTES_WRITTEN, out->len));
 
       g_string_free (out, TRUE);
 
@@ -559,17 +550,10 @@ dereference (gzochid_data_transaction_context *context,
   else 
     {
       GError *local_err = NULL;
-      gzochid_application_data_event *event = 
-	malloc (sizeof (gzochid_application_data_event));
-      gzochid_application_event *base_event = 
-	(gzochid_application_event *) event;
-
-      base_event->type = BYTES_READ;
-      gettimeofday (&base_event->timestamp, NULL);
-      event->bytes = data_len;
 
       gzochid_application_event_dispatch
-	(context->context->event_source, base_event);
+	(context->context->event_source,
+	 gzochid_application_data_event_new (BYTES_READ, data_len));
 
       in = g_string_new_len (data, data_len);
       free (data);

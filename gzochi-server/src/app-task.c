@@ -164,18 +164,15 @@ static void
 event_commit (gpointer data)
 {
   gzochid_event_transaction_context *tx_context = data;
-  gzochid_application_transaction_event *event = 
-    malloc (sizeof (gzochid_application_transaction_event));
-  gzochid_application_event *base_event = (gzochid_application_event *) event;
-  struct timeval now;
+  struct timeval now, duration;
 
   gettimeofday (&now, NULL);
-  base_event->type = TRANSACTION_COMMIT;
-  gettimeofday (&base_event->timestamp, NULL);
-  timersub (&now, &tx_context->start_time, &event->duration);
+  timersub (&now, &tx_context->start_time, &duration);
 
   gzochid_application_event_dispatch 
-    (tx_context->app_context->event_source, base_event);
+    (tx_context->app_context->event_source,
+     gzochid_application_transaction_event_new (TRANSACTION_COMMIT, duration));
+
   free (tx_context);
 }
 
@@ -183,18 +180,16 @@ static void
 event_rollback (gpointer data)
 {
   gzochid_event_transaction_context *tx_context = data;
-  gzochid_application_transaction_event *event = 
-    malloc (sizeof (gzochid_application_transaction_event));
-  gzochid_application_event *base_event = (gzochid_application_event *) event;
-  struct timeval now;
+  struct timeval now, duration;
 
   gettimeofday (&now, NULL);
-  base_event->type = TRANSACTION_ROLLBACK;
-  gettimeofday (&base_event->timestamp, NULL);
-  timersub (&now, &tx_context->start_time, &event->duration);
-
+  timersub (&now, &tx_context->start_time, &duration);
+  
   gzochid_application_event_dispatch 
-    (tx_context->app_context->event_source, base_event);
+    (tx_context->app_context->event_source,
+     gzochid_application_transaction_event_new
+     (TRANSACTION_ROLLBACK, duration));
+
   free (tx_context);
 }
 
@@ -221,15 +216,11 @@ event_func_wrapper (gpointer data)
   void (*func) (gpointer) = (void (*) (gpointer)) args[1];
   gpointer func_data = args[2];
 
-  gzochid_application_event *event = 
-    malloc (sizeof (gzochid_application_event));
-
-  event->type = TRANSACTION_START;
-  gettimeofday (&event->timestamp, NULL);
-
   join_transaction (context);
 
-  gzochid_application_event_dispatch (context->event_source, event);
+  gzochid_application_event_dispatch
+    (context->event_source, gzochid_application_event_new (TRANSACTION_START));
+
   func (func_data);  
 }
 

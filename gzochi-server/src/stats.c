@@ -1,5 +1,5 @@
 /* stats.c: Application statistics management routines for gzochid
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,13 +16,15 @@
  */
 
 #include <assert.h>
+#include <sys/time.h>
 
 #include "event.h"
 #include "stats.h"
 
-static void update_from_data_event
-(gzochid_application_stats *stats, gzochid_application_event_type type,
- gzochid_application_data_event *event)
+static void
+update_from_data_event (gzochid_application_stats *stats,
+			gzochid_application_event_type type,
+			gzochid_application_data_event *event)
 {
   switch (type)
     {
@@ -32,14 +34,28 @@ static void update_from_data_event
     }
 }
 
-static long timeval_to_milliseconds (struct timeval tv)
+static void
+update_from_event (gzochid_application_stats *stats,
+		   gzochid_application_event_type type,
+		   gzochid_application_message_event *event)
+{
+  switch (type)
+    {
+    case TRANSACTION_START: stats->num_transactions_started++; break;
+    default: assert (1 == 0);
+    }
+}
+
+static long
+timeval_to_milliseconds (struct timeval tv)
 {
   return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
-static void update_from_transaction_event
-(gzochid_application_stats *stats, gzochid_application_event_type type,
- gzochid_application_transaction_event *event)
+static void
+update_from_transaction_event (gzochid_application_stats *stats,
+			       gzochid_application_event_type type,
+			       gzochid_application_transaction_event *event)
 {
   long transaction_ms = 0;
 
@@ -72,8 +88,9 @@ static void update_from_transaction_event
     }
 }
 
-void gzochid_stats_update_from_event 
-(gzochid_application_stats *stats, gzochid_application_event *event)
+void
+gzochid_stats_update_from_event (gzochid_application_stats *stats,
+				 gzochid_application_event *event)
 {
   switch (event->type)
     {
@@ -84,6 +101,9 @@ void gzochid_stats_update_from_event
       break;
 
     case TRANSACTION_START:
+      update_from_event	(stats, event->type, event);
+      break;
+      
     case TRANSACTION_COMMIT:
     case TRANSACTION_ROLLBACK:
       update_from_transaction_event

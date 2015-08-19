@@ -1,5 +1,5 @@
 /* event.h: Prototypes and declarations for event.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,57 +21,86 @@
 #include <glib.h>
 #include <sys/time.h>
 
-typedef enum _gzochid_application_event_type
+enum _gzochid_application_event_type
   {
-    BYTES_READ,
-    BYTES_WRITTEN,
+    BYTES_READ, /* Bytes have been read from the data store. */
+    BYTES_WRITTEN, /* Bytes have been written to the data store. */
 
     TRANSACTION_START, /* An application transaction has been started. */
     TRANSACTION_COMMIT, /* A transaction has been committed. */
     TRANSACTION_ROLLBACK /* A transaction has been rolled back. */
-  }
-  gzochid_application_event_type;
+  };
 
-typedef struct _gzochid_application_event
+typedef enum _gzochid_application_event_type gzochid_application_event_type;
+
+struct _gzochid_application_event
 {
-  gzochid_application_event_type type;
-  struct timeval timestamp;
-} gzochid_application_event;
+  gzochid_application_event_type type; /* The type of event. */
+  struct timeval timestamp; /* The time the event was fired. */
+};
+
+typedef struct _gzochid_application_event gzochid_application_event;
+
+struct _gzochid_application_transaction_event
+{
+  gzochid_application_event base;
+  struct timeval duration; /* The transaction duration. */
+};
 
 typedef struct _gzochid_application_transaction_event
-{
-  gzochid_application_event base;
-  struct timeval duration;
-} gzochid_application_transaction_event;
+gzochid_application_transaction_event;
 
-typedef struct _gzochid_application_data_event
+struct _gzochid_application_data_event
 {
   gzochid_application_event base;
-  long bytes;
-} gzochid_application_data_event;
+  unsigned long bytes; /* The number of bytes. */
+};
+
+typedef struct _gzochid_application_data_event gzochid_application_data_event;
 
 typedef struct _gzochid_application_event_source 
 gzochid_application_event_source;
 
 gzochid_application_event_source *gzochid_application_event_source_new (void);
-void gzochid_application_event_source_free 
+void gzochid_application_event_source_free
 (gzochid_application_event_source *);
 
 typedef void (*gzochid_application_event_handler) 
 (gzochid_application_event *, gpointer);
 
-/**
-   Attaches the specified application event handler to the event source.
- */
+/* Create and return a new application event of the specified type, which must
+   be `TRANSACTION_START'. Do not free the memory referenced by the returned 
+   pointer; it will be freed after the event has been dispatched. */
+
+gzochid_application_event *gzochid_application_event_new
+(gzochid_application_event_type);
+
+/* Create and return a new application event of the specified type, which must
+   be one of `BYTES_READ' or `BYTES_WRITTEN', with the specified byte count. Do
+   not free the memory referenced by the returned pointer; it will be freed 
+   after the event has been dispatched. */
+
+gzochid_application_event *gzochid_application_data_event_new
+(gzochid_application_event_type, unsigned long);
+
+/* Create and return a new application event of the specified type, which must
+   be one of `TRANSACTION_COMMIT' or `TRANSACTION_ROLLBACK', along with the
+   specified transaction duration. Do not free the memory referenced by the 
+   returned pointer; it will be freed after the event has been dispatched. */
+
+gzochid_application_event *gzochid_application_transaction_event_new
+(gzochid_application_event_type, struct timeval);
+
+/* Attaches the specified application event handler to the event source.*/
+
 void gzochid_application_event_attach 
 (gzochid_application_event_source *, gzochid_application_event_handler, 
  gpointer);
 
-/**
-   Dispatches an event to the event source, triggering all registered handlers.
+/* Dispatches an event to the event source, triggering all registered handlers.
    The application event's memory will be freed once all handlers have been
-   invoked.
- */
+   invoked. */
+
 void gzochid_application_event_dispatch
 (gzochid_application_event_source *, gzochid_application_event *);
 
