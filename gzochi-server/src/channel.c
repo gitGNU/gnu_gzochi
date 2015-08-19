@@ -20,6 +20,7 @@
 #include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 
 #include "app.h"
@@ -132,9 +133,11 @@ gzochid_channel_payload_message_new (gzochid_application_context *app_context,
   message->type = type;
   message->oid_str = oid_str;
 
-  payload_message->msg = msg;
+  payload_message->msg = malloc (sizeof (char) * len);
   payload_message->len = len;
-
+  
+  memcpy (payload_message->msg, msg, len);
+  
   return payload_message;
 }
 
@@ -168,10 +171,26 @@ channel_side_effects_prepare (gpointer data)
 }
 
 static void
+free_message (gpointer data)
+{
+  gzochid_channel_message *message = data;
+
+  if (message->type == GZOCHID_CHANNEL_MESSAGE_SEND)
+    {
+      gzochid_channel_payload_message *payload_message =
+	(gzochid_channel_payload_message *) message;
+
+      free (payload_message->msg);
+    }
+
+  free (message);
+}
+
+static void
 cleanup_side_effects_transaction
 (gzochid_channel_side_effects_transaction_context *tx_context)
 {
-  g_list_free_full (tx_context->messages, free);
+  g_list_free_full (tx_context->messages, free_message);
   free (tx_context);
 }
 
@@ -253,6 +272,29 @@ join_side_effects_transaction (gzochid_application_context *context,
   return tx_context;
 }
 
+static void
+free_operation (gzochid_channel_pending_operation *op)
+{
+  if (op->type == GZOCHID_CHANNEL_OP_SEND)
+    {
+      gzochid_channel_pending_send_operation *send_op =
+	(gzochid_channel_pending_send_operation *) op;
+
+      free (send_op->message);
+    }
+  else if (op->type == GZOCHID_CHANNEL_OP_JOIN
+	   || op->type == GZOCHID_CHANNEL_OP_LEAVE)
+    {
+      gzochid_channel_pending_membership_operation *membership_op =
+	(gzochid_channel_pending_membership_operation *) op;
+
+      mpz_clear (membership_op->target_session);
+    }
+  
+  mpz_clear (op->target_channel);  
+  free (op);
+}
+
 static void close_channel (gzochid_application_context *context,
 			   gzochid_auth_identity *identity, gpointer data)
 {
@@ -273,6 +315,7 @@ static void close_channel (gzochid_application_context *context,
   if (err != NULL)
     {
       g_error_free (err);
+      free_operation (op);
       return;
     }
 
@@ -346,6 +389,8 @@ static void close_channel (gzochid_application_context *context,
   g_mutex_unlock (&context->client_mapping_lock);
   mpz_clear (session_oid);
   free (channel_oid_str);
+
+  free_operation (op);
 }
 
 static void
@@ -370,6 +415,7 @@ send_channel_message (gzochid_application_context *context,
   if (err != NULL)
     {
       g_error_free (err);
+      free_operation (op);
       return;
     }
   
@@ -412,6 +458,8 @@ send_channel_message (gzochid_application_context *context,
   if (channel_modified)
     gzochid_data_mark 
       (context, &gzochid_channel_serialization, channel, NULL);
+
+  free_operation (op);
 }
 
 static void
@@ -437,6 +485,8 @@ join_channel (gzochid_application_context *context,
   char *session_oid_str = NULL;
   GSequenceIter *iter = NULL;
 
+  free_operation (op);
+  
   gzochid_data_dereference (channel_reference, &err);
   if (err != NULL)
     {
@@ -513,6 +563,8 @@ leave_channel (gzochid_application_context *context,
   char *session_oid_str = NULL;
   GSequenceIter *iter = NULL;
 
+  free_operation (op);
+  
   gzochid_data_dereference (channel_reference, &err);
   if (err != NULL)
     {
@@ -640,7 +692,10 @@ create_send_operation (mpz_t channel_oid, unsigned char *message, short len)
     (gzochid_channel_pending_operation *) send_operation;
 
   operation->type = GZOCHID_CHANNEL_OP_SEND;
-  send_operation->message = message;
+  send_operation->message = malloc (sizeof (unsigned char) * len);
+
+  memcpy (send_operation->message, message, len);
+  
   send_operation->len = len;
   mpz_init (operation->target_channel);
   mpz_set (operation->target_channel, channel_oid);
