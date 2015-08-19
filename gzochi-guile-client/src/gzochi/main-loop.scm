@@ -127,11 +127,7 @@
 ;;    (gzochi:main-loop-run main-loop))
 
   (define (timeout? obj)
-    (and (list? obj)
-	 (let ((len (length obj)))
-	   (or (= len 1)
-	       (= len 2)))
-	 (every integer? obj)))	 
+    (and (pair? obj) (integer? (car obj)) (integer? (cdr obj))))
 
 ;; The selector event enumeration. Possible events are: read, write, error.
 ;;
