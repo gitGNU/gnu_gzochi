@@ -41,6 +41,8 @@ update_from_event (gzochid_application_stats *stats,
 {
   switch (type)
     {
+    case MESSAGE_RECEIVED: stats->num_messages_received++; break;
+    case MESSAGE_SENT: stats->num_messages_sent++; break;
     case TRANSACTION_START: stats->num_transactions_started++; break;
     default: assert (1 == 0);
     }
@@ -100,6 +102,8 @@ gzochid_stats_update_from_event (gzochid_application_stats *stats,
 	(stats, event->type, (gzochid_application_data_event *) event);
       break;
 
+    case MESSAGE_RECEIVED:
+    case MESSAGE_SENT:
     case TRANSACTION_START:
       update_from_event	(stats, event->type, event);
       break;

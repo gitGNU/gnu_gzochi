@@ -22,6 +22,9 @@
 
 typedef struct _gzochid_application_stats
 {
+  unsigned int num_messages_received;
+  unsigned int num_messages_sent;
+  
   unsigned int num_transactions_started;
   unsigned int num_transactions_committed;
   unsigned int num_transactions_rolled_back;

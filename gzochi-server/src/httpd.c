@@ -420,6 +420,17 @@ app_info (struct MHD_Connection *connection,
   g_string_append (response_str, "      </tr>\n");
 
   g_string_append (response_str, "      <tr>\n");
+  g_string_append (response_str, "        <td>Messages received</td>\n");
+  g_string_append_printf (response_str, "        <td>%u</td>\n", 
+			  app_context->stats->num_messages_received);
+  g_string_append (response_str, "      </tr>\n");
+  g_string_append (response_str, "      <tr>\n");
+  g_string_append (response_str, "        <td>Messages sent</td>\n");
+  g_string_append_printf (response_str, "        <td>%u</td>\n", 
+			  app_context->stats->num_messages_sent);
+  g_string_append (response_str, "      </tr>\n");
+
+  g_string_append (response_str, "      <tr>\n");
   g_string_append (response_str, "        <td>Transactions started</td>\n");
   g_string_append_printf (response_str, "        <td>%u</td>\n", 
 			  app_context->stats->num_transactions_started);
