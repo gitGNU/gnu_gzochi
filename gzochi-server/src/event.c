@@ -84,6 +84,8 @@ free_event (gzochid_application_event *event)
 		    (gzochid_application_data_event *) event);
       break;
 
+    case MESSAGE_RECEIVED:
+    case MESSAGE_SENT:
     case TRANSACTION_START:
       g_slice_free (gzochid_application_event, event);
       break;
@@ -177,11 +179,13 @@ gzochid_application_data_event_new (gzochid_application_event_type type,
 gzochid_application_event *
 gzochid_application_event_new (gzochid_application_event_type type)
 {
-  gzochid_application_message_event *event =
+  gzochid_application_event *event =
     g_slice_alloc (sizeof (gzochid_application_event));
 
-  assert (type == TRANSACTION_START);
-  
+  assert (type == MESSAGE_RECEIVED
+	  || type == MESSAGE_SENT
+	  || type == TRANSACTION_START);
+
   event_init (event, type);
   return event;
 }

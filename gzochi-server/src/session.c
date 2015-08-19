@@ -25,6 +25,7 @@
 #include "app.h"
 #include "auth_int.h"
 #include "data.h"
+#include "event.h"
 #include "game.h"
 #include "gzochid-auth.h"
 #include "io.h"
@@ -215,6 +216,9 @@ session_commit_operation
 		      tx_context->login_operation->target_session) != 0)
 	{
 	  msg_op = (gzochid_client_session_pending_message_operation *) op;
+	  gzochid_application_event_dispatch
+	    (context->event_source,
+	     gzochid_application_event_new (MESSAGE_SENT));
 	  gzochid_protocol_client_send (client, msg_op->message, msg_op->len);
 	}
 

@@ -37,7 +37,7 @@ update_from_data_event (gzochid_application_stats *stats,
 static void
 update_from_event (gzochid_application_stats *stats,
 		   gzochid_application_event_type type,
-		   gzochid_application_message_event *event)
+		   gzochid_application_event *event)
 {
   switch (type)
     {

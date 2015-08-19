@@ -26,6 +26,7 @@
 #include "app-task.h"
 #include "auth_int.h"
 #include "channel.h"
+#include "event.h"
 #include "game.h"
 #include "gzochid-auth.h"
 #include "io.h"
@@ -191,6 +192,9 @@ commit_channel_side_effect_message (gpointer data, gpointer user_data)
 	{
 	case GZOCHID_CHANNEL_MESSAGE_SEND:
 	  payload_message = (gzochid_channel_payload_message *) message;
+	  gzochid_application_event_dispatch
+	    (message->app_context->event_source,
+	     gzochid_application_event_new (MESSAGE_SENT));
 	  gzochid_protocol_client_send
 	    (client, payload_message->msg, payload_message->len);
       

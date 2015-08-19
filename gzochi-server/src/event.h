@@ -26,6 +26,9 @@ enum _gzochid_application_event_type
     BYTES_READ, /* Bytes have been read from the data store. */
     BYTES_WRITTEN, /* Bytes have been written to the data store. */
 
+    MESSAGE_RECEIVED, /* A message has been received from a client session. */
+    MESSAGE_SENT, /* A message has been sent to a client session. */
+    
     TRANSACTION_START, /* An application transaction has been started. */
     TRANSACTION_COMMIT, /* A transaction has been committed. */
     TRANSACTION_ROLLBACK /* A transaction has been rolled back. */

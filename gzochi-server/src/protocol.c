@@ -25,6 +25,7 @@
 
 #include "app.h"
 #include "context.h"
+#include "event.h"
 #include "game.h"
 #include "gzochid-auth.h"
 #include "lifecycle.h"
@@ -153,8 +154,14 @@ dispatch_session_message
       gzochid_warning 
 	("Received session message from unauthenticated client at %s",
 	 gzochid_socket_get_connection_description (client->sock));
-  else gzochid_application_session_received_message 
-	 (client->context, client, msg, len);
+  else
+    {
+      gzochid_application_event_dispatch
+	(client->context->event_source,
+	 gzochid_application_event_new (MESSAGE_RECEIVED));
+      gzochid_application_session_received_message 
+	(client->context, client, msg, len);
+    }
 }
 
 void 
