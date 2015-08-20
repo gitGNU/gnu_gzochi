@@ -52,6 +52,18 @@ struct _btree_datum
 
 typedef struct _btree_datum btree_datum;
 
+/* A lock that can be acquired by a transaction / thread. */
+
+struct _btree_lock
+{
+  GCond cond; /* A condition for lockers to wait on. */
+
+  struct _btree_transaction *writer; /* The current holder of the write lock. */
+  GList *readers; /* The current readers. */
+};
+
+typedef struct _btree_lock btree_lock;
+
 /* The "forest" of related B+trees across which transactional operations may be
    applied. */
 
@@ -60,7 +72,12 @@ struct _btree_environment
   GList *btrees; /* The B+trees opened in this environment. */
   GList *transactions; /* The set of active transactions. */
 
-  GMutex mutex; /* A mutex to protect the lists of B+trees and transactions. */
+  GHashTable *lock_table; /* A mapping of `btree_node' to `btree_lock'. */
+  GMutex lock_table_mutex; /* Protects access to the lock table. */
+  
+  /* A mutex to protect the lists of B+trees and transactions. */
+
+  GMutex mutex; 
 };
 
 typedef struct _btree_environment btree_environment;
@@ -81,6 +98,20 @@ memory_transaction_error_quark (void)
   return g_quark_from_static_string ("memory-transaction-error");
 }
 
+/* An enumeration of responses from attempting to obtain the lock associated
+   with a node in a B+tree. */
+
+enum btree_lock_node_response
+  {
+    SUCCESS, /* The lock was successfully acquired. */
+    FAILURE, /* The lock could not be acquired. */
+
+    /* The lock could not be acquired because the lock or the node was 
+       deleted. */
+    
+    DELETED 
+  };
+
 /* Holds transaction state. */
 
 struct _btree_transaction
@@ -89,8 +120,8 @@ struct _btree_transaction
 
   btree_environment *environment; /* The enclosing environment. */
 
-  struct _btree_lock *waiting_to_read; /* The read lock being attempted. */
-  struct _btree_lock *waiting_to_write; /* The write lock being attempted. */
+  btree_lock *waiting_to_read; /* The read lock being attempted. */
+  btree_lock *waiting_to_write; /* The write lock being attempted. */
 
   GList *modifications; /* The list of modified B+tree nodes. */
   GList *write_locks; /* The write locks held by the transaction. */
@@ -98,18 +129,6 @@ struct _btree_transaction
 };
 
 typedef struct _btree_transaction btree_transaction;
-
-/* A lock that can be acquired by a transaction / thread. */
-
-struct _btree_lock
-{
-  GCond cond; /* A condition for lockers to wait on. */
-
-  btree_transaction *writer; /* The current holder of the write lock. */
-  GList *readers; /* The current readers. */
-};
-
-typedef struct _btree_lock btree_lock;
 
 /* Linkage information for a B+tree node, encapsulated to simplify modification
    detection, application, and rollback. */
@@ -140,8 +159,6 @@ struct _btree_node
   unsigned int max_children; /* The maximum children before triggering split. */
   unsigned int flags; /* Status flags; see above. */
 
-  btree_lock lock; /* The read / write lock for this node. */
-
   btree_datum key; /* The key. */
   btree_datum new_key; /* Alternate key for temporary changes. */
 
@@ -158,7 +175,7 @@ struct _btree
   btree_environment *environment; /* The enclosing B+tree environment. */
   btree_node *root; /* The root node. */
   btree_node *new_root; /* Alternate root for temporary changes. */
-  btree_lock lock; /* The read / write lock for the root. */
+  btree_lock *lock; /* The read / write lock for the root. */
 };
 
 typedef struct _btree btree;
@@ -245,6 +262,9 @@ create_btree_environment ()
 
   g_mutex_init (&btree_env->mutex);
 
+  btree_env->lock_table = g_hash_table_new (g_direct_hash, g_direct_equal);
+  g_mutex_init (&btree_env->lock_table_mutex);
+  
   return btree_env;
 }
 
@@ -256,19 +276,25 @@ close_btree_environment (btree_environment *btree_env)
 {
   assert (btree_env->btrees == NULL);
   assert (btree_env->transactions == NULL);
+
   g_mutex_clear (&btree_env->mutex);
+
+  g_hash_table_destroy (btree_env->lock_table);
+  g_mutex_clear (&btree_env->lock_table_mutex);
+  
   free (btree_env);
 }
 
 /* Initializes and allocates resources for a new read / write lock. */
 
-static void
-lock_init (btree_lock *lock)
+static btree_lock *
+lock_new ()
 {
+  btree_lock *lock = calloc (1, sizeof (btree_lock));
+
   g_cond_init (&lock->cond);
 
-  lock->writer = NULL;
-  lock->readers = NULL;
+  return lock;
 }
 
 /* Frees the resources associated with the specified read / write lock. There
@@ -276,12 +302,13 @@ lock_init (btree_lock *lock)
    called. */
 
 static void
-lock_clear (btree_lock *lock)
+lock_free (btree_lock *lock)
 {
   assert (lock->writer == NULL);
   assert (lock->readers == NULL);
   
   g_cond_clear (&lock->cond);
+  free (lock);
 }
 
 /* Returns `TRUE' if the node's `FLAG_NEW' bit is set, `FALSE' otherwise. */
@@ -331,8 +358,6 @@ create_btree_node (btree_node *parent, unsigned int min_children,
 
   node->flags = FLAG_NEW;
 
-  lock_init (&node->lock);
-
   node->min_children = min_children;
   node->max_children = max_children;
 
@@ -348,96 +373,35 @@ create_btree_node (btree_node *parent, unsigned int min_children,
   return node;
 }
 
-/* Frees the resources associated with the specified node. */
+/* Associates the specified B+tree node with a new `btree_lock' in the lock
+   table for the B+tree environment that contains the specified 
+   `btree_transaction'. */
 
 static void
-free_btree_node (btree_node *node)
+lock_attach (btree_node *node, btree_transaction *btx)
 {
-  lock_clear (&node->lock);
-
-  free (node->key.data);
-
-  if (node->value.data != NULL)
-    free (node->value.data);
-
-  free (node);
-}
-
-/* Create and return a new B+tree wrapper structure. */
-
-static btree *
-create_btree (btree_environment *btree_env)
-{
-  btree *bt = malloc (sizeof (btree));
-
-  lock_init (&bt->lock);
-
-  /* The root node's min / max children are special. */
-
-  bt->root = create_btree_node (NULL, 1, BRANCHING_FACTOR - 1, NULL, 0);
-  bt->new_root = NULL;
-
-  clear_flags (bt->root);
-
-  /* Add the B+tree to the environment. */
-
-  g_mutex_lock (&btree_env->mutex);
-  btree_env->btrees = g_list_prepend (btree_env->btrees, bt);
-  g_mutex_unlock (&btree_env->mutex);
-
-  bt->environment = btree_env;
-
-  return bt;
-}
-
-/* Non-recursively frees all of the B+tree nodes reachable from the specified 
-   root node. */
-
-static void
-free_btree (btree_node *root)
-{
-  GList *to_visit = g_list_append (NULL, root);
-
-  while (to_visit != NULL)
-    {
-      GList *to_visit_ptr = to_visit;
-      btree_node *node = to_visit_ptr->data;
-
-      if (node->header.first_child != NULL)
-	to_visit = g_list_prepend (to_visit, node->header.first_child);
-
-      if (node->header.next != NULL)
-	to_visit = g_list_prepend (to_visit, node->header.next);
-
-      to_visit = g_list_delete_link (to_visit, to_visit_ptr);
-      free_btree_node (node);
-    }
-}
-
-/* Frees the resources allocated for the specified B+tree (including all key
-   and value datums) and removes it from its enclosing environment. */
-
-static void
-close_btree (btree *bt)
-{
-  GList *btree_link = NULL;
-  btree_environment *btree_env = bt->environment;
-
-  /* Remove the B+tree from the environment. */
+  btree_lock *lock = lock_new ();
   
-  g_mutex_lock (&btree_env->mutex);
-  
-  btree_link = g_list_find (btree_env->btrees, bt);
-  assert (btree_link != NULL);
-  btree_env->btrees = g_list_delete_link (btree_env->btrees, btree_link);
-  
-  g_mutex_unlock (&btree_env->mutex);
-
-  lock_clear (&bt->lock);
-  free_btree (bt->root);
-  free (bt);
+  g_hash_table_insert (btx->environment->lock_table, node, lock);
 }
 
+/* A wrapper around `create_btree_node' that separates the concern of creating
+   and registering a new `btree_lock' from the concern of creating a new B+tree
+   node. */
+
+static btree_node *
+create_lockable_btree_node (btree_node *parent, unsigned int min_children,
+			    unsigned int max_children, unsigned char *key,
+			    size_t key_len, btree_transaction *btx)
+{
+  btree_node *node = create_btree_node
+    (parent, min_children, max_children, key, key_len);
+
+  lock_attach (node, btx);
+
+  return node;
+}
+  
 /* Create and return a new transaction over the specified B+tree environment. 
    The transaction will not attempt to acquire any locks after the specified
    monotonic timestamp has elapsed. */
@@ -729,6 +693,18 @@ tx_lock (btree_lock *lock, btree_transaction *btx, gboolean write, GError **err)
   return !needs_lock;
 }
 
+
+static enum btree_lock_node_response
+tx_lock_node (btree_node *node, btree_transaction *btx, gboolean write,
+	      GError **err)
+{
+  btree_lock *lock = g_hash_table_lookup (btx->environment->lock_table, node);
+
+  if (lock == NULL)
+    return DELETED;
+  else return tx_lock (lock, btx, write, err) ? SUCCESS : FAILURE;
+}
+
 /* Releases the specified lock with respect to the specified transaction. Any
    other transactions waiting to acquire this lock are notified so that they
    may re-attempt it. */
@@ -774,6 +750,40 @@ tx_unlock (btree_lock *lock, btree_transaction *btx)
   g_cond_broadcast (&lock->cond); /* Wake up any waiting transactions. */
 
   g_mutex_unlock (&btree_env->mutex);
+}
+
+/* Releases the lock associated with the specified node with respect to the 
+   specified transaction. */
+
+static void
+tx_unlock_node (btree_node *node, btree_transaction *btx)
+{
+  btree_lock *lock = g_hash_table_lookup (btx->environment->lock_table, node);
+
+  assert (lock != NULL);
+  tx_unlock (lock, btx);
+}
+
+/* Breaks the connection between the specified node and its associated lock in
+   the environment's lock table. This is necessary as part of the destruction
+   of the node. */
+
+static void
+lock_detach (btree_node *node, btree_transaction *btx)
+{
+  btree_lock *lock = NULL;
+
+  g_mutex_lock (&btx->environment->lock_table_mutex);
+
+  lock = g_hash_table_lookup (btx->environment->lock_table, node);
+  assert (lock != NULL);
+  assert (lock->writer == btx);
+
+  g_hash_table_remove (btx->environment->lock_table, node);
+
+  tx_unlock (lock, btx);
+  
+  g_mutex_unlock (&btx->environment->lock_table_mutex);
 }
 
 /* Marks this node as having been modified by the specified transaction, so that
@@ -836,7 +846,7 @@ effective_header (btree_node *node, gboolean write)
   else return node->new_header != NULL ? node->new_header : &node->header;
 }
 
-/* Returns the "effective" B+tree keu datum. The effective key datum for writers
+/* Returns the "effective" B+tree key datum. The effective key datum for writers
    is the default key for newly created nodes; otherwise it is the "scratch" 
    datum. For readers, it is the default keu unless a scratch datum is present.
    
@@ -881,7 +891,8 @@ tx_first_child (btree_node *node, btree_transaction *btx, GError **err)
   btree_node_header *header = effective_header (node, FALSE);
   btree_node *first_child = header->first_child;
 
-  if (first_child != NULL && !tx_lock (&first_child->lock, btx, FALSE, err))
+  if (first_child != NULL &&
+      tx_lock_node (first_child, btx, FALSE, err) != SUCCESS)
     return NULL;
   else return first_child;
 }
@@ -898,7 +909,7 @@ tx_parent (btree_node *node, btree_transaction *btx, GError **err)
   btree_node_header *header = effective_header (node, FALSE);
   btree_node *parent = header->parent;
 
-  if (parent != NULL && !tx_lock (&parent->lock, btx, FALSE, err))
+  if (parent != NULL && tx_lock_node (parent, btx, FALSE, err) != SUCCESS)
     return NULL;
   else return parent;
 }
@@ -915,7 +926,7 @@ tx_next_sibling (btree_node *node, btree_transaction *btx, GError **err)
   btree_node_header *header = effective_header (node, FALSE);
   btree_node *next = header->next;
 
-  if (next != NULL && !tx_lock (&next->lock, btx, FALSE, err))
+  if (next != NULL && tx_lock_node (next, btx, FALSE, err) != SUCCESS)
     return NULL;
   else return next;
 }
@@ -971,9 +982,24 @@ tx_prev_sibling (btree_node *node, btree_transaction *btx, GError **err)
   btree_node_header *header = effective_header (node, FALSE);
   btree_node *prev = header->prev;
 
-  if (prev != NULL && !tx_lock (&prev->lock, btx, FALSE, err))
+  if (prev != NULL && tx_lock_node (prev, btx, FALSE, err) != SUCCESS)
     return NULL;
   else return prev;
+}
+
+static gboolean
+locked_for_write (btree_node *node, btree_transaction *btx)
+{
+  btree_lock *lock = NULL;
+  gboolean ret = FALSE;
+  
+  g_mutex_lock (&btx->environment->lock_table_mutex);
+  lock = g_hash_table_lookup (btx->environment->lock_table, node);
+  if (lock != NULL)
+    ret = lock->writer == btx;
+  g_mutex_unlock (&btx->environment->lock_table_mutex);
+
+  return ret;
 }
 
 /* Returns the root of the specified B+tree, from the point of view of the
@@ -985,11 +1011,11 @@ tx_prev_sibling (btree_node *node, btree_transaction *btx, GError **err)
 static btree_node *
 tx_root (btree *btree, btree_transaction *btx)
 {
-  if (!tx_lock (&btree->lock, btx, FALSE, NULL))
+  if (!tx_lock (btree->lock, btx, FALSE, NULL))
     return NULL;
-  else if (btree->new_root != NULL && btree->new_root->lock.writer == btx)
+  else if (btree->new_root != NULL && locked_for_write (btree->new_root, btx))
     return btree->new_root;
-  else if (tx_lock (&btree->root->lock, btx, FALSE, NULL))
+  else if (tx_lock_node (btree->root, btx, FALSE, NULL) == SUCCESS)
     return btree->root;
   else return NULL;
 }
@@ -1039,9 +1065,9 @@ tx_set_first_child (btree_node *node, btree_transaction *btx,
   GError *err = NULL;
   btree_node_header *header = effective_header (node, TRUE);
 
-  if (!tx_lock (&node->lock, btx, TRUE, &err))
+  if (tx_lock_node (node, btx, TRUE, &err) != SUCCESS)
     {
-      g_error_free (err);
+      g_clear_error (&err);
       return FALSE;
     }
 
@@ -1062,9 +1088,9 @@ tx_set_next_sibling (btree_node *node, btree_transaction *btx, btree_node *next)
   GError *err = NULL;
   btree_node_header *header = effective_header (node, TRUE);
 
-  if (!tx_lock (&node->lock, btx, TRUE, &err))
+  if (tx_lock_node (node, btx, TRUE, &err) != SUCCESS)
     {
-      g_error_free (err);
+      g_clear_error (&err);
       return FALSE;
     }
 
@@ -1085,9 +1111,9 @@ tx_set_prev_sibling (btree_node *node, btree_transaction *btx, btree_node *prev)
   GError *err = NULL;
   btree_node_header *header = effective_header (node, TRUE);
 
-  if (!tx_lock (&node->lock, btx, TRUE, &err))
+  if (tx_lock_node (node, btx, TRUE, &err) != SUCCESS)
     {
-      g_error_free (err);
+      g_clear_error (&err);
       return FALSE;
     }
 
@@ -1108,9 +1134,9 @@ tx_set_parent (btree_node *node, btree_transaction *btx, btree_node *parent)
   GError *err = NULL;
   btree_node_header *header = effective_header (node, TRUE);
 
-  if (!tx_lock (&node->lock, btx, TRUE, &err))
+  if (tx_lock_node (node, btx, TRUE, &err) != SUCCESS)
     {
-      g_error_free (err);
+      g_clear_error (&err);
       return FALSE;
     }
 
@@ -1130,14 +1156,13 @@ tx_set_root (btree *btree, btree_transaction *btx, btree_node *root)
 {
   GError *err = NULL;
 
-  if (!tx_lock (&btree->lock, btx, TRUE, &err))
+  if (!tx_lock (btree->lock, btx, TRUE, &err))
     {
-      g_error_free (err);
+      g_clear_error (&err);
       return FALSE;
     }
 
   btree->new_root = root;
-
   return TRUE;
 }
 
@@ -1195,11 +1220,24 @@ unlink_node (btree_node *node, btree_transaction *btx)
   else return TRUE;
 }
 
+/* Frees the resources associated with the specified node. */
+
+static void
+free_btree_node (btree_node *node)
+{
+  free (node->key.data);
+
+  if (node->value.data != NULL)
+    free (node->value.data);
+
+  free (node);
+}
+
 /* Destructively removes a node from the specified B+tree and frees its 
    resources.
 
    The specified transaction must have a write lock on the node, which will be
-   relesed when this function returns. 
+   released when this function returns. 
 */
 
 static void
@@ -1208,10 +1246,11 @@ delete_node (btree_node *node, btree_transaction *btx)
   assert (node->new_key.data == NULL);
   assert (node->new_value.data == NULL);
 
+  lock_detach (node, btx);
+  
   if (node->new_header != NULL)
     free (node->new_header);
-
-  tx_unlock (&node->lock, btx);
+  
   free_btree_node (node);
 }
 
@@ -1227,7 +1266,7 @@ delete_node (btree_node *node, btree_transaction *btx)
 static gboolean
 mark_node_deleted (btree_transaction *btx, btree_node *node)
 {
-  if (!tx_lock (&node->lock, btx, TRUE, NULL))
+  if (tx_lock_node (node, btx, TRUE, NULL) != SUCCESS)
     return FALSE;
 
   if (is_new (node))
@@ -1279,7 +1318,7 @@ apply_modification (gpointer data, gpointer user_data)
   btree_transaction *btx = user_data;
 
   if (! is_new (node))
-    assert (node->lock.writer == btx);
+    assert (locked_for_write (node, btx));
 
   /* Perform the deletion of a node with a tombstone marker. */
 
@@ -1307,7 +1346,7 @@ apply_modification (gpointer data, gpointer user_data)
 	}
 
       clear_flags (node);
-      tx_unlock (&node->lock, btx);
+      tx_unlock_node (node, btx);
     }
 }
 
@@ -1321,7 +1360,7 @@ apply_root_modification (gpointer data, gpointer user_data)
   btree *btree = data;
   btree_transaction *btx = user_data;
 
-  if (btree->new_root != NULL && btree->lock.writer == btx)
+  if (btree->new_root != NULL && btree->lock->writer == btx)
     {
       btree->root = btree->new_root;
       btree->new_root = NULL;
@@ -1366,7 +1405,7 @@ rollback_modification (gpointer data, gpointer user_data)
   btree_node *node = data;
   btree_transaction *btx = user_data;
 
-  assert (node->lock.writer ==  btx);
+  assert (locked_for_write (node, btx));
 
   if (is_new (node))
     /* Remove any newly created nodes. */
@@ -1388,7 +1427,7 @@ rollback_modification (gpointer data, gpointer user_data)
 	}
 
       clear_flags (node);
-      tx_unlock (&node->lock, btx);
+      tx_unlock_node (node, btx);
     }
 }
 
@@ -1402,7 +1441,7 @@ rollback_root_modification (gpointer data, gpointer user_data)
   btree *btree = data;
   btree_transaction *btx = user_data;
 
-  if (btree->new_root != NULL && btree->lock.writer == btx)
+  if (btree->new_root != NULL && btree->lock->writer == btx)
     btree->new_root = NULL;
 }
 
@@ -1432,6 +1471,82 @@ rollback (btree_transaction *btx)
   g_list_free (btx->read_locks);
 
   cleanup_transaction (btx);
+}
+
+static void
+free_btree_node_wrapper (gpointer data, gpointer user_data)
+{
+  free_btree_node (data);
+}
+
+static void
+walk_btree (btree_node *root, GFunc func, gpointer user_data)
+{
+  GList *to_visit = g_list_append (NULL, root);
+
+  while (to_visit != NULL)
+    {
+      GList *to_visit_ptr = to_visit;
+      btree_node *node = to_visit_ptr->data;
+
+      if (node->header.first_child != NULL)
+	to_visit = g_list_prepend (to_visit, node->header.first_child);
+
+      if (node->header.next != NULL)
+	to_visit = g_list_prepend (to_visit, node->header.next);
+
+      to_visit = g_list_delete_link (to_visit, to_visit_ptr);
+      func (node, user_data);
+    }
+}
+
+/* Non-recursively frees all of the B+tree nodes reachable from the specified 
+   root node. */
+
+static void
+free_btree (btree_node *root)
+{
+  walk_btree (root, free_btree_node_wrapper, NULL);
+}
+
+static void
+force_lock_detach (gpointer data, gpointer user_data)
+{
+  btree_transaction *btx = user_data;
+  btree_lock *lock = g_hash_table_lookup (btx->environment->lock_table, data);
+
+  assert (lock != NULL);
+  
+  g_hash_table_remove (btx->environment->lock_table, data);
+  lock_free (lock);
+}
+
+/* Frees the resources allocated for the specified B+tree (including all key
+   and value datums) and removes it from its enclosing environment. */
+
+static void
+close_btree (btree *bt)
+{
+  GList *btree_link = NULL;
+  btree_environment *btree_env = bt->environment;
+  btree_transaction *btx = create_transaction (btree_env, G_MAXINT64);
+  
+  /* Remove the B+tree from the environment. */
+  
+  g_mutex_lock (&btree_env->mutex);
+  
+  btree_link = g_list_find (btree_env->btrees, bt);
+  assert (btree_link != NULL);
+  btree_env->btrees = g_list_delete_link (btree_env->btrees, btree_link);
+  
+  g_mutex_unlock (&btree_env->mutex);
+
+  walk_btree (bt->root, force_lock_detach, btx);
+  commit (btx);
+
+  lock_free (bt->lock);
+  free_btree (bt->root);
+  free (bt);
 }
 
 /* Finds and returns the node with the specified key if it exists in the 
@@ -1919,8 +2034,8 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
       return FALSE;
     }
 
-  new_node = create_btree_node (parent, 0, 0, key, key_len);
-  if (! tx_lock (&new_node->lock, btx, TRUE, NULL))
+  new_node = create_lockable_btree_node (parent, 0, 0, key, key_len, btx);
+  if (tx_lock_node (new_node, btx, TRUE, NULL) != SUCCESS)
     return FALSE;
 
   write_datum (&new_node->value, value, value_len);
@@ -1972,12 +2087,12 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
 	  if (last_child->value.data == NULL)
 	    {
 	      unsigned char *interstitial_key = key_after (key, key_len);
-	      btree_node *interstitial = create_btree_node 
+	      btree_node *interstitial = create_lockable_btree_node 
 		(parent, MIN_INTERNAL_CHILDREN, MAX_INTERNAL_CHILDREN, 
-		 interstitial_key, key_len + 1);
+		 interstitial_key, key_len + 1, btx);
 
 	      free (interstitial_key);
-	      if (! tx_lock (&interstitial->lock, btx, TRUE, NULL))
+	      if (tx_lock_node (interstitial, btx, TRUE, NULL) != SUCCESS)
 		return FALSE;
 
 	      tx_set_first_child (interstitial, btx, new_node);
@@ -2004,9 +2119,9 @@ insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key,
     }
   else
     {
-      if (!tx_lock (&next->lock, btx, TRUE, &err))
+      if (tx_lock_node (next, btx, TRUE, &err) != SUCCESS)
 	{
-	  g_error_free (err);
+	  g_clear_error (&err);
 	  return FALSE;
 	}
 
@@ -2052,15 +2167,15 @@ split (btree_node *node, btree_transaction *btx)
 {
   GError *err = NULL;
   unsigned int split_position = 1;
-  btree_node *new_node = create_btree_node
-    (NULL, MIN_INTERNAL_CHILDREN, MAX_INTERNAL_CHILDREN, NULL, 0);
+  btree_node *new_node = create_lockable_btree_node
+    (NULL, MIN_INTERNAL_CHILDREN, MAX_INTERNAL_CHILDREN, NULL, 0, btx);
 
   btree_node *next = NULL;
   btree_node *parent = NULL;
   btree_node *split_point = NULL;
   btree_node *pre_split_point = NULL;
 
-  if (! tx_lock (&new_node->lock, btx, TRUE, NULL))
+  if (tx_lock_node (new_node, btx, TRUE, NULL) != SUCCESS)
     return NULL;
 
   next = tx_next_sibling (node, btx, &err);
@@ -2168,9 +2283,10 @@ maybe_split (btree_transaction *btx, btree *btree, btree_node *node)
 	{
 	  /* We just split the root. */
 
-	  parent = create_btree_node (NULL, 1, BRANCHING_FACTOR - 1, NULL, 0);
+	  parent = create_lockable_btree_node
+	    (NULL, 1, BRANCHING_FACTOR - 1, NULL, 0, btx);
 
-	  if (! tx_lock (&parent->lock, btx, TRUE, NULL))
+	  if (tx_lock_node (parent, btx, TRUE, NULL) != SUCCESS)
 	    return FALSE;
 
 	  node->min_children = MIN_INTERNAL_CHILDREN;
@@ -2196,6 +2312,38 @@ maybe_split (btree_transaction *btx, btree *btree, btree_node *node)
     }
 
   return TRUE;
+}
+
+/* Create and return a new B+tree wrapper structure. */
+
+static btree *
+create_btree (btree_environment *btree_env)
+{
+  btree *bt = malloc (sizeof (btree));
+  btree_transaction *btx = create_transaction (btree_env, G_MAXINT64);
+
+  bt->lock = lock_new ();
+  
+  /* The root node's min / max children are special. */
+
+  bt->root = create_lockable_btree_node
+    (NULL, 1, BRANCHING_FACTOR - 1, NULL, 0, btx);
+
+  bt->new_root = NULL;
+
+  clear_flags (bt->root);
+
+  /* Add the B+tree to the environment. */
+
+  g_mutex_lock (&btree_env->mutex);
+  btree_env->btrees = g_list_prepend (btree_env->btrees, bt);
+  g_mutex_unlock (&btree_env->mutex);
+
+  bt->environment = btree_env;
+  
+  commit (btx);
+  
+  return bt;
 }
 
 /* The following functions implement the gzochid storage engine interface (as
@@ -2368,7 +2516,7 @@ get_internal (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       mark_for_rollback (tx, TRUE);
       return NULL;
     }
-  else if (update && !tx_lock (&node->lock, btx, TRUE, NULL))
+  else if (update && tx_lock_node (node, btx, TRUE, NULL) != SUCCESS)
     {
       mark_for_rollback (tx, TRUE);
       return NULL;
@@ -2457,7 +2605,7 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 
   node = search (btx, store->database, key, key_len);
 
-  if (node != NULL && tx_lock (&node->lock, btx, TRUE, NULL))
+  if (node != NULL && tx_lock_node (node, btx, TRUE, NULL) == SUCCESS)
     {
       btree_datum *read_value = effective_value (node, FALSE);
 
