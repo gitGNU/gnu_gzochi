@@ -60,6 +60,11 @@ struct _btree_lock
 
   struct _btree_transaction *writer; /* The current holder of the write lock. */
   GList *readers; /* The current readers. */
+
+  /* The number of readers and writers attempting to seize this lock, plus one
+     if the lock is still stored in the lock table. */
+
+  guint ref_count; 
 };
 
 typedef struct _btree_lock btree_lock;
@@ -375,14 +380,20 @@ create_btree_node (btree_node *parent, unsigned int min_children,
 
 /* Associates the specified B+tree node with a new `btree_lock' in the lock
    table for the B+tree environment that contains the specified 
-   `btree_transaction'. */
+   `btree_transaction'. 
+
+   The reference count of the new lock is initially set to 1 to indicate its
+   housing within the lock table. */
 
 static void
 lock_attach (btree_node *node, btree_transaction *btx)
 {
   btree_lock *lock = lock_new ();
   
+  g_mutex_lock (&btx->environment->lock_table_mutex);
+  g_atomic_int_inc (&lock->ref_count);
   g_hash_table_insert (btx->environment->lock_table, node, lock);
+  g_mutex_unlock (&btx->environment->lock_table_mutex);
 }
 
 /* A wrapper around `create_btree_node' that separates the concern of creating
@@ -693,16 +704,78 @@ tx_lock (btree_lock *lock, btree_transaction *btx, gboolean write, GError **err)
   return !needs_lock;
 }
 
+/* Attempts to obtain and return the `btree_lock' associated with the specified
+   B+tree node. If the lock is still in the environment's lock table, its
+   reference count is also incremented. */
+
+static btree_lock *
+lock_ref (btree_node *node, btree_transaction *btx)
+{
+  btree_lock *lock = NULL;
+
+  g_mutex_lock (&btx->environment->lock_table_mutex);
+  lock = g_hash_table_lookup (btx->environment->lock_table, node);
+
+  if (lock != NULL)
+    g_atomic_int_inc (&lock->ref_count);
+  
+  g_mutex_unlock (&btx->environment->lock_table_mutex);
+  return lock;
+}
+
+/* Decrements the reference count on the specified lock. If the reference count
+   reaches zero, the lock is freed. */
+
+static void
+lock_unref (btree_lock *lock)
+{
+  if (g_atomic_int_dec_and_test (&lock->ref_count))
+    lock_free (lock);
+}
+
+/* A wrapper around `tx_lock' that negotiates the challenges of obtaining a lock
+   associated with a B+tree node pointer that may be in the process of being
+   freed or may already be freed.
+
+   If this function returns `SUCCESS', the requested lock has been acquired,
+   and cannot be deleted out from under the current transaction; if it returns
+   `FAILURE', the lock belongs to a node that (for the moment) still exists but
+   the requested lock could not be acquired, likely because of a timeout or
+   deadlock; if the function returns `DELETED', then the node is being or has
+   already been deleted. In this final case, the caller's transaction may still
+   be in a healthy state. */
 
 static enum btree_lock_node_response
 tx_lock_node (btree_node *node, btree_transaction *btx, gboolean write,
 	      GError **err)
 {
-  btree_lock *lock = g_hash_table_lookup (btx->environment->lock_table, node);
+  /* First, obtain a reference to the node to prevent it from being deleted
+     while the lock is attempted, if it still exists. */
+  
+  btree_lock *lock = lock_ref (node, btx);
+  enum btree_lock_node_response ret;
 
   if (lock == NULL)
     return DELETED;
-  else return tx_lock (lock, btx, write, err) ? SUCCESS : FAILURE;
+  else
+    {
+      /* Attempt to obtain the lock. */
+      
+      ret = tx_lock (lock, btx, write, err) ? SUCCESS : FAILURE;
+      lock_unref (lock); /* Decrement the ref count. */
+      
+      g_mutex_lock (&btx->environment->lock_table_mutex);
+
+      /* If the lock has subsequently been removed from the lock table, then it
+	 must be the case that another thread was in the process of deleting it.
+	 In that case, ignore the previous return value from `tx_lock'. */
+      
+      if (! g_hash_table_contains (btx->environment->lock_table, node))
+	ret = DELETED;      
+      g_mutex_unlock (&btx->environment->lock_table_mutex);
+
+      return ret;
+    }
 }
 
 /* Releases the specified lock with respect to the specified transaction. Any
@@ -766,7 +839,12 @@ tx_unlock_node (btree_node *node, btree_transaction *btx)
 
 /* Breaks the connection between the specified node and its associated lock in
    the environment's lock table. This is necessary as part of the destruction
-   of the node. */
+   of the node.
+
+   The lock is not necessarily deleted, since there may be other transactions in
+   other threads attempting to manipulate it. Instead, its reference count is 
+   decremented, which will trigger its deletion only when no other operations
+   are in progress against it. */
 
 static void
 lock_detach (btree_node *node, btree_transaction *btx)
@@ -782,6 +860,8 @@ lock_detach (btree_node *node, btree_transaction *btx)
   g_hash_table_remove (btx->environment->lock_table, node);
 
   tx_unlock (lock, btx);
+  
+  lock_unref (lock);
   
   g_mutex_unlock (&btx->environment->lock_table_mutex);
 }
