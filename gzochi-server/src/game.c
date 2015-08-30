@@ -94,7 +94,11 @@ scan_app_dir (gzochid_game_context *context, const char *dir)
   descriptor = gzochid_config_parse_application_descriptor (descriptor_file);
   fclose (descriptor_file);
 
-  if (g_hash_table_contains (context->applications, descriptor->name))
+  if (descriptor == NULL)
+    gzochid_warning
+      ("Failed to parse application descriptor %s; skipping.",
+       descriptor_filename);
+  else if (g_hash_table_contains (context->applications, descriptor->name))
     gzochid_warning
       ("Application in %s with name '%s' already exists; skipping.", 
        descriptor_file, descriptor->name);

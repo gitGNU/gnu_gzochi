@@ -256,46 +256,69 @@ descriptor_text (GMarkupParseContext *context, const gchar *text,
     }
 }
 
-static void 
-descriptor_error (GMarkupParseContext *context, GError *error, 
-		  gpointer user_data)
-{
-  gzochid_warning (error->message);
-}
-
 GMarkupParser descriptor_parser = 
   {
     descriptor_start_element, 
     descriptor_end_element, 
     descriptor_text, 
-    NULL, 
-    descriptor_error
+    NULL,
+    NULL
   };
+
+static gzochid_application_descriptor *
+descriptor_new ()
+{
+  gzochid_application_descriptor *descriptor =
+    calloc (1, sizeof (gzochid_application_descriptor));
+
+  descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);
+  descriptor->auth_properties = g_hash_table_new (g_str_hash, g_str_equal);
+
+  return descriptor;
+}
+
+static void
+descriptor_free (gzochid_application_descriptor *descriptor)
+{
+  g_hash_table_destroy (descriptor->properties);
+  g_hash_table_destroy (descriptor->auth_properties);
+
+  free (descriptor);
+}
 
 gzochid_application_descriptor *
 gzochid_config_parse_application_descriptor (FILE *file)
 {
   gzochid_application_descriptor *descriptor = NULL;  
   GMarkupParseContext *context = NULL; 
-
+  GError *err = NULL;
+  
   char buf[1024];
   int bytes_read = 0;
 
-  descriptor = calloc (1, sizeof (gzochid_application_descriptor));
-  descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);
-  descriptor->auth_properties = g_hash_table_new (g_str_hash, g_str_equal);
-
+  descriptor = descriptor_new ();
   context = g_markup_parse_context_new 
     (&descriptor_parser, 0, descriptor, NULL);
  
   while ((bytes_read = fread (buf, sizeof (char), 1024, file)) >= 0)
     {
-      g_markup_parse_context_parse (context, buf, bytes_read, NULL);      
-      if (bytes_read < 1024)
+      g_markup_parse_context_parse (context, buf, bytes_read, &err);      
+      if (bytes_read < 1024 || err != NULL)
 	break;
     }
+
+  if (err == NULL)
+    g_markup_parse_context_end_parse (context, &err);
+
+  if (err != NULL)
+    {
+      gzochid_warning (err->message);      
+      g_error_free (err);
+      
+      descriptor_free (descriptor);
+      descriptor = NULL;
+    }
   
-  g_markup_parse_context_end_parse (context, NULL);
   g_markup_parse_context_free (context);
   
   return descriptor;

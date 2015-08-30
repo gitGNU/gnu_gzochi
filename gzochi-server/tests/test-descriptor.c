@@ -68,6 +68,24 @@ test_descriptor_parse_ready ()
   g_assert_cmpstr (descriptor->ready->procedure, ==, "ready");
   g_assert (list_equal (module, descriptor->ready->module, 
 			(GCompareFunc) strcmp));
+
+  fclose (descriptor_file);
+}
+
+static void 
+test_descriptor_parse_error ()
+{
+  char *descriptor_text = "<?xml version=\"1.0\" ?>\n\
+<game name=\"test\">\n\
+  <description>Test</description>\n\
+  <load-paths />\n\
+</game>";
+
+  FILE *descriptor_file =
+    fmemopen (descriptor_text, strlen (descriptor_text), "r");
+
+  g_assert_null (gzochid_config_parse_application_descriptor (descriptor_file));
+  fclose (descriptor_file);
 }
 
 int 
@@ -76,6 +94,7 @@ main (int argc, char *argv[])
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/descriptor/parse/ready", test_descriptor_parse_ready);
+  g_test_add_func ("/descriptor/parse/error", test_descriptor_parse_error);
 
   return g_test_run ();
 }
