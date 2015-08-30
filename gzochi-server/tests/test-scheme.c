@@ -21,25 +21,51 @@
 #include <stdlib.h>
 
 #include "app.h"
-#include "mock-data.h"
 #include "scheme.h"
 
 static void
-test_serialization ()
+test_serialization_exception ()
 {
   gzochid_application_context *context = gzochid_application_context_new ();
   GString *str = g_string_new ("");
   GError *err = NULL;
-  gpointer data = NULL;
 
   context->descriptor = calloc (1, sizeof (gzochid_application_descriptor));
   context->deployment_root = "/";
 
   gzochid_util_serialize_string ("test-unknown-type", str);
-  data = gzochid_scheme_data_serialization.deserializer (context, str, &err);
 
-  g_assert (data == SCM_BOOL_F);
+  g_assert
+    (scm_is_false
+     (gzochid_scheme_data_serialization.deserializer (context, str, &err)));
+
   g_assert_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_FAILED);
+  g_clear_error (&err);
+
+  free (context->descriptor);
+  gzochid_application_context_free (context);
+  g_string_free (str, TRUE);
+}
+
+static void
+test_serialization_corrupt ()
+{
+  gzochid_application_context *context = gzochid_application_context_new ();
+  GString *str = g_string_new ("");
+  GError *err = NULL;
+  
+  gzochid_util_serialize_int (16, str);  
+
+  g_assert
+    (scm_is_false
+     (gzochid_scheme_data_serialization.deserializer (context, str, &err)));
+
+  g_assert_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_SERIAL);
+  g_clear_error (&err);
+
+  free (context->descriptor);
+  gzochid_application_context_free (context);
+  g_string_free (str, TRUE);
 }
 
 static void
@@ -47,7 +73,9 @@ inner_main (void *data, int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
-  g_test_add_func ("/scheme/serialization/exception", test_serialization);
+  g_test_add_func
+    ("/scheme/serialization/exception", test_serialization_exception);
+  g_test_add_func ("/scheme/serialization/corrupt", test_serialization_corrupt);
 
   gzochid_guile_init ();
   gzochid_scheme_initialize_bindings ();

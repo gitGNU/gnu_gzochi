@@ -35,7 +35,8 @@ GQuark gzochid_scheme_error_quark (void);
 typedef enum
   {
     GZOCHID_SCHEME_ERROR_RETRY,
-    GZOCHID_SCHEME_ERROR_FAILED
+    GZOCHID_SCHEME_ERROR_FAILED,
+    GZOCHID_SCHEME_ERROR_SERIAL
   }
   GzochidSchemeError;
 
