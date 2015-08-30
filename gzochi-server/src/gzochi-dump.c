@@ -241,7 +241,7 @@ main (int argc, char *argv[])
   
   setlocale (LC_ALL, "");
   
-  while ((optc = getopt_long (argc, argv, "+ce:o:hv", longopts, NULL)) != -1)
+  while ((optc = getopt_long (argc, argv, "+c:e:o:hv", longopts, NULL)) != -1)
     switch (optc)
       {
       case 'c':
