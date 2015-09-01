@@ -123,11 +123,23 @@ destroy_context (char *path)
   g_rmdir (path);
 }
 
+/* Sets or resets the character handling for the GLib IO Channel used to read or
+   write the treefile. In particular, set the encoding to `NULL' to put the
+   Channel in "binary" mode and set the line terminator to be a single newline
+   to support embedded `NULL' characters. */
+
+static void
+set_channel_format (GIOChannel *channel)
+{
+  g_io_channel_set_encoding (channel, NULL, NULL);
+  g_io_channel_set_line_term (channel, "\n", 1);
+}
+
 static gzochid_storage_store *
 open (gzochid_storage_context *context, char *path, unsigned int flags)
 {
   gzochid_storage_store *store = calloc (1, sizeof (gzochid_storage_store));
-  treefile *treefile = malloc (sizeof (treefile));
+  treefile *treefile = malloc (sizeof (struct _treefile));
 
   treefile->path = strdup (path);
 
@@ -135,10 +147,12 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
      effect of truncating the file. */
 
   if (flags & GZOCHID_STORAGE_CREATE)
-    treefile->channel = g_io_channel_new_file (treefile->path, "w+", NULL);
-  else treefile->channel = g_io_channel_new_file (treefile->path, "r+", NULL);
+    treefile->channel = g_io_channel_new_file (path, "w+", NULL);
+  else treefile->channel = g_io_channel_new_file (path, "r+", NULL);
 
   assert (treefile->channel != NULL);
+
+  set_channel_format (treefile->channel);
 
   store->context = context;
   store->database = treefile;
@@ -198,6 +212,19 @@ transaction_begin_timed (gzochid_storage_context *context,
   assert (1 == 0);
 }
 
+/* Destructively transfer the contents of the specified `GString' to the
+   specified `treefile_datum'. */
+
+static void
+move_to_datum (treefile_datum *datum, GString *str)
+{
+  datum->data = malloc (sizeof (unsigned char) * str->len - 1);
+  datum->data_len = str->len - 1;
+
+  memcpy (datum->data, str->str, str->len - 1);
+  g_string_erase (str, 0, str->len);	      
+}
+
 /* Allows lazy enlistment of the store in a transaction. Bootstraps an in-memory
    GTree with the contents of the store file. */
 
@@ -209,6 +236,7 @@ ensure_store_tx (gzochid_storage_transaction *tx, gzochid_storage_store *store)
   
   if (tree == NULL)
     {
+      GString *str = g_string_new ("");
       treefile *treefile = store->database;
       GIOStatus status = g_io_channel_seek_position 
 	(treefile->channel, 0, G_SEEK_SET, NULL);
@@ -218,33 +246,35 @@ ensure_store_tx (gzochid_storage_transaction *tx, gzochid_storage_store *store)
 
       do 
 	{
-	  char *key = NULL, *value = NULL;
-	  size_t key_len = 0, value_len = 0;
-
-	  status = g_io_channel_read_line 
-	    (treefile->channel, &key, &key_len, NULL, NULL);
+	  /* Use `g_io_channel_read_line_string' instead of plain old
+	     `g_io_channel_read_line' because the latter uses `g_strndup' to
+	     transfer bytes to the return value, which has the effect of
+	     truncating lines with embedded `NULL' bytes. Is this a bug? */
+	  
+	  status = g_io_channel_read_line_string
+	    (treefile->channel, str, NULL, NULL);
 
 	  if (status == G_IO_STATUS_NORMAL)
 	    {
 	      treefile_datum *key_datum = malloc (sizeof (treefile_datum));
 	      treefile_datum *value_datum = malloc (sizeof (treefile_datum));
+	      GError *err = NULL;
 
-	      status = g_io_channel_read_line 
-		(treefile->channel, &value, &value_len, NULL, NULL);	      
+	      move_to_datum (key_datum, str);
+	      
+	      status = g_io_channel_read_line_string
+		(treefile->channel, str, NULL, &err);	      
+	      
 	      assert (status == G_IO_STATUS_NORMAL);
 
-	      key_datum->data = (unsigned char *) key;
-	      key_datum->data_len = key_len - 1;
-
-	      value_datum->data = (unsigned char *) value;
-	      value_datum->data_len = value_len - 1;
-
+	      move_to_datum (value_datum, str);
 	      g_tree_insert (tree, key_datum, value_datum);
 	    }
 	}
       while (status == G_IO_STATUS_NORMAL);
-
+      
       g_hash_table_insert (ht, store->database, tree);
+      g_string_free (str, TRUE);
     }
 
   return tree;
@@ -317,8 +347,10 @@ write_treefile (gpointer key, gpointer value, gpointer user_data)
 */
 
   g_io_channel_shutdown (treefile->channel, TRUE, NULL);
-  treefile->channel = g_io_channel_new_file (treefile->path, "w+", NULL);
 
+  treefile->channel = g_io_channel_new_file (treefile->path, "w+", NULL);
+  set_channel_format (treefile->channel);
+  
   g_tree_foreach (value, write_keyvalue, treefile->channel);
   g_io_channel_flush (treefile->channel, NULL);
 }
