@@ -37,14 +37,18 @@ test_programs = \
 	test-task \
 	test-util
 
+dist_noinst_DATA = test-gzochi-migrate.conf.in test-gzochi-migrate.xml \
+	test-gzochi-migrate/game.xml test-gzochi-migrate/gzochi/test/migrate.scm
 dist_noinst_HEADERS = mock-data.h
-dist_noinst_SCRIPTS = test-gzochi-dump.sh test-gzochi-load.sh
+dist_noinst_SCRIPTS = test-gzochi-dump.sh test-gzochi-load.sh \
+	test-gzochi-migrate.sh
 
 check_PROGRAMS = $(test_programs) 
 check_LTLIBRARIES = treefile.la
 AM_TESTS_ENVIRONMENT = GUILE_LOAD_PATH='$(top_srcdir)/src/scheme'; \
 	export GUILE_LOAD_PATH;
-TESTS = $(test_programs) test-gzochi-dump.sh test-gzochi-load.sh
+TESTS = $(test_programs) test-gzochi-dump.sh test-gzochi-load.sh \
+	test-gzochi-migrate.sh
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
 treefile_la_SOURCES = treefile.c

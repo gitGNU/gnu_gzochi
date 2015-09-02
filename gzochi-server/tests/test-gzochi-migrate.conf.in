@@ -1,0 +1,11 @@
+# 
+# A super-minimal version of gzochid.conf, the gzochi server configuration file;
+# intended for use running the gzochi-migrate test suite.
+#
+
+[game]
+
+server.fs.apps = .
+server.fs.data = __TMPDIR__
+
+storage.engine = treefile

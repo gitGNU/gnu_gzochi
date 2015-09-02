@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+
+<!-- A gzochi game application descriptor to use with test-gzochi-migrate.sh -->
+
+<game name="test-gzochi-migrate">
+  <description>gzochi-migrate test application</description>
+  <load-paths />
+
+  <initialized><callback module="" procedure="" /></initialized>
+  <logged-in><callback module="" procedure="" /></logged-in>
+</game>

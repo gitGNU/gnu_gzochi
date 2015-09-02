@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+
+<!-- A gzochi migration descriptor to use with test-gzochi-migrate.sh -->
+
+<migration target="test-gzochi-migrate">
+  <load-paths>
+    <load-path>test-gzochi-migrate</load-path>
+  </load-paths>
+
+  <input-registry module="gzochi test migrate" name="pre-type-registry" />
+  <output-registry module="gzochi test migrate" name="post-type-registry" />
+  
+  <callback module="gzochi test migrate" procedure="test-visitor" />
+</migration>
