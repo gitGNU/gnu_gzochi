@@ -53,6 +53,9 @@
 
 #define GAME_DESCRIPTOR_XML "game.xml"
 
+#define SERVER_FS_APPS_DEFAULT "/var/gzochid/deploy"
+#define SERVER_FS_DATA_DEFAULT "/var/gzochid/data"
+
 /*
   Redundant prototype for gmp_fprintf, which does not seem to be consistently
   defined by the preprocessor magic in gmp.h.
@@ -530,8 +533,10 @@ create_application_context (char *path, char *app)
   const char *env = getenv ("GZOCHID_CONF_LOCATION");
   const char *gzochid_conf = NULL;
 
+  gzochid_game_context *parent = gzochid_game_context_new ();
   gzochid_application_context *context = gzochid_application_context_new ();
-  char *work_dir = NULL, *data_dir = NULL, *deploy_dir = NULL, *app_dir = NULL;
+  char *work_dir = NULL, *data_dir = NULL, *apps_dir = NULL,
+    *descriptor_path = NULL, *storage_engine = NULL;
 
   if (path != NULL)
     gzochid_conf = path;
@@ -541,21 +546,22 @@ create_application_context (char *path, char *app)
 
   config = gzochid_tool_load_game_config (gzochid_conf);
 
-  if (! g_hash_table_contains (config, "server.fs.data"))
-    {
-      g_critical ("server.fs.data must be set.");
-      exit (EXIT_FAILURE);
-    }
+  if (g_hash_table_contains (config, "server.fs.data"))
+    work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
+  else work_dir = strdup (SERVER_FS_DATA_DEFAULT);
 
-  work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
-  data_dir = g_strconcat (work_dir, "/", app, NULL);
-  deploy_dir = strdup (g_hash_table_lookup (config, "server.fs.apps"));
-  app_dir = g_strconcat (deploy_dir, "/", app, "/", GAME_DESCRIPTOR_XML, NULL);
+  data_dir = g_strconcat (work_dir, "/", app, NULL);  
 
-  descriptor_file = fopen (app_dir, "r");
+  if (g_hash_table_contains (config, "server.fs.apps"))    
+    apps_dir = strdup (g_hash_table_lookup (config, "server.fs.apps"));
+  else apps_dir = strdup (SERVER_FS_APPS_DEFAULT);
+
+  descriptor_path = g_build_filename (apps_dir, app, GAME_DESCRIPTOR_XML, NULL);
+  descriptor_file = fopen (descriptor_path, "r");
   if (descriptor_file == NULL)
     {
-      g_critical ("Failed to open application descriptor in %s", app_dir);
+      g_critical
+	("Failed to open application descriptor in %s", descriptor_path);
       exit (EXIT_FAILURE);
     }
   
@@ -566,12 +572,26 @@ create_application_context (char *path, char *app)
 
   if (context->descriptor == NULL)
     {
-      g_critical ("Failed to parse application descriptor in %s", app_dir);
+      g_critical
+	("Failed to parse application descriptor in %s", descriptor_path);
       exit (EXIT_FAILURE);
     }
 
-  context->load_paths = g_list_prepend 
-    (g_list_copy (context->descriptor->load_paths), strdup (app_dir));
+  context->deployment_root = g_path_get_dirname (descriptor_path);
+  context->load_paths = g_list_prepend
+    (g_list_copy (context->descriptor->load_paths), strdup (descriptor_path));
+
+  if (g_hash_table_contains (config, "storage.engine"))
+    storage_engine = strdup (g_hash_table_lookup (config, "storage.engine"));
+  else
+    {
+      g_critical ("storage.engine is required.");
+      exit (EXIT_FAILURE);
+    }
+  parent->storage_engine =
+    gzochid_tool_probe_storage_engine (config, storage_engine);
+  ((gzochid_context *) context)->parent = (gzochid_context *) parent;  
+
   context->storage_context = 
     APP_STORAGE_INTERFACE (context)->initialize (data_dir);
 
@@ -587,8 +607,9 @@ create_application_context (char *path, char *app)
 
   free (work_dir);
   free (data_dir);
-  free (deploy_dir);
-  free (app_dir);
+  free (apps_dir);
+  free (descriptor_path);
+  free (storage_engine);
 
   return context;
 }
