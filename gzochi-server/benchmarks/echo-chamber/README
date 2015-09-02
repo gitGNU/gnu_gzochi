@@ -1,0 +1,35 @@
+This README describes the "echo chamber" benchmark.
+
+The echo chamber tests the message delivery performance of the gzochid container
+by simulating a flurry of application messages. It exercises the inbound and
+outbound socket implementations, as well as the channel subsystem of the
+container. The benchmark client application creates one or more client
+connections to the server; each client sends one or more PING messages to the
+server application, and then waits to receive a PONG message from every other
+connected client, while itself PONGing any PINGs that it receives. The benchmark
+server application "broadcasts" the clients' PINGs over a channel to which all
+the clients are connected, and forwards PONGs from PING recipients to PING
+originators.
+
+To run the benchmark, launch the server such that it uses the customized
+gzochid.conf file in this folder as its bootstrap configuration. In a
+pre-install environment, you can do this using the scripts in the `meta/' folder
+of the source distribution, like so:
+
+  user@localhost:~/src/gzochi/gzochi-server/meta$ ./gzochid -c \
+    ../benchmarks/echo-chamber/gzochid.conf
+
+Once the server is running, launch the benchmark client application by running
+the `echo-chamber.sh' script. The script allows you to tune the behavior of the
+benchmark (number of client connections, number of messages per client, etc.)
+but will otherwise run with sensible defaults (10 clients, 100 messages per
+client). The client will print some statistics and exit once the benchmark
+scenario is complete:
+
+  Messages sent: 100
+  Messages received: 2000
+  Min response ms: 1.051
+  Max response ms: 113.808
+  Average response ms: 3.073
+  Min average response ms: 2.725
+  Max average response ms: 4.894

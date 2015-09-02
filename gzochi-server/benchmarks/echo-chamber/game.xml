@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<game name="echo-chamber">
+  <description>gzochid echo chamber benchmark</description>
+  <load-paths />
+
+  <initialized>
+    <callback module="server" procedure="initialized" />
+  </initialized>
+  
+  <logged-in>
+    <callback module="server" procedure="logged-in" />
+  </logged-in>
+</game>
