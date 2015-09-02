@@ -487,7 +487,9 @@ sub-directories.
 The filesystem directory to search for deployed game applications.
 The user associated with the gzochid process must have read and
 execute access to this directory---but it does not need to be able
-to write files here.
+to write files here. This may be an absolute or relative path; if
+relative, it is resolved relative to the location of the
+gzochid.conf file.
 
 @item auth.plugin.dir
 The filesystem directory to probe for application authentication 

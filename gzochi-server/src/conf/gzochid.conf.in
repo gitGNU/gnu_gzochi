@@ -39,7 +39,9 @@ module.httpd.port = 8000
 server.port = 8001
 
 # The root locations for various game application-related files. See the manual
-# for more information.
+# for more information. The path given by server.fs.apps may be absolute or
+# relative; if relative, it is resolved relative to the location of this
+# configuration file.
 
 server.fs.data = @localstatedir@/gzochid/data
 server.fs.apps = @datarootdir@/gzochid/deploy

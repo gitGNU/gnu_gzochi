@@ -557,6 +557,18 @@ create_application_context (char *path, char *app)
   else apps_dir = strdup (SERVER_FS_APPS_DEFAULT);
 
   descriptor_path = g_build_filename (apps_dir, app, GAME_DESCRIPTOR_XML, NULL);
+  
+  if (g_path_is_absolute (apps_dir))
+    descriptor_path = g_build_filename
+      (apps_dir, app, GAME_DESCRIPTOR_XML, NULL);
+  else
+    {
+      gchar *basedir = g_path_get_dirname (gzochid_conf);
+      descriptor_path = g_build_filename
+	(basedir, apps_dir, app, GAME_DESCRIPTOR_XML, NULL);
+      g_free (basedir);
+    }
+  
   descriptor_file = fopen (descriptor_path, "r");
   if (descriptor_file == NULL)
     {
@@ -588,6 +600,7 @@ create_application_context (char *path, char *app)
       g_critical ("storage.engine is required.");
       exit (EXIT_FAILURE);
     }
+  
   parent->storage_engine =
     gzochid_tool_probe_storage_engine (config, storage_engine);
   ((gzochid_context *) context)->parent = (gzochid_context *) parent;  

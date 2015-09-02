@@ -32,6 +32,7 @@
 #include "durable-task.h"
 #include "fsm.h"
 #include "game.h"
+#include "gzochid.h"
 #include "gzochid-storage.h"
 #include "log.h"
 #include "scheme.h"
@@ -107,21 +108,42 @@ scan_app_dir (gzochid_game_context *context, const char *dir)
   g_free (descriptor_filename);
 }
 
+static gchar *
+qualify_apps_dir (gzochid_game_context *context)
+{
+  if (g_path_is_absolute (context->apps_dir))
+    return g_strdup (context->apps_dir);
+  else
+    {
+      gzochid_server_context *server_context =
+	(gzochid_server_context *) ((gzochid_context *) context)->parent;
+      gchar *basedir = g_path_get_dirname (server_context->gzochid_conf_path);
+      gchar *path = g_strconcat (basedir, "/", context->apps_dir, NULL);
+      
+      g_free (basedir);
+      return path;
+    }
+}
+
 static void 
 scan_apps_dir (gzochid_game_context *context)
 {
-  GDir *dir = g_dir_open (context->apps_dir, O_RDONLY, NULL);
+  char *apps_dir = qualify_apps_dir (context);
+  GDir *dir = g_dir_open (apps_dir, O_RDONLY, NULL);
   const char *name = g_dir_read_name (dir);
+
   while (name != NULL)
     {
-      char *qname = g_strconcat (context->apps_dir, "/", name, NULL);
+      char *qname = g_strconcat (apps_dir, "/", name, NULL);
       if (g_file_test (qname, G_FILE_TEST_IS_DIR))
 	scan_app_dir (context, qname);
       free (qname);
 
       name = g_dir_read_name (dir);
     }
+  
   g_dir_close (dir);
+  g_free (apps_dir);
 }
 
 static void 
