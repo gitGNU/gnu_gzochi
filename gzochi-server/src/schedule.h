@@ -22,16 +22,6 @@
 
 #include "task.h"
 
-struct _gzochid_task_queue
-{
-  GCond cond;
-  GMutex mutex;
-  GThread *consumer_thread;
-
-  GQueue *queue;
-  GThreadPool *pool;
-};
-
 typedef struct _gzochid_task_queue gzochid_task_queue;
 
 gpointer gzochid_schedule_task_executor (gpointer);

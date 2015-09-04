@@ -30,6 +30,26 @@ enum gzochid_pending_task_state
     GZOCHID_PENDING_TASK_STATE_COMPLETED
   };
 
+/* The task queue structure. */
+
+struct _gzochid_task_queue
+{
+  /* A condition variable to signal when the contents of the queue have been 
+     modified. */
+  
+  GCond cond; 
+  GMutex mutex; /* The accompanying mutex. */
+
+  GThread *consumer_thread; /* The pool feeder thread. */
+
+  /* Indicates whether or not the consumer thread should continue. */
+  
+  gboolean running; 
+
+  GQueue *queue; /* The task queue. */
+  GThreadPool *pool; /* The pool to which ready tasks are fed. */
+};
+
 /* The pending task structure. Represents the status of a task submitted to a
    task execution queue. */
 
