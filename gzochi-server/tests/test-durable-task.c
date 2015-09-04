@@ -100,7 +100,7 @@ typedef struct _test_context test_context;
 static void 
 test_periodic_cancel_inner0 (gpointer data)
 {
-  test_context *context = (test_context *) data;
+  test_context *context = data;
   struct timeval immediate = { 0, 0 };
 
   gzochid_application_task *task = gzochid_application_task_new
@@ -118,18 +118,20 @@ test_periodic_cancel_inner0 (gpointer data)
 static void 
 test_periodic_cancel_inner1 (gpointer data)
 {
-  test_context *context = (test_context *) data;
+  GError *err = NULL;
+  test_context *context = data;
   gzochid_data_managed_reference *handle_ref = 
     gzochid_data_create_reference_to_oid 
     (context->app_context, 
-     &gzochid_durable_application_task_handle_serialization, 
+     &gzochid_durable_application_task_handle_serialization,
      context->handle_oid);
 
-  gzochid_data_dereference (handle_ref, NULL);
+  gzochid_data_dereference (handle_ref, &err);
 
-  gzochid_cancel_periodic_task 
-    (context->app_context, 
-     (gzochid_durable_application_task_handle *) handle_ref->obj);
+  if (err == NULL)
+    gzochid_cancel_periodic_task (context->app_context, handle_ref->obj);
+
+  g_clear_error (&err);
 }
 
 static void 
@@ -210,9 +212,11 @@ test_periodic_cancel ()
 
   g_assert_cmpint (test_worker_counter, <=, 4);
 
-  mpz_clear (context.handle_oid);
-  application_context_clear (app_context);
+  gzochid_schedule_task_queue_stop (game_context->task_queue);    
+
+  mpz_clear (context.handle_oid);  
   gzochid_auth_identity_unref (identity);  
+  application_context_clear (app_context);
 }
 
 int
