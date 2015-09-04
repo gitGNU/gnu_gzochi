@@ -143,7 +143,7 @@ gzochid_schedule_task_executor (gpointer data)
   gzochid_task_queue *task_queue = data;
 
   g_mutex_lock (&task_queue->mutex);
-  while (TRUE)
+  while (task_queue->running)
     {
       if (g_queue_is_empty (task_queue->queue))
 	g_cond_wait (&task_queue->cond, &task_queue->mutex);
@@ -185,9 +185,33 @@ gzochid_schedule_task_executor (gpointer data)
 void 
 gzochid_schedule_task_queue_start (gzochid_task_queue *task_queue)
 {
+  g_mutex_lock (&task_queue->mutex);
   if (task_queue->consumer_thread == NULL)
-    task_queue->consumer_thread = g_thread_new
-      ("task-consumer", gzochid_schedule_task_executor, task_queue);
+    {
+      task_queue->consumer_thread = g_thread_new
+	("task-consumer", gzochid_schedule_task_executor, task_queue);
+      task_queue->running = TRUE;
+    }
+  g_mutex_unlock (&task_queue->mutex);
+}
+
+void
+gzochid_schedule_task_queue_stop (gzochid_task_queue *task_queue)
+{
+  g_mutex_lock (&task_queue->mutex);
+  if (task_queue->consumer_thread != NULL)
+    {
+      GThread *consumer_thread_handle = task_queue->consumer_thread;
+      
+      task_queue->running = FALSE;
+      task_queue->consumer_thread = NULL;
+
+      g_cond_signal (&task_queue->cond);
+      g_mutex_unlock (&task_queue->mutex);
+
+      g_thread_join (consumer_thread_handle);
+    }
+  else g_mutex_unlock (&task_queue->mutex);
 }
 
 static gzochid_pending_task *

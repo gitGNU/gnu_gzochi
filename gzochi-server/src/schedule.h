@@ -29,6 +29,13 @@ gpointer gzochid_schedule_task_executor (gpointer);
 gzochid_task_queue *gzochid_schedule_task_queue_new (GThreadPool *);
 void gzochid_schedule_task_queue_start (gzochid_task_queue *);
 
+/* Stops the thread feeding tasks from the specified task queue. Once this
+   function returns, no additional tasks will be drained from the queue to its
+   associated `GThreadPool', though any tasks that have already been drained for
+   immediate execution will still execute. */
+
+void gzochid_schedule_task_queue_stop (gzochid_task_queue *);
+
 /* Submits the specified task for execution in the specified task queue and 
    returns immediately. The task will be executed no earlier than its configured
    execution time. */
