@@ -47,8 +47,7 @@ void gzochid_schedule_submit_task (gzochid_task_queue *, gzochid_task *);
    in the queue once the previous task has executed; each task will be executed
    no earlier than its configured execution time. 
 
-   The task execution code operates on a shallow copy of the specified 
-   `GList'. */
+   The task execution code operates on a deep copy of the specified `GList'. */
 
 void gzochid_schedule_submit_task_chain (gzochid_task_queue *, GList *);
 

@@ -290,7 +290,6 @@ gzochid_application_resubmitting_transactional_task_worker
 (gzochid_application_context *app_context, gzochid_auth_identity *identity, 
  gpointer data)
 {
-  gzochid_task *task = NULL;
   gzochid_application_task *application_task = NULL;
 
   gzochid_context *context = (gzochid_context *) app_context;
@@ -329,10 +328,13 @@ gzochid_application_resubmitting_transactional_task_worker
 
   if (application_task != NULL)
     {
-      task = gzochid_task_immediate_new
-	(gzochid_application_task_thread_worker, application_task);
+      gzochid_task task;
+
+      task.worker = gzochid_application_task_thread_worker;
+      task.data = application_task;
+      gettimeofday (&task.target_execution_time, NULL);
       
-      gzochid_schedule_submit_task (game_context->task_queue, task);
+      gzochid_schedule_submit_task (game_context->task_queue, &task);
     }
 }
 

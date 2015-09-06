@@ -781,7 +781,7 @@ channel_commit (gpointer data)
     }
 
   gzochid_schedule_submit_task_chain (game_context->task_queue, task_chain);
-  g_list_free (task_chain);
+  g_list_free_full (task_chain, (GDestroyNotify) gzochid_task_free);
 
   cleanup_transaction (tx_context);
 }

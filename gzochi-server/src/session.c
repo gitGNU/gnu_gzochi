@@ -679,7 +679,8 @@ gzochid_data_prefix_binding_persistence_task_free (gzochid_task *task)
   free (transactional_task);
   gzochid_transactional_application_task_execution_free (execution);
   free (application_task);
-  free (task);
+
+  gzochid_task_free (task);
 }
 
 void 

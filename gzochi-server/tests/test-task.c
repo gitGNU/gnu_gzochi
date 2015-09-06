@@ -44,6 +44,7 @@ test_immediate_new ()
   /* Workaround for platforms with broken `timercmp'. */
   
   g_assert (! timercmp (&task->target_execution_time, &t, <));
+  gzochid_task_free (task);
 }
 
 static void
@@ -63,6 +64,7 @@ test_new ()
   /* Workaround for platforms with broken `timercmp'. */
 
   g_assert (! timercmp (&task->target_execution_time, &t, !=));
+  gzochid_task_free (task);
 }
 
 int

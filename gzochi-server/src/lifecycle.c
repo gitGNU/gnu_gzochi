@@ -451,18 +451,16 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
 	(context, gzochid_protocol_client_get_identity (client),
 	 gzochid_application_resubmitting_transactional_task_worker, execution);
 
-      gzochid_task *task = NULL;      
-      struct timeval n;
-
-      gettimeofday (&n, NULL);
+      gzochid_task task;
       
-      task = gzochid_task_new
-	(gzochid_application_task_thread_worker, application_task, n);
+      task.worker = gzochid_application_task_thread_worker;
+      task.data = application_task;
+      gettimeofday (&task.target_execution_time, NULL);
 
       g_hash_table_remove (context->clients_to_oids, client);
       g_hash_table_remove (context->oids_to_clients, session_oid_str);
       
-      gzochid_schedule_submit_task (game_context->task_queue, task);
+      gzochid_schedule_submit_task (game_context->task_queue, &task);
 
       g_mutex_unlock (&context->client_mapping_lock);
     }

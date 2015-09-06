@@ -63,7 +63,8 @@ create_transaction_context (gzochid_application_context *app_context)
 static void 
 cleanup_transaction (gzochid_task_transaction_context *tx_context)
 {
-  g_list_free (tx_context->scheduled_tasks);
+  g_list_free_full
+    (tx_context->scheduled_tasks, (GDestroyNotify) gzochid_task_free);
   free (tx_context);
 }
 
