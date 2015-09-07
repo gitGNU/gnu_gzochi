@@ -272,6 +272,9 @@ join_side_effects_transaction (gzochid_application_context *context,
   return tx_context;
 }
 
+/* Frees the specified operation, potentially downcasting it to a more specific
+   type to allow operation-specific fields to be freed first. */
+
 static void
 free_operation (gzochid_channel_pending_operation *op)
 {
@@ -295,8 +298,18 @@ free_operation (gzochid_channel_pending_operation *op)
   free (op);
 }
 
-static void close_channel (gzochid_application_context *context,
-			   gzochid_auth_identity *identity, gpointer data)
+/* Exposes `free_operation' as a `gzochid_application_worker'. */
+
+static void
+free_operation_worker (gzochid_application_context *context,
+		       gzochid_auth_identity *identity, gpointer data)
+{
+  free_operation (data);
+}
+
+static void
+close_channel (gzochid_application_context *context,
+	       gzochid_auth_identity *identity, gpointer data)
 {
   GError *err = NULL;
   gzochid_channel_pending_operation *op = data;
@@ -315,7 +328,6 @@ static void close_channel (gzochid_application_context *context,
   if (err != NULL)
     {
       g_error_free (err);
-      free_operation (op);
       return;
     }
 
@@ -389,8 +401,6 @@ static void close_channel (gzochid_application_context *context,
   g_mutex_unlock (&context->client_mapping_lock);
   mpz_clear (session_oid);
   free (channel_oid_str);
-
-  free_operation (op);
 }
 
 static void
@@ -415,7 +425,6 @@ send_channel_message (gzochid_application_context *context,
   if (err != NULL)
     {
       g_error_free (err);
-      free_operation (op);
       return;
     }
   
@@ -458,8 +467,6 @@ send_channel_message (gzochid_application_context *context,
   if (channel_modified)
     gzochid_data_mark 
       (context, &gzochid_channel_serialization, channel, NULL);
-
-  free_operation (op);
 }
 
 static void
@@ -485,8 +492,6 @@ join_channel (gzochid_application_context *context,
   char *session_oid_str = NULL;
   GSequenceIter *iter = NULL;
 
-  free_operation (op);
-  
   gzochid_data_dereference (channel_reference, &err);
   if (err != NULL)
     {
@@ -563,8 +568,6 @@ leave_channel (gzochid_application_context *context,
   char *session_oid_str = NULL;
   GSequenceIter *iter = NULL;
 
-  free_operation (op);
-  
   gzochid_data_dereference (channel_reference, &err);
   if (err != NULL)
     {
@@ -618,6 +621,39 @@ leave_channel (gzochid_application_context *context,
     }
 }
 
+/* Creates a retryable `gzochid_application_task' to execute the specified
+   worker, which represents some channel-related operation, and then finally 
+   free the operation as a cleanup step. (The result is then wrapped again as a
+   `gzochid_task' that may be submitted directly to the scheduler.) */
+
+static gzochid_task *
+create_transactional_channel_operation_task
+(gzochid_application_context *context, gzochid_auth_identity *identity,
+ gzochid_application_worker worker, gpointer data, 
+ struct timeval target_execution_time)
+{
+  gzochid_application_task *transactional_task = 
+    gzochid_application_task_new (context, identity, worker, data);
+  gzochid_application_task *cleanup_task =
+    gzochid_application_task_new
+    (context, identity, free_operation_worker, data);
+  
+  gzochid_transactional_application_task_execution *execution = 
+    gzochid_transactional_application_task_execution_new 
+    (transactional_task, NULL, cleanup_task);
+  gzochid_application_task *application_task = 
+    gzochid_application_task_new
+    (context, identity, 
+     gzochid_application_resubmitting_transactional_task_worker, execution);
+  
+  return gzochid_task_new
+    (gzochid_application_task_thread_worker, application_task, 
+     target_execution_time);
+}
+
+/* Returns a `gzochid_task' that executes the specified channel operation
+   transactionally. */
+
 static gzochid_task *
 create_channel_operation_task
 (gzochid_channel_pending_operation *op, gzochid_application_context *context)
@@ -634,25 +670,25 @@ create_channel_operation_task
   switch (op->type)
     {
     case GZOCHID_CHANNEL_OP_CLOSE: 
-      task = gzochid_task_make_transactional_application_task 
+      task = create_transactional_channel_operation_task	
 	(context, identity, close_channel, op, now);
 
       break;
 
     case GZOCHID_CHANNEL_OP_SEND:
-      task = gzochid_task_make_transactional_application_task 
+      task = create_transactional_channel_operation_task	
 	(context, identity, send_channel_message, op, now);
 
       break;
 
     case GZOCHID_CHANNEL_OP_LEAVE: 
-      task = gzochid_task_make_transactional_application_task 
+      task = create_transactional_channel_operation_task	
 	(context, identity, leave_channel, op, now);
 
       break;
 
     case GZOCHID_CHANNEL_OP_JOIN: 
-      task = gzochid_task_make_transactional_application_task 
+      task = create_transactional_channel_operation_task	
 	(context, identity, join_channel, op, now);
 
       break;
