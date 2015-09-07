@@ -344,25 +344,6 @@ gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
   gzochid_application_task *task = data;
   task->worker (task->context, task->identity, task->data);
 
-gzochid_task *
-gzochid_task_make_transactional_application_task
-(gzochid_application_context *context, gzochid_auth_identity *identity,
- gzochid_application_worker worker, gpointer data, 
- struct timeval target_execution_time)
-{
-  gzochid_application_task *transactional_task = 
-    gzochid_application_task_new (context, identity, worker, data);
-  gzochid_transactional_application_task_execution *execution = 
-    gzochid_transactional_application_task_execution_new 
-    (transactional_task, NULL, NULL);
-  gzochid_application_task *application_task = 
-    gzochid_application_task_new 
-    (context, identity, 
-     gzochid_application_resubmitting_transactional_task_worker, execution);
-  
-  return gzochid_task_new 
-    (gzochid_application_task_thread_worker, application_task, 
-     target_execution_time);
 }
 
 gboolean 

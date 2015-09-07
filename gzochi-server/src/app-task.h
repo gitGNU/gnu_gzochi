@@ -134,8 +134,4 @@ void gzochid_application_task_thread_worker (gpointer, gpointer);
 gboolean gzochid_application_should_retry 
 (gzochid_transactional_application_task_execution *);
 
-gzochid_task *gzochid_task_make_transactional_application_task
-(gzochid_application_context *, gzochid_auth_identity *,
- gzochid_application_worker, gpointer, struct timeval);
-
 #endif /* GZOCHID_APP_TASK_H */
