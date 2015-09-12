@@ -46,6 +46,8 @@ struct _gzochid_application_task
   gzochid_application_context *context;
   gzochid_auth_identity *identity;
   gpointer data;
+
+  guint ref_count; /* The reference count. */
 };
 
 typedef struct _gzochid_application_task gzochid_application_task;
@@ -87,6 +89,22 @@ gzochid_transaction_result gzochid_application_transaction_execute_timed
 gzochid_application_task *gzochid_application_task_new 
 (gzochid_application_context *, gzochid_auth_identity *, 
  gzochid_application_worker, gpointer);
+
+/* Increases the reference count of the specified application task and returns 
+   the application task. */
+
+gzochid_application_task *gzochid_application_task_ref
+(gzochid_application_task *);
+
+/* Decreases the reference count of the specified application task. When the
+   reference count reaches zero, the memory associated with the application task
+   will be freed. */
+
+void gzochid_application_task_unref (gzochid_application_task *);
+
+/* Frees the memory associated with the specified application task. */
+
+void gzochid_application_task_free (gzochid_application_task *);
 
 /* Create a new transactional application task execution context with the
    specified main task and optional catch and cleanup tasks. */

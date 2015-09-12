@@ -19,11 +19,36 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include "app.h"
 #include "app-task.h"
 #include "game.h"
+#include "gzochid-auth.h"
 #include "schedule.h"
 #include "task.h"
 #include "tx.h"
+
+static void
+null_worker (gzochid_application_context *context,
+	     gzochid_auth_identity *identity, gpointer data)
+{
+}
+  
+static void
+test_application_task_ref ()
+{
+  gzochid_application_context *context = gzochid_application_context_new ();
+  gzochid_auth_identity *identity = gzochid_auth_identity_new ("test");
+  gzochid_application_task *task =
+    gzochid_application_task_new (context, identity, null_worker, NULL);
+
+  g_assert (task == gzochid_application_task_ref (task));
+
+  gzochid_application_task_unref (task);
+  gzochid_application_task_unref (task);
+  gzochid_auth_identity_unref (identity);
+
+  gzochid_application_context_free (context);
+}
 
 void
 gzochid_schedule_submit_task (gzochid_task_queue *task_queue,
@@ -142,10 +167,10 @@ app_task_fixture_tear_down (app_task_fixture *fixture, gconstpointer user_data)
 {
   gzochid_context *base = (gzochid_context *) fixture->context;
 
-  free (fixture->success_task);
-  free (fixture->failure_task);
-  free (fixture->catch_task);
-  free (fixture->cleanup_task);
+  gzochid_application_task_free (fixture->success_task);
+  gzochid_application_task_free (fixture->failure_task);
+  gzochid_application_task_free (fixture->catch_task);
+  gzochid_application_task_free (fixture->cleanup_task);
 
   gzochid_auth_identity_unref (fixture->identity);
   free (base->parent);
@@ -225,6 +250,8 @@ main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
+  g_test_add_func ("/application-task/ref", test_application_task_ref);
+  
   g_test_add ("/task-execution/reexecute/success", app_task_fixture, NULL,
 	      app_task_fixture_set_up, test_task_execution_reexecute_success,
 	      app_task_fixture_tear_down);

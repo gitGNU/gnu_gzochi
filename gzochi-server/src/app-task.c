@@ -54,7 +54,24 @@ gzochid_application_task_new (gzochid_application_context *context,
   task->worker = worker;
   task->data = data;
 
+  task->ref_count = 1;
+  
   return task;
+}
+
+gzochid_application_task *
+gzochid_application_task_ref (gzochid_application_task *task)
+{
+  g_atomic_int_inc (&task->ref_count);
+  return task;
+}
+
+void
+gzochid_application_task_unref (gzochid_application_task *task)
+{
+  if (g_atomic_int_dec_and_test (&task->ref_count)) {
+    gzochid_application_task_free (task);
+  }
 }
 
 static gzochid_transactional_application_task_execution *
@@ -336,6 +353,13 @@ gzochid_application_resubmitting_transactional_task_worker
       
       gzochid_schedule_submit_task (game_context->task_queue, &task);
     }
+}
+
+void
+gzochid_application_task_free (gzochid_application_task *task)
+{
+  gzochid_auth_identity_unref (task->identity);
+  free (task);
 }
 
 void 
