@@ -387,7 +387,7 @@ gzochid_application_task_thread_worker (gpointer data, gpointer user_data)
 {
   gzochid_application_task *task = data;
   task->worker (task->context, task->identity, task->data);
-
+  gzochid_application_task_unref (task);
 }
 
 gboolean 

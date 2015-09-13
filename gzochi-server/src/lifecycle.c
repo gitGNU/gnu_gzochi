@@ -406,6 +406,12 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   execution = gzochid_transactional_application_task_timed_execution_new 
     (login_task, login_catch_task, NULL, game_context->tx_timeout);
 
+  /* Not necessary to hold a ref to these, as we've transferred them to the
+     execution. */
+  
+  gzochid_application_task_unref (login_task);
+  gzochid_application_task_unref (login_catch_task);
+
   g_mutex_lock (&context->client_mapping_lock);
   g_hash_table_insert (context->oids_to_clients, session_oid_str, client);
   g_hash_table_insert (context->clients_to_oids, client, session_oid_str);
@@ -461,6 +467,13 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
 
       gzochid_task task;
       
+      /* Not necessary to hold a ref to these, as we've transferred them to the
+	 execution. */
+  
+      gzochid_application_task_unref (callback_task);
+      gzochid_application_task_unref (catch_task);
+      gzochid_application_task_unref (cleanup_task);
+
       task.worker = gzochid_application_task_thread_worker;
       task.data = application_task;
       gettimeofday (&task.target_execution_time, NULL);
@@ -508,6 +521,11 @@ gzochid_application_session_received_message
 
       execution = gzochid_transactional_application_task_timed_execution_new
 	(transactional_task, NULL, NULL, game_context->tx_timeout);
+
+      /* Not necessary to hold a ref to this, as we've transferred them to the
+	 execution. */
+  
+      gzochid_application_task_unref (transactional_task);
       
       application_task = gzochid_application_task_new
 	(context, gzochid_protocol_client_get_identity (client),
