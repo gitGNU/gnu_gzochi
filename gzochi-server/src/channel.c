@@ -182,6 +182,8 @@ free_message (gpointer data)
 
       free (payload_message->msg);
     }
+  else if (message->type == GZOCHID_CHANNEL_MESSAGE_LEAVE)
+    free (message->oid_str);
 
   free (message);
 }
@@ -617,8 +619,8 @@ leave_channel (gzochid_application_context *context,
 	}
       gzochid_data_mark 
 	(context, &gzochid_client_session_serialization, session, NULL);
-      return;
     }
+  else free (session_oid_str);
 }
 
 /* Creates a retryable `gzochid_application_task' to execute the specified
