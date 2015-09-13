@@ -420,11 +420,10 @@ remove_session (gzochid_application_context *context, const char *oid_str,
 	      g_clear_error (&local_err);
 	      gzochid_data_remove_object (session_reference, &local_err);
 	    }
-	  
-	  if (local_err != NULL)
-	    g_propagate_error (err, local_err);	  
 	}
-
+      if (local_err != NULL)
+	g_propagate_error (err, local_err);	  
+	
       mpz_clear (oid);
     }
   else g_propagate_error (err, local_err);
