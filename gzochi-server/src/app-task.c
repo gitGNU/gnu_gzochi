@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -82,9 +83,13 @@ execution_new (gzochid_application_task *task,
   gzochid_transactional_application_task_execution *execution = 
     malloc (sizeof (gzochid_transactional_application_task_execution));
 
-  execution->task = task;
-  execution->catch_task = catch_task;
-  execution->cleanup_task = cleanup_task;
+  assert (task != NULL);
+  
+  execution->task = gzochid_application_task_ref (task);
+  execution->catch_task = catch_task != NULL
+    ? gzochid_application_task_ref (catch_task) : NULL;
+  execution->cleanup_task = cleanup_task != NULL
+    ? gzochid_application_task_ref (cleanup_task) : NULL;
 
   if (timeout != NULL)
     {
@@ -121,6 +126,13 @@ void
 gzochid_transactional_application_task_execution_free
 (gzochid_transactional_application_task_execution *execution)
 {
+  gzochid_application_task_unref (execution->task);
+
+  if (execution->catch_task != NULL)
+    gzochid_application_task_unref (execution->catch_task);
+  if (execution->cleanup_task != NULL)
+    gzochid_application_task_unref (execution->cleanup_task);
+  
   if (execution->timeout != NULL)
     free (execution->timeout);
   free (execution);
@@ -341,7 +353,7 @@ gzochid_application_resubmitting_transactional_task_worker
 	 catch_execution);
     }
   else if (execution->cleanup_task != NULL)
-    application_task = execution->cleanup_task;
+    application_task = gzochid_application_task_ref (execution->cleanup_task);
 
   if (application_task != NULL)
     {

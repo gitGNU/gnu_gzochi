@@ -197,16 +197,16 @@ initialize_async_transactional (gpointer data)
 
   if (!initialized)
     {
-      gzochid_application_task application_task;
+      gzochid_application_task *application_task =
+	gzochid_application_task_new
+	(context, system_identity,
+	 gzochid_scheme_application_initialized_worker,
+	 context->descriptor->properties);
+
       gzochid_task task;
 
-      application_task.worker = gzochid_scheme_application_initialized_worker;
-      application_task.context = context;
-      application_task.identity = system_identity;
-      application_task.data = context->descriptor->properties;
-
       task.worker = gzochid_application_task_thread_worker;
-      task.data = &application_task;
+      task.data = application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
       gzochid_schedule_execute_task (&task);
@@ -344,16 +344,15 @@ void
 gzochid_application_client_logged_in (gzochid_application_context *context, 
 				      gzochid_protocol_client *client)
 {
+  gzochid_auth_identity *identity =
+    gzochid_protocol_client_get_identity (client);
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
-  gzochid_client_session *session = 
-    gzochid_client_session_new (gzochid_protocol_client_get_identity (client));
+  gzochid_client_session *session = gzochid_client_session_new (identity);
 
-  gzochid_application_task transactional_task;
-  gzochid_application_task application_task;
-  gzochid_transactional_application_task_execution *execution =
-    gzochid_transactional_application_task_timed_execution_new 
-    (&transactional_task, NULL, NULL, game_context->tx_timeout);
+  gzochid_application_task *application_task = NULL;
+  gzochid_application_task *transactional_task = NULL;
+  gzochid_transactional_application_task_execution *execution = NULL;
 
   gzochid_task task;
 
@@ -365,23 +364,22 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   session_oid_str = mpz_get_str (NULL, 16, session_oid);
   mpz_clear (session_oid);
 
+  transactional_task = gzochid_application_task_new
+    (context, identity, gzochid_scheme_application_logged_in_worker,
+     session_oid_str);
+  execution = gzochid_transactional_application_task_timed_execution_new 
+    (transactional_task, NULL, NULL, game_context->tx_timeout);
   g_mutex_lock (&context->client_mapping_lock);
   g_hash_table_insert (context->oids_to_clients, session_oid_str, client);
   g_hash_table_insert (context->clients_to_oids, client, session_oid_str);
   g_mutex_unlock (&context->client_mapping_lock);
 
-  transactional_task.worker = gzochid_scheme_application_logged_in_worker;
-  transactional_task.context = context;
-  transactional_task.identity = gzochid_protocol_client_get_identity (client);
-  transactional_task.data = session_oid_str;
-
-  application_task.worker = gzochid_application_transactional_task_worker;
-  application_task.context = context;
-  application_task.identity = gzochid_protocol_client_get_identity (client);
-  application_task.data = execution;
-
+  application_task = gzochid_application_task_new
+    (context, gzochid_protocol_client_get_identity (client), 
+     gzochid_application_reexecuting_transactional_task_worker, execution);
+     
   task.worker = gzochid_application_task_thread_worker;
-  task.data = &application_task;
+  task.data = application_task;
   gettimeofday (&task.target_execution_time, NULL);
 
   while (TRUE)
@@ -402,7 +400,7 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
 
 	      gzochid_protocol_client_disconnect (client);
 	      
-	      transactional_task.worker = 
+	      transactional_task->worker = 
 		gzochid_client_session_disconnected_worker;
 	      gzochid_schedule_run_task (game_context->task_queue, &task);
 	      free (session_oid_str);
@@ -485,31 +483,28 @@ gzochid_application_session_received_message
     return;
   else 
     {
-      gzochid_application_task transactional_task;
-      gzochid_application_task application_task;
-      gzochid_transactional_application_task_execution *execution =
-	gzochid_transactional_application_task_timed_execution_new
-	(&transactional_task, NULL, NULL, game_context->tx_timeout);
+      gzochid_application_task *transactional_task = NULL;
+      gzochid_application_task *application_task = NULL;
+      gzochid_transactional_application_task_execution *execution = NULL;
       gzochid_task task;
 
       data[0] = session_oid_str;
       data[1] = msg;
       data[2] = &len;
       
-      transactional_task.worker = 
-	gzochid_scheme_application_received_message_worker;
-      transactional_task.context = context;
-      transactional_task.identity = 
-	gzochid_protocol_client_get_identity (client);
-      transactional_task.data = data;
+      transactional_task = gzochid_application_task_new
+	(context, gzochid_protocol_client_get_identity (client),
+	 gzochid_scheme_application_received_message_worker, data);
+
+      execution = gzochid_transactional_application_task_timed_execution_new
+	(transactional_task, NULL, NULL, game_context->tx_timeout);
       
-      application_task.worker = gzochid_application_transactional_task_worker;
-      application_task.context = context;
-      application_task.identity = gzochid_protocol_client_get_identity (client);
-      application_task.data = execution;
+      application_task = gzochid_application_task_new
+	(context, gzochid_protocol_client_get_identity (client),
+	 gzochid_application_reexecuting_transactional_task_worker, execution);
       
       task.worker = gzochid_application_task_thread_worker;
-      task.data = &application_task;
+      task.data = application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
       while (TRUE)
