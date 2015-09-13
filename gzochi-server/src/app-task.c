@@ -51,7 +51,7 @@ gzochid_application_task_new (gzochid_application_context *context,
   gzochid_application_task *task = malloc (sizeof (gzochid_application_task));
 
   task->context = context;
-  task->identity = identity;
+  task->identity = gzochid_auth_identity_ref (identity);
   task->worker = worker;
   task->data = data;
 
