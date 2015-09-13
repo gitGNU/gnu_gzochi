@@ -798,9 +798,13 @@ channel_prepare (gpointer data)
 }
 
 static void
-cleanup_transaction (gzochid_channel_transaction_context *tx_context)
+cleanup_transaction (gzochid_channel_transaction_context *tx_context,
+		     gboolean free_operations)
 {
-  g_list_free (tx_context->operations);
+  if (free_operations)
+    g_list_free_full (tx_context->operations, (GDestroyNotify) free_operation);
+  else g_list_free (tx_context->operations);
+
   free (tx_context);
 }
 
@@ -826,13 +830,13 @@ channel_commit (gpointer data)
   gzochid_schedule_submit_task_chain (game_context->task_queue, task_chain);
   g_list_free_full (task_chain, (GDestroyNotify) gzochid_task_free);
 
-  cleanup_transaction (tx_context);
+  cleanup_transaction (tx_context, FALSE);
 }
 
 static void
 channel_rollback (gpointer tx_context)
 {
-  cleanup_transaction (tx_context);
+  cleanup_transaction (tx_context, TRUE);
 }
 
 static gzochid_transaction_participant channel_participant =
