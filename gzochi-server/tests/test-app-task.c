@@ -191,8 +191,6 @@ test_task_execution_reexecute_success (app_task_fixture *fixture,
   g_assert_cmpint (fixture->task_attempts, ==, 1);
   g_assert_cmpint (fixture->catch_invocations, ==, 0);
   g_assert_cmpint (fixture->cleanup_invocations, ==, 1);
-
-  gzochid_transactional_application_task_execution_free (execution);
 }
 
 static void
@@ -209,8 +207,6 @@ test_task_execution_reexecute_failure (app_task_fixture *fixture,
   g_assert_cmpint (fixture->task_attempts, ==, 3);
   g_assert_cmpint (fixture->catch_invocations, ==, 1);
   g_assert_cmpint (fixture->cleanup_invocations, ==, 1);
-
-  gzochid_transactional_application_task_execution_free (execution);
 }
 
 static void

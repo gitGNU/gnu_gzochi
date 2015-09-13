@@ -340,6 +340,38 @@ gzochid_application_context_init (gzochid_application_context *context,
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
 }
 
+static void
+login_catch_worker (gzochid_application_context *context,
+		    gzochid_auth_identity *identity, gpointer data)
+{
+  char *session_oid_str = data;
+  gzochid_game_context *game_context =
+    (gzochid_game_context *) ((gzochid_context *) context)->parent;
+  gzochid_protocol_client *client =
+    g_hash_table_lookup (context->oids_to_clients, session_oid_str);
+
+  gzochid_task task;
+  gzochid_application_task *disconnection_task = gzochid_application_task_new
+    (context, identity, gzochid_client_session_disconnected_worker,
+     session_oid_str);
+  
+  gzochid_info
+    ("Disconnecting session '%s'; failed login transaction.", session_oid_str);
+
+  g_mutex_lock (&context->client_mapping_lock);
+  g_hash_table_remove (context->oids_to_clients, session_oid_str);
+  g_hash_table_remove (context->clients_to_oids, client);
+  g_mutex_unlock (&context->client_mapping_lock);
+      
+  gzochid_protocol_client_disconnect (client);
+
+  task.worker = gzochid_application_task_thread_worker;
+  task.data = disconnection_task;
+  gettimeofday (&task.target_execution_time, NULL);
+  
+  gzochid_schedule_submit_task (game_context->task_queue, &task);
+}
+
 void 
 gzochid_application_client_logged_in (gzochid_application_context *context, 
 				      gzochid_protocol_client *client)
@@ -351,7 +383,7 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   gzochid_client_session *session = gzochid_client_session_new (identity);
 
   gzochid_application_task *application_task = NULL;
-  gzochid_application_task *transactional_task = NULL;
+  gzochid_application_task *login_task = NULL, *login_catch_task = NULL;
   gzochid_transactional_application_task_execution *execution = NULL;
 
   gzochid_task task;
@@ -364,11 +396,16 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   session_oid_str = mpz_get_str (NULL, 16, session_oid);
   mpz_clear (session_oid);
 
-  transactional_task = gzochid_application_task_new
+  login_task = gzochid_application_task_new
     (context, identity, gzochid_scheme_application_logged_in_worker,
      session_oid_str);
+
+  login_catch_task = gzochid_application_task_new
+    (context, identity, login_catch_worker, session_oid_str);
+
   execution = gzochid_transactional_application_task_timed_execution_new 
-    (transactional_task, NULL, NULL, game_context->tx_timeout);
+    (login_task, login_catch_task, NULL, game_context->tx_timeout);
+
   g_mutex_lock (&context->client_mapping_lock);
   g_hash_table_insert (context->oids_to_clients, session_oid_str, client);
   g_hash_table_insert (context->clients_to_oids, client, session_oid_str);
@@ -382,34 +419,7 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   task.data = application_task;
   gettimeofday (&task.target_execution_time, NULL);
 
-  while (TRUE)
-    {
-      gzochid_schedule_run_task (game_context->task_queue, &task);
-      if (!gzochid_application_should_retry (execution))
-	{
-	  if (execution->result != GZOCHID_TRANSACTION_SUCCESS)	
-	    {
-	      gzochid_info
-		("Disconnecting session '%s'; failed login transaction.", 
-		 session_oid_str);
-
-	      g_mutex_lock (&context->client_mapping_lock);
-	      g_hash_table_remove (context->oids_to_clients, session_oid_str);
-	      g_hash_table_remove (context->clients_to_oids, client);
-	      g_mutex_unlock (&context->client_mapping_lock);
-
-	      gzochid_protocol_client_disconnect (client);
-	      
-	      transactional_task->worker = 
-		gzochid_client_session_disconnected_worker;
-	      gzochid_schedule_run_task (game_context->task_queue, &task);
-	      free (session_oid_str);
-	    }
-	    break;
-	}
-    }
-
-  gzochid_transactional_application_task_execution_free (execution);
+  gzochid_schedule_run_task (game_context->task_queue, &task);
 }
 
 void 
@@ -507,13 +517,6 @@ gzochid_application_session_received_message
       task.data = application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
-      while (TRUE)
-	{
-	  gzochid_schedule_run_task (game_context->task_queue, &task);
-	  if (!gzochid_application_should_retry (execution))
-	    break;
-	}
-
-      gzochid_transactional_application_task_execution_free (execution);
+      gzochid_schedule_run_task (game_context->task_queue, &task);
     }
 }

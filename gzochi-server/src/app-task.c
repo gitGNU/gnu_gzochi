@@ -290,8 +290,6 @@ wrap_and_execute (gzochid_application_context *app_context,
 
   gzochid_application_reexecuting_transactional_task_worker
     (app_context, identity, execution);
-  
-  gzochid_transactional_application_task_execution_free (execution);
 }
 
 void 
@@ -312,6 +310,8 @@ gzochid_application_reexecuting_transactional_task_worker
   if (execution->cleanup_task != NULL)
     execution->cleanup_task->worker
       (app_context, identity, execution->cleanup_task->data);
+
+  gzochid_transactional_application_task_execution_free (execution);
 }
 
 void 
@@ -319,6 +319,7 @@ gzochid_application_resubmitting_transactional_task_worker
 (gzochid_application_context *app_context, gzochid_auth_identity *identity, 
  gpointer data)
 {
+  gboolean resubmitting_execution = FALSE;
   gzochid_application_task *application_task = NULL;
 
   gzochid_context *context = (gzochid_context *) app_context;
@@ -330,7 +331,8 @@ gzochid_application_resubmitting_transactional_task_worker
     (app_context, identity, execution);
   
   if (gzochid_application_should_retry (execution))
-    {	  
+    {
+      resubmitting_execution = TRUE;
       execution->result = GZOCHID_TRANSACTION_PENDING;
       
       application_task = gzochid_application_task_new
@@ -354,6 +356,12 @@ gzochid_application_resubmitting_transactional_task_worker
     }
   else if (execution->cleanup_task != NULL)
     application_task = gzochid_application_task_ref (execution->cleanup_task);
+
+  if (!resubmitting_execution)
+
+    /* Freeing the execution has the effect of unref'ing the primary task. */
+      
+    gzochid_transactional_application_task_execution_free (execution);
 
   if (application_task != NULL)
     {
