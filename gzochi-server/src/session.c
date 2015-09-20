@@ -455,8 +455,10 @@ gzochid_client_session_new (gzochid_auth_identity *identity)
 void 
 gzochid_client_session_free (gzochid_client_session *session)
 {
-  mpz_clear (session->scm_oid);
+  gzochid_auth_identity_unref (session->identity);
   g_sequence_free (session->channels);
+  mpz_clear (session->scm_oid);
+  
   free (session);
 }
 
