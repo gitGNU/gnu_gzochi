@@ -212,8 +212,21 @@ initialize_async_transactional (gpointer data)
     }
   else 
     {
-      gzochid_sweep_client_sessions (context, system_identity);
-      gzochid_restart_tasks (context);
+      gzochid_sweep_client_sessions (context, &err);
+
+      if (err != NULL)
+	{
+	  gzochid_warning
+	    ("Failed to sweep sessions for application '%s'; stopping: %s.",
+	     context->descriptor->name, err->message);
+	  
+	  g_error_free (err);
+	  
+	  gzochid_fsm_to_state
+	    (((gzochid_context *) context)->fsm,
+	     GZOCHID_APPLICATION_STATE_STOPPED);
+	}
+      else gzochid_restart_tasks (context);
     }
 }
 

@@ -82,6 +82,12 @@ struct _gzochid_client_session_transaction_context
 typedef struct _gzochid_client_session_transaction_context
 gzochid_client_session_transaction_context;
 
+GQuark
+gzochid_session_error_quark ()
+{
+  return g_quark_from_static_string ("gzochid-session-error-quark");
+}
+
 static gzochid_client_session_transaction_context *
 create_transaction_context (gzochid_application_context *context)
 {
@@ -694,20 +700,20 @@ gzochid_client_session_persist (gzochid_application_context *context,
 }
 
 void 
-gzochid_sweep_client_sessions (gzochid_application_context *context, 
-			       gzochid_auth_identity *identity)
+gzochid_sweep_client_sessions (gzochid_application_context *context,
+			       GError **err)
 {
   mpz_t oid;
-  GError *err = NULL;
+  GError *local_err = NULL;
   char *next_binding = NULL;
   int prefix_len = strlen (SESSION_PREFIX), num_sessions = 0;
 
   mpz_init (oid);
   gzochid_tx_info (context, "Sweeping old client sessions.");
   next_binding = gzochid_data_next_binding_oid 
-    (context, SESSION_PREFIX, oid, &err);
+    (context, SESSION_PREFIX, oid, &local_err);
 
-  assert (err == NULL);
+  assert (local_err == NULL);
 
   while (next_binding != NULL 
          && strncmp (SESSION_PREFIX, next_binding, prefix_len) == 0)
@@ -718,12 +724,25 @@ gzochid_sweep_client_sessions (gzochid_application_context *context,
       gzochid_scheme_application_disconnected_worker 
 	(context, gzochid_auth_system_identity (), oid_str);      
 
-      assert (! gzochid_transaction_rollback_only ());
-      
-      next_next_binding = gzochid_data_next_binding_oid 
-	(context, next_binding, oid, &err);
+      if (gzochid_transaction_rollback_only ())
+	{
+	  g_set_error
+	    (err, GZOCHID_SESSION_ERROR, GZOCHID_SESSION_ERROR_DISCONNECT,
+	     "Transaction rollback while sweeping disconnected session '%s'.",
+	     oid_str);
+	  
+	  free (next_binding);
+	  free (oid_str);
+	  mpz_clear (oid);
+	  
+	  return;
+	}
 
-      assert (err == NULL);
+      free (oid_str);
+      next_next_binding = gzochid_data_next_binding_oid 
+	(context, next_binding, oid, &local_err);
+
+      assert (local_err == NULL);
 
       free (next_binding);
       next_binding = next_next_binding;

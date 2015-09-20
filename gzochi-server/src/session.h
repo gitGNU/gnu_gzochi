@@ -26,6 +26,18 @@
 #include "gzochid-auth.h"
 #include "io.h"
 
+#define GZOCHID_SESSION_ERROR gzochid_session_error_quark ()
+
+GQuark gzochid_session_error_quark (void);
+
+enum _GzochidSessionError
+  {
+    GZOCHID_SESSION_ERROR_DISCONNECT,
+    GZOCHID_SESSION_ERROR_FAILED
+  };
+
+typedef enum _GzochidSessionError GzochidSessionError;
+  
 struct _gzochid_client_session_handler
 {
   gzochid_application_callback *received_message;
@@ -66,7 +78,6 @@ void gzochid_client_session_send_message
 
 void gzochid_client_session_persist 
 (gzochid_application_context *, gzochid_client_session *, mpz_t);
-void gzochid_sweep_client_sessions 
-(gzochid_application_context *, gzochid_auth_identity *);
+void gzochid_sweep_client_sessions (gzochid_application_context *, GError **);
 
 #endif /* GZOCHID_SESSION_H */

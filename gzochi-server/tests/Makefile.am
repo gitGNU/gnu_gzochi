@@ -32,6 +32,7 @@ test_programs = \
 	test-reloc \
 	test-scheme \
 	test-scheme-task \
+	test-session \
 	test-socket \
 	test-storage-mem \
 	test-task \
@@ -154,6 +155,11 @@ test_scheme_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 test_scheme_task_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_scheme_task_SOURCES = test-scheme-task.c 
 test_scheme_task_LDADD = $(top_builddir)/src/libgzochid.la \
+	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+test_session_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_session_SOURCES = test-session.c 
+test_session_LDADD = $(top_builddir)/src/libgzochid.la \
 	$(GZOCHI_COMMON_LIBS) @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_socket_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@
