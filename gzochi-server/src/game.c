@@ -255,7 +255,12 @@ initialize_event_loop (int from_state, int to_state, gpointer user_data)
 gzochid_game_context *
 gzochid_game_context_new (void)
 {
-  return calloc (1, sizeof (gzochid_game_context));
+  gzochid_game_context *context = calloc (1, sizeof (gzochid_game_context));
+
+  context->applications = g_hash_table_new (g_str_hash, g_str_equal);
+  context->auth_plugins = g_hash_table_new (g_str_hash, g_str_equal);
+
+  return context;
 }
 
 void 
@@ -371,9 +376,6 @@ FOR PRODUCTION USE.");
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_complete, context);
   
-  context->applications = g_hash_table_new (g_str_hash, g_str_equal);
-  context->auth_plugins = g_hash_table_new (g_str_hash, g_str_equal);
-
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
 }
 
