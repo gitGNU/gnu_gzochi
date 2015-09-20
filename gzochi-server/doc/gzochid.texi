@@ -89,6 +89,7 @@ Indices
 
 * Concept index::
 * Procedure index::
+* Type index::
 @end menu
 
 @contents
@@ -1734,6 +1735,8 @@ Note that because managed records are implemented on top of R6RS
 records, they may be treated as such for the purposes of the 
 procedures in the @code{(rnrs records inspection)} library.
 
+@tindex managed-record
+
 @deffn {Scheme Syntax} gzochi:define-managed-record-type name-spec record-clause*
 Defines a new managed record type, introducing bindings for a 
 record-type descriptor, a record constructor descriptor, a 
@@ -1812,6 +1815,8 @@ These procedures return the same values as their counterparts in the
 @code{(rnrs records procedural)} library.
 @end deffn
 
+@tindex managed-record-type-registry
+
 @deffn {Scheme Procedure} gzochi:make-managed-record-type-registry
 @deffnx {Scheme Procedure} gzochi:managed-record-type-registry?
 A constructor and type predicate for managed record type registries,
@@ -1860,6 +1865,8 @@ the association between @var{name} and a managed record; to remove
 the record itself, you must call @code{gzochi:remove-record!}.
 @end deffn
 
+@tindex managed-serializable
+
 Many of the operations provided by @code{(gzochi data)} are 
 supported only for managed records. For example, you cannot use
 @code{gzochi:set-binding!} to store a primitive value; you must 
@@ -1902,6 +1909,8 @@ removed, a managed sequence type is provided which features an API
 based on the SRFI-44 collections proposal 
 (@url{http://srf.schemers.org/srfi-44/srfi-44.html}).
 
+@tindex managed-vector
+
 @deffn {Scheme Procedure} gzochi:make-managed-vector len
 Returns a newly allocated managed vector of @var{len} elements. The
 initial contents of each position is set to @code{#f}.
@@ -1943,6 +1952,8 @@ Returns the number of elements in @var{vector} as an exact integer.
 @deffn {Scheme Procedure} gzochi:managed-vector->list v
 Return a newly allocated list composed of the contents of @var{v}.
 @end deffn
+
+@tindex managed-hashtable
 
 @deffn {Scheme Procedure} gzochi:make-managed-hashtable hash-callback equiv-callback
 Constructs a new hash table that uses the procedure specified by the
@@ -2032,6 +2043,8 @@ equivalence predicate used by @var{hashtable}.
 Returns a @code{gzochi:callback} record that represents the hash
 function used by @var{hashtable}
 @end deffn
+
+@tindex managed-sequence
 
 @deffn {Scheme Procedure} gzochi:make-managed-sequence
 Returns a newly allocated managed sequence.
@@ -2137,6 +2150,8 @@ retrieving application data. The serializations described below may
 be used directly as field serializations for a managed record-type
 descriptor or composed to form serializations for more complex
 types.
+
+@tindex serialization
 
 A serialization is an R6RS record with fields for a serialization
 procedure and a deserialization procedure. Serialization procedures
@@ -2253,6 +2268,8 @@ executed on behalf of a game application. All tasks are executed in
 a fully transactional context, meaning that their side effects enjoy
 guarantees of atomicity.
 
+@tindex callback
+
 @deffn {Scheme Procedure} gzochi:schedule-task callback [delay] [period]
 Transactionally schedules the @code{gzochi:callback} @var{callback} 
 for future execution. If @var{delay} is specified, it must be a
@@ -2273,6 +2290,8 @@ eligible for execution until at least the specified number of
 milliseconds have elapsed, but may be delayed further depending on 
 the current state of the server.
 @end deffn
+
+@tindex task-handle
 
 @deffn {Scheme Procedure} gzochi:task-handle? obj
 Returns @code{#t} if @var{obj} is a task handle, @code{#f} otherwise.
@@ -2297,6 +2316,8 @@ be synchronized with those of the container. Use this library, for
 example, to ensure that a row in a relational database is updated 
 if and only if a modification to a managed record in a game 
 application is performed successfully.
+
+@tindex transaction-participant
 
 The @code{gzochi:transaction-participant} record brokers the
 relationship between the gzochid container and an external 
@@ -2852,9 +2873,17 @@ The migration descriptor for this migration:
 @node Concept index
 @unnumbered Concept index
 
+@printindex cp
+
 @node Procedure index
 @unnumbered Procedure index
 
 @printindex fn
+
+@node Type index
+@unnumbered Type index
+
+@printindex tp
+
 
 @bye
