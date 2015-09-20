@@ -174,13 +174,16 @@ test_periodic_cancel ()
   gzochid_application_context *app_context = 
     gzochid_application_context_new ();
   gzochid_auth_identity *identity = gzochid_auth_identity_new ("test");
+  GThreadPool *pool = NULL;
 
   application_context_init (app_context);
 
   game_context = (gzochid_game_context *) 
     ((gzochid_context *) app_context)->parent;
-  game_context->task_queue = gzochid_schedule_task_queue_new 
-    (gzochid_thread_pool_new (game_context, 1, TRUE, NULL));
+
+  pool = gzochid_thread_pool_new (game_context, 1, TRUE, NULL);
+
+  game_context->task_queue = gzochid_schedule_task_queue_new (pool);
   game_context->tx_timeout = (struct timeval) { INT_MAX, INT_MAX };
   gzochid_schedule_task_queue_start (game_context->task_queue);  
 
@@ -199,7 +202,7 @@ test_periodic_cancel ()
 	}
 
       g_cond_wait (&test_worker_cond, &test_worker_mutex);
-      if (test_worker_counter == 3)
+      if (test_worker_counter >= 3)
 	{
 	  gzochid_transaction_execute (test_periodic_cancel_inner1, &context);
 	  done = TRUE;
@@ -210,9 +213,10 @@ test_periodic_cancel ()
 	break;
     }
 
-  g_assert_cmpint (test_worker_counter, <=, 4);
+  g_assert_cmpint (test_worker_counter, >=, 3);
 
-  gzochid_schedule_task_queue_stop (game_context->task_queue);    
+  gzochid_schedule_task_queue_stop (game_context->task_queue);
+  g_thread_pool_free (pool, TRUE, TRUE);
 
   mpz_clear (context.handle_oid);  
   gzochid_auth_identity_unref (identity);  
