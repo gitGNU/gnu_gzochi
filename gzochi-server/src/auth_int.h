@@ -41,6 +41,15 @@ void gzochid_auth_identity_finalizer
 
 typedef struct _gzochid_auth_identity_cache gzochid_auth_identity_cache;
 
+/* Returns the "system identity," a special identity to be used for executing
+   tasks not related to any one user, such as sweeping expired sessions on 
+   startup. 
+
+   The system identity is always available and does not participate in identity
+   caching. As such, the `ref' and `unref' operations have no effect on it. */
+
+gzochid_auth_identity *gzochid_auth_system_identity ();
+
 /* Create and return a new identity cache. */
 
 gzochid_auth_identity_cache *gzochid_auth_identity_cache_new ();

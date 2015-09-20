@@ -37,7 +37,14 @@ struct _gzochid_auth_identity
 {
   char *name;
   guint ref_count;
+
+  /* Indicates whether or not this identity is reserved. (I.e., is this the 
+     system identity?) */
+  
+  gboolean reserved; 
 };
+
+static gzochid_auth_identity system_identity = { "[SYSTEM]", 1, TRUE };
 
 GQuark
 gzochid_auth_plugin_error_quark (void)
@@ -126,6 +133,12 @@ identity_new_func (gpointer key, gpointer *key_copy)
   return gzochid_auth_identity_new (key);
 }
 
+gzochid_auth_identity *
+gzochid_auth_system_identity ()
+{
+  return &system_identity;
+}
+
 gzochid_auth_identity_cache *
 gzochid_auth_identity_cache_new ()
 {
@@ -157,13 +170,18 @@ gzochid_auth_identity_from_name (gzochid_auth_identity_cache *cache, char *name)
 gzochid_auth_identity *
 gzochid_auth_identity_ref (gzochid_auth_identity *identity)
 {
-  g_atomic_int_inc (&identity->ref_count);
+  if (!identity->reserved)  
+    g_atomic_int_inc (&identity->ref_count);
+
   return identity;
 }
 
 void
 gzochid_auth_identity_unref (gzochid_auth_identity *identity)
 {
+  if (identity->reserved)
+    return;
+  
   if (g_atomic_int_dec_and_test (&identity->ref_count)) {
     free (identity->name);
     free (identity);

@@ -190,8 +190,7 @@ initialize_async_transactional (gpointer data)
   gboolean initialized = gzochid_data_binding_exists 
     (context, "s.initializer", &err);
 
-  gzochid_auth_identity *system_identity =
-    gzochid_auth_identity_from_name (context->identity_cache, "[SYSTEM]");
+  gzochid_auth_identity *system_identity = gzochid_auth_system_identity ();
 
   assert (err == NULL);
 
@@ -222,13 +221,10 @@ static gboolean
 ready_async (gzochid_application_context *context)
 {
   GError *tmp_err = NULL;
-  gzochid_auth_identity *system_identity =
-    gzochid_auth_identity_from_name (context->identity_cache, "[SYSTEM]");
 
   if (context->descriptor->ready != NULL)
-    gzochid_scheme_application_ready (context, system_identity, &tmp_err);
-
-  gzochid_auth_identity_unref (system_identity);
+    gzochid_scheme_application_ready
+      (context, gzochid_auth_system_identity (), &tmp_err);
   
   if (tmp_err != NULL)
     {

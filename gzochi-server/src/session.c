@@ -716,7 +716,7 @@ gzochid_sweep_client_sessions (gzochid_application_context *context,
       char *next_next_binding = NULL;
       
       gzochid_scheme_application_disconnected_worker 
-	(context, identity, oid_str);      
+	(context, gzochid_auth_system_identity (), oid_str);      
 
       assert (! gzochid_transaction_rollback_only ());
       

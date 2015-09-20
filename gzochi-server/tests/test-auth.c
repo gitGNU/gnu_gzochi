@@ -39,8 +39,19 @@ test_identity_cache_lookup ()
   gzochid_auth_identity *aaa = gzochid_auth_identity_from_name (cache, "aaa");
 
   g_assert (aaa == gzochid_auth_identity_from_name (cache, "aaa"));
+
+  gzochid_auth_identity_unref (aaa);
+  gzochid_auth_identity_unref (aaa);
   
   gzochid_auth_identity_cache_destroy (cache);
+}
+
+static void
+test_identity_system ()
+{
+  gzochid_auth_identity *identity = gzochid_auth_system_identity ();
+
+  g_assert_cmpstr ("[SYSTEM]", ==, gzochid_auth_identity_name (identity));
 }
 
 int
@@ -50,6 +61,8 @@ main (int argc, char *argv[])
 
   g_test_add_func ("/auth/identity/ref", test_identity_ref);
   g_test_add_func ("/auth/identity/cache/lookup", test_identity_cache_lookup);
+  g_test_add_func ("/auth/identity/system", test_identity_system);
+
   
   return g_test_run ();
 }
