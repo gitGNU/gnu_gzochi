@@ -419,6 +419,8 @@ standard output and then exit successfully.
 @node The server configuration file
 @section The server configuration file
 
+@cindex gzochid.conf
+
 The gzochid server configuration file is usually named 
 @file{gzochid.conf} and is installed (and searched for) by default 
 in the @file{/etc/} directory of the installation prefix. It is an
@@ -564,6 +566,8 @@ settings are, in order of decreasing severity: @code{ERR},
 @node Application deployment
 @chapter Application deployment
 
+@cindex deployment
+
 Game applications hosted by gzochid are discovered by the server
 when it scans its deployment directory for sub-directories 
 containing game application descriptor files, which are discussed in
@@ -585,6 +589,8 @@ can be specified in the game application descriptor file.
 
 @node The game application descriptor
 @section The game application descriptor
+
+@cindex game.xml
 
 ``game.xml,'' the game application descriptor, is an XML document 
 that is deployed as part of a game application and provides game 
@@ -662,6 +668,8 @@ all of the services the container provides.
 @node Transaction management
 @section Transaction management
 
+@cindex transactions
+
 All game application code that executes within the gzochid container 
 executes in the context of a transaction, meaning that all of its 
 side effects, such as sending messages or modifying data, have the 
@@ -699,6 +707,8 @@ maximum number of times (3, by default) before being abandoned.
 @node External transactions
 @subsection External transactions
 
+@cindex transactions, external
+
 In some cases, an application running inside the gzochid container 
 may be merely one part of a larger application deployment that
 includes other services that need access to events that originate
@@ -735,6 +745,8 @@ external transaction SPI.
 
 @node Managed records
 @section Managed records
+
+@cindex managed records
 
 gzochid exposes its transactional persistence services via 
 flexible, user-defined data structures called ``managed records.''
@@ -833,6 +845,8 @@ mutated), the following expression will evaluate to @code{#t}:
 @node Client session management
 @section Client session management
 
+@cindex sessions
+
 A connected and authenticated user is exposed to game code in the
 form of a client session, a managed record that can be used to
 manipulate the state of that user. Messages may be queued 
@@ -849,6 +863,8 @@ information.
 
 @node Channel management
 @section Channel management
+
+@cindex channels
 
 Message broadcasting is a pattern that appears frequently in
 massively multiplayer game development. There may be a logical set
@@ -868,6 +884,8 @@ information.
 
 @node Task scheduling
 @section Task scheduling
+
+@cindex task scheduling
 
 gzochid provides an explicit task scheduling API that is used in 
 place of other mechanisms for asynchronous processing, such as 
@@ -895,6 +913,8 @@ tasks will survive a restart of the gzochid container.
 
 @node Transactional logging
 @section Transactional logging
+
+@cindex logging
 
 Because gzochid executes application code transactionally, any side
 effects (e.g., queued messages, scheduled tasks) will be rolled back
@@ -927,6 +947,8 @@ A transactional log message.
 
 @node Communication protocol
 @chapter Communication protocol
+
+@cindex protocol
 
 The protocol used for gzochi client-server communication is 
 documented below. Note that this description is provided merely for
@@ -995,6 +1017,8 @@ uninterpreted to a handler registered by game code.
 @node User authentication
 @chapter User authentication
 
+@cindex authentication
+
 gzochid employs a pluggable authentication mechanism to allow each
 game application endpoint to specify an authentication scheme that
 meets its security requirements. Authentication plugins are built
@@ -1028,6 +1052,8 @@ sections.
 @node Pass-thru authentication
 @section Pass-thru authentication
 
+@cindex authentication, pass-thru
+
 The pass-thru authentication plugin performs no actual 
 authentication---all login requests are accepted---and the contents
 of the byte sequence included as part of the login request are 
@@ -1041,6 +1067,8 @@ explicitly specify another authentication plugin.
 
 @node Password file authentication
 @section Password file authentication
+
+@cindex authentication, password
 
 The password file authentication plugin allows a game application to
 authenticate users against a list defined in a text file. The 
@@ -1076,6 +1104,8 @@ configuration properties.
 
 @node Kerberos v5 authentication
 @section Kerberos v5 authentication
+
+@cindex authentication, Kerberos
 
 The Kerberos v5 authentication plugin allows a game application to
 act as a host-based service in a Kerberos authentication realm, and 
@@ -1147,6 +1177,8 @@ identity to an authenticating client, and the
 @node Monitoring
 @chapter Monitoring
 
+@cindex monitoring
+
 When enabled, the gzochid administrative module collect various bits
 of statistical information and makes resources related to active
 game applications available for reporting. The module's architecture 
@@ -1187,6 +1219,8 @@ client session volume.
 
 @node Remote debugging
 @chapter Remote debugging
+
+@cindex debugging
 
 Application code deployed to gzochid executes in a context with
 fairly unique characteristics. Even when unit tests---which should
@@ -1263,6 +1297,8 @@ needs it. There is no need to synchronize access to data managed by
 gzochid; the container will prevent race conditions by rolling back
 task execution as necessary. 
 
+@cindex concurrency
+
 @emph{Express concurrency through task scheduling.}
 
 Likewise, you should never need to explicitly launch a thread to
@@ -1271,6 +1307,8 @@ API ensures that it is executed in the proper transactional context
 and that it will be transparently rescheduled following a non-fatal
 error and that its status will survive the failure and restart of
 the container.
+
+@cindex timeouts
 
 @emph{Limit task scope.}
 
@@ -1368,6 +1406,8 @@ be restored when @var{thunk} exits locally or non-locally.
 
 The @code{(gzochi app)} module exports procedures and data types
 common to other components of the API.
+
+@cindex callbacks
 
 Callbacks are serializable references to Scheme procedures with some
 optionally associated data. They are used in several places to
@@ -1501,6 +1541,8 @@ the session's identity.
 Enqueues a message to be sent, in the form of the bytevector 
 @var{msg}, to the client session @var{session}.
 @end deffn
+
+@cindex session listeners
 
 Client session listeners are managed records that are used by the
 gzochid container to notify game application code of events related
@@ -2535,6 +2577,8 @@ described in the following sections.
 @node Exporting data
 @section Exporting data
 
+@cindex exporting
+
 Making a copy of a gzochi game application database is a wise thing
 to do. Although the transactional storage layer of the server works
 to prevent inconsistent writes and catastrophic loss of data, it is
@@ -2621,6 +2665,8 @@ DATA=END
 @node Importing data
 @section Importing data
 
+@cindex importing
+
 The gzochi-load utility rebuilds a game database from the contents 
 of a database dumped by gzochi-dump in the format described in the
 previous section, read from standard input.
@@ -2669,6 +2715,8 @@ rm -rf $DUMPDIR
 @node Migrating data
 @section Migrating data
 
+@cindex migrating
+
 It is unusual that a single version of a piece of software serves
 its users for the duration of their experience of it. Game 
 application software is no different; delivering bug-fixes, 
@@ -2709,6 +2757,8 @@ visited exactly once.
 @node The migration visitor procedure
 @subsection The migration visitor procedure
 
+@cindex migration visitor
+
 The migration visitor is a Scheme procedure invoked by 
 gzochi-migrate on each reachable object in the game database. It is
 the responsibility of the migration visitor procedure to provide a
@@ -2746,6 +2796,8 @@ procedures in those modules is also undefined.
 
 @node The migration descriptor
 @subsection The migration descriptor
+
+@cindex migration descriptor
 
 The XML migration descriptor has the schema described in the 
 following paragraphs. A DTD that can be used to validate the 
@@ -2787,6 +2839,8 @@ default.
 
 @node A sample migration
 @subsection A sample migration
+
+@cindex migration example
 
 The following migration adds a new mutable field named 
 ``experience-points'' to the managed record with the serial UID
