@@ -109,6 +109,21 @@ application_context_init (gzochid_application_context *context)
     (context->storage_context, "/dev/null", 0);
 }
 
+static void
+application_context_shutdown (gzochid_application_context *context)
+{
+  gzochid_context *base = (gzochid_context *) context;
+  gzochid_game_context *game_context = (gzochid_game_context *) base->parent;
+
+  free (game_context->storage_engine);
+  gzochid_storage_engine_interface_mem.close_store (context->meta);
+  gzochid_storage_engine_interface_mem.close_store (context->oids);
+  gzochid_storage_engine_interface_mem.close_store (context->names);
+  gzochid_storage_engine_interface_mem.close_context (context->storage_context);
+					
+  gzochid_game_context_free (game_context);
+}
+
 static void test_data_reference_finalize ()
 {
   mpz_t z;
@@ -132,6 +147,9 @@ static void test_data_reference_finalize ()
   g_assert (!serialized);
   g_assert (deserialized);
   g_assert (finalized);
+
+  application_context_shutdown (context);
+  gzochid_application_context_free (context);
 }
 
 static void
@@ -159,6 +177,9 @@ test_data_transaction_prepare_flush_reference_failure ()
   g_assert (!serialized);
   g_assert (!deserialized);
   g_assert (finalized);  
+
+  application_context_shutdown (context);
+  gzochid_application_context_free (context);
 }
 
 static void 
@@ -170,6 +191,7 @@ binding_exists_timed_out (gpointer data)
 
   g_assert (! exists);
   g_assert_error (error, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION);
+  g_error_free (error);
 }
 
 static 
@@ -180,6 +202,8 @@ void test_data_transaction_timeout ()
 
   application_context_init (context);
   gzochid_transaction_execute_timed (binding_exists_timed_out, context, tm);
+  application_context_shutdown (context);
+  gzochid_application_context_free (context);
 }
 
 int 
