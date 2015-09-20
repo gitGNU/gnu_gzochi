@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <gmp.h>
 #include <gzochi-common.h>
@@ -113,9 +114,16 @@ gzochid_scheme_invoke (gzochid_application_context *context,
 static SCM 
 resolve_procedure (char *procedure, GList *module)
 {
-  SCM scm_procedure = scm_from_locale_symbol (procedure);
-  SCM scm_module = gzochid_scheme_glist_to_list 
+  SCM scm_procedure;
+  SCM scm_module;
+
+  assert (procedure != NULL);
+  assert (module != NULL);
+
+  scm_procedure = scm_from_locale_symbol (procedure);
+  scm_module = gzochid_scheme_glist_to_list 
     (module, (SCM (*) (gpointer)) scm_from_locale_symbol);
+  
   return scm_public_ref (scm_module, scm_procedure);
 }
 
