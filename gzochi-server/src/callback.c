@@ -88,6 +88,7 @@ gzochid_application_callback_new (char *procedure, GList *module, mpz_t scm_oid)
 void 
 gzochid_application_callback_free (gzochid_application_callback *callback)
 {
+  mpz_clear (callback->scm_oid);
   free (callback);
 }
 
