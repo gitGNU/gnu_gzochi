@@ -4,6 +4,17 @@ See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.9 (since 0.8):
+
+* Additions to the API
+
+** New `(gzochi main-loop)' procedure: `gzochi:main-loop-remove-source!'
+
+A new procedure allows callers to remove event sources from a main loop. See the
+`(gzochi main-loop)' source code for inline documentation.
+
+
+
 Changes in 0.8 (since 0.7):
 
 * Bug fixes

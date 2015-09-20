@@ -4,6 +4,58 @@ See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.9 (since 0.8):
+
+* Changes to the distribution
+
+** Benchmark suite
+
+The new `benchmarks' folder at the top level of the `gzochi-server' source 
+distribution includes scripts and application code for running and reporting on
+the performance of different gzochi application workloads. The first such
+benchmark ("echo chamber") exercises the channel messaging subsystem and
+reports on client message round trip times.
+
+See the README files in the `benchmarks/echo-chamber' subfolder for instructions
+for running the benchmark.
+
+* Incompatible changes
+
+** Server configuration setting name changes
+
+The documentation and implementation for previous releases disagreed on the
+names of several settings in the server configuration file. As part of
+correcting those inconsistencies, the following configuration settings have been
+renamed from:
+
+ - "server.auth.plugin.dir" to "auth.plugin.dir"
+ - "server.storage.engine" to "storage.engine"
+ - "server.storage.engine.dir" to "storage.engine.dir" 
+
+* Notable changes
+
+** Exit on bootstrap failure
+
+The gzochid container will now exit immediately if any of its necessary startup
+operations fail. These operations include bootstrapping the Scheme API and
+creating the work and application deployment folders on the local filesystem.
+
+** New application statistics
+
+The internal statistics capture module now publishes the aggregate number of
+messages sent and received, via the administrative web interface.
+
+* Bug fixes
+
+** Non-retryable condition in disconnect handler causes abort
+** Double-free during disconnected session cleanup
+
+In addition to the above, this release incldues fixes for several dozen memory
+leaks and other issues affecting container stability. The server is now a great
+deal better behaved in terms of its memory allocation and book-keeping
+behavior. 
+
+
 Changes in 0.8 (since 0.7):
 
 * Changes to the distribution
