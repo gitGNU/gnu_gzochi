@@ -1,11 +1,4 @@
 *.log
 *.trs
-test-data
-test-descriptor
-test-event
-test-reloc
-test-scheme
-test-scheme-task
-test-storage-mem
-test-task
-test-util
+test-*
+!test-*.c
