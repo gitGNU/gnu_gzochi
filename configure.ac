@@ -16,7 +16,7 @@ dnl You should have received a copy of the GNU General Public License
 dnl along with this package.  If not, see <http://www.gnu.org/licenses/>.
 dnl
 
-AC_INIT([gzochi], [0.8], [joolean@undecidable.net], [], 
+AC_INIT([gzochi], [0.9], [joolean@undecidable.net], [], 
         [http://www.nongnu.org/gzochi/])
 
 AM_INIT_AUTOMAKE(1.6)
