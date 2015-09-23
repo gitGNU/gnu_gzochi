@@ -27,6 +27,7 @@ EXTRA_DIST = conf/gzochid.conf.in gzochid.in gzochi-dump.in gzochi-load.in \
 substitute = sed -e 's,[@]abs_top_builddir[@],$(abs_top_builddir),g'
 
 conf/gzochid.conf: conf/gzochid.conf.in $(top_builddir)/config.status
+	mkdir -p $(builddir)/conf
 	$(substitute) < "$<" > "$@.out"
 	mv "$@.out" "$@"
 
@@ -55,4 +56,5 @@ uninstalled-env: uninstalled-env.in $(top_builddir)/config.status
 	chmod +x "$@.out"
 	mv "$@.out" "$@"
 
-CLEANFILES = gzochid gzochi-dump gzochi-load gzochi-migrate uninstalled-env
+CLEANFILES = conf/gzochid.conf gzochid gzochi-dump gzochi-load \
+	gzochi-migrate uninstalled-env

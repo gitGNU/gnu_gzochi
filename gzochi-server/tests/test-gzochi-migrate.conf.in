@@ -5,7 +5,7 @@
 
 [game]
 
-server.fs.apps = .
+server.fs.apps = __SRCDIR__
 server.fs.data = __TMPDIR__
 
 storage.engine = treefile

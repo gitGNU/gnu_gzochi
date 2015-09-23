@@ -16,9 +16,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export GZOCHID_STORAGE_ENGINE_DIR=`pwd`
-export TMPDIR=`mktemp -d tmp.XXXXXX`
-export TMPCONF=`mktemp tmp.conf.XXXXXX`
+export SRCDIR=$(dirname $0)
+export TMPDIR=$(mktemp -d tmp.XXXXXX)
+export TMPCONF=$(mktemp tmp.conf.XXXXXX)
+
+export GZOCHID_STORAGE_ENGINE_DIR="$PWD"
 
 fail () {
     case $1 in
@@ -77,9 +79,13 @@ echo "$NAMES" | ../meta/gzochi-load \
 echo "$OIDS" | ../meta/gzochi-load \
 		   -e treefile $TMPDIR/test-gzochi-migrate:oids || fail "load"
 
-sed -s "s/__TMPDIR__/$TMPDIR/" <test-gzochi-migrate.conf.in >$TMPCONF
+# Make a good-faith attempt to avoid tripping up sed with embedded '/'
+# characters by using a different delimiter.
 
-if ! ../meta/gzochi-migrate -c $TMPCONF test-gzochi-migrate.xml; then
+sed -e "s%__TMPDIR__%$TMPDIR%" <$SRCDIR/test-gzochi-migrate.conf.in | \
+    sed -e "s%__SRCDIR__%$SRCDIR%" >$TMPCONF
+
+if ! ../meta/gzochi-migrate -c $TMPCONF $SRCDIR/test-gzochi-migrate.xml; then
     fail "migrate"
 fi
 

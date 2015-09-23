@@ -32,6 +32,7 @@ substitute = sed -e 's,[@]datarootdir[@],$(datarootdir),g' \
 	-e 's,[@]localstatedir[@],$(localstatedir),g'
 
 conf/gzochid.conf: conf/gzochid.conf.in $(top_builddir)/config.status
+	mkdir -p $(builddir)/conf
 	$(substitute) < "$<" > "$@.out"
 	mv "$@.out" "$@"
 
@@ -96,3 +97,5 @@ gzochi_migrate_CFLAGS = @CFLAGS@ \
 	-Wall -Werror
 gzochi_migrate_SOURCES = gzochi-migrate.c toollib.c
 gzochi_migrate_LDADD = libgzochid.la @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+CLEANFILES = conf/gzochid.conf
