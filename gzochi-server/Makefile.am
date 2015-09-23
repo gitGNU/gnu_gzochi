@@ -20,7 +20,7 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
-GZOCHI_COMMON_CFLAGS = "-I$(abs_top_srcdir)/../../gzochi-common/src"
+GZOCHI_COMMON_CFLAGS = "-I$(abs_top_srcdir)/../gzochi-common/src"
 GZOCHI_COMMON_LIBS = \
 	"$(abs_top_builddir)/../gzochi-common/src/libgzochi-common.la"
 
