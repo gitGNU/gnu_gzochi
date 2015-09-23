@@ -27,3 +27,5 @@ AM_SCM_LOG_FLAGS = -L $(srcdir) -L $(top_srcdir)/src
 TESTS = $(test_programs)
 
 EXTRA_DIST = $(TESTS) gzochi/srfi-64-support.scm
+
+CLEANFILES = gzochi:main-loop.log gzochi:client.log

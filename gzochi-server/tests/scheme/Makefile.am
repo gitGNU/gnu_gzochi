@@ -31,3 +31,10 @@ check_SCRIPTS = $(test_programs)
 TESTS = $(test_programs)
 
 EXTRA_DIST = $(TESTS) gzochi/mock-data.scm gzochi/srfi-64-support.scm
+
+CLEANFILES = gzochi:managed-sequence.log gzochi:transaction-participant.log \
+	gzochi:deserialize-managed-record.log gzochi:abort-transaction.log \
+	gzochi:make-managed-record-type-descriptor.log \
+	gzochi:execute-ready.log gzochi:join-transaction.log \
+	gzochi:serialize-managed-record.log gzochi:execute-logged-in.log \
+	gzochi:define-managed-record-type.log
