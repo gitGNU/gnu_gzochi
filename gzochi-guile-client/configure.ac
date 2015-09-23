@@ -29,6 +29,14 @@ PKG_CHECK_MODULES([GUILE], [guile-2.0])
 GUILE_PROGS
 GUILE_SITE_DIR
 
+# Work around lack of VPATH awareness for GUILE_SITE.
+
+AC_MSG_CHECKING([whether this is a 'make distcheck' build])
+AS_CASE([$prefix],
+  [*/_inst], [AC_MSG_RESULT([yes, rewriting GUILE_SITE])
+              GUILE_SITE=${datarootdir}/guile/site],
+  [AC_MSG_RESULT([no])])
+
 AC_CONFIG_FILES([Makefile src/Makefile tests/Makefile])
 
 AC_OUTPUT

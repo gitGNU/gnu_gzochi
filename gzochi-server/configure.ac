@@ -49,6 +49,14 @@ AM_CONDITIONAL([BUILD_KRB5_AUTH], [test "x$KRB5_CFLAGS" != "x" ])
 GUILE_PROGS
 GUILE_SITE_DIR
 
+# Work around lack of VPATH awareness for GUILE_SITE.
+
+AC_MSG_CHECKING([whether this is a 'make distcheck' build])
+AS_CASE([$prefix],
+  [*/_inst], [AC_MSG_RESULT([yes, rewriting GUILE_SITE])
+              GUILE_SITE=${datarootdir}/guile/site],
+  [AC_MSG_RESULT([no])])
+
 AC_ARG_WITH([bdb],
   [AS_HELP_STRING([--with-bdb],
     [support for Berkeley DB @<:@default=check@:>@])],
