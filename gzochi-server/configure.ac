@@ -108,9 +108,6 @@ AC_CHECK_HEADER([gmp.h], [], [AC_MSG_ERROR([gmp.h is required.])])
 
 AC_CHECK_FUNCS([fmemopen])
 
-GZOCHI_COMMON="$PWD/../gzochi-common"
-AC_SUBST(GZOCHI_COMMON)
-
 AC_CONFIG_FILES([Makefile
 		 doc/Makefile
 		 meta/Makefile

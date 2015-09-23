@@ -18,9 +18,6 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
-GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
-
 AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) -Wall -Werror
 AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@ $(GZOCHI_COMMON_LIBS)
 

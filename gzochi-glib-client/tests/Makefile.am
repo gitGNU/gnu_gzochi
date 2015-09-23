@@ -18,9 +18,6 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
-GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
-
 check_PROGRAMS = $(test_programs)
 
 test_programs = \

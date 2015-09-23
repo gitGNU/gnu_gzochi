@@ -31,9 +31,6 @@ dist_noinst_DATA = passwords.txt
 
 TESTS = $(test_programs)
 
-GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
-GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
-
 test_krb5_CFLAGS = -I$(top_srcdir)/src \
 	@CFLAGS@ @GLIB_CFLAGS@ @GMODULE_CFLAGS@ $(GZOCHI_COMMON_CFLAGS)
 test_krb5_SOURCES = test-krb5.c mock-krb5.c

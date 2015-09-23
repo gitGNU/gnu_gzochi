@@ -22,9 +22,6 @@ plugindir = $(libdir)/gzochid
 
 SUBDIRS = api auth scheme storage
 
-GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
-GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
-
 bin_PROGRAMS = gzochid gzochi-dump gzochi-load gzochi-migrate
 dist_noinst_DATA = dtd/game.dtd dtd/migration.dtd
 dist_sysconf_DATA = conf/gzochid.conf

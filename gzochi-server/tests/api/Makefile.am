@@ -26,8 +26,6 @@ AM_TESTS_ENVIRONMENT = GUILE_LOAD_PATH='$(top_srcdir)/src/scheme'; \
 	export GUILE_LOAD_PATH;
 TESTS = $(test_programs)
 
-GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
-
 test_tx_CFLAGS = -I$(top_srcdir)/src/api @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 	@GUILE_CFLAGS@
 test_tx_SOURCES = test-tx.c
