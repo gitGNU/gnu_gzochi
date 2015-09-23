@@ -35,18 +35,18 @@ endif
 check_PROGRAMS = $(test_programs)
 TESTS = $(test_programs)
 
-test_bdb_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ \
+test_bdb_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
 	-DBDB_MODULE_LOCATION=$(top_builddir)/src/storage/bdb.la \
 	-Wall -Werror
 test_bdb_SOURCES = test-bdb.c
 test_bdb_LDADD = @GLIB_LIBS@ @GMODULE_LIBS@
 
-test_hdb_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ \
+test_hdb_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
 	-DHDB_MODULE_LOCATION=$(top_builddir)/src/storage/hdb.la
 test_hdb_SOURCES = test-hdb.c
 test_hdb_LDADD = @GLIB_LIBS@ @GMODULE_LIBS@
 
-test_lmdb_CFLAGS = -I$(top_builddir)/src @GLIB_CFLAGS@ -pthread \
+test_lmdb_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ -pthread \
 	-DLMDB_MODULE_LOCATION=$(top_builddir)/src/storage/lmdb.la
 test_lmdb_SOURCES = test-lmdb.c
 test_lmdb_LDADD = @GLIB_LIBS@ @GMODULE_LIBS@

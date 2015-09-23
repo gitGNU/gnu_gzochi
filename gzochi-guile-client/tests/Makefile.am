@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2014 Julian Graham
+# Copyright (C) 2015 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ test_programs = gzochi/test-main-loop.scm \
 
 TEST_EXTENSIONS = .scm
 SCM_LOG_COMPILER = $(GUILE)
-AM_SCM_LOG_FLAGS = -L . -L $(top_builddir)/src
+AM_SCM_LOG_FLAGS = -L $(srcdir) -L $(top_srcdir)/src
 TESTS = $(test_programs)
 
 EXTRA_DIST = $(TESTS) gzochi/srfi-64-support.scm

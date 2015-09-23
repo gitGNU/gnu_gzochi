@@ -25,7 +25,7 @@ test_programs = gzochi/test-data.scm \
 
 TEST_EXTENSIONS = .scm
 SCM_LOG_COMPILER = $(GUILE)
-AM_SCM_LOG_FLAGS = -L . -L $(top_srcdir)/src/scheme
+AM_SCM_LOG_FLAGS = -L $(srcdir) -L $(top_srcdir)/src/scheme
 
 check_SCRIPTS = $(test_programs)
 TESTS = $(test_programs)

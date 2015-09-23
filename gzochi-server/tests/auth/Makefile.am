@@ -34,9 +34,8 @@ TESTS = $(test_programs)
 GZOCHI_COMMON_CFLAGS = -I@GZOCHI_COMMON@/src
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
-AM_CFLAGS = -I$(top_builddir)/src \
+test_krb5_CFLAGS = -I$(top_srcdir)/src \
 	@CFLAGS@ @GLIB_CFLAGS@ @GMODULE_CFLAGS@ $(GZOCHI_COMMON_CFLAGS)
-
 test_krb5_SOURCES = test-krb5.c mock-krb5.c
 test_krb5_LDADD = $(top_builddir)/src/auth/krb5.la \
 	$(top_builddir)/src/libgzochid_la-auth.o \
@@ -45,6 +44,9 @@ test_krb5_LDADD = $(top_builddir)/src/auth/krb5.la \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GMODULE_LIBS@ $(GZOCHI_COMMON_LIBS)
 
+test_password_file_CFLAGS = -DPASSWORDS_TXT_PATH="$(srcdir)/passwords.txt" \
+	-I$(top_srcdir)/src \
+	@CFLAGS@ @GLIB_CFLAGS@ @GMODULE_CFLAGS@ $(GZOCHI_COMMON_CFLAGS)
 test_password_file_SOURCES = test-password_file.c
 test_password_file_LDADD = $(top_builddir)/src/auth/password_file.la \
 	$(top_builddir)/src/libgzochid_la-auth.o \

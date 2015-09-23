@@ -28,7 +28,7 @@ TESTS = $(test_programs)
 
 GZOCHI_COMMON_LIBS = @GZOCHI_COMMON@/src/libgzochi-common.la
 
-test_tx_CFLAGS = -I$(top_builddir)/src/api @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
+test_tx_CFLAGS = -I$(top_srcdir)/src/api @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 	@GUILE_CFLAGS@
 test_tx_SOURCES = test-tx.c
 test_tx_LDADD = $(top_builddir)/src/api/tx.o \

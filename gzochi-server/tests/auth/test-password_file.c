@@ -21,6 +21,13 @@
 
 #include "gzochid-auth.h"
 
+#define Q(x) #x
+#define QUOTE(x) Q(x)
+
+#ifndef PASSWORDS_TXT_PATH
+#define PASSWORDS_TXT_PATH "passwords.txt"
+#endif /* PASSWORDS_TXT_PATH */
+
 gint gzochid_auth_init_plugin (gzochid_auth_plugin *);
 
 static void 
@@ -31,7 +38,7 @@ test_initialize ()
   GHashTable *passwords = NULL;
   gzochid_auth_plugin *plugin = malloc (sizeof (gzochid_auth_plugin));
 
-  g_hash_table_insert (properties, "path", "passwords.txt");
+  g_hash_table_insert (properties, "path", QUOTE(PASSWORDS_TXT_PATH));
 
   gzochid_auth_init_plugin (plugin);
   passwords = (GHashTable *) plugin->info->initialize (properties, &error);
