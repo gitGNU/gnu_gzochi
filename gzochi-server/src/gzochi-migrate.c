@@ -591,7 +591,8 @@ create_application_context (char *path, char *app)
 
   context->deployment_root = g_path_get_dirname (descriptor_path);
   context->load_paths = g_list_prepend
-    (g_list_copy (context->descriptor->load_paths), strdup (descriptor_path));
+    (g_list_copy (context->descriptor->load_paths),
+     strdup (context->deployment_root));
 
   if (g_hash_table_contains (config, "storage.engine"))
     storage_engine = strdup (g_hash_table_lookup (config, "storage.engine"));
