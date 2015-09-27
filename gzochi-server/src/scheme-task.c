@@ -402,8 +402,13 @@ gzochid_scheme_application_disconnected_worker
 
   if (session->handler == NULL)
     {
+      /* In that case, don't bother trying to dredge up its disconnect handler.
+	 Just jump straight to removing the session from the data store. */
+      
       gzochid_tx_warning 
 	(context, "Session '%s' disconnected after incomplete login.", ptr);
+      gzochid_client_session_disconnected_worker (context, identity, ptr);
+      
       return;
     }
 
