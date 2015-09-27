@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <libguile.h>
 #include <stddef.h>
@@ -82,6 +83,8 @@ gzochid_with_application_context (gzochid_application_context *context,
     {
       g_private_set (&thread_application_context_key, context);
       g_private_set (&thread_identity_key, identity);
+
+      assert (context->deployment_root != NULL);
       
       scm_fluid_set_x
 	(application_root_fluid, 
