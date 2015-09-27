@@ -354,16 +354,9 @@ login_catch_worker (gzochid_application_context *context,
 		    gzochid_auth_identity *identity, gpointer data)
 {
   char *session_oid_str = data;
-  gzochid_game_context *game_context =
-    (gzochid_game_context *) ((gzochid_context *) context)->parent;
   gzochid_protocol_client *client =
     g_hash_table_lookup (context->oids_to_clients, session_oid_str);
 
-  gzochid_task task;
-  gzochid_application_task *disconnection_task = gzochid_application_task_new
-    (context, identity, gzochid_client_session_disconnected_worker,
-     session_oid_str);
-  
   gzochid_info
     ("Disconnecting session '%s'; failed login transaction.", session_oid_str);
 
@@ -374,11 +367,8 @@ login_catch_worker (gzochid_application_context *context,
       
   gzochid_protocol_client_disconnect (client);
 
-  task.worker = gzochid_application_task_thread_worker;
-  task.data = disconnection_task;
-  gettimeofday (&task.target_execution_time, NULL);
-  
-  gzochid_schedule_submit_task (game_context->task_queue, &task);
+  gzochid_client_session_disconnected_worker
+    (context, identity, session_oid_str);
 }
 
 void 

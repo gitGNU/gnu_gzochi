@@ -61,6 +61,11 @@ typedef struct _gzochid_client_session gzochid_client_session;
 
 extern gzochid_io_serialization gzochid_client_session_serialization;
 
+/* Transactional application worker that removes the persisted session 
+   corresponding to the specified oid string, as well as its binding in the
+   "names" database. The Scheme representation of the session is also removed if
+   it exists. */
+
 void gzochid_client_session_disconnected_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
