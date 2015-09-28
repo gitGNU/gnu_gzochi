@@ -18,8 +18,8 @@
 # along with this package.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ $(GZOCHI_COMMON_CFLAGS) -Wall -Werror
-AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@ $(GZOCHI_COMMON_LIBS)
+AM_CFLAGS = @CFLAGS@ @GLIB_CFLAGS@ @GZOCHI_COMMON_CFLAGS@ -Wall -Werror
+AM_LDFLAGS = @LDFLAGS@ @GLIB_LIBS@ @GZOCHI_COMMON_LIBS@
 
 lib_LTLIBRARIES = libgzochi-glib.la
 

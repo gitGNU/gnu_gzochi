@@ -28,11 +28,11 @@ TESTS = $(test_programs)
 
 test_client_SOURCES = test-client.c 
 test_client_CFLAGS = -I$(top_srcdir)/src \
-	$(GLIB_CFLAGS) $(GZOCHI_COMMON_CFLAGS) -Wall -Werror
+	$(GLIB_CFLAGS) @GZOCHI_COMMON_CFLAGS@ -Wall -Werror
 test_client_LDADD = $(top_builddir)/src/client.o \
 	$(top_builddir)/src/protocol.o $(top_builddir)/src/session.o \
-	$(GLIB_LIBS) $(GZOCHI_COMMON_LIBS)
+	$(GLIB_LIBS) @GZOCHI_COMMON_LIBS@
 
 test_session_SOURCES = test-session.c 
-test_session_CFLAGS = -I$(top_srcdir)/src $(GZOCHI_COMMON_CFLAGS) -Wall -Werror
-test_session_LDADD = $(top_builddir)/src/session.o $(GZOCHI_COMMON_LIBS)
+test_session_CFLAGS = -I$(top_srcdir)/src @GZOCHI_COMMON_CFLAGS@ -Wall -Werror
+test_session_LDADD = $(top_builddir)/src/session.o @GZOCHI_COMMON_LIBS@

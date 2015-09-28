@@ -116,6 +116,13 @@ AC_CHECK_HEADER([gmp.h], [], [AC_MSG_ERROR([gmp.h is required.])])
 
 AC_CHECK_FUNCS([fmemopen])
 
+ac_gzochi_common_cflags='-I$(abs_top_srcdir)/../gzochi-common/src'
+AC_SUBST([GZOCHI_COMMON_CFLAGS], [$ac_gzochi_common_cflags])
+
+ac_gzochi_common_libs='-L$(abs_top_builddir)/../gzochi-common/src/ \
+	-lgzochi-common'
+AC_SUBST([GZOCHI_COMMON_LIBS], [$ac_gzochi_common_libs])
+
 AC_CONFIG_FILES([Makefile
 		 doc/Makefile
 		 meta/Makefile

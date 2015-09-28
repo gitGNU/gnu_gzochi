@@ -20,10 +20,4 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
-GZOCHI_COMMON_CFLAGS = "-I$(srcdir)/../../gzochi-common/src"
-GZOCHI_COMMON_LIBS = "$(builddir)/../../gzochi-common/src/libgzochi-common.la"
-
-export GZOCHI_COMMON_CFLAGS
-export GZOCHI_COMMON_LIBS
-
 SUBDIRS = doc meta src tests

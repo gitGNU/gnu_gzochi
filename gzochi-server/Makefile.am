@@ -20,16 +20,7 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
-GZOCHI_COMMON_CFLAGS = "-I$(abs_top_srcdir)/../gzochi-common/src"
-GZOCHI_COMMON_LIBS = \
-	"$(abs_top_builddir)/../gzochi-common/src/libgzochi-common.la"
-
-export GZOCHI_COMMON_CFLAGS
-export GZOCHI_COMMON_LIBS
-
 SUBDIRS = src doc meta tests
-
-AM_LDFLAGS = @GUILE_LIBS@ @GLIB_LIBS@
 
 dist_noinst_DATA = benchmarks/echo-chamber/README \
 	benchmarks/echo-chamber/client.scm \

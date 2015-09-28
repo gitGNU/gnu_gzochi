@@ -33,6 +33,13 @@ LT_INIT
 
 PKG_CHECK_MODULES([GLIB], [glib-2.0])
 
+ac_gzochi_common_cflags='-I$(abs_top_srcdir)/../gzochi-common/src'
+AC_SUBST([GZOCHI_COMMON_CFLAGS], [$ac_gzochi_common_cflags])
+
+ac_gzochi_common_libs='-L$(abs_top_builddir)/../gzochi-common/src/ \
+	-lgzochi-common'
+AC_SUBST([GZOCHI_COMMON_LIBS], [$ac_gzochi_common_libs])
+
 GZOCHI_VERSION="$PACKAGE_VERSION"
 AC_CONFIG_FILES([meta/gzochi-glib.pc])
 
