@@ -22,7 +22,7 @@
 # its `pkg-config' file is created, which makes it a poor fit for dynamic
 # environments.
 
-pkgguile_sitedir = ${datadir}/${PACKAGE_TARNAME}/site/${GUILE_EFFECTIVE_VERSION}
+pkgguile_sitedir = ${datadir}/guile/site/${GUILE_EFFECTIVE_VERSION}
 
 nobase_dist_pkgguile_site_DATA = gzochi.scm \
 	gzochi/admin.scm gzochi/app.scm gzochi/channel.scm \

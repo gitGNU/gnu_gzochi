@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2014 Julian Graham
+# Copyright (C) 2015 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,7 +22,7 @@
 # its `pkg-config' file is created, which makes it a poor fit for dynamic
 # environments.
 
-pkgguile_sitedir = ${datadir}/${PACKAGE_TARNAME}/site/${GUILE_EFFECTIVE_VERSION}
+pkgguile_sitedir = ${datadir}/guile/site/${GUILE_EFFECTIVE_VERSION}
 
 nobase_dist_pkgguile_site_DATA = gzochi/client.scm gzochi/client/protocol.scm \
 	gzochi/main-loop.scm
