@@ -61,9 +61,10 @@
 	  gzochi:managed-serializable-value
 	  gzochi:managed-serializable-value-set!
 
-	  gzochi:make-managed-vector gzochi:managed-vector?
-	  gzochi:managed-vector-ref gzochi:managed-vector-set!
-          gzochi:managed-vector-length gzochi:managed-vector->list
+	  gzochi:make-managed-vector gzochi:managed-vector
+	  gzochi:managed-vector? gzochi:managed-vector-ref
+	  gzochi:managed-vector-set! gzochi:managed-vector-length
+	  gzochi:managed-vector->list
 
 	  gzochi:make-managed-sequence gzochi:managed-sequence?
           gzochi:managed-sequence->list gzochi:managed-sequence-add!
