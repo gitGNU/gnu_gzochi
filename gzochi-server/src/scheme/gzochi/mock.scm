@@ -16,7 +16,7 @@
 
 #!r6rs
 
-(library (gzochi data mock)
+(library (gzochi mock)
   (export)
   (import (gzochi data mock))
 
