@@ -24,6 +24,7 @@
 #include "game.h"
 #include "guile.h"
 #include "scheme.h"
+#include "scheme-task.h"
 #include "session.h"
 #include "storage-mem.h"
 #include "tx.h"

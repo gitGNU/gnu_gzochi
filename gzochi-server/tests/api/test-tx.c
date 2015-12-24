@@ -21,10 +21,18 @@
 #include <stdlib.h>
 
 #include "../app.h"
+#include "../guile.h"
 #include "../gzochid-auth.h"
 #include "../tx.h"
 
 #include "tx.h"
+#include "util.h"
+
+extern void
+primitive_join_transaction (SCM);
+
+extern void
+primitive_abort_transaction (SCM, SCM);
 
 struct test_context
 {
@@ -111,7 +119,7 @@ SCM
 abort_transaction_body (void *data)
 {
   SCM participant = data;
-  primitive_abort_transaction (participant);
+  primitive_abort_transaction (participant, SCM_BOOL_F);
   return SCM_UNSPECIFIED;
 }
 
@@ -266,7 +274,7 @@ test_rollback_inner (void *data)
   
   primitive_join_transaction (participant1);
   primitive_join_transaction (participant2);
-  primitive_abort_transaction (participant1);
+  primitive_abort_transaction (participant1, SCM_BOOL_F);
 
   gzochid_transaction_end ();
 

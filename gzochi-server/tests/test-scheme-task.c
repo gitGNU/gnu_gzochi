@@ -25,6 +25,7 @@
 #include "app-task.h"
 #include "context.h"
 #include "game.h"
+#include "guile.h"
 #include "gzochid-auth.h"
 #include "scheme.h"
 #include "scheme-task.h"

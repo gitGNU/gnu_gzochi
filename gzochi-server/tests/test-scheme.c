@@ -21,7 +21,9 @@
 #include <stdlib.h>
 
 #include "app.h"
+#include "guile.h"
 #include "scheme.h"
+#include "util.h"
 
 static void
 test_serialization_exception ()
