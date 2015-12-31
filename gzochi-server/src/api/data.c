@@ -209,7 +209,7 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
 
       free (cname);
       free (prefixed_name);
-      g_error_free (err);
+      g_clear_error (&err);
       
       if (scm_is_true (cond))
 	gzochid_guile_r6rs_raise (cond);
