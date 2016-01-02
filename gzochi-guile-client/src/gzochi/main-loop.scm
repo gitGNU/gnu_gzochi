@@ -430,7 +430,7 @@
 			  (gzochi:poll pollable (car timeout) (cdr timeout))
 			  (gzochi:poll pollable))))
 	      
-		(for-each dispatch (filter check prepared-sources))
-		(if (gzochi:main-loop-running main-loop)
-		  (loop)))))))))
+		(for-each dispatch (filter check prepared-sources)))))))
+      (if (gzochi:main-loop-running main-loop)
+	  (loop))))
 )
