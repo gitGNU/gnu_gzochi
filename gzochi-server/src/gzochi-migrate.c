@@ -533,7 +533,7 @@ create_application_context (char *path, char *app)
   const char *env = getenv ("GZOCHID_CONF_LOCATION");
   const char *gzochid_conf = NULL;
 
-  gzochid_game_context *parent = gzochid_game_context_new ();
+  gzochid_game_context *parent = gzochid_game_context_new (NULL);
   gzochid_application_context *context = gzochid_application_context_new ();
   char *work_dir = NULL, *data_dir = NULL, *apps_dir = NULL,
     *descriptor_path = NULL, *storage_engine = NULL;

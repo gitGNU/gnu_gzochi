@@ -1,5 +1,5 @@
 /* socket.c: Application socket server implementation for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <gzochi-common.h>
 #include <netinet/in.h>
@@ -32,27 +33,40 @@
 #include "socket.h"
 #include "threads.h"
 
-struct _gzochid_client_socket
+struct _gzochid_server_socket
 {
-  gzochid_socket_server_context *context;
-  gzochid_protocol_client *client;
+  gzochid_socket_context *context;
 
-  GMutex sock_mutex;
+  GIOChannel *channel; /* The server socket IO channel. */
+  struct sockaddr *addr; /* The actual address of the server socket. */
+  socklen_t addrlen; /* The length of `addr'. */
 
-  GArray *send_buffer;
-  GArray *recv_buffer;
-  
-  GIOChannel *channel;
-  char *connection_description;
-  GSource *read_source; /* The client's read source. */
-  GSource *write_source;
+  gzochid_server_protocol protocol; /* The server protocol. */
+  gpointer protocol_data; /* Callback data for the server protocol. */
 };
 
-gzochid_socket_server_context *
-gzochid_socket_server_context_new (void)
+struct _gzochid_client_socket
 {
-  gzochid_socket_server_context *context = calloc 
-    (1, sizeof (gzochid_socket_server_context));
+  gzochid_socket_context *context;
+  
+  GMutex sock_mutex; /* A mutex to synchronize access to the send buffer. */
+
+  GByteArray *send_buffer; /* The outgoing data buffer. */
+  GByteArray *recv_buffer; /* The incoming data buffer. */
+  
+  GIOChannel *channel; /* The client socket IO channel. */
+  char *connection_description; /* Description of the connection, for logs. */
+  GSource *read_source; /* The client's read source. */
+  GSource *write_source; /* The client's write source. */
+
+  gzochid_client_protocol protocol; /* The client protocol. */
+  gpointer protocol_data; /* Callback data for the client protocol. */
+};
+
+gzochid_socket_context *
+gzochid_socket_context_new (void)
+{
+  gzochid_socket_context *context = calloc (1, sizeof (gzochid_socket_context));
 
   context->main_context = g_main_context_new ();
   context->main_loop = g_main_loop_new (context->main_context, FALSE);
@@ -61,9 +75,27 @@ gzochid_socket_server_context_new (void)
 }
 
 void 
-gzochid_socket_server_context_free (gzochid_socket_server_context *context)
+gzochid_socket_context_free (gzochid_socket_context *context)
 {
   gzochid_context_free ((gzochid_context *) context);
+
+  g_main_context_unref (context->main_context);
+  g_main_loop_unref (context->main_loop);
+  
+  free (context);
+}
+
+gzochid_server_socket *
+gzochid_server_socket_new (gzochid_server_protocol protocol,
+			   gpointer protocol_data)
+{
+  gzochid_server_socket *server_socket =
+    calloc (1, sizeof (gzochid_server_socket));
+
+  server_socket->protocol = protocol;
+  server_socket->protocol_data = protocol_data;
+
+  return server_socket;
 }
 
 static gboolean
@@ -87,11 +119,11 @@ dispatch_client_write (GIOChannel *channel, GIOCondition cond, gpointer data)
       GError *error = NULL;
       
       status = g_io_channel_write_chars 
-	(sock->channel, sock->send_buffer->data, sock->send_buffer->len, 
-	 &written, &error);
+	(sock->channel, (const gchar *) sock->send_buffer->data,
+	 sock->send_buffer->len, &written, &error);
 
       if (written > 0)
-	g_array_remove_range (sock->send_buffer, 0, written);
+	g_byte_array_remove_range (sock->send_buffer, 0, written);
 
       if (error != NULL)
 	{
@@ -116,24 +148,7 @@ static gboolean
 dispatch_client_error (gzochid_client_socket *sock)
 {
   gzochid_debug ("Socket disconnected.");
-
-  /* 
-     It's actually not possible for the client's read source to produce an
-     error between the source being added to the main loop and the call to
-     `gzochid_protocol_client_accept', which is what's used to set the `client'
-     field of the socket struct; the accept dispatch should be running in the
-     same thread as the error dispatch.
-
-     Nonetheless, it seems like good hygiene to check this field before using
-     it.
-  */
- 
-  if (sock->client != NULL)
-    {
-      gzochid_protocol_client_disconnected (sock->client);
-      gzochid_protocol_client_free (sock->client);
-    }
-
+  sock->protocol.error (sock->protocol_data);
   return FALSE;
 }
 
@@ -144,15 +159,15 @@ fill_recv_buffer (gzochid_client_socket *sock)
 
   do
     {
-      gchar buf[1024];
+      guint8 buf[1024];
       gsize bytes_read = 0;
       GError *error = NULL;
 
       status = g_io_channel_read_chars 
-	(sock->channel, buf, 1024, &bytes_read, &error);
+	(sock->channel, (gchar *) buf, 1024, &bytes_read, &error);
 
       if (bytes_read > 0)
-	g_array_append_vals (sock->recv_buffer, buf, bytes_read);
+	g_byte_array_append (sock->recv_buffer, buf, bytes_read);
 
       if (error != NULL)
 	{
@@ -165,39 +180,24 @@ fill_recv_buffer (gzochid_client_socket *sock)
 }
 
 static gboolean
-dispatch_recv_buffer (gzochid_client_socket *sock)
-{
-  int offset = 0, total = 0;
-  int remaining = sock->recv_buffer->len;
-
-  while (remaining >= 3)
-    {
-      short len = gzochi_common_io_read_short 
-	((unsigned char *) sock->recv_buffer->data, offset);
-      
-      if (++len > remaining - 2)
-	break;
-      
-      offset += 2;
-      
-      gzochid_protocol_client_dispatch 
-	(sock->client, (unsigned char *) sock->recv_buffer->data + offset, len);
-      
-      offset += len;
-      remaining -= len + 2;
-      total += len + 2;
-    }
-  
-  if (total > 0)
-    g_array_remove_range (sock->recv_buffer, 0, total);
-
-  return TRUE;
-}
-
-static gboolean
 dispatch_client_read (gzochid_client_socket *sock)
 {
-  return fill_recv_buffer (sock) && dispatch_recv_buffer (sock);
+  if (fill_recv_buffer (sock))
+    {      
+      while (sock->recv_buffer->len > 0 && sock->protocol.can_dispatch
+	     (sock->recv_buffer, sock->protocol_data))
+	{
+	  unsigned int num = sock->protocol.dispatch
+	    (sock->recv_buffer, sock->protocol_data);
+
+	  if (num > 0)
+	    sock->recv_buffer = g_byte_array_remove_range
+	      (sock->recv_buffer, 0, num);
+	  else break;
+	}
+      return TRUE;
+    }
+  else return FALSE;
 }
 
 static gboolean
@@ -215,17 +215,25 @@ dispatch_client (GIOChannel *channel, GIOCondition condition, gpointer data)
     }
 }
 
-static gzochid_client_socket *
-create_client_socket (GIOChannel *channel)
+gzochid_client_socket *
+gzochid_client_socket_new (GIOChannel *channel,
+			   const char *connection_description,
+			   gzochid_client_protocol protocol,
+			   gpointer protocol_data)
 {
   gzochid_client_socket *sock = malloc (sizeof (gzochid_client_socket));
-
+  
   sock->channel = channel;
+  sock->connection_description = strdup (connection_description);
+
+  sock->protocol = protocol;
+  sock->protocol_data = protocol_data;
+  
   sock->write_source = NULL;
 
   g_mutex_init (&sock->sock_mutex);
-  sock->recv_buffer = g_array_new (FALSE, FALSE, sizeof (unsigned char));
-  sock->send_buffer = g_array_new (FALSE, FALSE, sizeof (unsigned char));
+  sock->recv_buffer = g_byte_array_new ();
+  sock->send_buffer = g_byte_array_new ();
 
   return sock;
 }
@@ -235,22 +243,40 @@ create_client_socket (GIOChannel *channel)
    `gzochid_client_socket_free'. */
 
 static void
-free_socket (gpointer data)
+free_client_socket (gpointer data)
 {
   gzochid_client_socket *sock = data;
 
+  sock->protocol.free (sock->protocol_data);
+
   g_io_channel_unref (sock->channel);
   g_mutex_clear (&sock->sock_mutex);
-  g_array_unref (sock->recv_buffer);
-  g_array_unref (sock->send_buffer);
+  g_byte_array_unref (sock->recv_buffer);
+  g_byte_array_unref (sock->send_buffer);
   g_free (sock->connection_description);
   free (sock);
+}
+
+void gzochid_server_socket_free (gzochid_server_socket *sock)
+{
+  free (sock);
+}
+
+static void
+free_server_socket (gpointer data)
+{
+  gzochid_server_socket *sock = data;
+
+  g_io_channel_unref (sock->channel);
+  free (sock->addr);
+  
+  gzochid_server_socket_free (sock);
 }
 
 static gboolean
 dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
 {
-  gzochid_socket_server_context *server_context = data;
+  gzochid_server_socket *server_socket = data;
   gint client_fd, server_fd = g_io_channel_unix_get_fd (channel);
   struct sockaddr_in client_addr;
   socklen_t client_addr_len = sizeof (struct sockaddr_in);
@@ -260,67 +286,70 @@ dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
 	  (server_fd, (struct sockaddr *) &client_addr, &client_addr_len)) >= 0)
     {
       GIOChannel *channel = g_io_channel_unix_new (client_fd);
-      gzochid_client_socket *sock = create_client_socket (channel);
-
-      sock->read_source = g_io_create_watch 
-	(channel, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP);
-
-      setsockopt (client_fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof (int));
-
-      g_io_channel_set_encoding (channel, NULL, NULL);
-      g_io_channel_set_flags (channel, G_IO_FLAG_NONBLOCK, NULL);
-      g_io_channel_set_buffered (channel, FALSE);
-
-      /* Set the read callback for the socket. `free_socket' is used as a
-	 `GDestroyNotify' callback for the socket when this source is 
-	 destroyed. */
-      
-      g_source_set_callback
-	(sock->read_source, (GSourceFunc) dispatch_client, sock, free_socket);
-      g_source_attach (sock->read_source, server_context->main_context);
-      
-      sock->client = gzochid_protocol_client_accept (sock);
-      sock->connection_description = g_strdup_printf 
+      char *connection_description = g_strdup_printf 
 	("%d.%d.%d.%d:%d",
 	 client_addr.sin_addr.s_addr & 0xff,
 	 (client_addr.sin_addr.s_addr & 0xff00) >> 8,
 	 (client_addr.sin_addr.s_addr & 0xff0000) >> 16,
 	 (client_addr.sin_addr.s_addr & 0xff000000) >> 24,
 	 client_addr.sin_port);
+      
+      gzochid_client_socket *sock = server_socket->protocol.accept
+	(channel, connection_description, server_socket->protocol_data);
 
-      sock->context = server_context;
+      g_free (connection_description);
+      
+      setsockopt (client_fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof (int));
+
+      g_io_channel_set_encoding (channel, NULL, NULL);
+      g_io_channel_set_flags (channel, G_IO_FLAG_NONBLOCK, NULL);
+      g_io_channel_set_buffered (channel, FALSE);
+
+      sock->read_source = g_io_create_watch 
+	(channel, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP);
+
+      /* Set the read callback for the socket. `free_socket' is used as a
+	 `GDestroyNotify' callback for the socket when this source is 
+	 destroyed. */
+      
+      g_source_set_callback
+	(sock->read_source, (GSourceFunc) dispatch_client, sock,
+	 free_client_socket);
+      g_source_attach (sock->read_source, server_socket->context->main_context);
+      
+      sock->context = server_socket->context;
     }
 
   return TRUE;
 }
 
-static void 
-initialize (int from_state, int to_state, gpointer user_data)
+void gzochid_server_socket_listen
+(gzochid_socket_context *context, gzochid_server_socket *sock, gint port)
 {
-  gzochid_context *context = (gzochid_context *) user_data;
-  gzochid_socket_server_context *server_context = 
-    (gzochid_socket_server_context *) context;
-  gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
-
   gint fd = socket (PF_INET, SOCK_STREAM, 0);
-  GIOChannel *server_sock = g_io_channel_unix_new (fd);
-  GSource *server_source = g_io_create_watch (server_sock, G_IO_IN);
+  GSource *server_source = NULL;
   struct sockaddr_in addr;
   int one = 1;
 
+  sock->channel = g_io_channel_unix_new (fd);
+  server_source = g_io_create_watch (sock->channel, G_IO_IN);
+  
+  assert (sock->context == NULL);
+  sock->context = context;
+  
   addr.sin_family = AF_INET;
-  addr.sin_port = htons (game_context->port);
+  addr.sin_port = htons (port);
   addr.sin_addr.s_addr = htonl (INADDR_ANY);
 
   setsockopt (fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof (int));
   setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof (int));
 
-  g_io_channel_set_flags (server_sock, G_IO_FLAG_NONBLOCK, NULL);
+  g_io_channel_set_flags (sock->channel, G_IO_FLAG_NONBLOCK, NULL);
 
   if (bind (fd, (struct sockaddr *) &addr, sizeof (struct sockaddr_in)) != 0)
-    gzochid_err ("Failed to bind server to port %d", game_context->port);
+    gzochid_err ("Failed to bind server to port %d", port);
   if (listen (fd, 128) != 0)
-    gzochid_err ("Failed to listen on port %d", game_context->port);
+    gzochid_err ("Failed to listen on port %d", port);
   else
     {
       /* To enable the server to bind to an arbitrary port - i.e., to allow
@@ -330,28 +359,26 @@ initialize (int from_state, int to_state, gpointer user_data)
       
       struct sockaddr_in *bound_addr = NULL;
       
-      server_context->addr = malloc (sizeof (struct sockaddr_in));
-      server_context->addrlen = sizeof (struct sockaddr_in);
+      sock->addr = malloc (sizeof (struct sockaddr_in));
+      sock->addrlen = sizeof (struct sockaddr_in);
 
-      bound_addr = (struct sockaddr_in *) server_context->addr;
+      bound_addr = (struct sockaddr_in *) sock->addr;
 
-      if (getsockname (fd, server_context->addr, &server_context->addrlen) != 0)
+      if (getsockname (fd, sock->addr, &sock->addrlen) != 0)
 	gzochid_err ("Failed to get name of bound socket");
       else gzochid_notice
 	     ("Game server listening on port %d", ntohs (bound_addr->sin_port));
     }
 
-  g_source_set_callback 
-    (server_source, (GSourceFunc) dispatch_accept, server_context, NULL);
-  g_source_attach (server_source, server_context->main_context);
-  
-  gzochid_fsm_to_state (context->fsm, GZOCHID_SOCKET_SERVER_STATE_RUNNING);
+  g_source_set_callback
+    (server_source, (GSourceFunc) dispatch_accept, sock, free_server_socket);
+  g_source_attach (server_source, context->main_context);
 }
 
 static gpointer 
 run_async (gpointer data)
 {
-  gzochid_socket_server_context *server = data;
+  gzochid_socket_context *server = data;
   g_main_loop_run (server->main_loop);
   return NULL;
 }
@@ -365,54 +392,72 @@ run (int from_state, int to_state, gpointer user_data)
 static void 
 stop (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_socket_server_context *server = user_data;
+  gzochid_socket_context *server = user_data;
   g_main_loop_quit (server->main_loop);
 }
 
 void 
-gzochid_socket_server_context_init 
-(gzochid_socket_server_context *context, gzochid_context *parent, int port)
+gzochid_socket_context_init
+(gzochid_socket_context *context, gzochid_context *parent)
 {
   gzochid_fsm *fsm = gzochid_fsm_new
-    ("socket-server", GZOCHID_SOCKET_SERVER_STATE_INITIALIZING, "INITIALIZING");
+    ("socket-server", GZOCHID_SOCKET_CONTEXT_STATE_RUNNING, "RUNNING");
   
-  gzochid_fsm_add_state (fsm, GZOCHID_SOCKET_SERVER_STATE_RUNNING, "RUNNING");
-  gzochid_fsm_add_state (fsm, GZOCHID_SOCKET_SERVER_STATE_STOPPED, "STOPPED");
+  gzochid_fsm_add_state (fsm, GZOCHID_SOCKET_CONTEXT_STATE_STOPPED, "STOPPED");
   
   gzochid_fsm_add_transition
-    (fsm, GZOCHID_SOCKET_SERVER_STATE_INITIALIZING,
-     GZOCHID_SOCKET_SERVER_STATE_RUNNING);
-  gzochid_fsm_add_transition
-    (fsm, GZOCHID_SOCKET_SERVER_STATE_RUNNING,
-     GZOCHID_SOCKET_SERVER_STATE_STOPPED);
+    (fsm, GZOCHID_SOCKET_CONTEXT_STATE_RUNNING,
+     GZOCHID_SOCKET_CONTEXT_STATE_STOPPED);
 
   gzochid_fsm_on_enter
-    (fsm, GZOCHID_SOCKET_SERVER_STATE_INITIALIZING, initialize, context);
-  gzochid_fsm_on_enter (fsm, GZOCHID_SOCKET_SERVER_STATE_RUNNING, run, context);
+    (fsm, GZOCHID_SOCKET_CONTEXT_STATE_RUNNING, run, context);
   gzochid_fsm_on_enter
-    (fsm, GZOCHID_SOCKET_SERVER_STATE_STOPPED, stop, context);
+    (fsm, GZOCHID_SOCKET_CONTEXT_STATE_STOPPED, stop, context);
 
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
 }
 
-gzochid_socket_server_context *
-gzochid_socket_get_server_context (gzochid_client_socket *sock)
+gzochid_socket_context *
+gzochid_client_socket_get_server_context (gzochid_client_socket *sock)
 {
   return sock->context;
 }
 
-char *
-gzochid_socket_get_connection_description (gzochid_client_socket *sock)
+const char *
+gzochid_client_socket_get_connection_description (gzochid_client_socket *sock)
 {
   return sock->connection_description;
 }
 
 void
-gzochid_client_socket_write 
-(gzochid_client_socket *sock, unsigned char *data, size_t len)
+_gzochid_server_socket_getsockname (gzochid_server_socket *sock,
+				    struct sockaddr *addr, size_t *addrlen)
+{
+  /* Ensure the socket is listening. */
+
+  assert (sock->addr != NULL);
+  
+  memcpy (addr, sock->addr, MIN(*addrlen, sock->addrlen));
+}
+
+gzochid_client_protocol
+_gzochid_client_socket_get_protocol (gzochid_client_socket *sock)
+{
+  return sock->protocol;
+}
+
+gpointer
+_gzochid_client_socket_get_protocol_data (gzochid_client_socket *sock)
+{
+  return sock->protocol_data;
+}
+
+void
+gzochid_client_socket_write (gzochid_client_socket *sock, unsigned char *data,
+			     size_t len)
 {
   g_mutex_lock (&sock->sock_mutex);
-  g_array_append_vals (sock->send_buffer, data, len);
+  g_byte_array_append (sock->send_buffer, data, len);
   if (sock->write_source == NULL)
     {
       sock->write_source = g_io_create_watch (sock->channel, G_IO_OUT);

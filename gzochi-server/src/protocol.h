@@ -1,4 +1,4 @@
-/* protocol.h: Prototypes and declarations for protocol.c
+/* protocol.h: Struct definitions for protocol descriptors.
  * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -19,31 +19,57 @@
 #define GZOCHID_PROTOCOL_H
 
 #include <glib.h>
-#include <gmp.h>
+#include <sys/socket.h>
 
-#include "app.h"
-#include "gzochid-auth.h"
-#include "socket.h"
+/* Describes a server protocol, used to create `gzochid_client_socket' instances
+   out of incoming connections on a listening `gzochid_server_socket'. */
 
-typedef struct _gzochid_protocol_client gzochid_protocol_client;
+struct _gzochid_server_protocol
+{
+  /* Return a new client socket structure from the specified IO Channel and a
+     `NULL'-terminated connection description string, which can be used in log
+     messages about the connection. 
 
-gzochid_auth_identity *gzochid_protocol_client_get_identity 
-(gzochid_protocol_client *);
+     Implementations of this function should almost always call 
+     `gzochid_client_socket_new', which has a matching prototype.
+  */
+  
+  struct _gzochid_client_socket *(*accept)
+    (GIOChannel *, const char *, gpointer);
+};
 
-gzochid_protocol_client *gzochid_protocol_client_accept 
-(gzochid_client_socket *);
+typedef struct _gzochid_server_protocol gzochid_server_protocol;
 
-void gzochid_protocol_client_disconnected (gzochid_protocol_client *);
-void gzochid_protocol_client_free (gzochid_protocol_client *);
+/* Describes a client protocol, used to handle incoming messages and state 
+   changes from connected client sockets. */
 
-void gzochid_protocol_client_dispatch (gzochid_protocol_client *, 
-				       unsigned char *, short);
+struct _gzochid_client_protocol
+{
+  /* Return `TRUE' if the specified byte array contains at least one message 
+     that can be consumed and dispatched via `dispatch'. This function will be
+     called by the socket server when data has arrived from a client socket to 
+     check whether any messages are ready to be dispatched. */
+  
+  gboolean (*can_dispatch) (const GByteArray *, gpointer);
 
-void gzochid_protocol_client_disconnect (gzochid_protocol_client *);
-void gzochid_protocol_client_login_success (gzochid_protocol_client *);
-void gzochid_protocol_client_login_failure (gzochid_protocol_client *);
+  /* Read one or more messages from the specified byte array and dispatch it
+     accordingly, returning the number of bytes that have been consumed. This
+     function will be called if and only if the `can_dispatch' function returns
+     `TRUE'. */
+  
+  unsigned int (*dispatch) (const GByteArray *, gpointer);
 
-void gzochid_protocol_client_send (gzochid_protocol_client *, unsigned char *, 
-				   short);
+  /* Called when the socket server detects an error or unexpected disconnect
+     from a connected client. */
+  
+  void (*error) (gpointer);
+
+  /* Called to release any resources (e.g., memory) referenced by the protocol 
+     data object. */
+  
+  void (*free) (gpointer);
+};
+
+typedef struct _gzochid_client_protocol gzochid_client_protocol;
 
 #endif /* GZOCHID_PROTOCOL_H */

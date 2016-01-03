@@ -1,5 +1,5 @@
 /* gzochid.h: Prototypes and declarations for gzochid.c
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 #include "admin.h"
 #include "context.h"
 
-typedef struct _gzochid_server_context
+struct _gzochid_server_context
 {
   gzochid_context base;
   const char *gzochid_conf_path;
@@ -31,7 +31,10 @@ typedef struct _gzochid_server_context
 
   gzochid_context *admin_context;
   gzochid_context *game_context;
-} gzochid_server_context;
+  gzochid_context *socket_context; /* The global socket context and loop. */
+};
+
+typedef struct _gzochid_server_context gzochid_server_context;
 
 enum gzochid_state 
   {

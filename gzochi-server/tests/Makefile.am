@@ -28,6 +28,7 @@ test_programs = \
 	test-durable-task \
 	test-event \
 	test-fsm \
+	test-game-protocol \
 	test-lrucache \
 	test-reloc \
 	test-scheme \
@@ -111,6 +112,11 @@ test_fsm_SOURCES = test-fsm.c
 test_fsm_LDADD = $(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	@GLIB_LIBS@
+
+test_game_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_game_protocol_SOURCES = test-game-protocol.c
+test_game_protocol_LDADD = $(top_builddir)/src/libgzochid.la \
+	@GZOCHI_COMMON_LIBS@ @GMODULE_LIBS@ @GLIB_LIBS@ @GUILE_LIBS@
 
 test_lrucache_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lrucache_SOURCES = test-lrucache.c

@@ -67,8 +67,11 @@ initialize_async (gpointer data, gpointer user_data)
 
   server_context->admin_context = 
     (gzochid_context *) gzochid_admin_context_new ();
+  server_context->socket_context =
+    (gzochid_context *) gzochid_socket_context_new ();
   server_context->game_context = 
-    (gzochid_context *) gzochid_game_context_new ();
+    (gzochid_context *) gzochid_game_context_new
+    ((gzochid_socket_context *) server_context->socket_context);
 
   g_key_file_load_from_file 
     (key_file, server_context->gzochid_conf_path, G_KEY_FILE_NONE, &err);

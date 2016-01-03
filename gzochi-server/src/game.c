@@ -32,6 +32,7 @@
 #include "durable-task.h"
 #include "fsm.h"
 #include "game.h"
+#include "game-protocol.h"
 #include "gzochid.h"
 #include "gzochid-storage.h"
 #include "log.h"
@@ -155,13 +156,16 @@ initialize_auth (int from_state, int to_state, gpointer user_data)
 static void 
 initialize_server (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_game_context *context = user_data;
+  gzochid_game_context *game_context = user_data;
 
-  context->server = gzochid_socket_server_context_new ();
-  gzochid_socket_server_context_init 
-    (context->server, (gzochid_context *) context, context->port);
-  gzochid_context_until 
-    ((gzochid_context *) context->server, GZOCHID_SOCKET_SERVER_STATE_RUNNING);
+  game_context->server_socket = gzochid_server_socket_new
+    (gzochid_game_server_protocol, game_context);
+  gzochid_server_socket_listen
+    (game_context->socket_context, game_context->server_socket,
+     game_context->port);
+
+  gzochid_socket_context_init
+    (game_context->socket_context, (gzochid_context *) game_context);
 }
 
 static void 
@@ -253,13 +257,14 @@ initialize_event_loop (int from_state, int to_state, gpointer user_data)
 }
 
 gzochid_game_context *
-gzochid_game_context_new (void)
+gzochid_game_context_new (gzochid_socket_context *socket_context)
 {
   gzochid_game_context *context = calloc (1, sizeof (gzochid_game_context));
 
   context->applications = g_hash_table_new (g_str_hash, g_str_equal);
   context->auth_plugins = g_hash_table_new (g_str_hash, g_str_equal);
-
+  context->socket_context = socket_context;
+  
   return context;
 }
 

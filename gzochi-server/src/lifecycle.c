@@ -24,11 +24,11 @@
 #include "auth_int.h"
 #include "fsm.h"
 #include "game.h"
+#include "game-protocol.h"
 #include "guile.h"
 #include "gzochid-auth.h"
 #include "lifecycle.h"
 #include "log.h"
-#include "protocol.h"
 #include "scheme-task.h"
 #include "session.h"
 #include "task.h"
@@ -354,8 +354,8 @@ login_catch_worker (gzochid_application_context *context,
 		    gzochid_auth_identity *identity, gpointer data)
 {
   char *session_oid_str = data;
-  gzochid_protocol_client *client =
-    g_hash_table_lookup (context->oids_to_clients, session_oid_str);
+  gzochid_game_client *client = g_hash_table_lookup
+    (context->oids_to_clients, session_oid_str);
 
   gzochid_info
     ("Disconnecting session '%s'; failed login transaction.", session_oid_str);
@@ -365,7 +365,7 @@ login_catch_worker (gzochid_application_context *context,
   g_hash_table_remove (context->clients_to_oids, client);
   g_mutex_unlock (&context->client_mapping_lock);
       
-  gzochid_protocol_client_disconnect (client);
+  gzochid_game_client_disconnect (client);
 
   gzochid_client_session_disconnected_worker
     (context, identity, session_oid_str);
@@ -373,10 +373,9 @@ login_catch_worker (gzochid_application_context *context,
 
 void 
 gzochid_application_client_logged_in (gzochid_application_context *context, 
-				      gzochid_protocol_client *client)
+				      gzochid_game_client *client)
 {
-  gzochid_auth_identity *identity =
-    gzochid_protocol_client_get_identity (client);
+  gzochid_auth_identity *identity = gzochid_game_client_get_identity (client);
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
   gzochid_client_session *session = gzochid_client_session_new (identity);
@@ -417,7 +416,7 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   g_mutex_unlock (&context->client_mapping_lock);
 
   application_task = gzochid_application_task_new
-    (context, gzochid_protocol_client_get_identity (client), 
+    (context, gzochid_game_client_get_identity (client), 
      gzochid_application_reexecuting_transactional_task_worker, execution);
      
   task.worker = gzochid_application_task_thread_worker;
@@ -429,7 +428,7 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
 
 void 
 gzochid_application_client_disconnected (gzochid_application_context *context, 
-					 gzochid_protocol_client *client)
+					 gzochid_game_client *client)
 {
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
@@ -446,22 +445,22 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
     {
       gzochid_application_task *callback_task = 
 	gzochid_application_task_new
-	(context, gzochid_protocol_client_get_identity (client),
+	(context, gzochid_game_client_get_identity (client),
 	 gzochid_scheme_application_disconnected_worker, session_oid_str);
       gzochid_application_task *catch_task =
 	gzochid_application_task_new
-	(context, gzochid_protocol_client_get_identity (client),
+	(context, gzochid_game_client_get_identity (client),
 	 gzochid_client_session_disconnected_worker, session_oid_str);
       gzochid_application_task *cleanup_task = 
 	gzochid_application_task_new
-	(context, gzochid_protocol_client_get_identity (client), 
+	(context, gzochid_game_client_get_identity (client), 
 	 gzochid_scheme_application_disconnected_cleanup_worker,
 	 session_oid_str);
       gzochid_transactional_application_task_execution *execution = 
 	gzochid_transactional_application_task_execution_new 
 	(callback_task, catch_task, cleanup_task);
       gzochid_application_task *application_task = gzochid_application_task_new 
-	(context, gzochid_protocol_client_get_identity (client),
+	(context, gzochid_game_client_get_identity (client),
 	 gzochid_application_resubmitting_transactional_task_worker, execution);
 
       gzochid_task task;
@@ -488,7 +487,7 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
 
 void 
 gzochid_application_session_received_message
-(gzochid_application_context *context, gzochid_protocol_client *client, 
+(gzochid_application_context *context, gzochid_game_client *client, 
  unsigned char *msg, short len)
 {
   gzochid_game_context *game_context = 
@@ -515,7 +514,7 @@ gzochid_application_session_received_message
       data[2] = &len;
       
       transactional_task = gzochid_application_task_new
-	(context, gzochid_protocol_client_get_identity (client),
+	(context, gzochid_game_client_get_identity (client),
 	 gzochid_scheme_application_received_message_worker, data);
 
       execution = gzochid_transactional_application_task_timed_execution_new
@@ -527,7 +526,7 @@ gzochid_application_session_received_message
       gzochid_application_task_unref (transactional_task);
       
       application_task = gzochid_application_task_new
-	(context, gzochid_protocol_client_get_identity (client),
+	(context, gzochid_game_client_get_identity (client),
 	 gzochid_application_reexecuting_transactional_task_worker, execution);
       
       task.worker = gzochid_application_task_thread_worker;

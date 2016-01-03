@@ -19,16 +19,15 @@
 #define GZOCHID_LIFECYCLE_H
 
 #include "app.h"
-#include "protocol.h"
+#include "game-protocol.h"
 
 void gzochid_application_client_logged_in (gzochid_application_context *, 
-					   gzochid_protocol_client *);
+					   gzochid_game_client *);
 
 void gzochid_application_client_disconnected (gzochid_application_context *, 
-					      gzochid_protocol_client *);
+					      gzochid_game_client *);
 
 void gzochid_application_session_received_message 
-(gzochid_application_context *, gzochid_protocol_client *, unsigned char *, 
- short);
+(gzochid_application_context *, gzochid_game_client *, unsigned char *, short);
 
 #endif /* GZOCHID_LIFECYCLE_H */

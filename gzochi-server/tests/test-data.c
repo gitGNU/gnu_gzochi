@@ -92,7 +92,7 @@ static void
 application_context_init (gzochid_application_context *context)
 {
   gzochid_context *base = (gzochid_context *) context;
-  gzochid_game_context *game_context = gzochid_game_context_new ();
+  gzochid_game_context *game_context = gzochid_game_context_new (NULL);
   base->parent = (gzochid_context *) game_context;
 
   game_context->storage_engine = malloc (sizeof (gzochid_storage_engine));

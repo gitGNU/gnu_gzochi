@@ -45,7 +45,7 @@ test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
 				gconstpointer user_data)
 {
   gzochid_context *base_context = NULL;
-  gzochid_game_context *game_context = gzochid_game_context_new ();
+  gzochid_game_context *game_context = gzochid_game_context_new (NULL);
   gzochid_storage_engine *storage_engine = 
     malloc (sizeof (gzochid_storage_engine));
 

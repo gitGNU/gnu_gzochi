@@ -1,5 +1,5 @@
 /* session.c: Client session management routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -27,10 +27,10 @@
 #include "data.h"
 #include "event.h"
 #include "game.h"
+#include "game-protocol.h"
 #include "gzochid-auth.h"
 #include "io.h"
 #include "log.h"
-#include "protocol.h"
 #include "reloc.h"
 #include "scheme-task.h"
 #include "session.h"
@@ -191,7 +191,7 @@ session_commit_operation
   gzochid_client_session_pending_message_operation *msg_op = NULL;
 
   char *oid_str = mpz_get_str (NULL, 16, op->target_session);
-  gzochid_protocol_client *client = NULL;
+  gzochid_game_client *client = NULL;
 
   g_mutex_lock (&context->client_mapping_lock);
   client = g_hash_table_lookup (context->oids_to_clients, oid_str);
@@ -210,11 +210,11 @@ session_commit_operation
   switch (op->type)
     {
     case GZOCHID_CLIENT_SESSION_OP_DISCONNECT:
-      gzochid_protocol_client_disconnect (client); break;
+      gzochid_game_client_disconnect (client); break;
     case GZOCHID_CLIENT_SESSION_OP_LOGIN_SUCCESS:
-      gzochid_protocol_client_login_success (client); break;
+      gzochid_game_client_login_success (client); break;
     case GZOCHID_CLIENT_SESSION_OP_LOGIN_FAILURE:
-      gzochid_protocol_client_login_failure (client); break;
+      gzochid_game_client_login_failure (client); break;
     case GZOCHID_CLIENT_SESSION_OP_MESSAGE:
 
       if (!tx_context->login_failed 
@@ -225,7 +225,7 @@ session_commit_operation
 	  gzochid_application_event_dispatch
 	    (context->event_source,
 	     gzochid_application_event_new (MESSAGE_SENT));
-	  gzochid_protocol_client_send (client, msg_op->message, msg_op->len);
+	  gzochid_game_client_send (client, msg_op->message, msg_op->len);
 	}
 
       break;

@@ -29,10 +29,10 @@
 #include "channel.h"
 #include "event.h"
 #include "game.h"
+#include "game-protocol.h"
 #include "gzochid-auth.h"
 #include "io.h"
 #include "log.h"
-#include "protocol.h"
 #include "scheme.h"
 #include "session.h"
 #include "task.h"
@@ -201,7 +201,7 @@ commit_channel_side_effect_message (gpointer data, gpointer user_data)
 {
   gzochid_channel_message *message = data;
   gzochid_channel_payload_message *payload_message = NULL;
-  gzochid_protocol_client *client = NULL;
+  gzochid_game_client *client = NULL;
 
   g_mutex_lock (&message->app_context->client_mapping_lock);
   client = g_hash_table_lookup
@@ -216,7 +216,7 @@ commit_channel_side_effect_message (gpointer data, gpointer user_data)
 	  gzochid_application_event_dispatch
 	    (message->app_context->event_source,
 	     gzochid_application_event_new (MESSAGE_SENT));
-	  gzochid_protocol_client_send
+	  gzochid_game_client_send
 	    (client, payload_message->msg, payload_message->len);
       
 	default:  break;
