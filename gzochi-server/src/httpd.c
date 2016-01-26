@@ -1,5 +1,5 @@
-/* httpd.c: Embedded informational web server for gzochid
- * Copyright (C) 2015 Julian Graham
+/* httpd.c: Embedded httpd and minimal request mapping framework for gzochid
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,169 +15,398 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <ctype.h>
+#include <assert.h>
 #include <glib.h>
-#include <gmp.h>
+#include <microhttpd.h>
 #include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 
-#include <microhttpd.h>
-
-#include "admin.h"
-#include "app.h"
 #include "context.h"
 #include "fsm.h"
-#include "game.h"
-#include "gzochid.h"
-#include "gzochid-storage.h"
-#include "log.h"
 #include "httpd.h"
-#include "stats.h"
+#include "log.h"
 
-#define OID_PREFIX_LEN 26
-#define OID_SUFFIX_LEN 29
-#define OID_LINE_LEN 80
+enum gzochid_httpd_state 
+  {
+    GZOCHID_HTTPD_STATE_INITIALIZING,
+    GZOCHID_HTTPD_STATE_RUNNING,
+    GZOCHID_HTTPD_STATE_STOPPED
+  };
 
-#define GREETING \
-  "<h1>Hello, browser!</h1>\n" \
-  "<p>This is the administrative web console for the gzochid game " \
-  "application server. You can use this console to interrogate the state of " \
-  "applications running within container, including their attached data " \
-  "stores.</p>"
+/* The HTTP server content. */
 
-struct data_state 
+struct _gzochid_httpd_context 
 {
-  char *data;
-  int data_offset;
-  int data_length;
+  gzochid_context base; /* The struct base. */
 
-  char *current_line;
-  int current_line_offset;
-  int current_line_length;
+  GNode *root; /* The root of the request mapping hierarchy. */
+  
+  struct MHD_Daemon *daemon; /* The GNU microhttpd daemon struct. */
+  int port; /* The server port, for logging / deferred startup. */
 };
 
-static void 
-next_line (struct data_state *state)
+/* The HTTP resonse sink. */
+
+struct _gzochid_httpd_response_sink
 {
-  char *buf = NULL;
-  int i = 0, remaining = state->data_length - state->data_offset,
-    num_bytes = MIN (16, remaining);
-  gboolean needs_prefix = state->data_offset == 0;
-  gboolean needs_suffix = remaining <= 16;
-
-  int line_length = OID_LINE_LEN - (16 - num_bytes) + 1;
+  /* Whether the response was written within the scope of a handler invocation.
+     The response can only be written once over the lifetime of a request 
+     flow. */
   
-  if (state->data_offset == state->data_length)
-    return;
+  gboolean response_written; 
 
-  if (needs_prefix)
-    line_length += OID_PREFIX_LEN;
-  if (needs_suffix)
-    line_length += OID_SUFFIX_LEN;
+  /* Stores the result of enqueueing the response. This is the value returned 
+     to the GNU microhttpd framework. */
+
+  int queue_code; 
+
+  /* The GNU microhttpd connecction object. */
   
-  state->current_line = malloc (sizeof (char) * (line_length + 1));
-  state->current_line_length = line_length;
+  struct MHD_Connection *connection; 
+};
 
-  buf = state->current_line;
+/* A little bit of legal compiler trickery to make it possible to declare
+   `gzochid_httpd_partial' as a struct in the header while still being able to
+   cast it back and forth from `GNode'. */
 
-  if (needs_prefix)
-    {
-      snprintf (buf, 8, "<html>\n");
-      snprintf (buf + 7, 10, "  <body>\n");
-      snprintf (buf + 16, 11, "    <pre>\n");
-      buf += OID_PREFIX_LEN;
-    }
+struct _gzochid_httpd_partial
+{
+  GNode *node;
+};
 
-  snprintf (buf, 13, "%.8x    ", state->data_offset);
-  buf += 12;
+typedef GNode gzochid_http_partial;
+
+/* Combines a terminal handler with a "user data" pointer. */
+
+struct _gzochid_httpd_terminal_registration
+{
+  gzochid_httpd_terminal terminal; /* The terminal handler function. */
+  gpointer user_data; /* The user data pointer. */
+};
+
+typedef struct _gzochid_httpd_terminal_registration
+gzochid_httpd_terminal_registration;
+
+/* Combines a continuation handler with a "user data" pointer. */
+
+struct _gzochid_httpd_continuation_registration
+{
+  /* The continuation handler function. */
+
+  gzochid_httpd_continuation continuation;
   
-  for (i = 0; i < num_bytes; i++)
-    {
-      snprintf (buf, 4, "%.2x ", state->data[state->data_offset + i]);
-      buf += 3;
+  gpointer user_data; /* The user data pointer. */
+};
 
-      if ((i + 1) % 4 == 0)
-	{
-	  snprintf (buf, 2, " ");
-	  buf += 1;
-	}
-    }
+typedef struct _gzochid_httpd_continuation_registration
+gzochid_httpd_continuation_registration;
 
-  for (i = num_bytes; i < 16; i++)
-    {
-      snprintf (buf, 4, "   ");
-      buf += 3;
+/* A node in the hierarchy of request mappings. */
 
-      if ((i + 1) % 4 == 0)
-	{
-	  snprintf (buf, 2, " ");
-	  buf += 1;
-	}
-    }
+struct _gzochid_httpd_pattern_node
+{
+  GRegex *path_regex; /* The pattern for this segment of the path. */
+  GList *terminals; /* The list of terminal handlers. */
+  GList *continuations; /* The list of continuation handlers. */
+};
 
-  for (i = 0; i < num_bytes; i++)
-    {
-      char c = state->data[state->data_offset + i];
-      snprintf (buf++, 2, "%c", isgraph (c) ? c : '.');
-    }
+typedef struct _gzochid_httpd_pattern_node gzochid_httpd_pattern_node;
 
-  snprintf (buf++, 2, "\n");
+static gzochid_httpd_pattern_node *
+create_pattern_node (const char *pattern)
+{
+  gzochid_httpd_pattern_node *pattern_node =
+    calloc (1, sizeof (gzochid_httpd_pattern_node));
+
+  /* These patterns may be applied many times over the lifetime of the HTTP 
+     server, so the `G_REGEX_OPTIMIZE' is worth it. */
+
+  pattern_node->path_regex = g_regex_new (pattern, G_REGEX_OPTIMIZE, 0, NULL);
   
-  state->data_offset += num_bytes;
-
-  if (needs_suffix)
-    {
-      snprintf (buf, 12, "    </pre>\n");
-      snprintf (buf + 11, 11, "  </body>\n");
-      snprintf (buf + 21, 9, "</html>\n");
-      buf += OID_SUFFIX_LEN;
-    }
+  return pattern_node;
 }
 
-static ssize_t 
-write_data_line (void *cls, uint64_t pos, char *buf, size_t max)
+static void
+free_pattern_node (gzochid_httpd_pattern_node *pattern_node)
 {
-  int n = 0;
-  struct data_state *state = cls;
+  g_regex_unref (pattern_node->path_regex);
+  
+  g_list_free_full (pattern_node->terminals, (GDestroyNotify) free);
+  g_list_free_full (pattern_node->continuations, (GDestroyNotify) free);
 
-  if (state->current_line == NULL)
-    next_line (state);
-  if (state->current_line == NULL)
-    return -1;
+  free (pattern_node);
+}
 
-  n = MIN (max, state->current_line_length - state->current_line_offset);
-  memcpy (buf, state->current_line + state->current_line_offset, n);
-  state->current_line_offset += n;
+/* A match of a pattern in the matching hierarchy against a prefix of the URL 
+   path. */
 
-  if (state->current_line_offset == state->current_line_length)
+struct _path_match
+{
+  /* The match structure, to be passed to the handler if this is the best 
+     match. */
+
+  GMatchInfo *match_info; 
+
+  /* The match length, cached so it doesn't have to be repeatedly extrated from
+     the match info. */
+
+  size_t match_length; 
+
+  GNode *matched_node; /* The node in the hierarchy that owns the pattern. */
+};
+
+typedef struct _path_match path_match;
+
+/* Combines a path (with positional offset) and a mutable `path_match' to 
+   provide the contextual pointer for the hierarchy traversal. */
+
+struct _node_match_context
+{
+  const char *path; /* The URL path. */
+  int pos; /* The current position. */
+
+  path_match *path_match; /* The path match structure. */
+};
+
+typedef struct _node_match_context node_match_context;
+
+/* A pattern to search for and a pointer in which to store the node discovered 
+   with that pattern during a pattern hierarchical traversal. */
+
+struct _node_pattern_search_context
+{
+  const char *pattern; /* The pattern to find. */
+  GNode *matching_node; /* A pointer to the node that has that pattern. */
+};
+
+typedef struct _node_pattern_search_context node_pattern_search_context;
+
+/* Continuation registration constructor. */
+
+static gzochid_httpd_continuation_registration *
+create_continuation_registration (gzochid_httpd_continuation continuation,
+				  gpointer user_data)
+{
+  gzochid_httpd_continuation_registration *registration =
+    malloc (sizeof (gzochid_httpd_continuation_registration));
+
+  registration->continuation = continuation;
+  registration->user_data = user_data;
+  
+  return registration;
+}
+
+/* Terminal registration constructor. */
+
+static gzochid_httpd_terminal_registration *
+create_terminal_registration (gzochid_httpd_terminal terminal,
+			      gpointer user_data)
+{
+  gzochid_httpd_terminal_registration *registration =
+    malloc (sizeof (gzochid_httpd_terminal_registration));
+
+  registration->terminal = terminal;
+  registration->user_data = user_data;
+  
+  return registration;
+}
+
+/* Convenience function to compute the match length. */
+
+static size_t
+match_length (GMatchInfo *match_info)
+{
+  int start_pos = 0, end_pos = 0;
+  g_match_info_fetch_pos (match_info, 0, &start_pos, &end_pos);
+  return end_pos - start_pos;
+}
+
+static void
+path_match_free (path_match *match)
+{
+  g_match_info_free (match->match_info);
+  free (match);
+}
+
+static gboolean
+find_longest_match_inner (GNode *node, gpointer data)
+{
+  node_match_context *match_context = data;
+  gzochid_httpd_pattern_node *pattern_node = node->data;
+  GMatchInfo *match_info = NULL;
+  
+  if (g_regex_match_full
+      (pattern_node->path_regex, match_context->path, -1, match_context->pos,
+       G_REGEX_MATCH_ANCHORED, &match_info, NULL))
     {
-      free (state->current_line);
+      size_t len = match_length (match_info);
+      gboolean best_match = FALSE;
       
-      state->current_line = NULL;
-      state->current_line_length = 0;
-      state->current_line_offset = 0;
-    }
+      if (match_context->path_match == NULL)
+	{
+	  match_context->path_match = malloc (sizeof (path_match));
+	  best_match = TRUE;
+	}
 
-  return n;
+      /* The matcher favors longer matches; this allows handlers to be 
+	 registered for both `/' and `/foo'. */
+      
+      else if (len > match_context->path_match->match_length)
+	{
+	  g_match_info_free (match_context->path_match->match_info);
+	  best_match = TRUE;
+	}
+
+      if (best_match)
+	{
+	  match_context->path_match->match_info = match_info;
+	  match_context->path_match->match_length = len;
+	  match_context->path_match->matched_node = node;
+	}
+    }
+  else g_match_info_free (match_info);
+      
+  if (node->next == NULL)
+    return TRUE;
+  else return FALSE;
 }
 
-static void 
-free_data_state (void *ptr)
+static path_match *
+find_longest_match (GNode *node, const char *path, const int pos)
 {
-  struct data_state *state = ptr;
+  node_match_context match_context;
+  
+  match_context.path = path;
+  match_context.pos = pos;
+  match_context.path_match = NULL;
 
-  free (state->data);
+  if (node->children != NULL)
+    g_node_traverse
+      (node, G_POST_ORDER, G_TRAVERSE_ALL, 2,
+       find_longest_match_inner, &match_context);
 
-  if (state->current_line != NULL)
-    free (state->current_line);
+  return match_context.path_match;
+}
 
-  free (state);
+static gboolean
+find_pattern_node_inner (GNode *node, gpointer user_data)
+{
+  node_pattern_search_context *search_context = user_data;
+  gzochid_httpd_pattern_node *pattern_node = node->data;
+
+  /* Do a straight-up match on the raw pattern string. */
+  
+  if (strcmp (search_context->pattern,
+	      g_regex_get_pattern (pattern_node->path_regex)) == 0)
+    {
+      search_context->matching_node = node;
+      return TRUE;
+    }
+  else if (node->next == NULL)
+    return TRUE;
+  else return FALSE;
+}
+
+static GNode *
+find_pattern_node (GNode *node, const char *pattern)
+{
+  node_pattern_search_context search_context;
+  
+  search_context.pattern = pattern;
+  search_context.matching_node = NULL;
+
+  g_node_traverse
+    (node, G_POST_ORDER, G_TRAVERSE_ALL, 2, find_pattern_node_inner,
+     &search_context);
+
+  return search_context.matching_node;
+}
+
+static void
+add_terminal (GNode *node, gzochid_httpd_terminal terminal, gpointer user_data)
+{
+  gzochid_httpd_pattern_node *pattern_node = node->data;
+
+  pattern_node->terminals = g_list_append
+    (pattern_node->terminals, create_terminal_registration
+     (terminal, user_data));
+}
+
+void
+gzochid_httpd_add_terminal (gzochid_httpd_context *context, const char *pattern,
+			    gzochid_httpd_terminal terminal, gpointer user_data)
+{
+  GNode *target = find_pattern_node (context->root, pattern);
+
+  if (target == NULL)
+    target = g_node_insert
+      (context->root, -1, g_node_new (create_pattern_node (pattern)));
+  
+  add_terminal (target, terminal, user_data);
+}
+
+void
+gzochid_httpd_append_terminal (gzochid_httpd_partial *partial,
+			       const char *pattern,
+			       gzochid_httpd_terminal terminal,
+			       gpointer user_data)
+{
+  GNode *node = (GNode *) partial;
+  GNode *target = find_pattern_node (node, pattern);
+
+  if (target == NULL)
+    target = g_node_insert
+      (node, -1, g_node_new (create_pattern_node (pattern)));
+  
+  add_terminal (target, terminal, user_data);
+}
+
+static void
+add_continuation (GNode *node, gzochid_httpd_continuation continuation,
+		  gpointer user_data)
+{
+  gzochid_httpd_pattern_node *pattern_node = node->data;
+  
+  pattern_node->continuations = g_list_append
+    (pattern_node->continuations,
+     create_continuation_registration (continuation, user_data));
+}
+  
+gzochid_httpd_partial *
+gzochid_httpd_add_continuation (gzochid_httpd_context *context,
+				const char *pattern,
+				gzochid_httpd_continuation continuation,
+				gpointer user_data)
+{
+  GNode *target = find_pattern_node (context->root, pattern);
+
+  if (target == NULL)
+    target = g_node_insert
+      (context->root, -1, g_node_new (create_pattern_node (pattern)));
+  
+  add_continuation (target, continuation, user_data);
+
+  return (gzochid_httpd_partial *) target;
+}
+
+gzochid_httpd_partial *
+gzochid_httpd_append_continuation (gzochid_httpd_partial *partial,
+				   const char *pattern,
+				   gzochid_httpd_continuation continuation,
+				   gpointer user_data)
+{
+  GNode *node = (GNode *) partial;
+  GNode *target = find_pattern_node (node, pattern);
+
+  if (target == NULL)
+    target = g_node_insert
+      (node, -1, g_node_new (create_pattern_node (pattern)));
+  
+  add_continuation (target, continuation, user_data);
+
+  return (gzochid_httpd_partial *) target;
 }
 
 static int 
@@ -200,375 +429,137 @@ not_found404_default (struct MHD_Connection *connection)
     (connection, "<html><body>Not found.</body></html>", FALSE, FALSE);
 }
 
-static int 
-dispatch_oid (struct MHD_Connection *connection, 
-	      gzochid_application_context *context, mpz_t oid)
+void
+gzochid_httpd_write_response
+(gzochid_httpd_response_sink *sink, int code, char *bytes, size_t len)
 {
-  int ret = 0;
-  size_t data_length = 0;
-  char *oid_str = mpz_get_str (NULL, 16, oid);
-  char *data = APP_STORAGE_INTERFACE (context)->get
-    (context->oids, oid_str, strlen (oid_str) + 1, &data_length);
-  struct data_state *state = calloc (1, sizeof (struct data_state));
-  struct MHD_Response *response = NULL;
+  struct MHD_Response *response =
+    MHD_create_response_from_data (len, bytes, TRUE, TRUE);
 
-  state->data = data;
-  state->data_length = data_length;
-
-  response = MHD_create_response_from_callback 
-    (-1, OID_PREFIX_LEN + OID_LINE_LEN + OID_SUFFIX_LEN, write_data_line, 
-     state, free_data_state);
-
-  ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
+  sink->queue_code = MHD_queue_response (sink->connection, code, response);
   MHD_destroy_response (response);
-  return ret;
+  sink->response_written = TRUE;
 }
 
-static int 
-dispatch_oids (struct MHD_Connection *connection, const char *url,
-	       gzochid_application_context *context)
-{
-  int ret = 0;
-  if (strlen (url) == 0)
-    {
-      GString *response_str = g_string_new (NULL);
-      struct MHD_Response *response = NULL;
-      
-      size_t klen = 0;
-      char *k = APP_STORAGE_INTERFACE (context)->first_key 
-	(context->oids, &klen);
-      
-      g_string_append (response_str, "<html>\n");
-      g_string_append (response_str, "  <body>\n");
-      g_string_append_printf 
-	(response_str, "    <h1>%s</h1><br />\n", context->descriptor->name);
-      g_string_append (response_str, "    <ul>\n");
-      
-      while (k != NULL)
-	{
-	  char *next_k = NULL;
-	  
-	  g_string_append (response_str, "      <li><a href=\"");
-	  g_string_append_len (response_str, k, klen - 1);
-	  g_string_append (response_str, "\">");
-	  g_string_append_len (response_str, k, klen - 1);
-	  g_string_append (response_str, "</a></li>\n");
-	  
-	  next_k = APP_STORAGE_INTERFACE (context)->next_key 
-	    (context->oids, k, klen, &klen);
-	  
-	  free (k);
-	  k = next_k;
-	}
-
-      g_string_append (response_str, "    </ul>\n");
-      g_string_append (response_str, "  </body>\n");
-      g_string_append (response_str, "</html>");
-      
-      response = MHD_create_response_from_data
-	(response_str->len, response_str->str, TRUE, FALSE);
-      g_string_free (response_str, FALSE);
-      
-      ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
-      MHD_destroy_response (response);
-      return ret;
-    }
-  else
-    {
-      mpz_t oid;
-
-      mpz_init (oid);
-      if (mpz_set_str (oid, url, 16) < 0)
-	{	  
-	  mpz_clear (oid);
-	  return not_found404_default (connection);
-	}
-
-      ret = dispatch_oid (connection, context, oid);
-      mpz_clear (oid);
-
-      return ret;
-    }
-}
-
-static int 
-dispatch_names (struct MHD_Connection *connection, 
-		gzochid_application_context *context)
-{
-  int ret = 0;
-  GString *response_str = g_string_new (NULL);
-  struct MHD_Response *response = NULL;
-  
-  size_t klen = 0;
-  char *k = APP_STORAGE_INTERFACE (context)->first_key (context->names, &klen);
-
-  g_string_append (response_str, "<html>\n");
-  g_string_append (response_str, "  <body>\n");
-  g_string_append_printf 
-    (response_str, "    <h1>%s</h1><br />\n", context->descriptor->name);
-  g_string_append (response_str, "    <ul>\n");
-
-  while (k != NULL)
-    {
-      char *next_k = NULL;
-
-      g_string_append (response_str, "      <li>");
-      g_string_append_len (response_str, k, klen);
-      g_string_append (response_str, "</li>\n");
-      
-      next_k = APP_STORAGE_INTERFACE (context)->next_key 
-	(context->names, k, klen, &klen);
-
-      free (k);
-      k = next_k;
-    }
-
-  g_string_append (response_str, "    </ul>\n");
-  g_string_append (response_str, "  </body>\n");
-  g_string_append (response_str, "</html>");
-
-  response = MHD_create_response_from_data 
-    (response_str->len, response_str->str, TRUE, FALSE);
-  g_string_free (response_str, FALSE);
-  
-  ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
-  MHD_destroy_response (response);
-  return ret;
-}
-
-static int 
-list_apps (struct MHD_Connection *connection, 
-	   gzochid_game_context *game_context)
-{
-  struct MHD_Response *response = NULL;
-  GList *apps = gzochid_game_context_get_applications (game_context);
-
-  if (apps == NULL)
-    return not_found404 
-      (connection, "<html><body>No applications.</body></html>", FALSE, FALSE);
-  else 
-    {
-      int ret = 0;
-      GList *apps_ptr = apps;
-      GString *response_str = g_string_new (NULL);
-
-      g_string_append (response_str, "<html>\n");
-      g_string_append (response_str, "  <body>\n");
-      g_string_append (response_str, "    <ul>\n");
-      
-      while (apps_ptr != NULL)
-	{
-	  gzochid_application_context *app = apps_ptr->data;
-	  
-  	  g_string_append_printf 
-	    (response_str, 
-	     "      <li><a href=\"/app/%s/\">%s</a></li><br />\n", 
-	     app->descriptor->name, app->descriptor->name);
-
-	  apps_ptr = apps_ptr->next;
-	}
-
-      g_string_append (response_str, "    </ul>\n");
-      g_string_append (response_str, "  </body>\n");
-      g_string_append (response_str, "</html>");
-
-      response = MHD_create_response_from_data
-	(response_str->len, response_str->str, TRUE, FALSE);
-      g_string_free (response_str, FALSE);
-
-      ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
-      MHD_destroy_response (response);
-      return ret;
-    }
-}
-
-static int 
-app_info (struct MHD_Connection *connection, 
-	  gzochid_application_context *app_context)
-{
-  int ret = 0;
-  struct MHD_Response *response = NULL;
-  GString *response_str = g_string_new (NULL);
-
-  g_string_append (response_str, "<html>\n");
-  g_string_append (response_str, "  <body>\n");
-
-  g_string_append_printf 
-    (response_str, "    <h1>%s</h1>\n", app_context->descriptor->name);
-  g_string_append_printf 
-    (response_str, "    <p>%s</p>\n", app_context->descriptor->description);
-  g_string_append (response_str, "    <h2>Application data</h2>\n");
-  g_string_append_printf 
-    (response_str, "    <a href=\"/app/%s/names/\">names</a><br />\n", 
-     app_context->descriptor->name);
-  g_string_append_printf 
-    (response_str, "    <a href=\"/app/%s/oids/\">oids</a><br />\n", 
-     app_context->descriptor->name);
-
-  g_string_append (response_str, "    <h2>Application statistics</h2>\n");
-  g_string_append (response_str, "    <table>\n");
-
-  g_string_append (response_str, "      <tr>\n");
-  g_string_append (response_str, "        <td>Bytes read</td>\n");
-  g_string_append_printf (response_str, "        <td>%lu</td>\n", 
-			  app_context->stats->bytes_read);
-  g_string_append (response_str, "      </tr>\n");
-  g_string_append (response_str, "      <tr>\n");
-  g_string_append (response_str, "        <td>Bytes written</td>\n");
-  g_string_append_printf (response_str, "        <td>%lu</td>\n", 
-			  app_context->stats->bytes_written);
-  g_string_append (response_str, "      </tr>\n");
-
-  g_string_append (response_str, "      <tr>\n");
-  g_string_append (response_str, "        <td>Messages received</td>\n");
-  g_string_append_printf (response_str, "        <td>%u</td>\n", 
-			  app_context->stats->num_messages_received);
-  g_string_append (response_str, "      </tr>\n");
-  g_string_append (response_str, "      <tr>\n");
-  g_string_append (response_str, "        <td>Messages sent</td>\n");
-  g_string_append_printf (response_str, "        <td>%u</td>\n", 
-			  app_context->stats->num_messages_sent);
-  g_string_append (response_str, "      </tr>\n");
-
-  g_string_append (response_str, "      <tr>\n");
-  g_string_append (response_str, "        <td>Transactions started</td>\n");
-  g_string_append_printf (response_str, "        <td>%u</td>\n", 
-			  app_context->stats->num_transactions_started);
-  g_string_append (response_str, "      </tr>\n");
-  g_string_append (response_str, "      <tr>\n");
-  g_string_append (response_str, "        <td>Transactions committed</td>\n");
-  g_string_append_printf (response_str, "        <td>%u</td>\n", 
-			  app_context->stats->num_transactions_committed);
-  g_string_append (response_str, "      </tr>\n");
-  g_string_append (response_str, "      <tr>\n");
-  g_string_append 
-    (response_str, "        <td>Transactions rolled back</td>\n");
-  g_string_append_printf (response_str, "        <td>%u</td>\n", 
-			  app_context->stats->num_transactions_rolled_back);
-  g_string_append (response_str, "      </tr>\n");
-
-  if (app_context->stats->num_transactions_committed > 0)
-    {
-      g_string_append (response_str, "      <tr>\n");
-      g_string_append
-	(response_str, "        <td>Maximum transaction duration</td>\n");
-      g_string_append_printf 
-	(response_str, "        <td>%ld</td>\n", 
-	 app_context->stats->max_transaction_duration);
-      g_string_append (response_str, "      </tr>\n");
-
-      g_string_append (response_str, "      <tr>\n");
-      g_string_append
-	(response_str, "        <td>Minimum transaction duration</td>\n");
-      g_string_append_printf 
-	(response_str, "        <td>%ld</td>\n", 
-	 app_context->stats->min_transaction_duration);
-      g_string_append (response_str, "      </tr>\n");
-
-      g_string_append (response_str, "      <tr>\n");
-      g_string_append
-	(response_str, "        <td>Average transaction duration</td>\n");
-      g_string_append_printf 
-	(response_str, "        <td>%.2f</td>\n", 
-	 app_context->stats->average_transaction_duration);
-      g_string_append (response_str, "      </tr>\n");
-    }
-
-  g_string_append (response_str, "    </table>\n");
-  g_string_append (response_str, "  </body>\n");
-  g_string_append (response_str, "</html>");
-
-  response = MHD_create_response_from_data 
-    (response_str->len, response_str->str, TRUE, FALSE);
-  g_string_free (response_str, FALSE);
-
-  ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
-  MHD_destroy_response (response);
-  return ret;
-}
-
-static int 
-dispatch_app (struct MHD_Connection *connection, const char *url,
-	      gzochid_game_context *game_context)
-{
-  gzochid_application_context *app_context = NULL;
-  char *rest = strchr (url, '/');
-  char *name = NULL;
-  int name_len = 0;
-  
-  if (rest == NULL)
-    return not_found404_default (connection);
-
-  name_len = rest - url;
-  name = strndup (url, name_len);  
-  app_context = gzochid_game_context_lookup_application (game_context, name);
-  free (name);
-
-  if (app_context != NULL)
-    {
-      if (strcmp (rest, "/") == 0)
-	return app_info (connection, app_context);
-      if (strncmp (rest, "/names/", 7) == 0)
-	return dispatch_names (connection, app_context);
-      else if (strncmp (rest, "/oids/", 6) == 0)
-	return dispatch_oids 
-	  (connection, rest + 6, app_context);
-      else return not_found404_default (connection);
-    }
-  else return not_found404_default (connection);
-}
-
-static int 
-dispatch_apps (struct MHD_Connection *connection, const char *url,
-	       gzochid_game_context *game_context)
-{
-  if (strlen (url) == 0)
-    return list_apps (connection, game_context);
-  else return dispatch_app (connection, url, game_context);
-}
+/* The `MHD_AccessHandlerCallback' for GNU microhttpd. */
 
 static int 
 dispatch (void *cls, struct MHD_Connection *connection, 
-	  const char *url, const char *method, const char *version, 
+	  const char *path, const char *method, const char *version, 
 	  const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-  int ret = 0;
-  struct MHD_Response *response = NULL;
+  gzochid_httpd_response_sink sink;
   gzochid_httpd_context *context = cls;
+  GNode *node = context->root;
 
+  int pos = 0;
+  gpointer request_context = NULL;
+  path_match *match = NULL;
+  
   if (strcmp (method, "GET") != 0)
-    return ret;
+    return 0;
 
-  if (strcmp (url, "/") == 0)
+  sink.response_written = FALSE;
+  sink.connection = connection;
+
+  /* Traverse the hierarchy by finding, at each level, the child with the 
+     pattern that produces the longest match against the current suffix of the
+     URL path. If that node exists and has continuation handlers, invoke them
+     before consuming the matched portion of the path (by incrementing the
+     position by the length of the match. If that node doesn't exist, return a
+     404. 
+
+     Once the path is fully consumed by pattern matches, invoke the terminal
+     handlers on the final match node. */
+  
+  while (path[pos] != 0 && path[pos] != '?')
     {
-      GString *response_str = g_string_new (NULL);
-
-      g_string_append (response_str, "<html><body>");
-      g_string_append (response_str, GREETING);
-      g_string_append (response_str, "<a href=\"app/\">app/</a>");
-      g_string_append (response_str, "</body></html>");
+      GList *continuations = NULL;
+      int start_pos = 0, end_pos = 0;
+      gzochid_httpd_pattern_node *pattern_node = NULL;
       
-      response = MHD_create_response_from_data 
-	(response_str->len, (void *) response_str->str, TRUE, FALSE);
-      g_string_free (response_str, FALSE);
+      if (match != NULL)
+	{
+	  node = match->matched_node;
+	  path_match_free (match);
+	}
+      
+      match = find_longest_match (node, path, pos);
 
-      ret = MHD_queue_response (connection, MHD_HTTP_OK, response);
-      MHD_destroy_response (response);
-    }
-  else if (strncmp (url, "/app/", 5) == 0)
+      if (match == NULL)
+	break;
+
+      pattern_node = match->matched_node->data;
+      continuations = pattern_node->continuations;
+      
+      while (continuations != NULL)
+	{
+	  gzochid_httpd_continuation_registration *registration =
+	    continuations->data;
+	  
+	  request_context = registration->continuation
+	    (match->match_info, &sink, request_context,
+	     registration->user_data);
+
+	  /* If any continuation handler writes a response, halt 
+	     processing. */
+	  
+	  if (sink.response_written)
+	    {
+	      path_match_free (match);
+	      break;
+	    }
+	  
+	  continuations = continuations->next;
+	}
+
+      /* Advance the position by the length of the matched segment. */
+      
+      g_match_info_fetch_pos (match->match_info, 0, &start_pos, &end_pos);
+      pos += (end_pos - start_pos);
+    }     
+
+  /* The response may have already been written by one of the continuation 
+     handlers - short-circuiting to a 404, for example. */
+  
+  if (sink.response_written)
+    return sink.queue_code;
+
+  /* If the loop ran out of URL path ending on a match node, invoke that node's 
+     terminal handlers. */
+  
+  else if (match != NULL)
     {
-      gzochid_admin_context *admin_context = 
-	(gzochid_admin_context *) ((gzochid_context *) context)->parent;
-      gzochid_server_context *server_context =
-	(gzochid_server_context *) ((gzochid_context *) admin_context)->parent; 
-      gzochid_game_context *game_context = (gzochid_game_context *)
-	server_context->game_context;
+      gzochid_httpd_pattern_node *pattern_node = match->matched_node->data;
+      GList *terminals = pattern_node->terminals;
+      
+      while (terminals != NULL)
+	{
+	  gzochid_httpd_terminal_registration *registration =
+	    terminals->data;
+	  
+	  registration->terminal
+	    (match->match_info, &sink, request_context,
+	     registration->user_data);
 
-      return dispatch_apps (connection, url + 5, game_context);
-    }
+	  /* Stop processing if the handler wrote a response. */
+	  
+	  if (sink.response_written)
+	    break;
+	  
+	  terminals = terminals->next;
+	}
+
+      path_match_free (match);
+
+      if (sink.response_written)
+	return sink.queue_code;
+
+      /* If none of the handlers wrote a response, assume 404. */
+      
+      else return not_found404_default (connection);
+    }   
   else return not_found404_default (connection);
-
-  return ret;
 }
 
 static void 
@@ -589,12 +580,29 @@ initialize (int from_state, int to_state, gpointer user_data)
 gzochid_httpd_context *
 gzochid_httpd_context_new (void)
 {
-  return calloc (1, sizeof (gzochid_httpd_context));
+  gzochid_httpd_context *httpd_context =
+    calloc (1, sizeof (gzochid_httpd_context));
+
+  httpd_context->root = g_node_new (create_pattern_node (""));
+  
+  return httpd_context;
+}
+
+static gboolean
+traverse_free (GNode *node, gpointer data)
+{
+  free_pattern_node (node->data);
+  return FALSE;
 }
 
 void 
 gzochid_httpd_context_free (gzochid_httpd_context *context)
 {
+  g_node_traverse
+    (context->root, G_IN_ORDER, G_TRAVERSE_ALL, -1, traverse_free, NULL);
+  g_node_destroy (context->root);
+
+  gzochid_fsm_free (((gzochid_context *) context)->fsm);
   gzochid_context_free ((gzochid_context *) context);
   free (context);
 }
@@ -620,4 +628,19 @@ gzochid_httpd_context_init (gzochid_httpd_context *context,
   context->port = port;
 
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
+}
+
+void
+_gzochid_httpd_context_getsockname (gzochid_httpd_context *httpd_context,
+				    struct sockaddr *addr, socklen_t *addrlen)
+{
+  const union MHD_DaemonInfo *daemon_info = NULL;
+  
+  /* Ensure the server is listening. */
+
+  assert (httpd_context->daemon != NULL);
+  
+  daemon_info = MHD_get_daemon_info
+    (httpd_context->daemon, MHD_DAEMON_INFO_LISTEN_FD);
+  getsockname (daemon_info->listen_fd, addr, addrlen);
 }

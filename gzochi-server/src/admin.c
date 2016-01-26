@@ -1,5 +1,5 @@
 /* Administrative context routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include "debug.h"
 #include "gzochid.h"
 #include "httpd.h"
+#include "httpd-app.h"
 #include "threads.h"
 
 #include "api/admin.h"
@@ -66,6 +67,10 @@ initialize (int from_state, int to_state, gpointer user_data)
 
       gzochid_httpd_context *httpd_context = gzochid_httpd_context_new ();
       gzochid_httpd_context_init (httpd_context, context, port);
+
+      gzochid_httpd_app_register_handlers
+	(httpd_context, (gzochid_game_context *)
+	 ((gzochid_server_context *) context->parent)->game_context);
     }
   if (gzochid_config_to_boolean 
       (g_hash_table_lookup 
