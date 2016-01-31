@@ -1,5 +1,5 @@
 /* gzochid.c: Main server bootstrapping routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -98,23 +98,23 @@ initialize_async (gpointer data, gpointer user_data)
       char *threshold = g_hash_table_lookup (log_config, "priority.threshold");
 
       if (g_ascii_strncasecmp (threshold, "EMERG", 5) == 0)
-	gzochid_set_log_threshold (LOG_EMERG);
+	gzochid_install_log_handler (G_LOG_LEVEL_ERROR);
       else if (g_ascii_strncasecmp (threshold, "ALERT", 5) == 0)
-	gzochid_set_log_threshold (LOG_ALERT);
+	gzochid_install_log_handler (G_LOG_LEVEL_ERROR);
       else if (g_ascii_strncasecmp (threshold, "CRIT", 4) == 0)
-	gzochid_set_log_threshold (LOG_CRIT);
+	gzochid_install_log_handler (G_LOG_LEVEL_ERROR);
       else if (g_ascii_strncasecmp (threshold, "ERR", 3) == 0)
-	gzochid_set_log_threshold (LOG_ERR);
+	gzochid_install_log_handler (G_LOG_LEVEL_CRITICAL);
       else if (g_ascii_strncasecmp (threshold, "WARNING", 7) == 0)
-	gzochid_set_log_threshold (LOG_WARNING);
+	gzochid_install_log_handler (G_LOG_LEVEL_WARNING);
       else if (g_ascii_strncasecmp (threshold, "NOTICE", 6) == 0)
-	gzochid_set_log_threshold (LOG_NOTICE);
+	gzochid_install_log_handler (G_LOG_LEVEL_MESSAGE);
       else if (g_ascii_strncasecmp (threshold, "INFO", 4) == 0)
-	gzochid_set_log_threshold (LOG_INFO);
+	gzochid_install_log_handler (G_LOG_LEVEL_INFO);
       else if (g_ascii_strncasecmp (threshold, "DEBUG", 5) == 0)
-	gzochid_set_log_threshold (LOG_DEBUG);
+	gzochid_install_log_handler (G_LOG_LEVEL_DEBUG);
     }
-  else gzochid_set_log_threshold (LOG_INFO);
+  else gzochid_install_log_handler (G_LOG_LEVEL_INFO);
 
   gzochid_admin_context_init 
     ((gzochid_admin_context *) server_context->admin_context, context, 

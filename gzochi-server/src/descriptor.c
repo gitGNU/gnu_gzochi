@@ -1,5 +1,5 @@
 /* descriptor.c: Game application descriptor parsing routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -28,7 +28,6 @@
 #include <unistd.h>
 
 #include "descriptor.h"
-#include "log.h"
 
 struct _descriptor_builder_context
 {
@@ -312,7 +311,7 @@ gzochid_config_parse_application_descriptor (FILE *file)
 
   if (err != NULL)
     {
-      gzochid_warning (err->message);      
+      g_warning ("%s", err->message);      
       g_error_free (err);
       
       descriptor_free (descriptor);

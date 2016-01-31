@@ -1,5 +1,5 @@
-/* log.c: Log-writing routines for gzochid
- * Copyright (C) 2014 Julian Graham
+/* log.c: Log configuration routines for gzochid
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,106 +16,75 @@
  */
 
 #include <glib.h>
-#include <stdarg.h>
+#include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/time.h>
-#include <syslog.h>
 #include <time.h>
 
 #include "log.h"
 
-static GMutex log_mutex;
-
-static int max_priority = LOG_INFO;
-
-void gzochid_vlog (int priority, char *msg, va_list ap)
+struct _priority_mask_holder
 {
-  va_list app;
-  char *severity = NULL;
+  GLogLevelFlags priority_mask;
+};
+
+typedef struct _priority_mask_holder priority_mask_holder;
+
+static void
+log_handler (const gchar *log_domain, GLogLevelFlags log_level,
+	     const gchar *message, gpointer user_data)
+{
+  const char *severity = "";
   struct timeval tv;
   struct tm ltm;
 
-  if (priority > max_priority)
+  priority_mask_holder *holder = user_data;
+  
+  if (!(log_level & G_LOG_LEVEL_MASK & holder->priority_mask))
     return;
 
-  va_copy (app, ap);
   gettimeofday (&tv, NULL);
   localtime_r (&tv.tv_sec, &ltm);
 
-  switch (priority)
-    {
-    case LOG_ERR: severity = "ERR"; break;
-    case LOG_WARNING: severity = "WARNING"; break;
-    case LOG_NOTICE: severity = "NOTICE"; break;
-    case LOG_INFO: severity = "INFO"; break;
-    case LOG_DEBUG: severity = "DEBUG"; break;
-    default: break;
-    }
+  if (log_level & G_LOG_LEVEL_ERROR ||
+      log_level & G_LOG_LEVEL_CRITICAL)
+    severity = "ERR";
+  else if (log_level & G_LOG_LEVEL_WARNING)
+    severity = "WARNING";
+  else if (log_level & G_LOG_LEVEL_MESSAGE)
+    severity = "NOTICE";
+  else if (log_level & G_LOG_LEVEL_INFO)
+    severity = "INFO";
+  else if (log_level & G_LOG_LEVEL_DEBUG)
+    severity = "DEBUG";
 
-  vsyslog (priority, msg, app);
-  va_end (app);
-  va_copy (app, ap);
-
-  g_mutex_lock (&log_mutex);
-  fprintf (stderr, "%d-%.2d-%.2dT%.2d:%.2d,%dZ ", 1900 + ltm.tm_year, 
+  fprintf (stderr, "%d-%.2d-%.2dT%.2d:%.2d,%dZ %s %s\n", 1900 + ltm.tm_year, 
 	   ltm.tm_mon + 1, ltm.tm_mday, ltm.tm_hour, ltm.tm_min, 
-	   (int) (tv.tv_usec / 1000));
-  fprintf (stderr, "%s ", severity);
-  vfprintf (stderr, msg, app);
-  va_end (app);
-  fprintf (stderr, "\n");
-  g_mutex_unlock (&log_mutex);
+	   (int) (tv.tv_usec / 1000), severity, message);
 }
 
-void gzochid_log (int priority, char *msg, ...)
+void gzochid_install_log_handler (GLogLevelFlags log_level)
 {
-  va_list args;
-  va_start (args, msg);
-  gzochid_vlog (priority, msg, args);
-  va_end (args);
-}
+  priority_mask_holder *holder = NULL;
+  GLogLevelFlags priority_mask = G_LOG_LEVEL_MASK;
+  
+  if (log_level & G_LOG_LEVEL_INFO)
+    priority_mask = priority_mask & ~G_LOG_LEVEL_DEBUG;
+  else if (log_level & G_LOG_LEVEL_MESSAGE)
+    priority_mask = priority_mask & ~(G_LOG_LEVEL_INFO | G_LOG_LEVEL_DEBUG);
+  else if (log_level & G_LOG_LEVEL_WARNING)
+    priority_mask =
+      G_LOG_LEVEL_ERROR | G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_WARNING;
+  else if (log_level & G_LOG_LEVEL_CRITICAL)
+    priority_mask = G_LOG_LEVEL_ERROR | G_LOG_LEVEL_CRITICAL;
+  else if (log_level & G_LOG_LEVEL_ERROR)
+    priority_mask = G_LOG_LEVEL_ERROR;
 
-void gzochid_err (char *msg, ...)
-{
-  va_list args;
-  va_start (args, msg);
-  gzochid_vlog (LOG_ERR, msg, args);
-  va_end (args);
-}
-
-void gzochid_warning (char *msg, ...)
-{
-  va_list args;
-  va_start (args, msg);
-  gzochid_vlog (LOG_WARNING, msg, args);
-  va_end (args);
-}
-
-void gzochid_notice (char *msg, ...)
-{
-  va_list args;
-  va_start (args, msg);
-  gzochid_vlog (LOG_NOTICE, msg, args);
-  va_end (args);
-}
-
-void gzochid_info (char *msg, ...)
-{
-  va_list args;
-  va_start (args, msg);
-  gzochid_vlog (LOG_INFO, msg, args);
-  va_end (args);
-}
-
-void gzochid_debug (char *msg, ...)
-{
-  va_list args;
-  va_start (args, msg);
-  gzochid_vlog (LOG_DEBUG, msg, args);
-  va_end (args);
-}
-
-void gzochid_set_log_threshold (int priority)
-{
-  max_priority = priority;
+  holder = malloc (sizeof (priority_mask_holder));
+  holder->priority_mask = priority_mask;
+  
+  g_log_set_handler
+    (NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
+     log_handler, holder);
 }

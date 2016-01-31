@@ -1,5 +1,5 @@
 /* game-protocol.c: Implementation of game application protocol.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -29,7 +29,6 @@
 #include "game-protocol.h"
 #include "gzochid-auth.h"
 #include "lifecycle.h"
-#include "log.h"
 #include "protocol.h"
 #include "socket.h"
 
@@ -82,7 +81,7 @@ dispatch_login_request (gzochid_game_client *client, char *endpoint,
 
   if (client->identity != NULL)
     {
-      gzochid_warning
+      g_warning
 	("Client with identity %s attempted to re-authenticate", 
 	 gzochid_auth_identity_name (client->identity));
       return;
@@ -92,7 +91,7 @@ dispatch_login_request (gzochid_game_client *client, char *endpoint,
     (client->game_context, endpoint);
   if (client->app_context == NULL)
     {
-      gzochid_warning
+      g_warning
 	("Client at %s attempted to authenticate to unknown endpoint %s", 
 	 gzochid_client_socket_get_connection_description (client->sock),
 	 endpoint);
@@ -109,9 +108,10 @@ dispatch_login_request (gzochid_game_client *client, char *endpoint,
   if (client->identity == NULL)
     {
       if (error != NULL)
-	gzochid_err 
-	  ("Error from authenticator for endpoint '%s': %s", error->message);
-      else gzochid_warning 
+	g_critical 
+	  ("Error from authenticator for endpoint '%s': %s", endpoint,
+	   error->message);
+      else g_warning 
 	     ("Client at %s failed to authenticate to endpoint %s", 
 	      gzochid_client_socket_get_connection_description (client->sock),
 	      endpoint);
@@ -120,7 +120,7 @@ dispatch_login_request (gzochid_game_client *client, char *endpoint,
     }
   else 
     {
-      gzochid_info
+      g_info
 	("Client at %s authenticated to endpoint %s as %s",
 	 gzochid_client_socket_get_connection_description (client->sock),
 	 endpoint, gzochid_auth_identity_name (client->identity));
@@ -132,7 +132,7 @@ static void
 dispatch_logout_request (gzochid_game_client *client)
 {
   if (client->identity == NULL)
-    gzochid_warning
+    g_warning
       ("Received logout request from unauthenticated client at %s",
        gzochid_client_socket_get_connection_description (client->sock));
   else gzochid_application_client_disconnected (client->app_context, client);
@@ -151,7 +151,7 @@ dispatch_session_message (gzochid_game_client *client, unsigned char *msg,
 			  short len)
 {
   if (client->identity == NULL)
-      gzochid_warning 
+      g_warning 
 	("Received session message from unauthenticated client at %s",
 	 gzochid_client_socket_get_connection_description (client->sock));
   else
@@ -195,7 +195,7 @@ dispatch_message (gzochid_game_client *client, unsigned char *message,
       dispatch_session_message (client, (unsigned char *) payload, len); break;
 
     default:
-      gzochid_warning ("Unexpected opcode %d received from client", opcode);
+      g_warning ("Unexpected opcode %d received from client", opcode);
     }
 
   if (pfx != NULL)

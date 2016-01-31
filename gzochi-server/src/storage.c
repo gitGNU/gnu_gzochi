@@ -1,5 +1,5 @@
 /* storage.c: Storage engine management routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@
 #include "game.h"
 #include "gzochid-storage.h"
 #include "storage.h"
-#include "log.h"
 
 #define ENGINE_INTERFACE_FUNCTION "gzochid_storage_init_engine"
 
@@ -46,7 +45,7 @@ gzochid_storage_load_engine (const char *dir, const char *name)
 
       if (engine_handle == NULL)
 	{
-	  gzochid_warning 
+	  g_warning 
 	    ("Failed to load storage engine at '%s': %s", path, 
 	     g_module_error ());
 
@@ -60,7 +59,7 @@ gzochid_storage_load_engine (const char *dir, const char *name)
       else if (!g_module_symbol (engine_handle, ENGINE_INTERFACE_FUNCTION, 
 				 (gpointer *) &engine_interface))
 	{
-	  gzochid_warning
+	  g_warning
 	    ("Missing engine info at '%s': %s", path, g_module_error ());
 
 	  free (path);
@@ -77,7 +76,7 @@ gzochid_storage_load_engine (const char *dir, const char *name)
 
 	  if (engine_interface (engine) != 0)
 	    {
-	      gzochid_warning ("Failed to introspect engine at '%s'.", path);
+	      g_warning ("Failed to introspect engine at '%s'.", path);
 
 	      free (path);
 	      g_module_close (engine_handle);	  
@@ -88,14 +87,13 @@ gzochid_storage_load_engine (const char *dir, const char *name)
 
 	  engine->handle = engine_handle;
 	      
-	  gzochid_info ("Loaded storage engine '%s'", engine->interface->name);
+	  g_info ("Loaded storage engine '%s'", engine->interface->name);
 	  return engine;
 	}
     }
   else 
     {
-      gzochid_info 
-	("Plugins not supported; cannot load storage engine '%s'.", name);
+      g_info ("Plugins not supported; cannot load storage engine '%s'.", name);
       return NULL;
     }
 }

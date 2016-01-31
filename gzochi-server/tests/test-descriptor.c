@@ -27,6 +27,16 @@
 #endif /* HAVE_FMEMOPEN */
 
 static gboolean
+ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
+		 const gchar *message, gpointer user_data)
+{
+  if (log_level & G_LOG_LEVEL_CRITICAL
+      || log_level & G_LOG_LEVEL_WARNING)
+    return FALSE;
+  else return log_level & G_LOG_FLAG_FATAL;
+}
+
+static gboolean
 list_equal (const GList *l1, const GList *l2, GCompareFunc f)
 {
   const GList *lp1 = l1;
@@ -84,6 +94,8 @@ test_descriptor_parse_error ()
   FILE *descriptor_file =
     fmemopen (descriptor_text, strlen (descriptor_text), "r");
 
+  g_test_log_set_fatal_handler (ignore_warnings, NULL);
+  
   g_assert_null (gzochid_config_parse_application_descriptor (descriptor_file));
   fclose (descriptor_file);
 }

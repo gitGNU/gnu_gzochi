@@ -30,7 +30,6 @@
 #include "game-protocol.h"
 #include "gzochid-auth.h"
 #include "io.h"
-#include "log.h"
 #include "reloc.h"
 #include "scheme-task.h"
 #include "session.h"
@@ -198,7 +197,7 @@ session_commit_operation
 
   if (client == NULL)
     {
-      gzochid_warning 
+      g_warning
 	("Client not found for session '%s'; skipping operation.", oid_str);
       g_mutex_unlock (&context->client_mapping_lock);
       free (oid_str);
@@ -411,7 +410,7 @@ remove_session (gzochid_application_context *context, const char *oid_str,
 		 successfully. */
 
 	      if (local_err->message != NULL)
-		gzochid_info 
+		g_info 
 		  ("Unable to remove Scheme object for session '%s': %s",
 		   oid_str, local_err->message);
 	    }

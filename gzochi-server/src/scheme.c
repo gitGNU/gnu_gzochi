@@ -1,5 +1,5 @@
 /* scheme.c: Supplementary Scheme routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@
 #include "guile.h"
 #include "gzochid-auth.h"
 #include "io.h"
-#include "log.h"
 #include "reloc.h"
 #include "scheme.h"
 #include "tx.h"
@@ -235,7 +234,7 @@ scheme_managed_record_deserializer (gzochid_application_context *context,
 	 serializer and deserializer aren't idempotent. */
 
       if (scm_eof_object_p (scm_lookahead_u8 (port)) == SCM_BOOL_F)
-	gzochid_warning ("Deserialization failed to consume all bytes.");
+	g_warning ("Deserialization failed to consume all bytes.");
 
       scm_gc_protect_object (record);
     }

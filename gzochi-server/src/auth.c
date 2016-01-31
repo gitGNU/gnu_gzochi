@@ -26,7 +26,6 @@
 #include "auth_int.h"
 #include "game.h"
 #include "gzochid-auth.h"
-#include "log.h"
 #include "util.h"
 
 #define PLUGIN_INFO_FUNCTION "gzochid_auth_init_plugin"
@@ -208,13 +207,12 @@ probe_auth_plugin (gpointer data, gpointer user_data)
   int (*plugin_info) (gzochid_auth_plugin *);
 
   if (plugin_handle == NULL)
-    gzochid_warning 
+    g_warning
       ("Failed to load auth plugin at '%s': %s", path, g_module_error ());
   else if (!g_module_symbol 
       (plugin_handle, PLUGIN_INFO_FUNCTION, (gpointer *) &plugin_info))
     {
-      gzochid_warning
-	("Missing plugin info at '%s': %s", path, g_module_error ());
+      g_warning ("Missing plugin info at '%s': %s", path, g_module_error ());
       g_module_close (plugin_handle);
     }
   else 
@@ -222,14 +220,14 @@ probe_auth_plugin (gpointer data, gpointer user_data)
       gzochid_auth_plugin *plugin = malloc (sizeof (gzochid_auth_plugin));
       if (plugin_info (plugin) != 0)
 	{
-	  gzochid_warning ("Failed to introspect plugin at '%s'.", path);
+	  g_warning ("Failed to introspect plugin at '%s'.", path);
 
 	  free (plugin);
 	  g_module_close (plugin_handle);
 	}
       else 
 	{
-	  gzochid_info ("Loaded auth plugin '%s'", plugin->info->name);
+	  g_info ("Loaded auth plugin '%s'", plugin->info->name);
 	  g_hash_table_insert 
 	    (context->auth_plugins, plugin->info->name, plugin);
 	  plugin->handle = plugin_handle;
@@ -288,5 +286,5 @@ gzochid_auth_init (gzochid_game_context *context)
 {
   if (g_module_supported ())
     probe_auth_plugins (context, context->auth_plugin_dir);
-  else gzochid_info ("Plugins not supported; skipping auth plugin probe.");
+  else g_info ("Plugins not supported; skipping auth plugin probe.");
 }

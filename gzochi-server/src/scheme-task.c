@@ -1,5 +1,5 @@
 /* scheme-task.c: Scheme callback handlers and interface to gzochi Scheme API
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -261,7 +261,7 @@ gzochid_scheme_application_logged_in_worker
     }
   else if (! is_client_session_listener (handler))
     {
-      gzochid_warning ("Invalid type returned by logged-in callback.");
+      g_warning ("Invalid type returned by logged-in callback.");
       gzochid_transaction_mark_for_rollback
 	(&scheme_participant, FALSE);
     }
@@ -385,10 +385,10 @@ gzochid_scheme_application_disconnected_worker
   if (err != NULL)
     {
       if (err->message != NULL)
-	gzochid_warning
+	g_warning
 	  ("Failed to dereference disconnecting session '%s': %s", 
 	   oid_str, err->message);
-      else gzochid_warning 
+      else g_warning 
 	     ("Failed to dereference disconnecting session '%s'.", oid_str);
 
       g_error_free (err);
@@ -422,10 +422,10 @@ gzochid_scheme_application_disconnected_worker
   if (err != NULL)
     {
       if (err->message != NULL)
-	gzochid_warning
+	g_warning
 	  ("Failed to retrieve disconnect callback for session '%s': %s", 
 	   oid_str, err->message);
-      else gzochid_warning 
+      else g_warning 
 	     ("Failed to retrieve disconnect callback for session '%s'.", 
 	      oid_str);
 

@@ -20,11 +20,9 @@
 #include <syslog.h>
 
 #include "../app.h"
-#include "../log.h"
 #include "../scheme.h"
 #include "../txlog.h"
 
-#include "log.h"
 #include "util.h"
 
 SCM_DEFINE (primitive_log_internal, "primitive-log-internal", 2, 0, 0,
@@ -35,15 +33,15 @@ SCM_DEFINE (primitive_log_internal, "primitive-log-internal", 2, 0, 0,
   char *cmsg = scm_to_locale_string (msg);
 
   if (strcmp (cpriority, "err") == 0)
-    gzochid_log (LOG_ERR, cmsg);
+    g_log (G_LOG_DOMAIN, G_LOG_LEVEL_CRITICAL, "%s", cmsg);
   else if (strcmp (cpriority, "warning") == 0)
-    gzochid_log (LOG_WARNING, cmsg);
+    g_log (G_LOG_DOMAIN, G_LOG_LEVEL_WARNING, "%s", cmsg);
   else if (strcmp (cpriority, "notice") == 0)
-    gzochid_log (LOG_NOTICE, cmsg);
+    g_log (G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, "%s", cmsg);
   else if (strcmp (cpriority, "info") == 0)
-    gzochid_log (LOG_INFO, cmsg);
+    g_log (G_LOG_DOMAIN, G_LOG_LEVEL_INFO, "%s", cmsg);
   else if (strcmp (cpriority, "debug") == 0)
-    gzochid_log (LOG_DEBUG, cmsg);
+    g_log (G_LOG_DOMAIN, G_LOG_LEVEL_DEBUG, "%s", cmsg);
 
   free (cpriority);
   free (cmsg);

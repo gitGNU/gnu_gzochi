@@ -1,5 +1,5 @@
 /* debug.c: Remote debugging module for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,7 +24,6 @@
 #include "debug.h"
 #include "fsm.h"
 #include "guile.h"
-#include "log.h"
 
 static SCM scm_run_repl_server;
 
@@ -77,7 +76,7 @@ run (int from_state, int to_state, gpointer user_data)
   gzochid_context *context = user_data;
   gzochid_debug_context *debug_context = (gzochid_debug_context *) context;
 
-  gzochid_notice ("Debug server listening on port %d", debug_context->port);
+  g_message ("Debug server listening on port %d", debug_context->port);
   g_thread_new ("repl-server", run_async, user_data);
 }
 

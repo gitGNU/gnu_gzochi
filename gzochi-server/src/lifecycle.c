@@ -1,5 +1,5 @@
 /* lifecycle.c: Handlers for gzochi application lifecycle events
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -28,7 +28,6 @@
 #include "guile.h"
 #include "gzochid-auth.h"
 #include "lifecycle.h"
-#include "log.h"
 #include "scheme-task.h"
 #include "session.h"
 #include "task.h"
@@ -54,15 +53,15 @@ initialize_auth (int from_state, int to_state, gpointer user_data)
 	  gzochid_auth_plugin *plugin = g_hash_table_lookup 
 	    (game_context->auth_plugins, app_context->descriptor->auth_type);
 
-	  gzochid_debug 
-	    ("Initializing auth plugin '%s' for application '%'.",
+	  g_debug 
+	    ("Initializing auth plugin '%s' for application '%s'.",
 	     app_context->descriptor->auth_type,
 	     app_context->descriptor->name);
 
 	  app_context->auth_data = plugin->info->initialize 
 	    (app_context->descriptor->auth_properties, &error);
 	  if (error != NULL)
-	    gzochid_err
+	    g_critical
 	      ("Auth plugin '%s' failed to initialize "
 	       "for application '%s': %s",
 	       app_context->descriptor->auth_type,
@@ -72,14 +71,14 @@ initialize_auth (int from_state, int to_state, gpointer user_data)
 	  g_clear_error (&error);
 	  app_context->authenticator = plugin->info->authenticate;
 	}
-      else gzochid_err 
+      else g_critical 
 	     ("Unknown auth type '%s' for application '%s'.", 
 	      app_context->descriptor->auth_type,
 	      app_context->descriptor->name);
     }
   else
     {
-      gzochid_info 
+      g_info 
 	("No auth plugin specified for application '%s'; " 
 	 "pass-thru authentication will be used.", 
 	 app_context->descriptor->name);
@@ -106,17 +105,17 @@ initialize_data (int from_state, int to_state, gpointer user_data)
 
   if (!g_file_test (data_dir, G_FILE_TEST_EXISTS))
     {
-      gzochid_notice 
+      g_message 
 	("Work directory %s does not exist; creating...", data_dir);
       if (g_mkdir_with_parents (data_dir, 493) != 0)
 	{
-	  gzochid_err ("Unable to create work directory %s.", data_dir);
+	  g_critical ("Unable to create work directory %s.", data_dir);
 	  exit (EXIT_FAILURE);
 	}
     }
   else if (!g_file_test (data_dir, G_FILE_TEST_IS_DIR))
     {
-      gzochid_err ("%s is not a directory.", data_dir);
+      g_critical ("%s is not a directory.", data_dir);
       exit (EXIT_FAILURE);
     }
 
@@ -124,7 +123,7 @@ initialize_data (int from_state, int to_state, gpointer user_data)
 
   if (storage_context == NULL)
     {
-      gzochid_err ("Unable to initialize storage. Exiting.");
+      g_critical ("Unable to initialize storage. Exiting.");
       exit (EXIT_FAILURE);
     }
 
@@ -216,7 +215,7 @@ initialize_async_transactional (gpointer data)
 
       if (err != NULL)
 	{
-	  gzochid_warning
+	  g_warning
 	    ("Failed to sweep sessions for application '%s'; stopping: %s.",
 	     context->descriptor->name, err->message);
 	  
@@ -357,7 +356,7 @@ login_catch_worker (gzochid_application_context *context,
   gzochid_game_client *client = g_hash_table_lookup
     (context->oids_to_clients, session_oid_str);
 
-  gzochid_info
+  g_info
     ("Disconnecting session '%s'; failed login transaction.", session_oid_str);
 
   g_mutex_lock (&context->client_mapping_lock);

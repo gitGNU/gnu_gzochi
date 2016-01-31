@@ -66,7 +66,6 @@ test_app_task_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-fsm.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-task.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
@@ -77,7 +76,6 @@ test_app_task_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 test_auth_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
 test_auth_SOURCES = test-auth.c
 test_auth_LDADD = $(top_builddir)/src/libgzochid_la-auth.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@
@@ -92,7 +90,6 @@ test_descriptor_SOURCES = test-descriptor.c
 test_descriptor_LDADD = $(top_builddir)/src/libgzochid_la-callback.o \
 	$(top_builddir)/src/libgzochid_la-descriptor.o \
 	$(top_builddir)/src/libgzochid_la-fmemopen.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 
@@ -104,14 +101,12 @@ test_durable_task_LDADD = $(top_builddir)/src/libgzochid.la \
 test_event_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_event_SOURCES = test-event.c
 test_event_LDADD = $(top_builddir)/src/libgzochid_la-event.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 
 test_fsm_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_fsm_SOURCES = test-fsm.c
 test_fsm_LDADD = $(top_builddir)/src/libgzochid_la-fsm.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
 	@GLIB_LIBS@
 
 test_game_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
@@ -124,7 +119,6 @@ test_httpd_SOURCES = test-httpd.c
 test_httpd_LDADD = $(top_builddir)/src/libgzochid_la-httpd.o \
 	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-fsm.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
 	@GLIB_LIBS@ @MICROHTTPD_LIBS@
 
 test_lrucache_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
@@ -143,7 +137,6 @@ test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-reloc.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
@@ -158,7 +151,6 @@ test_scheme_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-reloc.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
@@ -180,7 +172,6 @@ test_socket_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_socket_SOURCES = test-socket.c
 test_socket_LDADD = $(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-fsm.o \
-	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 

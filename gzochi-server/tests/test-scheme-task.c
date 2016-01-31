@@ -1,5 +1,5 @@
 /* test-scheme-task.c: Test routines for scheme-task.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -39,6 +39,16 @@ struct test_scheme_task_fixture
   gzochid_auth_identity *identity;
   gzochid_storage_engine_interface *storage_interface;
 };
+
+static gboolean
+ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
+		 const gchar *message, gpointer user_data)
+{
+  if (log_level & G_LOG_LEVEL_CRITICAL
+      || log_level & G_LOG_LEVEL_WARNING)
+    return FALSE;
+  else return log_level & G_LOG_FLAG_FATAL;
+}
 
 static void
 test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
@@ -129,6 +139,8 @@ test_disconnected_worker_no_handler_inner (gpointer data)
     gzochid_client_session_new (fixture->identity);
   char *oid_str = persist_client_session (fixture, session);
 
+  g_test_log_set_fatal_handler (ignore_warnings, NULL);
+  
   gzochid_scheme_application_disconnected_worker
     (fixture->context, fixture->identity, oid_str);
 

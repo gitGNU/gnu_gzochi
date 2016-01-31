@@ -27,7 +27,6 @@
 #include "game.h"
 #include "gzochid-storage.h"
 #include "io.h"
-#include "log.h"
 #include "tx.h"
 
 #define ALLOCATION_BLOCK_SIZE 100
@@ -145,7 +144,7 @@ flush_reference (gzochid_data_managed_reference *reference,
       assert (reference->obj != NULL);
 
       oid_str = mpz_get_str (NULL, 16, reference->oid);
-      gzochid_debug ("Flushing new/modified reference '%s'.", oid_str);
+      g_debug ("Flushing new/modified reference '%s'.", oid_str);
 
       reference->serialization->serializer
 	(context->context, reference->obj, out, &err);
@@ -524,7 +523,7 @@ dereference (gzochid_data_transaction_context *context,
     return;
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
-  gzochid_debug ("Retrieving data for reference '%s'.", oid_str);
+  g_debug ("Retrieving data for reference '%s'.", oid_str);
 
   data = APP_STORAGE_INTERFACE (context->context)->transaction_get
     (context->transaction, context->context->oids, oid_str, 
@@ -587,7 +586,7 @@ remove_object (gzochid_data_transaction_context *context, mpz_t oid,
   gzochid_data_transaction_context *tx_context =
     gzochid_transaction_context (&data_participant);
 
-  gzochid_debug ("Removing reference '%s'.", oid_str);      
+  g_debug ("Removing reference '%s'.", oid_str);      
   ret = APP_STORAGE_INTERFACE (context->context)->transaction_delete 
     (context->transaction, context->context->oids, oid_str, 
      strlen (oid_str) + 1);
@@ -927,7 +926,7 @@ gzochid_data_mark (gzochid_application_context *context,
       char *oid_str = mpz_get_str (NULL, 16, reference->oid); 
 
       reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
-      gzochid_debug ("Marking reference '%s' for update.", oid_str);
+      g_debug ("Marking reference '%s' for update.", oid_str);
 
       data = APP_STORAGE_INTERFACE (context)->transaction_get_for_update
 	(tx_context->transaction, tx_context->context->oids, oid_str, 

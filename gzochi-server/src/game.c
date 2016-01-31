@@ -1,5 +1,5 @@
 /* game.c: Game context management routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -35,7 +35,6 @@
 #include "game-protocol.h"
 #include "gzochid.h"
 #include "gzochid-storage.h"
-#include "log.h"
 #include "scheme.h"
 #include "scheme-task.h"
 #include "socket.h"
@@ -86,7 +85,7 @@ scan_app_dir (gzochid_game_context *context, const char *dir)
 
   if (!g_file_test (descriptor_filename, G_FILE_TEST_IS_REGULAR))
     {
-      gzochid_warning 
+      g_warning 
 	("%s does not exist or is not a regular file.", descriptor_filename);
       g_free (descriptor_filename);
       return;
@@ -97,13 +96,13 @@ scan_app_dir (gzochid_game_context *context, const char *dir)
   fclose (descriptor_file);
 
   if (descriptor == NULL)
-    gzochid_warning
+    g_warning
       ("Failed to parse application descriptor %s; skipping.",
        descriptor_filename);
   else if (g_hash_table_contains (context->applications, descriptor->name))
-    gzochid_warning
+    g_warning
       ("Application in %s with name '%s' already exists; skipping.", 
-       descriptor_file, descriptor->name);
+       descriptor_filename, descriptor->name);
   else initialize_application (context, dir, descriptor);
 
   g_free (descriptor_filename);
@@ -175,31 +174,31 @@ initialize_apps (int from_state, int to_state, gpointer user_data)
   
   if (!g_file_test (context->work_dir, G_FILE_TEST_EXISTS))
     {
-      gzochid_notice 
+      g_message 
 	("Work directory %s does not exist; creating...", 
 	 context->work_dir);
       if (g_mkdir_with_parents (context->work_dir, 493) != 0)
 	{
-	  gzochid_err
+	  g_critical
 	    ("Unable to create work directory %s.", context->work_dir);
 	  exit (EXIT_FAILURE);
 	}
     }
   else if (!g_file_test (context->work_dir, G_FILE_TEST_IS_DIR))
     {
-      gzochid_err ("%s is not a directory.", context->work_dir);
+      g_critical ("%s is not a directory.", context->work_dir);
       exit (EXIT_FAILURE);
     }
   
   if (!g_file_test (context->apps_dir, G_FILE_TEST_EXISTS))
     {
-      gzochid_err 
+      g_critical 
 	("Application directory %s does not exist.", context->apps_dir);
       exit (EXIT_FAILURE);
     }
   else if (!g_file_test (context->apps_dir, G_FILE_TEST_IS_DIR))
     {
-      gzochid_err ("%s is not a directory.", context->apps_dir);
+      g_critical ("%s is not a directory.", context->apps_dir);
       exit (EXIT_FAILURE);
     }
 
@@ -335,12 +334,12 @@ gzochid_game_context_init (gzochid_game_context *context,
       context->storage_engine = gzochid_storage_load_engine 
 	(dir, g_hash_table_lookup (config, "storage.engine"));
     }
-  else gzochid_info 
+  else g_info 
 	 ("No durable storage engine configured; memory engine will be used.");
 
   if (context->storage_engine == NULL)
     {
-      gzochid_info ("\
+      g_info ("\
 Using in-memory storage for application data. THIS CONFIGURATION IS NOT SAFE \
 FOR PRODUCTION USE.");
 

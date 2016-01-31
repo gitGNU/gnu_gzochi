@@ -28,7 +28,6 @@
 #include "context.h"
 #include "fsm.h"
 #include "game.h"
-#include "log.h"
 #include "protocol.h"
 #include "socket.h"
 #include "threads.h"
@@ -147,7 +146,7 @@ dispatch_client_write (GIOChannel *channel, GIOCondition cond, gpointer data)
 static gboolean
 dispatch_client_error (gzochid_client_socket *sock)
 {
-  gzochid_debug ("Socket disconnected.");
+  g_debug ("Socket disconnected.");
   sock->protocol.error (sock->protocol_data);
   return FALSE;
 }
@@ -347,9 +346,9 @@ void gzochid_server_socket_listen
   g_io_channel_set_flags (sock->channel, G_IO_FLAG_NONBLOCK, NULL);
 
   if (bind (fd, (struct sockaddr *) &addr, sizeof (struct sockaddr_in)) != 0)
-    gzochid_err ("Failed to bind server to port %d", port);
+    g_critical ("Failed to bind server to port %d", port);
   if (listen (fd, 128) != 0)
-    gzochid_err ("Failed to listen on port %d", port);
+    g_critical ("Failed to listen on port %d", port);
   else
     {
       /* To enable the server to bind to an arbitrary port - i.e., to allow
@@ -365,8 +364,8 @@ void gzochid_server_socket_listen
       bound_addr = (struct sockaddr_in *) sock->addr;
 
       if (getsockname (fd, sock->addr, &sock->addrlen) != 0)
-	gzochid_err ("Failed to get name of bound socket");
-      else gzochid_notice
+	g_critical ("Failed to get name of bound socket");
+      else g_message
 	     ("Game server listening on port %d", ntohs (bound_addr->sin_port));
     }
 

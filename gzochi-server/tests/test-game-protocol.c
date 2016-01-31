@@ -36,6 +36,16 @@ struct _game_protocol_fixture
 
 typedef struct _game_protocol_fixture game_protocol_fixture;
 
+static gboolean
+ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
+		 const gchar *message, gpointer user_data)
+{
+  if (log_level & G_LOG_LEVEL_CRITICAL
+      || log_level & G_LOG_LEVEL_WARNING)
+    return FALSE;
+  else return log_level & G_LOG_FLAG_FATAL;
+}
+
 static gzochid_client_socket *
 server_accept_wrapper (GIOChannel *channel, const char *desc, gpointer data)
 {
@@ -58,6 +68,8 @@ game_protocol_fixture_set_up (game_protocol_fixture *fixture,
   size_t addrlen = sizeof (struct sockaddr);
   int socket_fd = socket (AF_INET, SOCK_STREAM, 0);
 
+  g_test_log_set_fatal_handler (ignore_warnings, NULL);
+  
   fixture->socket_context = gzochid_socket_context_new ();
   fixture->game_context = gzochid_game_context_new (fixture->socket_context);
   fixture->server_socket = gzochid_server_socket_new

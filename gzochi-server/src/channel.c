@@ -32,7 +32,6 @@
 #include "game-protocol.h"
 #include "gzochid-auth.h"
 #include "io.h"
-#include "log.h"
 #include "scheme.h"
 #include "session.h"
 #include "task.h"
@@ -456,7 +455,7 @@ send_channel_message (gzochid_application_context *context,
 
 	  iter = g_sequence_iter_next (iter);
 
-	  gzochid_warning 
+	  g_warning 
 	    ("Client not found for messaged channel session '%s'; removing.", 
 	     session_oid_str);
 	  g_sequence_remove (old_iter);

@@ -1,5 +1,5 @@
 /* tx.c: Application-level transactions implementation for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,7 +22,6 @@
 #include <stdlib.h>
 #include <sys/time.h>
 
-#include "log.h"
 #include "tx.h"
 #include "util.h"
 
@@ -147,8 +146,8 @@ gzochid_transaction_join (gzochid_transaction_participant *participant,
       g_hash_table_insert 
 	(transaction->participants, participant->name, registration);
 
-      gzochid_debug ("Participant '%s' joined transaction '%s'.", 
-		     participant->name, transaction->name);
+      g_debug ("Participant '%s' joined transaction '%s'.", participant->name,
+	       transaction->name);
     }
 }
 
@@ -173,7 +172,7 @@ prepare (gzochid_transaction *transaction)
   GList *participant_ptr = participants;
 
   transaction->state = GZOCHID_TRANSACTION_STATE_PREPARING;
-  gzochid_debug ("Preparing transaction '%s' for commit.", transaction->name);
+  g_debug ("Preparing transaction '%s' for commit.", transaction->name);
   
   while (participant_ptr != NULL)
     {
@@ -181,7 +180,7 @@ prepare (gzochid_transaction *transaction)
 	(gzochid_transaction_participant_registration *) participant_ptr->data;
       if (!participant->participant->prepare (participant->data))
 	{
-	  gzochid_info 
+	  g_info 
 	    ("Participant '%s' in transaction '%s' failed to prepare.",
 	     participant->participant->name, transaction->name);
 
@@ -213,7 +212,7 @@ commit (gzochid_transaction *transaction)
     }
 
   transaction->state = GZOCHID_TRANSACTION_STATE_COMMITTED;
-  gzochid_debug ("Committed transaction '%s'.", transaction->name);
+  g_debug ("Committed transaction '%s'.", transaction->name);
 
   g_list_free (participants);
 }
@@ -271,7 +270,7 @@ rollback (gzochid_transaction *transaction)
     }
 
   transaction->state = GZOCHID_TRANSACTION_STATE_ROLLED_BACK;
-  gzochid_debug ("Rolled back transaction '%s'.", transaction->name);
+  g_debug ("Rolled back transaction '%s'.", transaction->name);
 
   g_list_free (participants);
 }
@@ -379,8 +378,8 @@ gzochid_transaction_end ()
 	+ ((tx_finish.tv_usec - timing->start_time.tv_usec) / 1000);
       
       if (success)
-	gzochid_debug ("Transaction completed in %dms", ms);
-      else gzochid_warning ("Transaction failed after %dms", ms);
+	g_debug ("Transaction completed in %dms", ms);
+      else g_warning ("Transaction failed after %dms", ms);
     }
 
   g_private_set (&thread_transaction_key, NULL);

@@ -1,5 +1,5 @@
 /* log.h: Prototypes and declarations for log.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,16 +18,8 @@
 #ifndef GZOCHID_LOG_H
 #define GZOCHID_LOG_H
 
-#include <stdarg.h>
+#include <glib.h>
 
-void gzochid_vlog (int, char *, va_list);
-void gzochid_log (int, char *, ...);
-void gzochid_err (char *, ...);
-void gzochid_warning (char *, ...);
-void gzochid_notice (char *, ...);
-void gzochid_info (char *, ...);
-void gzochid_debug (char *, ...);
-
-void gzochid_set_log_threshold (int);
+void gzochid_install_log_handler (GLogLevelFlags);
 
 #endif /* GZOCHID_LOG_H */

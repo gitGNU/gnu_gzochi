@@ -20,7 +20,6 @@
 #include <string.h>
 
 #include "fsm.h"
-#include "log.h"
 
 /* The FSM struct. */
 
@@ -247,12 +246,12 @@ static void to_state (gzochid_fsm *fsm, int state)
   /* The state exit and entry functions could change as a result of a re-entrant
      call, so make a copy of both lists before iterating. */
 
-  gzochid_debug ("[%s] exiting state %s", fsm->name, old_state->description);
+  g_debug ("[%s] exiting state %s", fsm->name, old_state->description);
   exit_functions_copy = g_list_copy (old_state->exit_functions);
   g_list_foreach (exit_functions_copy, call_exit_function, transition);
   g_list_free (exit_functions_copy);
 
-  gzochid_debug ("[%s] entering state %s", fsm->name, new_state->description);
+  g_debug ("[%s] entering state %s", fsm->name, new_state->description);
   enter_functions_copy = g_list_copy (new_state->enter_functions);
   g_list_foreach (enter_functions_copy, call_enter_function, transition);
   g_list_free (enter_functions_copy);
@@ -284,7 +283,7 @@ gzochid_fsm_start (gzochid_fsm *fsm)
   fsm->started = TRUE;
   fsm->pending_states = g_array_append_val (fsm->pending_states, state);
   
-  gzochid_debug ("[%s] entering state %s", fsm->name, state->description);
+  g_debug ("[%s] entering state %s", fsm->name, state->description);
 
   /* The state entry functions could change as a result of a re-entrant call,
      so make a copy of the list before iterating. */
