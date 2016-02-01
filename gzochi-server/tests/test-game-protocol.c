@@ -118,9 +118,9 @@ test_server_accept (game_protocol_fixture *fixture, gconstpointer user_data)
 
   protocol = _gzochid_client_socket_get_protocol (fixture->client_socket);
 
-  g_assert_cmpmem
-    (&protocol, sizeof (gzochid_client_protocol),
-     &gzochid_game_client_protocol, sizeof (gzochid_client_protocol));
+  g_assert_cmpint
+    (memcmp (&protocol, &gzochid_game_client_protocol,
+	     sizeof (gzochid_client_protocol)), ==, 0);
 }
 
 static void
