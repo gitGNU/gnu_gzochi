@@ -22,6 +22,7 @@
 
 #include "admin.h"
 #include "context.h"
+#include "socket.h"
 
 struct _gzochid_server_context
 {

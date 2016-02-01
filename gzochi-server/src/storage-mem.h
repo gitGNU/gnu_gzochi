@@ -18,7 +18,7 @@
 #ifndef GZOCHID_STORAGE_MEM_H
 #define GZOCHID_STORAGE_MEM_H
 
-#include "storage.h"
+#include "gzochid-storage.h"
 
 /* This is the storage interface for the in-memory B*tree-based storage engine.
    
