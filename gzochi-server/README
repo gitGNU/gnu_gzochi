@@ -21,9 +21,10 @@ INSTALL file. gzochid-specific information and configuration options can be
 found below.
 
 gzochid depends on the following external libraries.
-- libg
 - libdb
+- libg
 - libgmp
+- libgobject
 - libguile
 - libgzochi-common
 - libmicrohttpd
@@ -52,16 +53,17 @@ Required External Packages ====================================================
 
 gzochid requires the following external packages:
 
-  - GNU GLib, at least version 2.32
-
-    GLib is used throughout gzochid for its general-purpose utility functions
-    and data structures. It is available from http://www.gtk.org/ .
-
   - Oracle BerkeleyDB, at least version 5.1
 
     BDB is used for data persistence. It is available from
     http://www.oracle.com/technetwork/products/berkeleydb/downloads/ .
     
+  - GNU GLib and GObject, at least version 2.32
+
+    GLib is used throughout gzochid for its general-purpose utility functions
+    and data structures. The GObject library is used for component modeling and
+    wiring. Both are available from http://www.gtk.org/ .
+
   - GNU MP, at least version 4.1
 
     GNU MP is used for bignum arithmetic. It is available from 

@@ -62,7 +62,7 @@ libgzochid_la_SOURCES = admin.c app.c app-task.c auth.c callback.c channel.c \
 	task.c threads.c tx.c txlog.c util.c
 
 libgzochid_la_LIBADD = api/libgzochid-api.la @GZOCHI_COMMON_LIBS@ \
-	@GUILE_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ \
+	@GUILE_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ \
 	@MICROHTTPD_LIBS@ @ZLIB_LIBS@
 
 gzochid_CFLAGS = @CFLAGS@ -DGZOCHID_CONF_LOCATION=$(sysconfdir)/gzochid.conf \
