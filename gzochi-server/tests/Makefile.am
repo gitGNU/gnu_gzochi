@@ -32,6 +32,7 @@ test_programs = \
 	test-httpd \
 	test-lrucache \
 	test-reloc \
+	test-resolver \
 	test-scheme \
 	test-scheme-task \
 	test-session \
@@ -141,6 +142,11 @@ test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+test_resolver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
+test_resolver_SOURCES = test-resolver.c
+test_resolver_LDADD = $(top_builddir)/src/libgzochid_la-resolver.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_scheme_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_scheme_SOURCES = test-scheme.c mock-data.c
