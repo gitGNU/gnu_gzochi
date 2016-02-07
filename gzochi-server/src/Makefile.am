@@ -51,8 +51,8 @@ noinst_LTLIBRARIES = libgzochid.la
 libgzochid_la_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_AUTH_PLUGIN_DIR=\"$(plugindir)/auth\" \
 	-DGZOCHID_STORAGE_ENGINE_DIR=\"$(plugindir)/storage\" @GUILE_CFLAGS@ \
-	@GLIB_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ @MICROHTTPD_CFLAGS@ \
-	@ZLIB_CFLAGS@ @GZOCHI_COMMON_CFLAGS@ \
+	@GLIB_CFLAGS@ @GOBJECT_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ \
+	@MICROHTTPD_CFLAGS@ @ZLIB_CFLAGS@ @GZOCHI_COMMON_CFLAGS@ \
 	-Wall -Werror
 
 libgzochid_la_SOURCES = admin.c app.c app-task.c auth.c callback.c channel.c \
