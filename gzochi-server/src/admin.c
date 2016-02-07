@@ -16,6 +16,7 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <libguile.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -27,9 +28,20 @@
 #include "gzochid.h"
 #include "httpd.h"
 #include "httpd-app.h"
+#include "resolver.h"
 #include "threads.h"
 
 #include "api/admin.h"
+
+struct _gzochid_admin_context
+{
+  gzochid_context base;
+
+  GzochidHttpServer *http_server;
+  
+  GThreadPool *pool;
+  GHashTable *config;
+};
 
 static void *
 initialize_guile (void *data)
@@ -64,13 +76,15 @@ initialize (int from_state, int to_state, gpointer user_data)
       int port = gzochid_config_to_int 
 	(g_hash_table_lookup (admin_context->config, "module.httpd.port"), 
 	 8000);
-
-      gzochid_httpd_context *httpd_context = gzochid_httpd_context_new ();
-      gzochid_httpd_context_init (httpd_context, context, port);
-
+      
+      admin_context->http_server = gzochid_resolver_require
+	(GZOCHID_TYPE_HTTP_SERVER, NULL);
+      
       gzochid_httpd_app_register_handlers
-	(httpd_context, (gzochid_game_context *)
+	(admin_context->http_server, (gzochid_game_context *)
 	 ((gzochid_server_context *) context->parent)->game_context);
+
+      gzochid_http_server_start (admin_context->http_server, port, NULL);
     }
   if (gzochid_config_to_boolean 
       (g_hash_table_lookup 

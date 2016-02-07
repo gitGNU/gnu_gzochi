@@ -1,5 +1,5 @@
 /* admin.h: Prototypes and declarations for admin.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,7 +21,6 @@
 #include <glib.h>
 
 #include "context.h"
-#include "fsm.h"
 
 enum gzochid_admin_state 
   {
@@ -30,13 +29,7 @@ enum gzochid_admin_state
     GZOCHID_ADMIN_STATE_STOPPED
   };
 
-typedef struct _gzochid_admin_context
-{
-  gzochid_context base;
-
-  GThreadPool *pool;
-  GHashTable *config;
-} gzochid_admin_context;
+typedef struct _gzochid_admin_context gzochid_admin_context;
 
 gzochid_admin_context *gzochid_admin_context_new (void);
 void gzochid_admin_context_free (gzochid_admin_context *);

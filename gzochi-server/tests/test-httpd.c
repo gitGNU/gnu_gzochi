@@ -23,7 +23,7 @@
 
 struct _test_httpd_fixture
 {
-  gzochid_httpd_context *httpd_context;
+  GzochidHttpServer *http_server;
   GIOChannel *client_channel;
   int client_socket_fd;
 };
@@ -32,24 +32,24 @@ typedef struct _test_httpd_fixture test_httpd_fixture;
 
 static void
 test_terminal_handler (const GMatchInfo *match_info,
-		       gzochid_httpd_response_sink *sink,
+		       gzochid_http_response_sink *sink,
 		       gpointer request_context, gpointer user_data)
 {
-  gzochid_httpd_write_response (sink, 200, "SUCCESS\n", 8);
+  gzochid_http_write_response (sink, 200, "SUCCESS\n", 8);
 }
 
 static void
 test_continuation_terminal (const GMatchInfo *match_info,
-			    gzochid_httpd_response_sink *sink,
+			    gzochid_http_response_sink *sink,
 			    gpointer request_context, gpointer user_data)
 {
   g_assert_cmpstr (request_context, ==, "foo");
-  gzochid_httpd_write_response (sink, 200, "SUCCESS\n", 8);
+  gzochid_http_write_response (sink, 200, "SUCCESS\n", 8);
 }
 
 static gpointer
 test_continuation_handler (const GMatchInfo *match_info,
-			   gzochid_httpd_response_sink *sink,
+			   gzochid_http_response_sink *sink,
 			   gpointer request_context, gpointer user_data)
 {
   return "foo";
@@ -62,11 +62,11 @@ test_httpd_fixture_set_up (test_httpd_fixture *fixture, gconstpointer user_data)
   socklen_t addrlen = sizeof (struct sockaddr);
 
   fixture->client_socket_fd = socket (AF_INET, SOCK_STREAM, 0);
-  fixture->httpd_context = gzochid_httpd_context_new ();
+  fixture->http_server = g_object_new (GZOCHID_TYPE_HTTP_SERVER, NULL);
 
-  gzochid_httpd_context_init (fixture->httpd_context, NULL, 0);
+  gzochid_http_server_start (fixture->http_server, 0, NULL);
   
-  _gzochid_httpd_context_getsockname (fixture->httpd_context, &addr, &addrlen);
+  _gzochid_http_server_getsockname (fixture->http_server, &addr, &addrlen);
   connect (fixture->client_socket_fd, &addr, addrlen);
 
   fixture->client_channel = g_io_channel_unix_new (fixture->client_socket_fd);
@@ -76,7 +76,7 @@ static void
 test_httpd_fixture_tear_down (test_httpd_fixture *fixture,
 			      gconstpointer user_data)
 {
-  gzochid_httpd_context_free (fixture->httpd_context);
+  g_object_unref (fixture->http_server);
   g_io_channel_unref (fixture->client_channel);
 }
 
@@ -119,7 +119,7 @@ test_add_terminal_simple (test_httpd_fixture *fixture, gconstpointer user_data)
   GError *err = NULL;
 
   gzochid_httpd_add_terminal
-    (fixture->httpd_context, "/", test_terminal_handler, NULL);
+    (fixture->http_server, "/", test_terminal_handler, NULL);
 
   g_io_channel_write_chars
     (fixture->client_channel, "GET / HTTP/1.1\n\n", 16, NULL, &err);
@@ -140,7 +140,7 @@ test_add_continuation_simple (test_httpd_fixture *fixture,
   GError *err = NULL;
   char *response_line = NULL;
   gzochid_httpd_partial *partial = gzochid_httpd_add_continuation
-    (fixture->httpd_context, "/foo", test_continuation_handler, NULL);
+    (fixture->http_server, "/foo", test_continuation_handler, NULL);
 
   gzochid_httpd_append_terminal
     (partial, "/", test_continuation_terminal, NULL);  

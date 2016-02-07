@@ -177,9 +177,9 @@ free_data_state (void *ptr)
    single, shared one visible. */
 
 static void
-not_found404_default (gzochid_httpd_response_sink *sink)
+not_found404_default (gzochid_http_response_sink *sink)
 {
-  gzochid_httpd_write_response
+  gzochid_http_write_response
     (sink, 404, "<html><body>Not found.</body></html>", 36);
 }
 
@@ -191,7 +191,7 @@ not_found404_default (gzochid_httpd_response_sink *sink)
   "stores.</p>"
 
 static void
-hello_world (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
+hello_world (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	     gpointer request_context, gpointer user_data)
 {
   GString *response_str = g_string_new (NULL);
@@ -201,21 +201,21 @@ hello_world (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
   g_string_append (response_str, "<a href=\"app/\">app/</a>");
   g_string_append (response_str, "</body></html>");
 
-  gzochid_httpd_write_response
+  gzochid_http_write_response
     (sink, 200, response_str->str, response_str->len);
 
   g_string_free (response_str, TRUE);
 }
 
 static void
-list_apps (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
+list_apps (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	   gpointer request_context, gpointer user_data)
 {
   gzochid_game_context *game_context = user_data;
   GList *apps = gzochid_game_context_get_applications (game_context);
 
   if (apps == NULL)
-    gzochid_httpd_write_response
+    gzochid_http_write_response
       (sink, 404, "<html><body>No applications.</body></html>", 22);
   else 
     {
@@ -242,7 +242,7 @@ list_apps (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
       g_string_append (response_str, "  </body>\n");
       g_string_append (response_str, "</html>");
 
-      gzochid_httpd_write_response
+      gzochid_http_write_response
 	(sink, 200, response_str->str, response_str->len);
 
       g_string_free (response_str, TRUE);
@@ -251,7 +251,7 @@ list_apps (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
 }
 
 static gpointer
-bind_app (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
+bind_app (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	  gpointer request_context, gpointer user_data)
 {
   gchar *app = g_match_info_fetch (match_info, 1);
@@ -268,7 +268,7 @@ bind_app (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
 }
 
 static void 
-app_info (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
+app_info (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	  gpointer request_context, gpointer user_data)
 {
   GString *response_str = g_string_new (NULL);
@@ -362,14 +362,14 @@ app_info (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
   g_string_append (response_str, "  </body>\n");
   g_string_append (response_str, "</html>");
 
-  gzochid_httpd_write_response
+  gzochid_http_write_response
     (sink, 200, response_str->str, response_str->len);
 
   g_string_free (response_str, TRUE);
 }
 
 static void
-list_oids (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
+list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	   gpointer request_context, gpointer user_data)
 {
   gzochid_application_context *app_context = request_context;
@@ -406,14 +406,14 @@ list_oids (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
   g_string_append (response_str, "  </body>\n");
   g_string_append (response_str, "</html>");
 
-  gzochid_httpd_write_response
+  gzochid_http_write_response
     (sink, 200, response_str->str, response_str->len);
 
   g_string_free (response_str, TRUE);
 }
 
 static void
-render_oid (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
+render_oid (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	    gpointer request_context, gpointer user_data)
 {
   size_t data_length = 0;
@@ -441,13 +441,13 @@ render_oid (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
 	g_string_append_len (response, buf, len);
 
       free_data_state (state);
-      gzochid_httpd_write_response (sink, 200, response->str, response->len);
+      gzochid_http_write_response (sink, 200, response->str, response->len);
       g_string_free (response, TRUE);
     }
 }
 
 static void
-list_names (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
+list_names (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	    gpointer request_context, gpointer user_data)
 {
   GString *response_str = g_string_new (NULL);
@@ -482,7 +482,7 @@ list_names (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
   g_string_append (response_str, "  </body>\n");
   g_string_append (response_str, "</html>");
 
-  gzochid_httpd_write_response
+  gzochid_http_write_response
     (sink, 200, response_str->str, response_str->len);
 
   g_string_free (response_str, TRUE);
@@ -493,24 +493,24 @@ list_names (const GMatchInfo *match_info, gzochid_httpd_response_sink *sink,
 
 static gpointer
 null_continuation (const GMatchInfo *match_info,
-		   gzochid_httpd_response_sink *sink, gpointer request_context,
+		   gzochid_http_response_sink *sink, gpointer request_context,
 		   gpointer user_data)
 {
   return request_context;
 }
 
 void
-gzochid_httpd_app_register_handlers (gzochid_httpd_context *httpd_context,
+gzochid_httpd_app_register_handlers (GzochidHttpServer *http_server,
 				     gzochid_game_context *game_context)
 {
   gzochid_httpd_partial *apps_root = NULL;
   gzochid_httpd_partial *oids_root = NULL;
   
-  gzochid_httpd_add_terminal (httpd_context, "/", hello_world, NULL);
-  gzochid_httpd_add_terminal (httpd_context, "/app/", list_apps, game_context);
+  gzochid_httpd_add_terminal (http_server, "/", hello_world, NULL);
+  gzochid_httpd_add_terminal (http_server, "/app/", list_apps, game_context);
 
   apps_root = gzochid_httpd_add_continuation
-    (httpd_context, "/app/([^/]+)", bind_app, game_context);
+    (http_server, "/app/([^/]+)", bind_app, game_context);
 
   gzochid_httpd_append_terminal (apps_root, "/?", app_info, NULL);
   gzochid_httpd_append_terminal (apps_root, "/oids/", list_oids, NULL);

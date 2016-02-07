@@ -115,12 +115,11 @@ test_game_protocol_SOURCES = test-game-protocol.c
 test_game_protocol_LDADD = $(top_builddir)/src/libgzochid.la \
 	@GZOCHI_COMMON_LIBS@ @GMODULE_LIBS@ @GLIB_LIBS@ @GUILE_LIBS@
 
-test_httpd_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @MICROHTTPD_CFLAGS@
+test_httpd_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
+	@MICROHTTPD_CFLAGS@
 test_httpd_SOURCES = test-httpd.c
 test_httpd_LDADD = $(top_builddir)/src/libgzochid_la-httpd.o \
-	$(top_builddir)/src/libgzochid_la-context.o \
-	$(top_builddir)/src/libgzochid_la-fsm.o \
-	@GLIB_LIBS@ @MICROHTTPD_LIBS@
+	@GLIB_LIBS@ @GOBJECT_LIBS@ @MICROHTTPD_LIBS@
 
 test_lrucache_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lrucache_SOURCES = test-lrucache.c

@@ -15,93 +15,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <arpa/inet.h>
 #include <assert.h>
 #include <glib.h>
 #include <microhttpd.h>
+#include <netinet/in.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 
-#include "context.h"
-#include "fsm.h"
 #include "httpd.h"
-#include "log.h"
-
-enum gzochid_httpd_state 
-  {
-    GZOCHID_HTTPD_STATE_INITIALIZING,
-    GZOCHID_HTTPD_STATE_RUNNING,
-    GZOCHID_HTTPD_STATE_STOPPED
-  };
-
-/* The HTTP server content. */
-
-struct _gzochid_httpd_context 
-{
-  gzochid_context base; /* The struct base. */
-
-  GNode *root; /* The root of the request mapping hierarchy. */
-  
-  struct MHD_Daemon *daemon; /* The GNU microhttpd daemon struct. */
-  int port; /* The server port, for logging / deferred startup. */
-};
-
-/* The HTTP resonse sink. */
-
-struct _gzochid_httpd_response_sink
-{
-  /* Whether the response was written within the scope of a handler invocation.
-     The response can only be written once over the lifetime of a request 
-     flow. */
-  
-  gboolean response_written; 
-
-  /* Stores the result of enqueueing the response. This is the value returned 
-     to the GNU microhttpd framework. */
-
-  int queue_code; 
-
-  /* The GNU microhttpd connecction object. */
-  
-  struct MHD_Connection *connection; 
-};
-
-/* A little bit of legal compiler trickery to make it possible to declare
-   `gzochid_httpd_partial' as a struct in the header while still being able to
-   cast it back and forth from `GNode'. */
-
-struct _gzochid_httpd_partial
-{
-  GNode *node;
-};
-
-typedef GNode gzochid_http_partial;
-
-/* Combines a terminal handler with a "user data" pointer. */
-
-struct _gzochid_httpd_terminal_registration
-{
-  gzochid_httpd_terminal terminal; /* The terminal handler function. */
-  gpointer user_data; /* The user data pointer. */
-};
-
-typedef struct _gzochid_httpd_terminal_registration
-gzochid_httpd_terminal_registration;
-
-/* Combines a continuation handler with a "user data" pointer. */
-
-struct _gzochid_httpd_continuation_registration
-{
-  /* The continuation handler function. */
-
-  gzochid_httpd_continuation continuation;
-  
-  gpointer user_data; /* The user data pointer. */
-};
-
-typedef struct _gzochid_httpd_continuation_registration
-gzochid_httpd_continuation_registration;
 
 /* A node in the hierarchy of request mappings. */
 
@@ -138,6 +62,110 @@ free_pattern_node (gzochid_httpd_pattern_node *pattern_node)
 
   free (pattern_node);
 }
+
+static gboolean
+traverse_free (GNode *node, gpointer data)
+{
+  free_pattern_node (node->data);
+  return FALSE;
+}
+
+/* The HTTP server object. */
+
+struct _GzochidHttpServer
+{
+  GObject parent_instance;
+
+  GNode *root; /* The root of the request mapping hierarchy. */
+  
+  struct MHD_Daemon *daemon; /* The GNU microhttpd daemon struct. */
+};
+
+G_DEFINE_TYPE (GzochidHttpServer, gzochid_http_server, G_TYPE_OBJECT);
+
+static void 
+gzochid_http_server_finalize (GObject *gobject)
+{
+  GzochidHttpServer *server = GZOCHID_HTTP_SERVER (gobject);
+
+  if (server->daemon != NULL)
+    gzochid_http_server_stop (server);
+  
+  g_node_traverse
+    (server->root, G_IN_ORDER, G_TRAVERSE_ALL, -1, traverse_free, NULL);
+  g_node_destroy (server->root);
+
+  G_OBJECT_CLASS (gzochid_http_server_parent_class)->finalize (gobject);
+}
+
+static void
+gzochid_http_server_class_init (GzochidHttpServerClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->finalize = gzochid_http_server_finalize;
+}
+
+static void
+gzochid_http_server_init (GzochidHttpServer *self)
+{
+  self->root = g_node_new (create_pattern_node (""));
+  self->daemon = NULL;
+}
+
+/* The HTTP resonse sink. */
+
+struct _gzochid_http_response_sink
+{
+  /* Whether the response was written within the scope of a handler invocation.
+     The response can only be written once over the lifetime of a request 
+     flow. */
+  
+  gboolean response_written; 
+
+  /* Stores the result of enqueueing the response. This is the value returned 
+     to the GNU microhttpd framework. */
+
+  int queue_code; 
+
+  /* The GNU microhttpd connecction object. */
+  
+  struct MHD_Connection *connection; 
+};
+
+/* A little bit of legal compiler trickery to make it possible to declare
+   `gzochid_httpd_partial' as a struct in the header while still being able to
+   cast it back and forth from `GNode'. */
+
+struct _gzochid_httpd_partial
+{
+  GNode *node;
+};
+
+/* Combines a terminal handler with a "user data" pointer. */
+
+struct _gzochid_httpd_terminal_registration
+{
+  gzochid_httpd_terminal terminal; /* The terminal handler function. */
+  gpointer user_data; /* The user data pointer. */
+};
+
+typedef struct _gzochid_httpd_terminal_registration
+gzochid_httpd_terminal_registration;
+
+/* Combines a continuation handler with a "user data" pointer. */
+
+struct _gzochid_httpd_continuation_registration
+{
+  /* The continuation handler function. */
+
+  gzochid_httpd_continuation continuation;
+  
+  gpointer user_data; /* The user data pointer. */
+};
+
+typedef struct _gzochid_httpd_continuation_registration
+gzochid_httpd_continuation_registration;
 
 /* A match of a pattern in the matching hierarchy against a prefix of the URL 
    path. */
@@ -335,14 +363,14 @@ add_terminal (GNode *node, gzochid_httpd_terminal terminal, gpointer user_data)
 }
 
 void
-gzochid_httpd_add_terminal (gzochid_httpd_context *context, const char *pattern,
+gzochid_httpd_add_terminal (GzochidHttpServer *server, const char *pattern,
 			    gzochid_httpd_terminal terminal, gpointer user_data)
 {
-  GNode *target = find_pattern_node (context->root, pattern);
+  GNode *target = find_pattern_node (server->root, pattern);
 
   if (target == NULL)
     target = g_node_insert
-      (context->root, -1, g_node_new (create_pattern_node (pattern)));
+      (server->root, -1, g_node_new (create_pattern_node (pattern)));
   
   add_terminal (target, terminal, user_data);
 }
@@ -375,16 +403,16 @@ add_continuation (GNode *node, gzochid_httpd_continuation continuation,
 }
   
 gzochid_httpd_partial *
-gzochid_httpd_add_continuation (gzochid_httpd_context *context,
+gzochid_httpd_add_continuation (GzochidHttpServer *server,
 				const char *pattern,
 				gzochid_httpd_continuation continuation,
 				gpointer user_data)
 {
-  GNode *target = find_pattern_node (context->root, pattern);
+  GNode *target = find_pattern_node (server->root, pattern);
 
   if (target == NULL)
     target = g_node_insert
-      (context->root, -1, g_node_new (create_pattern_node (pattern)));
+      (server->root, -1, g_node_new (create_pattern_node (pattern)));
   
   add_continuation (target, continuation, user_data);
 
@@ -430,8 +458,8 @@ not_found404_default (struct MHD_Connection *connection)
 }
 
 void
-gzochid_httpd_write_response
-(gzochid_httpd_response_sink *sink, int code, char *bytes, size_t len)
+gzochid_http_write_response
+(gzochid_http_response_sink *sink, int code, char *bytes, size_t len)
 {
   struct MHD_Response *response =
     MHD_create_response_from_data (len, bytes, TRUE, TRUE);
@@ -448,9 +476,9 @@ dispatch (void *cls, struct MHD_Connection *connection,
 	  const char *path, const char *method, const char *version, 
 	  const char *upload_data, size_t *upload_data_size, void **con_cls)
 {
-  gzochid_httpd_response_sink sink;
-  gzochid_httpd_context *context = cls;
-  GNode *node = context->root;
+  gzochid_http_response_sink sink;
+  GzochidHttpServer *server = cls;
+  GNode *node = server->root;
 
   int pos = 0;
   gpointer request_context = NULL;
@@ -562,85 +590,56 @@ dispatch (void *cls, struct MHD_Connection *connection,
   else return not_found404_default (connection);
 }
 
-static void 
-initialize (int from_state, int to_state, gpointer user_data)
-{
-  gzochid_context *context = user_data;
-  gzochid_httpd_context *httpd_context = (gzochid_httpd_context *) context;
-
-  httpd_context->daemon = MHD_start_daemon 
-    (MHD_USE_SELECT_INTERNALLY, httpd_context->port, NULL, NULL, dispatch, 
-     httpd_context, MHD_OPTION_END);
-
-  gzochid_notice ("HTTP server listening on port %d", httpd_context->port);
-  
-  gzochid_fsm_to_state (context->fsm, GZOCHID_HTTPD_STATE_RUNNING);
-}
-
-gzochid_httpd_context *
-gzochid_httpd_context_new (void)
-{
-  gzochid_httpd_context *httpd_context =
-    calloc (1, sizeof (gzochid_httpd_context));
-
-  httpd_context->root = g_node_new (create_pattern_node (""));
-  
-  return httpd_context;
-}
-
-static gboolean
-traverse_free (GNode *node, gpointer data)
-{
-  free_pattern_node (node->data);
-  return FALSE;
-}
-
 void 
-gzochid_httpd_context_free (gzochid_httpd_context *context)
+gzochid_http_server_start (GzochidHttpServer *server, guint port, GError **err)
 {
-  g_node_traverse
-    (context->root, G_IN_ORDER, G_TRAVERSE_ALL, -1, traverse_free, NULL);
-  g_node_destroy (context->root);
+  assert (server->daemon == NULL);
+  
+  server->daemon = MHD_start_daemon 
+    (MHD_USE_SELECT_INTERNALLY, port, NULL, NULL, dispatch, server,
+     MHD_OPTION_END);
 
-  gzochid_fsm_free (((gzochid_context *) context)->fsm);
-  gzochid_context_free ((gzochid_context *) context);
-  free (context);
-}
+  if (server->daemon == NULL)
+    g_set_error
+      (err, GZOCHID_HTTP_SERVER_ERROR, GZOCHID_HTTP_SERVER_ERROR_FAILED,
+       "Failed to start HTTP server on port %d.", port);
+  else
+    {
+      struct sockaddr_in addr;
+      socklen_t addrlen = sizeof (struct sockaddr_in);
 
-void 
-gzochid_httpd_context_init (gzochid_httpd_context *context, 
-			    gzochid_context *parent, int port)
-{
-  gzochid_fsm *fsm = gzochid_fsm_new 
-    ("httpd", GZOCHID_HTTPD_STATE_INITIALIZING, "INITIALIZING");
-
-  gzochid_fsm_add_state (fsm, GZOCHID_HTTPD_STATE_RUNNING, "RUNNING");
-  gzochid_fsm_add_state (fsm, GZOCHID_HTTPD_STATE_STOPPED, "STOPPED");
-
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_HTTPD_STATE_INITIALIZING, initialize, context);
-   
-  gzochid_fsm_add_transition 
-    (fsm, GZOCHID_HTTPD_STATE_INITIALIZING, GZOCHID_HTTPD_STATE_RUNNING);
-  gzochid_fsm_add_transition 
-    (fsm, GZOCHID_HTTPD_STATE_RUNNING, GZOCHID_HTTPD_STATE_STOPPED);
-
-  context->port = port;
-
-  gzochid_context_init ((gzochid_context *) context, parent, fsm);
+      _gzochid_http_server_getsockname
+	(server, (struct sockaddr *) &addr, &addrlen);
+      
+      g_message ("HTTP server listening on port %d.", ntohs (addr.sin_port));
+    }
 }
 
 void
-_gzochid_httpd_context_getsockname (gzochid_httpd_context *httpd_context,
-				    struct sockaddr *addr, socklen_t *addrlen)
+gzochid_http_server_stop (GzochidHttpServer *server)
+{
+  assert (server->daemon != NULL);
+
+  MHD_stop_daemon (server->daemon);
+  server->daemon = NULL;
+}
+
+void
+_gzochid_http_server_getsockname (GzochidHttpServer *server,
+				  struct sockaddr *addr, socklen_t *addrlen)
 {
   const union MHD_DaemonInfo *daemon_info = NULL;
   
   /* Ensure the server is listening. */
 
-  assert (httpd_context->daemon != NULL);
+  assert (server->daemon != NULL);
   
-  daemon_info = MHD_get_daemon_info
-    (httpd_context->daemon, MHD_DAEMON_INFO_LISTEN_FD);
+  daemon_info = MHD_get_daemon_info (server->daemon, MHD_DAEMON_INFO_LISTEN_FD);
   getsockname (daemon_info->listen_fd, addr, addrlen);
+}
+
+GQuark
+gzochid_http_server_error_quark ()
+{
+  return g_quark_from_static_string ("gzochid-http-server-error-quark");
 }

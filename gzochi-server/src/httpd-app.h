@@ -38,6 +38,6 @@
   references. */
 
 void gzochid_httpd_app_register_handlers
-(gzochid_httpd_context *, gzochid_game_context *);
+(GzochidHttpServer *, gzochid_game_context *);
 
 #endif /* GZOCHID_HTTPD_APP_H */

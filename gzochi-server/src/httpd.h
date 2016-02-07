@@ -19,29 +19,35 @@
 #define GZOCHID_HTTPD_H
 
 #include <glib.h>
+#include <glib-object.h>
 #include <sys/socket.h>
 
-#include "context.h"
+/* The core embedded HTTP server type definitions. */
 
-/* The httpd service context. */
+#define GZOCHID_TYPE_HTTP_SERVER gzochid_http_server_get_type ()
+G_DECLARE_FINAL_TYPE (GzochidHttpServer, gzochid_http_server, GZOCHID,
+		      HTTP_SERVER, GObject);
 
-typedef struct _gzochid_httpd_context gzochid_httpd_context;
+enum GzochidHttpServerError
+  { 
+    GZOCHID_HTTP_SERVER_ERROR_FAILED /* Generic HTTP server failure. */
+  };
 
-/* Construct and return a new httpd service context. This pointer should be 
-   freed via `gzochid_httpd_context_free' when no longer needed. */
+/* The error domain for HTTP server-related errors. Error codes for errors in
+   this domain will be values from the `GzochidHttpServerError' enum above. */
 
-gzochid_httpd_context *gzochid_httpd_context_new (void);
+#define GZOCHID_HTTP_SERVER_ERROR gzochid_http_server_error_quark ()
 
-/* Releases the resources associated with the specified httpd service 
-   context. */
+/* Starts the HTTP server listening on the specified port. A thread (managed by
+   the server) will be launched to accept connections and respond to requests.
+   A port number of `0' may specified to direct the server to listen on an
+   arbitrary available port. */
 
-void gzochid_httpd_context_free (gzochid_httpd_context *);
+void gzochid_http_server_start (GzochidHttpServer *, guint, GError **);
 
-/* Initialize the specified httpd service context, binding it to the specified
-   parent content and starting it listening on the specified port. */
+/* Stops the specified HTTP server. */
 
-void gzochid_httpd_context_init 
-(gzochid_httpd_context *, gzochid_context *, int);
+void gzochid_http_server_stop (GzochidHttpServer *);
 
 /* The following functions and typedefs form a minimal web framework that allows
    intermediate ("continuation") and terminal handlers to be mapped to regular
@@ -51,7 +57,7 @@ void gzochid_httpd_context_init
    handling control flow. It can be used (via `gzochid_httpd_write_response' 
    below) to send data to a connected client. */
 
-typedef struct _gzochid_httpd_response_sink gzochid_httpd_response_sink;
+typedef struct _gzochid_http_response_sink gzochid_http_response_sink;
 
 /* Returned by the `continuation' functions below; represents an intermediate 
    state of request path matching, to which multiple patterns can be attached to
@@ -68,7 +74,7 @@ typedef struct _gzochid_httpd_partial gzochid_httpd_partial;
    registration. */
 
 typedef void (*gzochid_httpd_terminal)
-(const GMatchInfo *, gzochid_httpd_response_sink *, gpointer, gpointer);
+(const GMatchInfo *, gzochid_http_response_sink *, gpointer, gpointer);
 
 /* The function pointer typedef for a continuation handler, invoked to bind
    path parameters common to multiple downstream request patterns. This function
@@ -83,14 +89,14 @@ typedef void (*gzochid_httpd_terminal)
    `NULL'. */
 
 typedef gpointer (*gzochid_httpd_continuation)
-(const GMatchInfo *, gzochid_httpd_response_sink *, gpointer, gpointer);
+(const GMatchInfo *, gzochid_http_response_sink *, gpointer, gpointer);
 
 /* Adds a new terminal handler that will be called for paths matching the 
    specified pattern, which will be rooted at the beginning of the request 
    path. */
 
 void gzochid_httpd_add_terminal
-(gzochid_httpd_context *, const char *, gzochid_httpd_terminal, gpointer);
+(GzochidHttpServer *, const char *, gzochid_httpd_terminal, gpointer);
 
 /* Adds a new terminal handler that will be called for paths matching the
    specified pattern, which will be rooted at the part of the path following the
@@ -105,7 +111,7 @@ void gzochid_httpd_append_terminal
    terminals or continuations. */
 
 gzochid_httpd_partial *gzochid_httpd_add_continuation
-(gzochid_httpd_context *, const char *, gzochid_httpd_continuation, gpointer);
+(GzochidHttpServer *, const char *, gzochid_httpd_continuation, gpointer);
 
 /* Adds a new continuation handler that will be called for paths matching the
    specified pattern, which will be rooted at the part of the path following the
@@ -119,8 +125,8 @@ gzochid_httpd_partial *gzochid_httpd_append_continuation
    code. Note that the first write in a request-handling flow will terminate the
    flow, even if the write occurs within a continuation handler. */
 
-void gzochid_httpd_write_response
-(gzochid_httpd_response_sink *, int, char *, size_t);
+void gzochid_http_write_response
+(gzochid_http_response_sink *, int, char *, size_t);
 
 /* Private httpd service context API, visible for testing only. */
 
@@ -130,7 +136,9 @@ void gzochid_httpd_write_response
    buffer in the address struct. It is updated to reflect the actual size of the
    address, which may be truncated as necessary. */
 
-void _gzochid_httpd_context_getsockname
-(gzochid_httpd_context *, struct sockaddr *, socklen_t *);
+void _gzochid_http_server_getsockname
+(GzochidHttpServer *, struct sockaddr *, socklen_t *);
+
+GQuark gzochid_http_server_error_quark ();
 
 #endif /* GZOCHID_HTTPD_H */
