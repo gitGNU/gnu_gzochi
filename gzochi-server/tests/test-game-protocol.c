@@ -96,14 +96,10 @@ game_protocol_fixture_tear_down (game_protocol_fixture *fixture,
   GSource *client_source = g_main_context_find_source_by_user_data
     (fixture->socket_context->main_context, fixture->client_socket);
 
-  g_source_destroy (server_source);
   g_source_unref (server_source);
   
   if (client_source != NULL)
-    {
-      g_source_destroy (client_source);
-      g_source_unref (client_source);
-    }
+    g_source_unref (client_source);
   
   gzochid_game_context_free (fixture->game_context);
   gzochid_socket_context_free (fixture->socket_context);

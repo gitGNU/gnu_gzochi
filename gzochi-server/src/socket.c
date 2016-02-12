@@ -472,10 +472,10 @@ gzochid_client_socket_free (gzochid_client_socket *sock)
 {
   /* It's not safe to free the socket synchronously, because another thread may
      be in the process of dispatching a read or a write and the caller has no
-     way of knowing that. Instead, destroy both sources and let the 
+     way of knowing that. Instead, unref both sources and let the 
      `GDestroyNotify' attached to the read source take care of the cleanup. */
 
   if (sock->write_source != NULL)
-    g_source_destroy (sock->write_source);
-  g_source_destroy (sock->read_source);
+    g_source_unref (sock->write_source);
+  g_source_unref (sock->read_source);
 }
