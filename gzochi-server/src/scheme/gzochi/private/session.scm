@@ -1,5 +1,5 @@
 ;; gzochi/private/session.scm: Private infrastructure for gzochi client API 
-;; Copyright (C) 2014 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -57,19 +57,18 @@
 
   (define (gzochi:send-message session msg)
     (or (gzochi:client-session? session)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition session))))
+	(assertion-violation
+	 'gzochi:send-message "Expected gzochi:client-session." session))
 
     (or (bytevector? msg)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition msg))))
+	(assertion-violation 'gzochi:send-message "Expected bytevector." msg))
     
     (primitive-send-message session msg))
 
   (define (gzochi:disconnect session)
     (or (gzochi:client-session? session)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition session))))
+	(assertion-violation
+	 'gzochi:disconnect "Expected gzochi:client-session." session))
 
     (primitive-disconnect session))
 )

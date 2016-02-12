@@ -1,5 +1,5 @@
 ;; gzochi/private/data/migration.scm: Private infrastructure for migration tools
-;; Copyright (C) 2014 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -21,9 +21,7 @@
   (import (gzochi data) (gzochi private data) (rnrs))
 
   (define (enqueue-oids! migration oids) 
-    (raise (condition 
-	    (make-assertion-violation)
-	    (make-message-condition "enqueue-oids! not initialized."))))
+    (assertion-violation 'gzochi:visit-object "enqueue-oids! not initialized."))
 
   (define (gzochi:visit-object migration obj visitor)
     (define (reference-fields obj)

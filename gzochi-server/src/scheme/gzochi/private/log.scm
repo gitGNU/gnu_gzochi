@@ -1,5 +1,5 @@
 ;; gzochi/private/log.scm: Private infrastructure for transactional log support
-;; Copyright (C) 2014 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -49,8 +49,8 @@
 	((notice) (primitive-log-internal 'notice formatted-msg))
 	((info) (primitive-log-internal 'info formatted-msg))
 	((debug) (primitive-log-internal 'debug formatted-msg))
-	(else (raise (condition (make-assertion-violation)
-				(make-irritants-condition priority)))))))
+	(else (assertion-violation
+	       'gzochi:log-internal "Invalid priority." priority)))))
 
   (define (gzochi:log-err-internal msg . args)
     (apply gzochi:log-internal (cons* (gzochi:log-priority err) msg args)))
@@ -75,8 +75,7 @@
 	((notice) (primitive-log 'notice formatted-msg))
 	((info) (primitive-log 'info formatted-msg))
 	((debug) (primitive-log 'debug formatted-msg))
-	(else (raise (condition (make-assertion-violation)
-				(make-irritants-condition priority)))))))
+	(else (assertion-violation 'gzochi:log "Invalid priority." priority)))))
 
   (define (gzochi:log-err msg . args)
     (apply gzochi:log (cons* (gzochi:log-priority err) msg args)))

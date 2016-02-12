@@ -1,5 +1,5 @@
 ;; gzochi/admin.scm: Administrative interface to gzochid
-;; Copyright (C) 2012 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -48,13 +48,10 @@
 
   (define (gzochi:with-application context thunk)
     (or (gzochi:application-context? context)
-	(raise (condition
-		(make-assertion-violation)
-		(make-irritants-condition context))))
+	(assertion-violation
+	 'gzochi:with-application "Expected application context." context))
     (or (thunk? thunk)
-	(raise (condition
-		(make-assertion-violation)
-		(make-irritants-condition thunk))))
+	(assertion-violation 'gzochi:with-application "Expected thunk." thunk))
 
     (primitive-with-application context thunk))
 )

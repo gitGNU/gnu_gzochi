@@ -1,5 +1,5 @@
 ;; gzochi/private/channel.scm: Private infrastructure for gzochi channel API 
-;; Copyright (C) 2013 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -43,56 +43,56 @@
 	   (immutable name (serialization gzochi:string-serialization))))
 
   (define (gzochi:create-channel name)
-    (or (string? name) 
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition name))))
+    (or (string? name)
+	(assertion-violation
+	 'gzochi:create-channel "Channel name must be a string." name))
 
     (and (primitive-get-channel name)
 	 (raise (gzochi:make-name-exists-condition name)))
     (primitive-create-channel name))
 
   (define (gzochi:get-channel name)
-    (or (string? name) 
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition name))))
+    (or (string? name)
+	(assertion-violation
+	 'gzochi:get-channel "Channel name must be a string." name))
 
     (or (primitive-get-channel name) 
 	(raise (gzochi:make-name-not-bound-condition name))))
 
   (define (gzochi:join-channel channel session)
     (or (gzochi:channel? channel)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition channel))))
+	(assertion-violation
+	 'gzochi:join-channel "Expected gzochi:channel." channel))
     (or (gzochi:client-session? session)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition channel))))
+	(assertion-violation
+	 'gzochi:join-channel "Expeted gzochi:client-session." session))
 
     (primitive-join-channel channel session))
 
   (define (gzochi:leave-channel channel session)
     (or (gzochi:channel? channel)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition channel))))
+	(assertion-violation
+	 'gzochi:leave-channel "Expected gzochi:channel." channel))
     (or (gzochi:client-session? session)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition channel))))
+	(assertion-violation
+	 'gzochi:leave-channel "Expeted gzochi:client-session." session))
 
     (primitive-leave-channel channel session))
 
   (define (gzochi:send-channel-message channel msg)
     (or (gzochi:channel? channel)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition channel))))
+	(assertion-violation
+	 'gzochi:send-channel-message "Expected gzochi:channel." channel))
     (or (bytevector? msg)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition msg))))
+	(assertion-violation
+	 'gzochi:send-channel-message "Expected bytevector." msg))
     
     (primitive-send-channel-message channel msg))
 
   (define (gzochi:close-channel channel)
     (or (gzochi:channel? channel)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition channel))))
+	(assertion-violation
+	 'gzochi:close-channel "Expected gzochi:channel." channel))
 
     (primitive-close-channel channel))
   

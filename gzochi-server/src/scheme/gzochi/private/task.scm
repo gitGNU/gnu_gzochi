@@ -1,5 +1,5 @@
 ;; gzochi/private/task.scm: Private infrastructure for gzochi task API
-;; Copyright (C) 2013 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -45,8 +45,8 @@
 
   (define (gzochi:cancel-task handle)
     (or (gzochi:task-handle? handle)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition handle))))
+	(assertion-violation
+	 'gzochi:cancel-task "Expected gzochi:task-handle." handle))
     
     (primitive-cancel-task handle))
 
@@ -58,19 +58,20 @@
 
   (define* (gzochi:schedule-task callback #:optional delay period)
     (or (gzochi:callback? callback)
-	(raise (condition (make-assertion-violation)
-			  (make-irritants-condition callback))))
+	(assertion-violation
+	 'gzochi:schedule-task "Exepcted gzochi:callback."  callback))
 
     (if delay
 	(begin
 	  (or (and (integer? delay) (>= delay 0))
-	      (raise (condition (make-assertion-violation)
-				(make-irritants-condition delay))))
+	      (assertion-violation
+	       'gzochi:schedule-task "Delay must be an integer >= 0." delay))
 	  (if period
 	      (begin
 		(or (and (integer? period) (>= period 0))
-		    (raise (condition (make-assertion-violation)
-				      (make-irritants-condition period))))
+		    (assertion-violation
+		     'gzochi:schedule-task "Period must be an integer >= 0."
+		     period))
 		(primitive-schedule-task callback delay period))
 	      (primitive-schedule-task callback delay)))
 	(primitive-schedule-task callback)))

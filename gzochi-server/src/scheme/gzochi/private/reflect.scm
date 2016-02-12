@@ -1,5 +1,5 @@
 ;; gzochi/private/reflect.scm: Exports for common binding reflection procedures
-;; Copyright (C) 2013 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
   (import (guile)
 	  (ice-9 format)
 	  (ice-9 threads)
+	  (rnrs base)
 	  (rnrs conditions)
 	  (rnrs exceptions))
 
@@ -36,21 +37,15 @@
       ;; performance implications.
 
       (let ((module (resolve-module module-name #:ensure #f)))
-	(or module
-	    (raise 
-	     (condition 
-	      (make-assertion-violation)
-	      (make-message-condition 
-	       (format #f "Unable to resolve ~A" module-name)))))
+	(or module (assertion-violation
+		    'gzochi:resolve-procedure
+		    (format #f "Unable to resolve ~A." module-name)))
 
 	(let ((variable (module-variable module procedure)))
-	  (or variable 
-	      (raise 
-	       (condition 
-		(make-assertion-violation)
-		(make-message-condition 
-		 (format #f "No binding for ~A in ~A" 
-			 procedure module-name)))))
-
-	(variable-ref variable)))))
+	  (or variable
+	      (assertion-violation
+	       'gzochi:resolve-procedure
+	       (format #f "No binding for ~A in ~A" procedure module-name)))
+	
+	  (variable-ref variable)))))
 )

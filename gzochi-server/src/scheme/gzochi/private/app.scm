@@ -1,5 +1,5 @@
 ;; gzochi/private/app.scm: Private infrastructure for application support
-;; Copyright (C) 2015 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -47,26 +47,23 @@
      (lambda (p)
        (lambda (procedure module . args)
 	 (or (list? module)
-	     (raise (condition
-		     (make-assertion-violation)
-		     (make-message-condition "Invalid module name."))))
+	     (assertion-violation
+	      'gzochi:make-callback "Invalid module name." module))
 	 (if (null? args)
 	     (p procedure module #f)
 	     (let ((arg (car args)))
 	       (or (and (or (gzochi:managed-record? arg) (not arg))
 			(null? (cdr args)))
-		   (raise
-		    (condition
-		     (make-assertion-violation)
-		     (make-message-condition
-		      "Callback data must be a single managed record or #f."
-		      ))))
+		   (assertion-violation
+		    'gzochi:make-callback
+		    "Callback data must be a single managed record or #f." arg))
 	       (p procedure module arg))))))
     (sealed #t))
 
   (define (gzochi:execute-initialized callback properties)
     (or (gzochi:callback? callback)
-	(raise (make-assertion-violation)))
+	(assertion-violation
+	 'gzochi:execute-initialized "Expected gzochi:callback." callback))
 
     (let ((procedure (gzochi:resolve-procedure
 		      (gzochi:callback-procedure callback)
@@ -75,7 +72,8 @@
 
   (define (gzochi:execute-logged-in callback client-session)
     (or (gzochi:callback? callback)
-	(raise (make-assertion-violation)))
+	(assertion-violation
+	 'gzochi:execute-logged-in "Expected gzochi:callback." callback))
       
     (let* ((procedure (gzochi:resolve-procedure 
 		       (gzochi:callback-procedure callback)
@@ -83,14 +81,14 @@
 	   (handler (procedure client-session)))
       (cond ((not handler) #f)
 	    ((gzochi:client-session-listener? handler) handler)
-	    (else (raise (condition
-			  (make-assertion-violation)
-			  (make-message-condition
-			   "Invalid type returned by logged-in callback.")))))))
+	    (else (assertion-violation
+		   'gzochi:execute-logged-in
+		   "Invalid type returned by logged-in callback." handler)))))
 
   (define (gzochi:execute-disconnected callback)
     (or (gzochi:callback? callback)
-	(raise (make-assertion-violation)))
+	(assertion-violation
+	 'gzochi:execute-disconnected "Expected gzochi:callback." callback))
 
     (let ((procedure (gzochi:resolve-procedure
 		      (gzochi:callback-procedure callback)
@@ -100,7 +98,8 @@
 
   (define (gzochi:execute-ready callback properties)
     (or (gzochi:callback? callback)
-	(raise (make-assertion-violation)))
+	(assertion-violation
+	 'gzochi:execute-ready "Expected gzochi:callback." callback))
 
     (let ((procedure (gzochi:resolve-procedure
 		      (gzochi:callback-procedure callback)
@@ -109,7 +108,8 @@
 
   (define (gzochi:execute-received-message callback msg)
     (or (gzochi:callback? callback)
-	(raise (make-assertion-violation)))
+	(assertion-violation
+	 'gzochi:execute-received-message "Expected gzochi:callback." callback))
  
     (let* ((procedure (gzochi:resolve-procedure 
 		       (gzochi:callback-procedure callback)

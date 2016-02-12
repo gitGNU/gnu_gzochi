@@ -1,5 +1,5 @@
 ;; gzochi/data.scm: Public exports for gzochi data API
-;; Copyright (C) 2013 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -121,7 +121,7 @@
   (define (gzochi:cons x y)
     (or (and (or (gzochi:managed-record? x) (not x))
 	     (or (gzochi:managed-record? y) (not y) (null? y)))
-	(raise (make-assertion-violation)))
+	(assertion-violation 'gzochi:cons "Arguments must be managed records."))
     (gzochi:make-managed-pair x (if (null? y) #f y)))
 
   (define (gzochi:managed-list h . t)
@@ -169,13 +169,13 @@
    (protocol (lambda (p)
 	       (lambda (value serializer-callback deserializer-callback)
 		 (or (gzochi:callback? serializer-callback)
-		     (raise (condition 
-			     (make-assertion-violation)
-			     (make-irritants-condition serializer-callback))))
+		     (assertion-violation
+		      'gzochi:make-managed-serializable
+		      "Expected callback record." serializer-callback))
 		 (or (gzochi:callback? deserializer-callback)
-		     (raise (condition 
-			     (make-assertion-violation)
-			     (make-irritants-condition deserializer-callback))))
+		     (assertion-violation
+		      'gzochi:make-managed-serializable
+		      "Expected callback record." deserializer-callback))
 
 		 (p (list serializer-callback deserializer-callback value))))))
  
@@ -220,10 +220,9 @@
 	(or (gzochi:managed-record? value)
 	    (and (gzochi:callback? value-serializer)
 		 (gzochi:callback? value-deserializer))
-	    (raise (condition
-		    (make-assertion-violation)
-		    (make-message-condition 
-		     "Serialization must be specified for unmanaged values."))))
+	    (assertion-violation
+	     'make-managed-vector-entry
+	     "Serialization must be specified for unmanaged values."))
 
 	(let* ((wrapped-value (not (gzochi:managed-record? value)))
 	       (value (if wrapped-value
@@ -252,11 +251,9 @@
 	(begin
 	  (or (and (gzochi:callback? value-serializer)
 		   (gzochi:callback? value-deserializer))
-	      (raise 
-	       (condition 
-		(make-assertion-violation)
-		(make-message-condition 
-		 "Serialization must be specified for unmanaged values."))))
+	      (assertion-violation
+	       'managed-vector-entry-value-set!
+	       "Serialization must be specified for unmanaged values."))
 	  (managed-vector-entry-value-internal-set!
 	   entry (gzochi:make-managed-serializable 
 		  value value-serializer value-deserializer))
@@ -326,9 +323,8 @@
 
   (define (managed-vector-shift-right! mvec i count)
     (or (eqv? count 1) 
-	(raise (condition 
-		(make-message-condition "Cannot shift by more than 1 position")
-		(make-assertion-violation))))
+	(assertion-violation
+	 'managed-vector-shift-right! "Cannot shift by more than 1 position"))
 
     (let ((vec (gzochi:managed-vector-vector mvec)))
       (let loop ((i i) (j (- (vector-length vec) 1)))      
@@ -341,10 +337,9 @@
 	      (loop i jj))))))
 
   (define (managed-vector-shift-left! mvec i count)
-    (or (eqv? count 1) 
-	(raise (condition 
-		(make-message-condition "Cannot shift by more than 1 position")
-		(make-assertion-violation))))
+    (or (eqv? count 1)
+	(assertion-violation
+	 'managed-vector-shift-left! "Cannot shift by more than 1 position"))
 
     (let ((vec (gzochi:managed-vector-vector mvec)))
       (let loop ((i i) (j (- (vector-length vec) 1)))
@@ -389,7 +384,8 @@
 	  (size (managed-sequence-subsequence-size subseq)))
 
       (or (<= i (managed-sequence-subsequence-max-size subseq))
-	  (raise (make-assertion-violation)))
+	  (assertion-violation
+	   'managed-sequence-subsequence-insert! "Index out of bounds." i))
 
       (managed-vector-shift-right! content i 1)
       (gzochi:managed-vector-set! 
@@ -676,9 +672,8 @@
 	(if (< offset to)
 	    (search-managed-sequence 
 	     (or (managed-sequence-node-next node)
-		 (raise (condition
-			 (make-message-condition "Index out of bounds")
-			 (make-assertion-violation))))
+		 (assertion-violation
+		  'search-managed-sequence "Index out of bounds."))
 	     offset to)
 	    (search-managed-sequence
 	     (managed-sequence-tree-node-child node) from to))))
@@ -687,17 +682,18 @@
 	(if (< offset to)
 	    (search-managed-sequence
 	     (or (managed-sequence-node-next node)
-		 (raise (condition 
-			 (make-message-condition "Index out of bounds")
-			 (make-assertion-violation))))
+		 (assertion-violation
+		  'search-managed-sequence "Index out of bounds."))
 	     offset to)
 	    (values node (- (- to from) 1)))))
 
-     (else (raise (make-assertion-violation)))))
+     (else (assertion-violation
+	    'search-managed-sequence "Expected list or tree node." node))))
 
   (define* (gzochi:managed-sequence-insert! 
 	    seq i obj #:key serializer deserializer)
-    (or (>= i 0) (raise (make-assertion-violation)))
+    (or (>= i 0) (assertion-violation
+		  'gzochi:managed-sequence-insert! "Index out of bounds." i))
     (let ((head (managed-sequence-connector-target 
 		 (managed-sequence-head seq)))
 	  (tail (managed-sequence-connector-target
@@ -706,7 +702,8 @@
     (cond
      ((and (eq? head tail) (zero? (managed-sequence-node-size head)))
       (managed-sequence-list-node-append! tail obj serializer deserializer))
-     ((not head) (raise (make-assertion-violation)))
+     ((not head)
+      (assertion-violation 'gzochi:managed-sequence-insert! "Missing head."))
      ((zero? i)
       (managed-sequence-list-node-prepend! head obj serializer deserializer))
      (else (receive (node index)
@@ -720,7 +717,8 @@
        (managed-sequence-tail seq) new-tail))))
 
   (define (gzochi:managed-sequence-ref seq i)
-    (or (>= i 0) (raise (make-assertion-violation)))
+    (or (>= i 0) (assertion-violation
+		  'gzochi:managed-sequence-ref "Index out of bounds." i))
     
     (receive (node index)
       (search-managed-sequence 
@@ -732,8 +730,9 @@
 
   (define* (gzochi:managed-sequence-set! 
 	    seq i obj #:key serializer deserializer)
-    (or (>= i 0) (raise (make-assertion-violation)))
-    
+    (or (>= i 0) (assertion-violation
+		  'gzochi:managed-sequence-set! "Index out of bounds." i))
+		  
     (receive (node index)
       (search-managed-sequence 
        (managed-sequence-tree-node-child (managed-sequence-root seq)) 
@@ -762,7 +761,8 @@
 	       (loop (managed-sequence-node-next node))))))
 
   (define (gzochi:managed-sequence-delete-at! seq i)
-    (or (>= i 0) (raise (make-assertion-violation)))
+    (or (>= i 0) (assertion-violation
+		  'gzochi:managed-sequence-delete-at! "Index out of bounds." i))
     
     (receive (node index)
       (search-managed-sequence 
@@ -789,7 +789,9 @@
 	      (let ((num-seeds (length seeds)))
 		(cond ((terminate? seeds) #f)
 		      ((eqv? num-seeds seeds-length) (loop (+ i 1) seeds))
-		      (else (raise (make-assertion-violation))))))
+		      (else (assertion-violation
+			     'gzochi:managed-sequence-fold-left
+			     "Seed length mismatch." num-seeds seeds-length)))))
 	    (apply values seeds))))
 	
     (define (managed-sequence-list-node-fold-left node . seeds)
@@ -820,7 +822,9 @@
 	      (let ((num-seeds (length seeds)))
 		(cond ((terminate? seeds) #f)
 		      ((eqv? num-seeds seeds-length) (loop (- i 1) seeds))
-		      (else (raise (make-assertion-violation))))))
+		      (else (assertion-violation
+			     'gzochi:managed-sequence-fold-right
+			     "Seed length mismatch." num-seeds seeds-length)))))
 	    (apply values seeds))))
 	
     (define (managed-sequence-list-node-fold-right node . seeds)
@@ -873,17 +877,15 @@
 	(or (gzochi:managed-record? key)
 	    (and (gzochi:callback? key-serializer)
 		 (gzochi:callback? key-deserializer))
-	    (raise (condition 
-		    (make-assertion-violation)
-		    (make-message-condition 
-		     "Serialization must be specified for unmanaged keys."))))
+	    (assertion-violation
+	     'make-managed-hashtable-entry
+	     "Serialization must be specified for unmanaged keys."))
 	(or (gzochi:managed-record? value)
 	    (and (gzochi:callback? value-serializer)
 		 (gzochi:callback? value-deserializer))
-	    (raise (condition
-		    (make-assertion-violation)
-		    (make-message-condition 
-		     "Serialization must be specified for unmanaged values."))))
+	    (assertion-violation
+	     'make-managed-hashtable-entry
+	     "Serialization must be specified for unmanaged values."))
 
 	(let* ((wrapped-key (not (gzochi:managed-record? key)))
 	       (key (if wrapped-key
@@ -922,11 +924,9 @@
 	(begin
 	  (or (and (gzochi:callback? value-serializer)
 		   (gzochi:callback? value-deserializer))
-	      (raise 
-	       (condition 
-		(make-assertion-violation)
-		(make-message-condition 
-		 "Serialization must be specified for unmanaged values."))))
+	      (assertion-violation
+	       'managed-hashtable-entry-value-set!
+	       "Serialization must be specified for unmanaged values."))
 	  (managed-hashtable-entry-value-internal-set!
 	   entry (gzochi:make-managed-serializable 
 		  value value-serializer value-deserializer))
@@ -1006,9 +1006,8 @@
 
   (define (managed-hashtable-node-split! node)
     (or (managed-hashtable-node-entries node)
-	(raise (condition 
-		(make-assertion-violation)
-		(make-message-condition "Can't split a directory node!"))))
+	(assertion-violation
+	 'managed-hashtable-node-split! "Can't split a directory node!"))
     (let* ((depth (managed-hashtable-node-depth node))
 	   (entries (managed-hashtable-node-entries node))
 	   (left-child (make-managed-hashtable-node (+ depth 1)))
@@ -1434,10 +1433,8 @@
   
   (define (gzochi:serialize port obj)
     (or (gzochi:managed-record? obj)
-	(raise (condition 
-		(make-assertion-violation)
-		(make-message-condition 
-		 "Only managed records may be auto-serialized."))))
+	(assertion-violation
+	 'gzochi:serialize "Only managed records may be auto-serialized." obj))
 
     (gzochi:serialize-managed-reference port (gzochi:create-reference obj)))
 

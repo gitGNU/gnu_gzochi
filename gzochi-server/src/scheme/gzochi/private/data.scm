@@ -1,5 +1,5 @@
 ;; gzochi/private/data.scm: Private infrastructure for gzochi data API
-;; Copyright (C) 2014 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -76,10 +76,10 @@
   (define (gzochi:serialize-managed-reference port reference)
     (or (not reference) 
 	(gzochi:managed-reference? reference)
-	(raise (condition (make-assertion-violation)
-			  (make-message-condition "Not a managed reference.")
-			  (make-irritants-condition reference))))
-
+	(assertion-violation
+	 'gzochi:serialize-managed-reference "Not a managed reference."
+	 reference))
+    
     (gzochi:write-boolean port reference)
     (if reference (gzochi:write-integer 
 		   port (gzochi:managed-reference-oid reference))))
@@ -140,11 +140,10 @@
 	   (managed-parent
 	    (cond ((not parent) gzochi:managed-record)
 		  ((managed-record-subtype? parent) parent)
-		  (else (raise (condition 
-				(make-assertion-violation)
-				(make-message-condition
-				 "Parent types must be managed"))))))
-
+		  (else (assertion-violation
+			 'gzochi:make-managed-record-type-descriptor
+			 "Parent types must be managed." parent))))
+	   
 	   (serial-uid (or serial-uid uid name))
 	   (type-registry (or type-registry default-type-registry))
 
@@ -156,11 +155,9 @@
 		  serial-uid type-registry)))
 	(if reg
 	    (or (eq? (gzochi:managed-record-type-registration-rtd reg) rtd)
-		(raise (condition
-			(make-assertion-violation)
-			(make-message-condition 
-			 "Managed records must be nongenerative"))))
-
+		(assertion-violation 'gzochi:make-managed-record-type-descriptor
+				     "Managed records must be nongenerative"))
+	    
 	    (gzochi:register-type! 
 	     type-registry
 	     (gzochi:make-managed-record-type-registration 
@@ -187,8 +184,10 @@
     (define (wrap-field-binder field-binder)
       (lambda args (apply field-binder (map maybe-create-reference args))))
 
-    (or (managed-type? rtd) (raise (make-assertion-violation)))
-
+    (or (managed-type? rtd)
+	(assertion-violation 'gzochi:make-managed-record-constructor-descriptor
+			     "Expecting managed record type descriptor." rtd))
+    
     (if (eq? prtd gzochi:managed-record)
 	(make-record-constructor-descriptor 
 	 rtd
@@ -433,64 +432,83 @@
                   (loop #'(record-fields ...) _parent _protocol _sealed _opaque
 			_nongenerative _serial-uid _type-registry _constructor 
 			_parent-rtd #'rest)
-                  (raise (make-assertion-violation)))]
+		  (assertion-violation
+		   'define-managed-record-type0 "Duplicate fields clause."))]
              [((parent parent-name) . rest)
               (if (not (unspecified? _parent-rtd))
-                  (raise (make-assertion-violation))
+		  (assertion-violation 'define-managed-record-type0
+				       "Duplicate parent specification.")
                   (if (unspecified? _parent)
                       (loop _fields #'parent-name _protocol _sealed _opaque
                             _nongenerative _serial-uid _type-registry 
 			    _constructor _parent-rtd #'rest)
-                      (raise (make-assertion-violation))))]
+		      (assertion-violation
+		       'define-managed-record-type0
+		       "Duplicate parent specification.")))]
              [((protocol expression) . rest)
               (if (unspecified? _protocol)
                   (loop _fields _parent #'expression _sealed _opaque
                         _nongenerative _serial-uid _type-registry _constructor 
 			_parent-rtd #'rest)
-                  (raise (make-assertion-violation)))]
+		  (assertion-violation
+		   'define-managed-record-type0
+		   "Duplicate protocol definition."))]
              [((sealed sealed?) . rest)
               (if (unspecified? _sealed)
                   (loop _fields _parent _protocol #'sealed? _opaque
                         _nongenerative _serial-uid _type-registry _constructor 
 			_parent-rtd #'rest)
-                  (raise (make-assertion-violation)))]
+		  (assertion-violation
+		   'define-managed-record-type0 "Duplicate sealed specifier."))]
              [((opaque opaque?) . rest)
               (if (unspecified? _opaque)
                   (loop _fields _parent _protocol _sealed #'opaque?
                         _nongenerative _serial-uid _type-registry _constructor 
 			_parent-rtd #'rest)
-                  (raise (make-assertion-violation)))]
+		  (assertion-violation
+		   'define-managed-record-type0 "Duplicate opaque specifier."))]
              [((nongenerative) . rest)
               (if (unspecified? _nongenerative)
                   (loop _fields _parent _protocol _sealed _opaque 
 			#''record-name _serial-uid _type-registry _constructor 
 			_parent-rtd #'rest)
-                  (raise (make-assertion-violation)))]
+		  (assertion-violation
+		   'define-managed-record-type0
+		   "Duplicate nongenerative specifier."))]
              [((nongenerative uid) . rest)
               (if (unspecified? _nongenerative)
                   (loop _fields _parent _protocol _sealed _opaque #''uid 
 			_serial-uid _type-registry _constructor _parent-rtd 
 			#'rest)
-                  (raise (make-assertion-violation)))]
+		  (assertion-violation
+		   'define-managed-record-type0
+		   "Duplicate nongenerative specification."))]
 	     [((serial-uid uid) . rest)
 	      (if (unspecified? _serial-uid)
 		  (loop _fields _parent _protocol _sealed _opaque _nongenerative
 			#''uid _type-registry _constructor _parent-rtd #'rest)
-		  (raise (make-assertion-violation)))]
+		  (assertion-violation
+		   'define-managed-record-type0
+		   "Duplicate serial UID specification."))]
 	     [((type-registry registry) . rest)
 	      (if (unspecified? _type-registry)
 		  (loop _fields _parent _protocol _sealed _opaque _nongenerative
 			_serial-uid #'registry _constructor _parent-rtd
 			#'rest)
-		  (raise (make-assertion-violation)))]
+		  (assertion-violation
+		   'define-managed-record-type0
+		   "Duplicate type registry specification."))]
              [((parent-rtd rtd cd) . rest)
               (if (not (unspecified? _parent))
-                  (raise (make-assertion-violation))
+		  (assertion-violation 'define-managed-record-type0
+				       "Duplicate parent type specification.")
                   (if (unspecified? _parent-rtd)
                       (loop _fields _parent _protocol _sealed _opaque
                             _nongenerative _serial-uid _type-registry 
 			    _constructor #'(rtd cd) #'rest)
-                      (raise (make-assertion-violation))))]))))))
+		      (assertion-violation
+		       'define-managed-record-type0
+		       "Duplicate parent type specification.")))]))))))
 
   (define-syntax gzochi:managed-record-type-descriptor
     (lambda (stx)
@@ -509,13 +527,11 @@
   (define (gzochi:serialize-managed-record port record)
     (define (lookup-registration rtd)
       (or (gzochi:rtd->type-registration rtd)
-	  (raise (condition 
-		  (make-assertion-violation)
-		  (make-message-condition 
-		   (simple-format #f 
-				  "Attempting to serialize unknown type ~A" 
-				  (record-type-name rtd)))))))
-
+	  (assertion-violation
+	   'gzochi:serialize-managed-record	   
+	   (simple-format #f "Attempting to serialize unknown type ~A" 
+			  (record-type-name rtd)))))
+      
     (define (serialize rtd serialization)
       (let ((parent-rtd (record-type-parent rtd)))
 	(if (and parent-rtd (not (eq? parent-rtd gzochi:managed-record)))
@@ -563,12 +579,11 @@
 	    (and parent-rtd 
 		 (not (eq? parent-rtd gzochi:managed-record))
 		 (or (gzochi:rtd->type-registration parent-rtd)
-		     (raise (condition 
-			     (make-assertion-violation)
-			     (make-message-condition 
-			      (string-append 
-			       "Attempting to deserialize unknown type " 
-			       (record-type-name parent-rtd))))))))
+		     (assertion-violation
+		      'gzochi:deserialize-managed-record
+		      (simple-format
+		       #f "Attempting to deserialize unknown type ~A." 
+		       (record-type-name parent-rtd))))))
 	   
 	   (parent-rctd 
 	    (and parent-registration
@@ -586,14 +601,12 @@
     
     (let* ((serial-uid (gzochi:read-symbol port))
 	   (registration (gzochi:serial-uid->type-registration serial-uid)))
-      (or registration 
-	  (raise (condition 
-		  (make-assertion-violation)
-		  (make-message-condition 
-		   (string-append 
-		    "Attempting to deserialize unknown type " 
-		    (symbol->string serial-uid))))))
-
+      (or registration
+	  (assertion-violation
+	   'gzochi:deserialize-managed-record
+	   (simple-format #f "Attempting to deserialize unknown type ~A."
+			  serial-uid)))
+      
       (let* 
 	  ((rctd 
 	    (constructor-descriptor 
@@ -631,9 +644,8 @@
   (define (gzochi:pop-type-registry!)
     (let ((stack (fluid-ref type-registry-stack)))
       (if (null? stack)
-	  (raise (condition 
-		  (make-assertion-violation)
-		  (make-message-condition "Type registry stack is empty")))
+	  (assertion-violation
+	   'gzochi:pop-type-registry! "Type registry stack is empty.")
 	  (let ((registry (car stack))
 		(stack (cdr stack)))
 	    (fluid-set! type-registry-stack stack)
@@ -678,9 +690,10 @@
 
   (define (gzochi:mark-for-write! managed-record)
     (or (gzochi:managed-record? managed-record)
-	(raise (condition (make-assertion-violation)
-			  (make-message-condition
-			   "Only managed records may be marked."))))
+	(assertion-violation
+	 'gzochi:mark-for-write!
+	 "Only managed records may be marked." managed-record))
+    
     (primitive-mark-for-write! managed-record))
     
   (define (gzochi:mark-for-read! managed-record) (if #f #f))
@@ -695,42 +708,48 @@
 
   (define (gzochi:create-reference obj)
     (or (gzochi:managed-record? obj)
-	(raise (condition (make-assertion-violation)
-			  (make-message-condition 
-			   "References can only be created to managed records.")
-			  (make-irritants-condition obj))))
-
+	(assertion-violation
+	 'gzochi:create-reference
+	 "References can only be created to managed records." obj))
+    
     (primitive-create-reference obj))
 
   (define (gzochi:dereference reference)
     (or (gzochi:managed-reference? reference)
-	(raise (condition (make-assertion-violation)
-			  (make-message-condition
-			   "Only managed references can be dereferenced."))))
+	(assertion-violation
+	 'gzochi:dereference "Only managed references can be dereferenced."
+	 reference))
+    
     (primitive-dereference reference))
 
   (define (gzochi:get-binding name)
-    (or (string? name) (raise (make-assertion-violation)))
+    (or (string? name)
+	(assertion-violation 'gzochi:get-binding "Expecting string." name))
+    
     (primitive-get-binding name))
   
   (define (gzochi:set-binding! name obj)
-    (or (string? name) (raise (make-assertion-violation)))
+    (or (string? name)
+	(assertion-violation 'gzochi:set-binding! "Expecting string." name))
+    
     (or (gzochi:managed-record? obj)
-	(raise (condition 
-		(make-assertion-violation)
-		(make-message-condition
-		 "Bindings may only be created for managed records."))))
-
+	(assertion-violation
+	 'gzochi:set-binding!
+	 "Bindings may only be created for managed records." obj))
+    
     (primitive-set-binding! name obj))
 
   (define (gzochi:remove-binding! name)
-    (or (string? name) (raise (make-assertion-violation)))
+    (or (string? name)
+	(assertion-violation 'gzochi:remove-binding! "Expecting string." name))
+    
     (primitive-remove-binding! name))
 
   (define (gzochi:remove-object! obj)
     (or (gzochi:managed-record? obj)
-	(raise (condition (make-message-condition "Not a managed record.") 
-			  (make-assertion-violation))))
+	(assertion-violation
+	 'gzochi:remove-object! "Not a managed record." obj))
+    
     (primitive-remove-object! obj))
 
   (define primitive-mark-for-write! #f)

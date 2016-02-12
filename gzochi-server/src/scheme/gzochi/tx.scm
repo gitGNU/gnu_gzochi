@@ -1,5 +1,5 @@
 ;; gzochi/tx.scm: Public exports for gzochi external transaction API
-;; Copyright (C) 2015 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -49,17 +49,15 @@
     (protocol (lambda (p)
 		(lambda (prepare commit rollback)
 		  (or (thunk? prepare)
-		      (raise (condition
-			      (make-assertion-violation)
-			      (make-irritants-condition prepare))))
+		      (assertion-violation 'gzochi:make-transaction-participant
+					   "Prepare must be a thunk." prepare))
 		  (or (thunk? commit)
-		      (raise (condition
-			      (make-assertion-violation)
-			      (make-irritants-condition commit))))
+		      (assertion-violation 'gzochi:make-transaction-participant
+					   "Commit must be a thunk." commit))
 		  (or (thunk? rollback)
-		      (raise (condition
-			      (make-assertion-violation)
-			      (make-irritants-condition commit))))
+		      (assertion-violation
+		       'gzochi:make-transaction-participant
+		       "Rollback must be a thunk." rollback))
 
 		  (p prepare commit rollback)))))
   
@@ -74,9 +72,9 @@
 
   (define (gzochi:join-transaction participant)
     (or (gzochi:transaction-participant? participant)
-	(raise (condition
-		(make-assertion-violation)
-		(make-irritants-condition participant))))
+	(assertion-violation
+	 'gzochi:join-transaction "Expected transaction participant."
+	 participant))
     
     (primitive-join-transaction participant))
 
@@ -85,9 +83,9 @@
 
   (define* (gzochi:abort-transaction participant #:optional (retryable? #t))
     (or (gzochi:transaction-participant? participant)
-	(raise (condition
-		(make-assertion-violation)
-		(make-irritants-condition participant))))
+	(assertion-violation
+	 'gzochi:join-transaction "Expected transaction participant."
+	 participant))
 
     (primitive-abort-transaction participant retryable?))
 )
