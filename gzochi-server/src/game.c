@@ -35,6 +35,7 @@
 #include "game-protocol.h"
 #include "gzochid.h"
 #include "gzochid-storage.h"
+#include "resolver.h"
 #include "scheme.h"
 #include "scheme-task.h"
 #include "socket.h"
@@ -160,11 +161,10 @@ initialize_server (int from_state, int to_state, gpointer user_data)
   game_context->server_socket = gzochid_server_socket_new
     (gzochid_game_server_protocol, game_context);
   gzochid_server_socket_listen
-    (game_context->socket_context, game_context->server_socket,
+    (game_context->socket_server, game_context->server_socket,
      game_context->port);
 
-  gzochid_socket_context_init
-    (game_context->socket_context, (gzochid_context *) game_context);
+  gzochid_socket_server_start (game_context->socket_server);
 }
 
 static void 
@@ -256,13 +256,14 @@ initialize_event_loop (int from_state, int to_state, gpointer user_data)
 }
 
 gzochid_game_context *
-gzochid_game_context_new (gzochid_socket_context *socket_context)
+gzochid_game_context_new ()
 {
   gzochid_game_context *context = calloc (1, sizeof (gzochid_game_context));
 
   context->applications = g_hash_table_new (g_str_hash, g_str_equal);
   context->auth_plugins = g_hash_table_new (g_str_hash, g_str_equal);
-  context->socket_context = socket_context;
+  context->socket_server = gzochid_resolver_require
+    (GZOCHID_TYPE_SOCKET_SERVER, NULL);
   
   return context;
 }
@@ -275,6 +276,8 @@ gzochid_game_context_free (gzochid_game_context *context)
   g_hash_table_destroy (context->applications);
   g_hash_table_destroy (context->auth_plugins);
 
+  g_object_unref (context->socket_server);
+  
   free (context);
 } 
 

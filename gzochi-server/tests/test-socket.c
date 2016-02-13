@@ -1,5 +1,5 @@
 /* test-socket.c: Test routines for socket.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@ typedef struct _test_client_state test_client_state;
 
 struct _test_socket_fixture
 {
-  gzochid_socket_context *socket_context;
+  GzochidSocketServer *socket_server;
   gzochid_server_socket *server_socket;
   gzochid_client_socket *client_socket;
   int client_socket_fd;
@@ -120,18 +120,18 @@ test_socket_fixture_set_up (test_socket_fixture *fixture,
 
   fixture->client_socket_fd = socket (AF_INET, SOCK_STREAM, 0);
   fixture->state = calloc (1, sizeof (test_client_state));
-  fixture->socket_context = gzochid_socket_context_new ();
+  fixture->socket_server = g_object_new (GZOCHID_TYPE_SOCKET_SERVER, NULL);
   fixture->server_socket = gzochid_server_socket_new
     (test_server_protocol, fixture);
 
   gzochid_server_socket_listen
-    (fixture->socket_context, fixture->server_socket, 0);
+    (fixture->socket_server, fixture->server_socket, 0);
   _gzochid_server_socket_getsockname (fixture->server_socket, &addr, &addrlen);
   connect (fixture->client_socket_fd, &addr, addrlen);
 
   g_assert_true
     (g_main_context_iteration
-     (fixture->socket_context->main_context, FALSE));
+     (fixture->socket_server->main_context, FALSE));
 
   g_assert_nonnull (fixture->client_socket);
 }
@@ -141,9 +141,9 @@ test_socket_fixture_tear_down (test_socket_fixture *fixture,
 			       gconstpointer user_data)
 {
   GSource *server_source = g_main_context_find_source_by_user_data
-    (fixture->socket_context->main_context, fixture->server_socket);
+    (fixture->socket_server->main_context, fixture->server_socket);
   GSource *client_source = g_main_context_find_source_by_user_data
-    (fixture->socket_context->main_context, fixture->client_socket);
+    (fixture->socket_server->main_context, fixture->client_socket);
   
   g_source_destroy (server_source);
   g_source_unref (server_source);
@@ -155,7 +155,7 @@ test_socket_fixture_tear_down (test_socket_fixture *fixture,
     }
 
   free (fixture->state);
-  gzochid_socket_context_free (fixture->socket_context);
+  g_object_unref (fixture->socket_server);
 }
 
 static void
@@ -171,7 +171,7 @@ test_socket_client_dispatch (test_socket_fixture *fixture,
 {
   write (fixture->client_socket_fd, "\x01\x02\x03", 3);
 
-  g_main_context_iteration (fixture->socket_context->main_context, FALSE);
+  g_main_context_iteration (fixture->socket_server->main_context, FALSE);
   
   g_assert_cmpint (fixture->state->can_dispatch_called, ==, 1);
   g_assert_cmpint (fixture->state->dispatch_called, ==, 1);

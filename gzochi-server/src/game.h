@@ -49,13 +49,13 @@ struct _gzochid_game_context
 
   GHashTable *applications;
   GHashTable *auth_plugins;
-
+  
   /* The storage engine loaded by the game manager. */
 
   gzochid_storage_engine *storage_engine; 
 
   gzochid_server_socket *server_socket; /* The game protocol server socket. */
-  gzochid_socket_context *socket_context; /* The game server socket context. */
+  GzochidSocketServer *socket_server; /* The game server socket server. */
 
   GMainLoop *event_loop;
 };
@@ -66,7 +66,7 @@ typedef struct _gzochid_game_context gzochid_game_context;
    context to listen for and dispatch messages from client connections. This
    may be `NULL' if no connnections are expected. */
 
-gzochid_game_context *gzochid_game_context_new (gzochid_socket_context *);
+gzochid_game_context *gzochid_game_context_new ();
 void gzochid_game_context_free (gzochid_game_context *);
 void gzochid_game_context_init (gzochid_game_context *, gzochid_context *, 
 				GHashTable *);

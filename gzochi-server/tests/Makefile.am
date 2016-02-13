@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2015 Julian Graham
+# Copyright (C) 2016 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -173,12 +173,10 @@ test_session_SOURCES = test-session.c
 test_session_LDADD = $(top_builddir)/src/libgzochid.la \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
-test_socket_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_socket_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_socket_SOURCES = test-socket.c
-test_socket_LDADD = $(top_builddir)/src/libgzochid_la-context.o \
-	$(top_builddir)/src/libgzochid_la-fsm.o \
-	$(top_builddir)/src/libgzochid_la-socket.o \
-	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
+test_socket_LDADD = $(top_builddir)/src/libgzochid_la-socket.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_storage_mem_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_storage_mem_SOURCES = test-storage-mem.c

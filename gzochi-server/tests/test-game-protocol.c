@@ -1,5 +1,5 @@
 /* test-game-protocol.c: Test routines for game-protocol.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -27,7 +27,6 @@
 
 struct _game_protocol_fixture
 {
-  gzochid_socket_context *socket_context;
   gzochid_game_context *game_context;
 
   gzochid_client_socket *client_socket;
@@ -70,19 +69,18 @@ game_protocol_fixture_set_up (game_protocol_fixture *fixture,
 
   g_test_log_set_fatal_handler (ignore_warnings, NULL);
   
-  fixture->socket_context = gzochid_socket_context_new ();
-  fixture->game_context = gzochid_game_context_new (fixture->socket_context);
+  fixture->game_context = gzochid_game_context_new ();
   fixture->server_socket = gzochid_server_socket_new
     (game_server_wrapper_protocol, fixture);
   
   gzochid_server_socket_listen
-    (fixture->socket_context, fixture->server_socket, 0);
+    (fixture->game_context->socket_server, fixture->server_socket, 0);
   _gzochid_server_socket_getsockname (fixture->server_socket, &addr, &addrlen);
   connect (socket_fd, &addr, addrlen);
 
   g_assert_true
     (g_main_context_iteration
-     (fixture->socket_context->main_context, FALSE));
+     (fixture->game_context->socket_server->main_context, FALSE));
 
   g_assert_nonnull (fixture->client_socket);
 }
@@ -92,9 +90,11 @@ game_protocol_fixture_tear_down (game_protocol_fixture *fixture,
 				 gconstpointer user_data)
 {
   GSource *server_source = g_main_context_find_source_by_user_data
-    (fixture->socket_context->main_context, fixture->server_socket);
+    (fixture->game_context->socket_server->main_context,
+     fixture->server_socket);
   GSource *client_source = g_main_context_find_source_by_user_data
-    (fixture->socket_context->main_context, fixture->client_socket);
+    (fixture->game_context->socket_server->main_context,
+     fixture->client_socket);
 
   g_source_unref (server_source);
   
@@ -102,7 +102,6 @@ game_protocol_fixture_tear_down (game_protocol_fixture *fixture,
     g_source_unref (client_source);
   
   gzochid_game_context_free (fixture->game_context);
-  gzochid_socket_context_free (fixture->socket_context);
 }
 
 static void
@@ -199,7 +198,8 @@ static void
 test_client_error (game_protocol_fixture *fixture, gconstpointer user_data)
 {
   GSource *source = g_main_context_find_source_by_user_data
-    (fixture->socket_context->main_context, fixture->client_socket);
+    (fixture->game_context->socket_server->main_context,
+     fixture->client_socket);
   gzochid_game_client *client = _gzochid_client_socket_get_protocol_data
     (fixture->client_socket);
 

@@ -32,7 +32,6 @@ struct _gzochid_server_context
 
   gzochid_context *admin_context;
   gzochid_context *game_context;
-  gzochid_context *socket_context; /* The global socket context and loop. */
 };
 
 typedef struct _gzochid_server_context gzochid_server_context;

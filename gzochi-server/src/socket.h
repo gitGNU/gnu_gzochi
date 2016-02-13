@@ -19,48 +19,43 @@
 #define GZOCHID_SOCKET_H
 
 #include <glib.h>
+#include <glib-object.h>
 #include <sys/socket.h>
 
-#include "context.h"
 #include "protocol.h"
 
-enum gzochid_socket_context_state 
-  {
-    GZOCHID_SOCKET_CONTEXT_STATE_RUNNING,
-    GZOCHID_SOCKET_CONTEXT_STATE_STOPPED
-  };
+/* GObject type definition for the socket server. */
 
-struct _gzochid_socket_context
+#define GZOCHID_TYPE_SOCKET_SERVER gzochid_socket_server_get_type ()
+G_DECLARE_FINAL_TYPE (GzochidSocketServer, gzochid_socket_server, GZOCHID,
+		      SOCKET_SERVER, GObject);
+
+/* The socket server struct itself; this part of the server is public. */
+
+struct _GzochidSocketServer
 {
-  gzochid_context base;
+  GObject parent_instance;
 
   GMainContext *main_context; /* The main context for socket events. */
   GMainLoop *main_loop; /* The main loop for socket events. */
 };
 
-typedef struct _gzochid_socket_context gzochid_socket_context;
+/* The following functions can be used to control the lifecycle of a 
+   `GzochidSocketServer' object. */
+
+/* Starts the socket server's main loop. A thread (managed by the server) will
+   be launched to drive the loop's iteration. */
+
+void gzochid_socket_server_start (GzochidSocketServer *);
+
+/* Stops the specified socket server. */
+
+void gzochid_socket_server_stop (GzochidSocketServer *);
+
+/* Typedefs for client and server sockets. */
 
 typedef struct _gzochid_server_socket gzochid_server_socket;
 typedef struct _gzochid_client_socket gzochid_client_socket;
-
-/* The following functions can be used to manipulate `gzochid_socket_context'
-   structures. */
-
-/* Create and return a new socket context. */
-
-gzochid_socket_context *gzochid_socket_context_new (void);
-
-/* Frees the resources associated with the specified socket context. The 
-   reference count for the context's main context and main loop will be
-   decremented as part of this process. */
-
-void gzochid_socket_context_free (gzochid_socket_context *);
-
-/* Associate the specified socket context with the specified parent context and
-   transition it to the `GZOCHID_SOCKET_CONTEXT_STATE_RUNNING' state. The socket
-   context will launch an event-processing thread as part of this process. */
-
-void gzochid_socket_context_init (gzochid_socket_context *, gzochid_context *);
 
 /* The following functions can be used to manipulate `gzochid_client_socket'
    structures. */
@@ -125,7 +120,7 @@ void gzochid_server_socket_free (gzochid_server_socket *);
    server socket) once this function returns. */
 
 void gzochid_server_socket_listen
-(gzochid_socket_context *, gzochid_server_socket *, int);
+(GzochidSocketServer *, gzochid_server_socket *, int);
 
 /* Private server socket API, visible for testing only. */
 
