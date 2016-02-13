@@ -21,26 +21,138 @@
 #include "resolver.h"
 
 #define TEST_TYPE_OBJECT_A test_object_a_get_type ()
-G_DECLARE_FINAL_TYPE (TestObjectA, test_object_a, TEST, OBJECT_A, GObject);
-
-#define TEST_TYPE_OBJECT_B test_object_b_get_type ()
-G_DECLARE_FINAL_TYPE (TestObjectB, test_object_b, TEST, OBJECT_B, GObject);
-
-#define TEST_TYPE_OBJECT_C test_object_c_get_type ()
-G_DECLARE_FINAL_TYPE (TestObjectC, test_object_c, TEST, OBJECT_C, GObject);
-
-#define TEST_TYPE_OBJECT_D test_object_d_get_type ()
-G_DECLARE_FINAL_TYPE (TestObjectD, test_object_d, TEST, OBJECT_D, GObject);
-
-#define TEST_TYPE_OBJECT_E test_object_e_get_type ()
-G_DECLARE_FINAL_TYPE (TestObjectE, test_object_e, TEST, OBJECT_E, GObject);
+GType test_object_a_get_type (void);
 
 struct _TestObjectA
 {
   GObject parent_instance;
 };
 
+typedef struct _TestObjectA TestObjectA;
+
+struct _TestObjectAClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _TestObjectAClass TestObjectAClass;
+
+static inline TestObjectA *
+TEST_OBJECT_A (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, test_object_a_get_type (), TestObjectA);
+}
+
 G_DEFINE_TYPE (TestObjectA, test_object_a, G_TYPE_OBJECT);
+
+#define TEST_TYPE_OBJECT_B test_object_b_get_type ()
+GType test_object_b_get_type (void);
+
+struct _TestObjectB
+{
+  GObject parent_instance;
+
+  TestObjectA *a;
+};
+
+typedef struct _TestObjectB TestObjectB;
+
+struct _TestObjectBClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _TestObjectBClass TestObjectBClass;
+
+static inline TestObjectB *
+TEST_OBJECT_B (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, test_object_b_get_type (), TestObjectB);
+}
+
+G_DEFINE_TYPE (TestObjectB, test_object_b, G_TYPE_OBJECT);
+
+#define TEST_TYPE_OBJECT_C test_object_c_get_type ()
+GType test_object_c_get_type (void);
+
+struct _TestObjectC
+{
+  GObject parent_instance;
+
+  TestObjectA *a;
+  guint value;
+};
+
+typedef struct _TestObjectC TestObjectC;
+
+struct _TestObjectCClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _TestObjectCClass TestObjectCClass;
+
+static inline TestObjectC *
+TEST_OBJECT_C (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, test_object_c_get_type (), TestObjectC);
+}
+
+G_DEFINE_TYPE (TestObjectC, test_object_c, G_TYPE_OBJECT);
+
+#define TEST_TYPE_OBJECT_D test_object_d_get_type ()
+GType test_object_d_get_type (void);
+
+struct _TestObjectD
+{
+  GObject parent_instance;
+
+  struct _TestObjectD *d;
+};
+
+typedef struct _TestObjectD TestObjectD;
+
+struct _TestObjectDClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _TestObjectDClass TestObjectDClass;
+
+static inline TestObjectD *
+TEST_OBJECT_D (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, test_object_d_get_type (), TestObjectD);
+}
+
+G_DEFINE_TYPE (TestObjectD, test_object_d, G_TYPE_OBJECT);
+
+#define TEST_TYPE_OBJECT_E test_object_e_get_type ()
+GType test_object_e_get_type (void);
+
+struct _TestObjectE
+{
+  GObject parent_instance;
+
+  GzochidResolutionContext *resolution_context;
+};
+
+typedef struct _TestObjectE TestObjectE;
+
+struct _TestObjectEClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _TestObjectEClass TestObjectEClass;
+
+static inline TestObjectE *
+TEST_OBJECT_E (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, test_object_e_get_type (), TestObjectE);
+}
+
+G_DEFINE_TYPE (TestObjectE, test_object_e, G_TYPE_OBJECT);
 
 static void
 test_object_a_class_init (TestObjectAClass *klass)
@@ -52,14 +164,6 @@ test_object_a_init (TestObjectA *self)
 {
 }
 
-struct _TestObjectB
-{
-  GObject parent_instance;
-
-  TestObjectA *a;
-};
-
-G_DEFINE_TYPE (TestObjectB, test_object_b, G_TYPE_OBJECT);
 
 enum
   {
@@ -114,16 +218,6 @@ static void
 test_object_b_init (TestObjectB *self)
 {
 }
-
-struct _TestObjectC
-{
-  GObject parent_instance;
-
-  TestObjectA *a;
-  guint value;
-};
-
-G_DEFINE_TYPE (TestObjectC, test_object_c, G_TYPE_OBJECT);
 
 enum
   {
@@ -186,15 +280,6 @@ test_object_c_init (TestObjectC *self)
 {
 }
 
-struct _TestObjectD
-{
-  GObject parent_instance;
-
-  struct _TestObjectD *d;
-};
-
-G_DEFINE_TYPE (TestObjectD, test_object_d, G_TYPE_OBJECT);
-
 enum
   {
     TEST_OBJECT_D_PROP_D = 1,
@@ -248,15 +333,6 @@ static void
 test_object_d_init (TestObjectD *self)
 {
 }
-
-struct _TestObjectE
-{
-  GObject parent_instance;
-
-  GzochidResolutionContext *resolution_context;
-};
-
-G_DEFINE_TYPE (TestObjectE, test_object_e, G_TYPE_OBJECT);
 
 enum
   {
