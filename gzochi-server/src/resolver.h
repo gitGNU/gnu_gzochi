@@ -41,8 +41,27 @@
 
 #define GZOCHID_TYPE_RESOLUTION_CONTEXT gzochid_resolution_context_get_type ()
 
-G_DECLARE_FINAL_TYPE (GzochidResolutionContext, gzochid_resolution_context,
-		      GZOCHID, RESOLUTION_CONTEXT, GObject);
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_resolution_context_get_type (void);
+
+typedef struct _GzochidResolutionContext GzochidResolutionContext;
+
+struct _GzochidResolutionContextClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _GzochidResolutionContextClass GzochidResolutionContextClass;
+
+static inline GzochidResolutionContext *
+GZOCHID_RESOLUTION_CONTEXT (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_resolution_context_get_type (), GzochidResolutionContext);
+}
+
+/* End boilerplate. */
 
 enum GzochidResolutionError
   {

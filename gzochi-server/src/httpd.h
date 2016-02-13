@@ -25,8 +25,28 @@
 /* The core embedded HTTP server type definitions. */
 
 #define GZOCHID_TYPE_HTTP_SERVER gzochid_http_server_get_type ()
-G_DECLARE_FINAL_TYPE (GzochidHttpServer, gzochid_http_server, GZOCHID,
-		      HTTP_SERVER, GObject);
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_http_server_get_type (void);
+
+typedef struct _GzochidHttpServer GzochidHttpServer;
+
+struct _GzochidHttpServerClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _GzochidHttpServerClass GzochidHttpServerClass;
+
+static inline GzochidHttpServer *
+GZOCHID_HTTP_SERVER (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_http_server_get_type (), GzochidHttpServer);
+}
+
+/* End boilerplate. */
 
 enum GzochidHttpServerError
   { 

@@ -27,8 +27,11 @@
 /* GObject type definition for the socket server. */
 
 #define GZOCHID_TYPE_SOCKET_SERVER gzochid_socket_server_get_type ()
-G_DECLARE_FINAL_TYPE (GzochidSocketServer, gzochid_socket_server, GZOCHID,
-		      SOCKET_SERVER, GObject);
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_socket_server_get_type (void);
 
 /* The socket server struct itself; this part of the server is public. */
 
@@ -39,6 +42,23 @@ struct _GzochidSocketServer
   GMainContext *main_context; /* The main context for socket events. */
   GMainLoop *main_loop; /* The main loop for socket events. */
 };
+
+typedef struct _GzochidSocketServer GzochidSocketServer;
+
+struct _GzochidSocketServerClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _GzochidSocketServerClass GzochidSocketServerClass;
+
+static inline GzochidSocketServer *
+GZOCHID_SOCKET_SERVER (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_socket_server_get_type (), GzochidSocketServer);
+}
+
+/* End boilerplate. */
 
 /* The following functions can be used to control the lifecycle of a 
    `GzochidSocketServer' object. */
