@@ -40,250 +40,304 @@ teardown_lock_table (test_lock_table_fixture *fixture, gconstpointer user_data)
 static void
 test_read_single (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
   g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 1, &key, FALSE, NULL));
+		 (fixture->lock_table, 1, key, FALSE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_read_multiple (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &key, FALSE, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
 
   g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, &key, FALSE, NULL));
+		 (fixture->lock_table, 2, key, FALSE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_read_with_range_lock (test_lock_table_fixture *fixture,
 			   gconstpointer user_data)
 {
-  gzochid_lock_key from = { "foo", 4 };
-  gzochid_lock_key to = { "foo2", 5 };
+  GBytes *from = g_bytes_new_static ("foo", 4);
+  GBytes *to = g_bytes_new_static ("foo2", 5);
 
-  gzochid_lock_range_check_and_set (fixture->lock_table, 1, &from, &to, NULL);
+  gzochid_lock_range_check_and_set (fixture->lock_table, 1, from, to, NULL);
 
   g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, &from, FALSE, NULL));
+		 (fixture->lock_table, 2, from, FALSE, NULL));
+
+  g_bytes_unref (from);
+  g_bytes_unref (to);
 }
 
 static void
 test_read_conflict_with_write (test_lock_table_fixture *fixture,
 			       gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &key, TRUE, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, key, TRUE, NULL);
 
   g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, &key, FALSE, NULL));
+		  (fixture->lock_table, 2, key, FALSE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_write (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
   g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 1, &key, TRUE, NULL));
+		 (fixture->lock_table, 1, key, TRUE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_write_conflict_with_read (test_lock_table_fixture *fixture,
 			       gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &key, FALSE, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
 
   g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, &key, TRUE, NULL));
+		  (fixture->lock_table, 2, key, TRUE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_write_conflict_with_write (test_lock_table_fixture *fixture,
 				gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &key, TRUE, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, key, TRUE, NULL);
 
   g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, &key, TRUE, NULL));
+		  (fixture->lock_table, 2, key, TRUE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_write_conflict_with_range_lock (test_lock_table_fixture *fixture,
 				     gconstpointer user_data)
 {
-  gzochid_lock_key from = { "foo", 4 };
-  gzochid_lock_key to = { "foo2", 5 };
+  GBytes *from = g_bytes_new_static ("foo", 4);
+  GBytes *to = g_bytes_new_static ("foo2", 5);
 
-  gzochid_lock_range_check_and_set (fixture->lock_table, 1, &from, &to, NULL);
+  gzochid_lock_range_check_and_set (fixture->lock_table, 1, from, to, NULL);
 
   g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, &from, TRUE, NULL));
+		  (fixture->lock_table, 2, from, TRUE, NULL));
+
+  g_bytes_unref (from);
+  g_bytes_unref (to);
 }
 
 static void
 test_upgrade (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &key, FALSE, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
 
   g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 1, &key, TRUE, NULL));
+		 (fixture->lock_table, 1, key, TRUE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_upgrade_conflict_with_read (test_lock_table_fixture *fixture,
 				 gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &key, FALSE, NULL);
-  gzochid_lock_check_and_set (fixture->lock_table, 2, &key, FALSE, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 2, key, FALSE, NULL);
 
   g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 1, &key, TRUE, NULL));
+		  (fixture->lock_table, 1, key, TRUE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_upgrade_conflict_with_range_lock (test_lock_table_fixture *fixture,
 				       gconstpointer user_data)
 {
-  gzochid_lock_key from = { "foo", 4 };
-  gzochid_lock_key to = { "foo2", 5 };
+  GBytes *from = g_bytes_new_static ("foo", 4);
+  GBytes *to = g_bytes_new_static ("foo2", 5);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &from, FALSE, NULL);
-  gzochid_lock_range_check_and_set (fixture->lock_table, 2, &from, &to, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, from, FALSE, NULL);
+  gzochid_lock_range_check_and_set (fixture->lock_table, 2, from, to, NULL);
 
   g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 1, &from, TRUE, NULL));
+		  (fixture->lock_table, 1, from, TRUE, NULL));
+
+  g_bytes_unref (from);
+  g_bytes_unref (to);
 }
 
 static void
 test_range_lock (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_lock_key from = { "foo", 4 };
-  gzochid_lock_key to = { "foo2", 5 };
+  GBytes *from = g_bytes_new_static ("foo", 4);
+  GBytes *to = g_bytes_new_static ("foo2", 5);
 
   g_assert_true (gzochid_lock_range_check_and_set
-		 (fixture->lock_table, 1, &from, &to, NULL));
+		 (fixture->lock_table, 1, from, to, NULL));
+
+  g_bytes_unref (from);
+  g_bytes_unref (to);
 }
 
 static void
 test_range_lock_conflict_with_range_lock (test_lock_table_fixture *fixture,
 					  gconstpointer user_data)
 {
-  gzochid_lock_key from1 = { "foo1", 5 };
-  gzochid_lock_key to1 = { "foo3", 5 };
-  gzochid_lock_key from2 = { "foo2", 5 };
-  gzochid_lock_key to2 = { "foo4", 5 };
+  GBytes *from1 = g_bytes_new_static ("foo1", 5);
+  GBytes *to1 = g_bytes_new_static ("foo3", 5);
+  GBytes *from2 = g_bytes_new_static ("foo2", 5);
+  GBytes *to2 = g_bytes_new_static ("foo4", 5);
 
-  gzochid_lock_range_check_and_set (fixture->lock_table, 1, &from1, &to1, NULL);
+  gzochid_lock_range_check_and_set (fixture->lock_table, 1, from1, to1, NULL);
 
   g_assert_false (gzochid_lock_range_check_and_set
-		  (fixture->lock_table, 2, &from2, &to2, NULL));
+		  (fixture->lock_table, 2, from2, to2, NULL));
+
+  g_bytes_unref (from1);
+  g_bytes_unref (to1);
+  g_bytes_unref (from2);
+  g_bytes_unref (to2);
+
 }
 
 static void
 test_range_lock_conflict_with_write (test_lock_table_fixture *fixture,
 				     gconstpointer user_data)
 {
-  gzochid_lock_key from = { "foo", 4 };
-  gzochid_lock_key to = { "foo2", 5 };
+  GBytes *from = g_bytes_new_static ("foo", 4);
+  GBytes *to = g_bytes_new_static ("foo2", 5);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &from, TRUE, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, from, TRUE, NULL);
 
   g_assert_false (gzochid_lock_range_check_and_set
-		  (fixture->lock_table, 2, &from, &to, NULL));
+		  (fixture->lock_table, 2, from, to, NULL));
+
+  g_bytes_unref (from);
+  g_bytes_unref (to);
 }
 
 static void
 test_range_lock_rebalance (test_lock_table_fixture *fixture,
 			   gconstpointer user_data)
 {
-  gzochid_lock_key range1 = { "foo1", 4 };
-  gzochid_lock_key range2 = { "foo2", 4 };
-  gzochid_lock_key range3 = { "foo3", 4 };
-  gzochid_lock_key range4 = { "foo4", 4 };
-  gzochid_lock_key range5 = { "foo5", 4 };
-  gzochid_lock_key range6 = { "foo6", 4 };
+  GBytes *range1 = g_bytes_new_static ("foo1", 5);
+  GBytes *range2 = g_bytes_new_static ("foo2", 5);
+  GBytes *range3 = g_bytes_new_static ("foo3", 5);
+  GBytes *range4 = g_bytes_new_static ("foo4", 5);
+  GBytes *range5 = g_bytes_new_static ("foo5", 5);
+  GBytes *range6 = g_bytes_new_static ("foo6", 5);
 
   gzochid_lock_range_check_and_set
-    (fixture->lock_table, 1, &range1, &range1, NULL);
+    (fixture->lock_table, 1, range1, range1, NULL);
   gzochid_lock_range_check_and_set
-    (fixture->lock_table, 1, &range2, &range2, NULL);
+    (fixture->lock_table, 1, range2, range2, NULL);
   gzochid_lock_range_check_and_set
-    (fixture->lock_table, 1, &range3, &range3, NULL);
+    (fixture->lock_table, 1, range3, range3, NULL);
   gzochid_lock_range_check_and_set
-    (fixture->lock_table, 1, &range4, &range4, NULL);
+    (fixture->lock_table, 1, range4, range4, NULL);
   gzochid_lock_range_check_and_set
-    (fixture->lock_table, 1, &range5, &range5, NULL);
+    (fixture->lock_table, 1, range5, range5, NULL);
   gzochid_lock_range_check_and_set
-    (fixture->lock_table, 1, &range6, &range6, NULL);
+    (fixture->lock_table, 1, range6, range6, NULL);
 
   gzochid_lock_release_all (fixture->lock_table, 1);
+
+  g_bytes_unref (range1);
+  g_bytes_unref (range2);
+  g_bytes_unref (range3);
+  g_bytes_unref (range4);
+  g_bytes_unref (range5);
+  g_bytes_unref (range6);
 }
 
 static void
 test_release_read_lock (test_lock_table_fixture *fixture,
 			gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &key, FALSE, NULL);
-  gzochid_lock_release (fixture->lock_table, 1, &key);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
+  gzochid_lock_release (fixture->lock_table, 1, key);
 
   g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, &key, TRUE, NULL));
+		 (fixture->lock_table, 2, key, TRUE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_release_write_lock (test_lock_table_fixture *fixture,
 			 gconstpointer user_data)
 {
-  gzochid_lock_key key = { "foo", 4 };
+  GBytes *key = g_bytes_new_static ("foo", 4);
 
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &key, TRUE, NULL);
-  gzochid_lock_release (fixture->lock_table, 1, &key);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, key, TRUE, NULL);
+  gzochid_lock_release (fixture->lock_table, 1, key);
 
   g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, &key, FALSE, NULL));
+		 (fixture->lock_table, 2, key, FALSE, NULL));
+
+  g_bytes_unref (key);
 }
 
 static void
 test_release_range_lock (test_lock_table_fixture *fixture,
 			 gconstpointer user_data)
 {
-  gzochid_lock_key from = { "foo", 4 };
-  gzochid_lock_key to = { "foo2", 5 };
+  GBytes *from = g_bytes_new_static ("foo", 4);
+  GBytes *to = g_bytes_new_static ("foo2", 5);
 
-  gzochid_lock_range_check_and_set (fixture->lock_table, 1, &from, &to, NULL);
-  gzochid_lock_release_range (fixture->lock_table, 1, &from, &to);
+  gzochid_lock_range_check_and_set (fixture->lock_table, 1, from, to, NULL);
+  gzochid_lock_release_range (fixture->lock_table, 1, from, to);
 
   g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, &from, TRUE, NULL));
+		 (fixture->lock_table, 2, from, TRUE, NULL));
+
+  g_bytes_unref (from);
+  g_bytes_unref (to);
 }
 
 static void
 test_release_all (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_lock_key from = { "foo", 4 };
-  gzochid_lock_key to = { "foo2", 5 };
+  GBytes *from = g_bytes_new_static ("foo", 4);
+  GBytes *to = g_bytes_new_static ("foo2", 5);
 
-  gzochid_lock_range_check_and_set (fixture->lock_table, 1, &from, &to, NULL);
-  gzochid_lock_check_and_set (fixture->lock_table, 1, &from, TRUE, NULL);
+  gzochid_lock_range_check_and_set (fixture->lock_table, 1, from, to, NULL);
+  gzochid_lock_check_and_set (fixture->lock_table, 1, from, TRUE, NULL);
 
   gzochid_lock_release_all (fixture->lock_table, 1);
   
   g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, &from, TRUE, NULL));
+		 (fixture->lock_table, 2, from, TRUE, NULL));
+
+  g_bytes_unref (from);
+  g_bytes_unref (to);
 }
 
 int

@@ -588,7 +588,7 @@ struct _gzochid_lock
 {
   guint node_id; /* Node id of the locker. */
   
-  gzochid_lock_key *key; /* The key being locked. */
+  GBytes *key; /* The key being locked. */
   gboolean for_write; /* Locked for write? */
 
   /* The last-modified timestamp of the lock, which may be different than the 
@@ -610,8 +610,8 @@ struct _gzochid_range_lock
 {
   guint node_id; /* Node id of the locker. */
 
-  gzochid_lock_key *from; /* The lower bound of the locked range, inclusive. */
-  gzochid_lock_key *to; /* The upper bound of the locked rang, inclusive. */
+  GBytes *from; /* The lower bound of the locked range, inclusive. */
+  GBytes *to; /* The upper bound of the locked rang, inclusive. */
 
   struct timeval timestamp; /* The lock creation timestamp. */
 
@@ -708,20 +708,8 @@ lock_failure (struct timeval lock_timestamp, struct timeval *ret_timestamp)
   return FALSE;
 }
 
-/* A `GCompareFunc' implementation for `gzochid_lock_key' structures, in terms
-   of bytes. */
-
-static gint
-compare_keys (gconstpointer a, gconstpointer b)
-{
-  const gzochid_lock_key *key_a = a;
-  const gzochid_lock_key *key_b = b;
-
-  return memcmp (key_a->key, key_b->key, MIN (key_a->len, key_b->len));
-}
-
 /* A `GCompareFunc' implementation for `gzochid_lock' structures, in terms of
-   `gzochid_lock_key' structures. */
+   `GBytes' structures. */
 
 static gint
 compare_locks (gconstpointer a, gconstpointer b)
@@ -729,7 +717,7 @@ compare_locks (gconstpointer a, gconstpointer b)
   const gzochid_lock *lock_a = a;
   const gzochid_lock *lock_b = b;
 
-  return compare_keys (lock_a->key, lock_b->key);
+  return g_bytes_compare (lock_a->key, lock_b->key);
 }
 
 /* A `GCompareFunc' implementation for `gzochid_locks' structures, in terms of
@@ -756,7 +744,7 @@ compare_lock_lists (gconstpointer a, gconstpointer b)
 */
 
 static gzochid_lock *
-lock_new (gzochid_lock_key *key, guint node_id, gboolean for_write)
+lock_new (GBytes *key, guint node_id, gboolean for_write)
 {
   gzochid_lock *lock = malloc (sizeof (gzochid_lock));
 
@@ -791,7 +779,7 @@ lock_free (gzochid_lock *lock, GDestroyNotify key_destroy_fn)
 */
 
 static gzochid_range_lock *
-range_lock_new (gzochid_lock_key *from, gzochid_lock_key *to, guint node_id)
+range_lock_new (GBytes *from, GBytes *to, guint node_id)
 {
   gzochid_range_lock *range_lock = malloc (sizeof (gzochid_range_lock));
 
@@ -881,7 +869,7 @@ gzochid_lock_table_new (const char *scope, GDestroyNotify key_destroy_fn)
   lock_table->locks = g_sequence_new (locks_free);
   lock_table->locks_by_timestamp = g_sequence_new (NULL);
 
-  lock_table->range_locks = itree_new (compare_keys);
+  lock_table->range_locks = itree_new (g_bytes_compare);
   lock_table->range_locks_by_timestamp = g_sequence_new (NULL);
   
   lock_table->nodes_to_locks = g_hash_table_new_full
@@ -993,12 +981,12 @@ find_most_recent_covering_range_lock (gpointer from, gpointer to,
 }
 
 /* Returns the most recently-acquired `gzochid_range_lock' not held by the 
-   specified node and covering the specified `gzochid_lock_key' in the specified
+   specified node and covering the specified `GBytes' in the specified
    `gzochid_lock_table', or `NULL' if no such range lock exists. */
 
 static gzochid_range_lock *
 most_recent_covering_range_lock (gzochid_lock_table *lock_table,
-				 gzochid_lock_key *key, guint excluded_node_id)
+				 GBytes *key, guint excluded_node_id)
 {
   range_lock_search_context search_context;
 
@@ -1033,7 +1021,7 @@ compare_timestamp_data (gconstpointer a, gconstpointer b, gpointer data)
    no such lock exists. */
 
 static GSequenceIter *
-find_locks_by_key (gzochid_lock_table *lock_table, gzochid_lock_key *key)
+find_locks_by_key (gzochid_lock_table *lock_table, GBytes *key)
 {
   gzochid_lock lock;  
   gzochid_locks locks;
@@ -1055,7 +1043,7 @@ find_locks_by_key (gzochid_lock_table *lock_table, gzochid_lock_key *key)
 
 gboolean
 gzochid_lock_check_and_set (gzochid_lock_table *lock_table, guint node_id,
-			    gzochid_lock_key *key, gboolean for_write,
+			    GBytes *key, gboolean for_write,
 			    struct timeval *ret_timestamp)
 {
   GSequenceIter *iter = find_locks_by_key (lock_table, key);
@@ -1221,7 +1209,7 @@ find_overlapping_range_lock (gpointer from, gpointer to, gpointer data,
 
 gboolean
 gzochid_lock_range_check_and_set (gzochid_lock_table *lock_table, guint node_id,
-				  gzochid_lock_key *from, gzochid_lock_key *to,
+				  GBytes *from, GBytes *to,
 				  struct timeval *ret_timestamp)
 {
   range_lock_search_context search_context;
@@ -1337,7 +1325,7 @@ remove_lock (gzochid_lock_table *lock_table, gzochid_lock *lock)
 
 void
 gzochid_lock_release (gzochid_lock_table *lock_table, guint node_id,
-		      gzochid_lock_key *key)
+		      GBytes *key)
 {
   GSequenceIter *iter = find_locks_by_key (lock_table, key);  
   
@@ -1383,8 +1371,8 @@ find_range_lock_with_owner (gpointer from, gpointer to, gpointer data,
   gzochid_range_lock *lock = data;
   range_lock_match_context *match_context = user_data;
 
-  if (compare_keys (match_context->from, from) == 0
-      && compare_keys (match_context->to, to) == 0
+  if (g_bytes_compare (match_context->from, from) == 0
+      && g_bytes_compare (match_context->to, to) == 0
       && lock->node_id == match_context->node_id)
     {
       match_context->range_lock = lock;
@@ -1432,7 +1420,7 @@ remove_range_lock (gzochid_lock_table *lock_table,
 
 void
 gzochid_lock_release_range (gzochid_lock_table *lock_table, guint node_id,
-			    gzochid_lock_key *from, gzochid_lock_key *to)
+			    GBytes *from, GBytes *to)
 {
   range_lock_match_context match_context;
 

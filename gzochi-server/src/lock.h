@@ -30,16 +30,6 @@
    in the lock table can be declared with intention (to read or write) and locks
    can be created on ranges of keys that may or may not currently exist. */
 
-/* The data structure for keys.*/
-
-struct _gzochid_lock_key
-{
-  unsigned char *key; /* The key bytes; need not be `NULL'-terminated. */
-  size_t len; /*  The length of the key byte buffer. */
-};
-
-typedef struct _gzochid_lock_key gzochid_lock_key;
-
 /* The lock table structure. */
 
 typedef struct _gzochid_lock_table gzochid_lock_table;
@@ -78,7 +68,8 @@ void gzochid_lock_table_free (gzochid_lock_table *);
 */
 
 gboolean gzochid_lock_check_and_set
-(gzochid_lock_table *, guint, gzochid_lock_key *, gboolean, struct timeval *);
+(gzochid_lock_table *, guint, GBytes *, gboolean, struct timeval *);
+
 
 /* 
    Attempts to obtain a range lock on the specified key interval on behalf of 
@@ -94,17 +85,17 @@ gboolean gzochid_lock_check_and_set
 */
 
 gboolean gzochid_lock_range_check_and_set
-(gzochid_lock_table *, guint, gzochid_lock_key *, gzochid_lock_key *,
- struct timeval *);
+(gzochid_lock_table *, guint, GBytes *, GBytes *, struct timeval *);
+
 
 /* Completely releases the specified node's lock on the specified point lock. */
 
-void gzochid_lock_release (gzochid_lock_table *, guint, gzochid_lock_key *);
+void gzochid_lock_release (gzochid_lock_table *, guint, GBytes *);
 
 /* Releases the specified node's range lock on the specified key interval. */
 
 void gzochid_lock_release_range
-(gzochid_lock_table *, guint, gzochid_lock_key *, gzochid_lock_key *);
+(gzochid_lock_table *, guint, GBytes *, GBytes *);
 
 /* Releases all the point and range locks held by the specified node. */
 
