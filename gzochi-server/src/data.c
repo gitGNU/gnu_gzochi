@@ -27,17 +27,23 @@
 #include "game.h"
 #include "gzochid-storage.h"
 #include "io.h"
+#include "oids.h"
 #include "tx.h"
 
-#define ALLOCATION_BLOCK_SIZE 100
+struct _gzochid_data_oid_block_state
+{
+  mpz_t first;
+  mpz_t next;
+  mpz_t last;  
+};
 
-#define NEXT_OID_KEY 0x00
+typedef struct _gzochid_data_oid_block_state gzochid_data_oid_block_state;
 
 struct _gzochid_data_transaction_context
 {
   gzochid_application_context *context;
 
-  gzochid_data_oid_block *free_oids;
+  gzochid_data_oid_block_state *free_oids;
   GList *used_oid_blocks;
 
   gzochid_storage_transaction *transaction;
@@ -97,25 +103,43 @@ create_transaction_context (gzochid_application_context *app_context,
   return tx_context;
 }
 
-static void 
-free_oid_block (void *ptr)
+static gzochid_data_oid_block_state *
+create_oid_block_state (gzochid_data_oids_block *block)
 {
-  gzochid_data_oid_block *block = ptr;
+  gzochid_data_oid_block_state *block_state =
+    malloc (sizeof (gzochid_data_oid_block_state));
 
-  mpz_clear (block->first);
-  mpz_clear (block->next);
-  mpz_clear (block->last);
+  mpz_init (block_state->first);
+  mpz_init (block_state->next);
+  mpz_init (block_state->last);
 
-  free (block);
+  mpz_set (block_state->first, block->block_start);
+  mpz_set (block_state->next, block->block_start);
+  mpz_add_ui (block_state->last, block_state->first, block->block_size);
+  mpz_sub_ui (block_state->last, block_state->last, 1);
+  
+  return block_state;
+}
+
+static void 
+free_oid_block_state (void *ptr)
+{
+  gzochid_data_oid_block_state *block_state = ptr;
+
+  mpz_clear (block_state->first);
+  mpz_clear (block_state->next);
+  mpz_clear (block_state->last);
+
+  free (block_state);
 } 
 
 static void 
 transaction_context_free (gzochid_data_transaction_context *context)
 {  
   if (context->free_oids != NULL)
-    free_oid_block (context->free_oids);
+    free_oid_block_state (context->free_oids);
 
-  g_list_free_full (context->used_oid_blocks, free_oid_block);
+  g_list_free_full (context->used_oid_blocks, free_oid_block_state);
 
   g_hash_table_destroy (context->oids_to_references);
   g_hash_table_destroy (context->ptrs_to_references);
@@ -293,66 +317,32 @@ data_rollback (gpointer data)
 static gzochid_transaction_participant data_participant = 
   { "data", data_prepare, data_commit, data_rollback };
 
-static gzochid_data_oid_block *
-create_oid_block (gzochid_application_context *context)
-{
-  char next_oid_key[] = { NEXT_OID_KEY };
-  char *next_oid_value = NULL;
-  size_t next_oid_value_len = 0;
-
-  gzochid_data_oid_block *block = calloc (1, sizeof (gzochid_data_oid_block));
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (context);
-
-  mpz_init (block->first);
-  mpz_init (block->next);
-  mpz_init (block->last);
-
-  iface->lock (context->meta);
-
-  next_oid_value = iface->get
-    (context->meta, next_oid_key, 1, &next_oid_value_len);
-
-  if (next_oid_value != NULL)
-    {
-      mpz_set_str (block->first, next_oid_value, 16);
-
-      mpz_set (block->next, block->first);
-      mpz_set (block->last, block->first);
-      free (next_oid_value);
-    }
-  
-  mpz_add_ui (block->last, block->last, ALLOCATION_BLOCK_SIZE);
-
-  next_oid_value = mpz_get_str (NULL, 16, block->last);
-  next_oid_value_len = strlen (next_oid_value) + 1;
-  iface->put 
-    (context->meta, next_oid_key, 1, next_oid_value, next_oid_value_len);
-  free (next_oid_value);
-
-  mpz_sub_ui (block->last, block->last, 1);
-  
-  iface->unlock (context->meta);
-
-  return block;
-}
-
-static gzochid_data_oid_block *
+static gzochid_data_oid_block_state *
 reserve_oids (gzochid_application_context *context)
 {
-  gzochid_data_oid_block *block = NULL;
+  gzochid_data_oid_block_state *block_state = NULL;
   
   g_mutex_lock (&context->free_oids_lock);
   
   if (g_list_length (context->free_oid_blocks) > 0)
     {
-      block = (gzochid_data_oid_block *) context->free_oid_blocks->data;
+      block_state = context->free_oid_blocks->data;
       context->free_oid_blocks = g_list_remove_link 
 	(context->free_oid_blocks, context->free_oid_blocks);
     }
-  else block = create_oid_block (context);
+  else
+    {
+      gzochid_data_oids_block new_block;
+
+      assert (gzochid_oids_reserve_block
+	      (APP_STORAGE_INTERFACE (context), context->storage_context,
+	       context->meta, &new_block, NULL));
+      block_state = create_oid_block_state (&new_block);
+      mpz_clear (new_block.block_start);
+    }
 
   g_mutex_unlock (&context->free_oids_lock);
-  return block;
+  return block_state;
 }
 
 static void 

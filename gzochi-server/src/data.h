@@ -75,15 +75,6 @@ struct _gzochid_data_managed_reference
 
 typedef struct _gzochid_data_managed_reference gzochid_data_managed_reference;
 
-struct _gzochid_data_oid_block
-{
-  mpz_t first;
-  mpz_t next;
-  mpz_t last;  
-};
-
-typedef struct _gzochid_data_oid_block gzochid_data_oid_block;
-
 struct _gzochid_data_managed_reference_holder
 {
   gzochid_application_context *context;
