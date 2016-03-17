@@ -154,6 +154,60 @@ TEST_OBJECT_E (gconstpointer ptr) {
 
 G_DEFINE_TYPE (TestObjectE, test_object_e, G_TYPE_OBJECT);
 
+#define TEST_TYPE_OBJECT_F test_object_f_get_type ()
+GType test_object_f_get_type (void);
+
+struct _TestObjectF
+{
+  GObject parent_instance;
+
+  const gchar *foo;
+};
+
+typedef struct _TestObjectF TestObjectF;
+
+struct _TestObjectFClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _TestObjectFClass TestObjectFClass;
+
+static inline TestObjectF *
+TEST_OBJECT_F (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, test_object_f_get_type (), TestObjectF);
+}
+
+G_DEFINE_TYPE (TestObjectF, test_object_f, G_TYPE_OBJECT);
+
+#define TEST_TYPE_OBJECT_G test_object_g_get_type ()
+GType test_object_g_get_type (void);
+
+struct _TestObjectG
+{
+  GObject parent_instance;
+
+  TestObjectF *f;
+};
+
+typedef struct _TestObjectG TestObjectG;
+
+struct _TestObjectGClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _TestObjectGClass TestObjectGClass;
+
+static inline TestObjectG *
+TEST_OBJECT_G (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, test_object_g_get_type (), TestObjectG);
+}
+
+G_DEFINE_TYPE (TestObjectG, test_object_g, G_TYPE_OBJECT);
+
 static void
 test_object_a_class_init (TestObjectAClass *klass)
 {
@@ -389,6 +443,106 @@ test_object_e_init (TestObjectE *self)
 {
 }
 
+enum
+  {
+    TEST_OBJECT_F_PROP_FOO = 1,
+    TEST_OBJECT_F_N_PROPERTIES
+  };
+
+static GParamSpec *obj_f_properties[TEST_OBJECT_F_N_PROPERTIES] = { NULL };
+
+static void
+test_object_f_set_property (GObject *object, guint property_id,
+			    const GValue *value, GParamSpec *pspec)
+{
+  TestObjectF *self = TEST_OBJECT_F (object);
+
+  switch (property_id)
+    {
+    case TEST_OBJECT_F_PROP_FOO:
+      self->foo = g_value_get_string (value);
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+test_object_f_class_init (TestObjectFClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->set_property = test_object_f_set_property;
+
+  obj_f_properties[TEST_OBJECT_F_PROP_FOO] = g_param_spec_string
+    ("foo", "FOO", "Set Foo", "", G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE);
+
+  g_object_class_install_properties
+    (object_class, TEST_OBJECT_F_N_PROPERTIES, obj_f_properties);
+}
+
+static void
+test_object_f_init (TestObjectF *self)
+{
+}
+
+enum
+  {
+    TEST_OBJECT_G_PROP_F = 1,
+    TEST_OBJECT_G_N_PROPERTIES
+  };
+
+static GParamSpec *obj_g_properties[TEST_OBJECT_G_N_PROPERTIES] = { NULL };
+
+static void
+test_object_g_set_property (GObject *object, guint property_id,
+			    const GValue *value, GParamSpec *pspec)
+{
+  TestObjectG *self = TEST_OBJECT_G (object);
+
+  switch (property_id)
+    {
+    case TEST_OBJECT_G_PROP_F:
+      self->f = g_object_ref (g_value_get_object (value));
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+test_object_g_dispose (GObject *object)
+{
+  TestObjectG *self = TEST_OBJECT_G (object);
+  
+  g_object_unref (self->f);  
+}
+
+static void
+test_object_g_class_init (TestObjectGClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = test_object_g_dispose;
+  object_class->set_property = test_object_g_set_property;
+
+  obj_g_properties[TEST_OBJECT_G_PROP_F] = g_param_spec_object
+    ("f", "F", "Set F", TEST_TYPE_OBJECT_F,
+     G_PARAM_CONSTRUCT | G_PARAM_WRITABLE);
+
+  g_object_class_install_properties
+    (object_class, TEST_OBJECT_G_N_PROPERTIES, obj_g_properties);
+}
+
+static void
+test_object_g_init (TestObjectG *self)
+{
+}
+
 static void
 test_require_simple ()
 {
@@ -451,11 +605,38 @@ test_require_resolution_context ()
   g_object_unref (e2);
 }
 
+static void
+test_provide ()
+{
+  GError *err = NULL;
+  GzochidResolutionContext *resolution_context = g_object_new
+    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+  TestObjectF *f = g_object_new (TEST_TYPE_OBJECT_F, "foo", "bar", NULL);
+  TestObjectG *g = NULL;
+
+  gzochid_resolver_provide (resolution_context, G_OBJECT (f), &err);
+
+  g_assert_no_error (err);
+
+  g = gzochid_resolver_require_full
+    (resolution_context, TEST_TYPE_OBJECT_G, &err);
+
+  g_assert_nonnull (g);
+  g_assert_no_error (err);
+
+  g_assert (g->f == f);
+  
+  g_object_unref (resolution_context);
+  g_object_unref (f);
+  g_object_unref (g);
+}
+
 int
 main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
+  g_test_add_func ("/resolver/provide", test_provide);
   g_test_add_func ("/resolver/require/simple", test_require_simple);
   g_test_add_func
     ("/resolver/require/bad-constructor", test_require_bad_constructor);

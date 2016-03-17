@@ -76,6 +76,11 @@ enum GzochidResolutionError
     
     GZOCHID_RESOLUTION_ERROR_INCOMPATIBLE_CONSTRUCTOR,
 
+    /* A type being added to the resolution context - e.g., via 
+       `gzochid_resolver_provide' - is already present in the context. */
+    
+    GZOCHID_RESOLUTION_ERROR_DUPLICATE_TYPE,
+
     /* Generic resolution failure. */
     
     GZOCHID_RESOLUTION_ERROR_FAILED
@@ -100,6 +105,16 @@ gpointer gzochid_resolver_require (GType, GError **);
 
 gpointer gzochid_resolver_require_full
 (GzochidResolutionContext *, GType, GError **);
+
+/* Adds the specified object to the specified resolution context, registering it
+   as its most specified concrete type. Sets the specified `GError' if an 
+   instance is already registered for this type.
+
+   Use this function to inject types that would otherwise be unconstructable 
+   (because they have non-injectable arguments, e.g.). */
+
+void gzochid_resolver_provide (GzochidResolutionContext *, GObject *,
+			       GError **);
 
 GQuark gzochid_resolution_error_quark ();
 

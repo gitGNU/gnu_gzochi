@@ -266,7 +266,8 @@ extract_dependencies (constructor *ctor)
 }
 
 static tree_state *
-build_dependency_tree_inner (GList *stack, GError **err)
+build_dependency_tree_inner (GzochidResolutionContext *context, GList *stack,
+			     GError **err)
 {
   GError *local_err = NULL;
   tree_state *state = NULL;
@@ -284,6 +285,12 @@ build_dependency_tree_inner (GList *stack, GError **err)
   type = state->types->data;
   state->types = g_list_delete_link (state->types, state->types);  
 
+  if (g_hash_table_contains (context->instances, type))
+    {
+      free (type);
+      return NULL;
+    }
+  
   /* Circular dependencies are detected by walking up the tree to make sure that
      a type never appears as its own ancestor reachable on the same "branch" of
      the dependency tree. */
@@ -333,7 +340,8 @@ build_dependency_tree_inner (GList *stack, GError **err)
    stack. */
 
 static GNode *
-build_dependency_tree (GType root_type, GError **err)
+build_dependency_tree (GzochidResolutionContext *context, GType root_type,
+		       GError **err)
 {
   GError *local_err = NULL;
   constructor *ctor = injectable_constructor_for_type (root_type, &local_err);
@@ -365,7 +373,7 @@ build_dependency_tree (GType root_type, GError **err)
 	  continue;
 	}
       
-      new_state = build_dependency_tree_inner (stack, &local_err);
+      new_state = build_dependency_tree_inner (context, stack, &local_err);
 
       if (local_err != NULL)
 	{
@@ -469,7 +477,8 @@ gzochid_resolver_require_full (GzochidResolutionContext *context,
 
   if (!g_hash_table_contains (context->instances, &type))
     {
-      GNode *dependency_tree = build_dependency_tree (type, &local_err);
+      GNode *dependency_tree = build_dependency_tree
+	(context, type, &local_err);
 
       if (local_err != NULL)
 	{
@@ -497,4 +506,25 @@ gzochid_resolver_require (GType type, GError **err)
     g_object_unref (context);
 
   return obj;
+}
+
+void
+gzochid_resolver_provide (GzochidResolutionContext *context, GObject *obj,
+			  GError **err)
+{
+  GType type = G_OBJECT_TYPE (obj);
+
+  if (!g_hash_table_contains (context->instances, &type))
+    {
+      GType *type_key = malloc (sizeof (GType));
+      *type_key = type;
+
+      g_hash_table_insert
+	(context->instances, type_key, g_object_ref_sink (obj));
+    }
+  else g_set_error
+	 (err, GZOCHID_RESOLUTION_ERROR,
+	  GZOCHID_RESOLUTION_ERROR_DUPLICATE_TYPE,
+	  "Type '%s' already present in resolution context.",
+	  g_type_name (type));
 }
