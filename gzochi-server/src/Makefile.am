@@ -41,10 +41,10 @@ dist_include_HEADERS = gzochid-auth.h gzochid-storage.h
 noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
 	config.h context.h data.h debug.h descriptor.h durable-task.h event.h \
 	fmemopen.h fsm.h game.h game-protocol.h guile.h gzochid.h httpd.h \
-	httpd-app.h io.h lifecycle.h log.h lrucache.h protocol.h reloc.h \
-	resolver.h schedule.h scheme.h scheme-task.h session.h socket.h \
-	stats.h storage.h storage-mem.h task.h threads.h toollib.h tx.h \
-	txlog.h util.h
+	httpd-app.h io.h lifecycle.h log.h lrucache.h oids.h protocol.h \
+	reloc.h resolver.h schedule.h scheme.h scheme-task.h session.h \
+	socket.h stats.h storage.h storage-mem.h task.h threads.h toollib.h \
+	tx.h txlog.h util.h
 
 noinst_LTLIBRARIES = libgzochid.la
 
@@ -58,7 +58,7 @@ libgzochid_la_CFLAGS = @CFLAGS@ \
 libgzochid_la_SOURCES = admin.c app.c app-task.c auth.c callback.c channel.c \
 	config.c context.c data.c debug.c descriptor.c durable-task.c event.c \
 	fmemopen.c fsm.c game.c game-protocol.c guile.c httpd.c httpd-app.c \
-	io.c lifecycle.c log.c lrucache.c reloc.c resolver.c schedule.c \
+	io.c lifecycle.c log.c lrucache.c oids.c reloc.c resolver.c schedule.c \
 	scheme.c scheme-task.c session.c socket.c stats.c storage.c \
 	storage-mem.c task.c threads.c tx.c txlog.c util.c
 
