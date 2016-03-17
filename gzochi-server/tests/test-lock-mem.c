@@ -28,7 +28,7 @@ typedef struct _test_lock_table_fixture test_lock_table_fixture;
 static void
 setup_lock_table (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
-  fixture->lock_table = gzochid_lock_table_new (NULL, NULL);
+  fixture->lock_table = gzochid_lock_table_new (NULL);
 }
 
 static void

@@ -667,8 +667,6 @@ struct _gzochid_lock_table
   /* A mapping of node id `guint' pointers to `gzochid_node_locks'. */
 
   GHashTable *nodes_to_locks; 
-
-  GDestroyNotify key_destroy_fn; /* The cleanup function for key pointers. */
 };
 
 /* Convenience function to ensure the allocation of a `gzochid_node_locks' 
@@ -748,7 +746,7 @@ lock_new (GBytes *key, guint node_id, gboolean for_write)
 {
   gzochid_lock *lock = malloc (sizeof (gzochid_lock));
 
-  lock->key = key;
+  lock->key = g_bytes_ref (key);
   lock->node_id = node_id;
   lock->for_write = for_write;
 
@@ -758,15 +756,12 @@ lock_new (GBytes *key, guint node_id, gboolean for_write)
   return lock;
 }
 
-/* Free the memory associated with the specifed `gzochid_lock', invoking the 
-   specified `GDestroyNotify' (if provided) to free the key. */
+/* Free the memory associated with the specifed `gzochid_lock'. */
 
 static void
-lock_free (gzochid_lock *lock, GDestroyNotify key_destroy_fn)
+lock_free (gzochid_lock *lock)
 {
-  if (key_destroy_fn != NULL)
-    key_destroy_fn (lock->key);
-
+  g_bytes_unref (lock->key);
   free (lock);
 }
 
@@ -783,8 +778,8 @@ range_lock_new (GBytes *from, GBytes *to, guint node_id)
 {
   gzochid_range_lock *range_lock = malloc (sizeof (gzochid_range_lock));
 
-  range_lock->from = from;
-  range_lock->to = to;
+  range_lock->from = from == NULL ? NULL : g_bytes_ref (from);
+  range_lock->to = to == NULL ? NULL : g_bytes_ref (to);
   range_lock->node_id = node_id;
 
   gettimeofday (&range_lock->timestamp, NULL);
@@ -793,18 +788,15 @@ range_lock_new (GBytes *from, GBytes *to, guint node_id)
   return range_lock;
 }
 
-/* Free the memory associated with the specifed `gzochid_range_lock', invoking 
-   the specified `GDestroyNotify' (if provided) to free each of the lower and
-   upper bound keys. */
+/* Free the memory associated with the specifed `gzochid_range_lock'. */
 
 static void
-range_lock_free (gzochid_range_lock *range_lock, GDestroyNotify key_destroy_fn)
+range_lock_free (gzochid_range_lock *range_lock)
 {
-  if (key_destroy_fn != NULL)
-    {
-      key_destroy_fn (range_lock->from);
-      key_destroy_fn (range_lock->to);
-    }
+  if (range_lock->from != NULL)
+    g_bytes_unref (range_lock->from);
+  if (range_lock->to != NULL)
+    g_bytes_unref (range_lock->to);
   
   free (range_lock);
 }
@@ -827,42 +819,27 @@ locks_free (gpointer data)
   free (locks);
 }
 
-/* Free the memory associated with the specifed `gzochid_node_locks' structure,
-   passing the the specified `GDestroyNotify' (if provided) to the destructors
-   for point and range locks. */
+/* Free the memory associated with the specifed `gzochid_node_locks' 
+   structure. */
 
 static void
-node_locks_free (gzochid_node_locks *node_locks, GDestroyNotify key_destroy_fn)
+node_locks_free (gzochid_node_locks *node_locks)
 {
-  GList *locks_ptr = node_locks->locks;
-  GList *range_locks_ptr = node_locks->range_locks;
-
-  while (locks_ptr != NULL)
-    {
-      lock_free (locks_ptr->data, key_destroy_fn);
-      locks_ptr = g_list_delete_link (locks_ptr, locks_ptr);
-    }
-
-  while (range_locks_ptr != NULL)
-    {
-      range_lock_free (range_locks_ptr->data, key_destroy_fn);
-      range_locks_ptr = g_list_delete_link (range_locks_ptr, range_locks_ptr);
-    }
+  g_list_free_full (node_locks->locks, (GDestroyNotify) lock_free);
+  g_list_free_full (node_locks->range_locks, (GDestroyNotify) range_lock_free);
   
   free (node_locks);
 }
 
 /* 
-   Create and return a pointer to a new `gzochid_lock_table' structure that 
-   calls the specified `GDestroyNotify' (if provided) on key values explicitly
-   removed from the table, or upon the destruction of the table as a whole.
+   Create and return a pointer to a new `gzochid_lock_table' structure.
 
    The memory allocated for this structure should be freed via a call to
    `gzochid_lock_table_free' when no logner in use.
 */
 
 gzochid_lock_table *
-gzochid_lock_table_new (const char *scope, GDestroyNotify key_destroy_fn)
+gzochid_lock_table_new (const char *scope)
 {
   gzochid_lock_table *lock_table = malloc (sizeof (gzochid_lock_table));
 
@@ -874,8 +851,6 @@ gzochid_lock_table_new (const char *scope, GDestroyNotify key_destroy_fn)
   
   lock_table->nodes_to_locks = g_hash_table_new_full
     (g_int_hash, g_int_equal, (GDestroyNotify) free, NULL);
-
-  lock_table->key_destroy_fn = key_destroy_fn;
   
   return lock_table;
 }
@@ -900,14 +875,7 @@ gzochid_lock_table_free (gzochid_lock_table *lock_table)
   itree_free (lock_table->range_locks);
   g_sequence_free (lock_table->range_locks_by_timestamp);
 
-  while (node_lock_lists != NULL)
-    {
-      /* Frees the actual point locks and range locks. */
-      
-      node_locks_free (node_lock_lists->data, lock_table->key_destroy_fn);
-      node_lock_lists = g_list_delete_link (node_lock_lists, node_lock_lists);
-    }
-
+  g_list_free_full (node_lock_lists, (GDestroyNotify) node_locks_free);
   g_hash_table_destroy (lock_table->nodes_to_locks);
   
   free (lock_table);
@@ -1415,7 +1383,7 @@ remove_range_lock (gzochid_lock_table *lock_table,
       g_hash_table_remove (lock_table->nodes_to_locks, &range_lock->node_id);
     }
   
-  range_lock_free (range_lock, lock_table->key_destroy_fn);  
+  range_lock_free (range_lock);  
 }
 
 void

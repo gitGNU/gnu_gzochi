@@ -35,19 +35,16 @@
 typedef struct _gzochid_lock_table gzochid_lock_table;
 
 /* 
-   Create and return a pointer to a new lock table structure, which will use the
-   specified `GDestroyNotify' (if provided) to free the memory associated with
-   keys when they are removed from the table. The interpretation of the path 
-   argument is implementation-specific.  
+   Create and return a pointer to a new lock table structure. The 
+   interpretation of the path argument is implementation-specific.  
 
    The pointer returned from this function should be freed via
    `gzochid_lock_table_free'.
 */
 
-gzochid_lock_table *gzochid_lock_table_new (const char *, GDestroyNotify);
+gzochid_lock_table *gzochid_lock_table_new (const char *);
 
-/* Frees the resources (including keys) associated with the specified lock 
-   table. */
+/* Frees the resources associated with the specified lock table. */
 
 void gzochid_lock_table_free (gzochid_lock_table *);
 
