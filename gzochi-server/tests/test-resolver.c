@@ -189,7 +189,7 @@ test_object_b_set_property (GObject *object, guint property_id,
   switch (property_id)
     {
     case TEST_OBJECT_B_PROP_A:
-      self->a = g_value_get_object (value);
+      self->a = g_object_ref (g_value_get_object (value));
       break;
 
     default:
@@ -244,7 +244,7 @@ test_object_c_set_property (GObject *object, guint property_id,
   switch (property_id)
     {
     case TEST_OBJECT_C_PROP_A:
-      self->a = g_value_get_object (value);
+      self->a = g_object_ref (g_value_get_object (value));
       break;
     case TEST_OBJECT_C_PROP_VALUE:
       self->value = g_value_get_uint (value);
@@ -304,7 +304,7 @@ test_object_d_set_property (GObject *object, guint property_id,
   switch (property_id)
     {
     case TEST_OBJECT_D_PROP_D:
-      self->d = g_value_get_object (value);
+      self->d = g_object_ref (g_value_get_object (value));
       break;
 
     default:
@@ -351,7 +351,7 @@ test_object_e_set_property (GObject *object, guint property_id,
   switch (property_id)
     {
     case TEST_OBJECT_E_PROP_RESOLUTION_CONTEXT:
-      self->resolution_context = g_value_get_object (value);
+      self->resolution_context = g_object_ref_sink (g_value_get_object (value));
       break;
 
     default:

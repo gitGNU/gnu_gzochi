@@ -33,8 +33,16 @@ struct _GzochidResolutionContext
 {
   GInitiallyUnowned parent_instance;
 
-  gboolean disposing;
   GHashTable *instances; /* The instance cache. */
+
+  /*
+    Forsaken instances are those instances that hold a reference to the
+    resolution context that created them. They shouldn't be unref'd during the
+    disposal of the context, because the results are unpredictable (usually a
+    double `free'). 
+  */*
+  
+  GList *forsaken_instances;
 };
 
 G_DEFINE_TYPE (GzochidResolutionContext, gzochid_resolution_context,
@@ -43,7 +51,10 @@ G_DEFINE_TYPE (GzochidResolutionContext, gzochid_resolution_context,
 static void
 unref_value (gpointer key, gpointer value, gpointer userdata)
 {
-  g_object_unref (value);
+  GList *forsaken_instances = userdata;
+
+  if (!g_list_find (forsaken_instances, value))
+    g_object_unref (value);
 }
 
 void
@@ -51,20 +62,19 @@ gzochid_resolution_context_dispose (GObject *object)
 {
   GzochidResolutionContext *self = GZOCHID_RESOLUTION_CONTEXT (object);
 
-  if (!self->disposing)
-    {
-      GType context_type = GZOCHID_TYPE_RESOLUTION_CONTEXT;
-      
-      self->disposing = TRUE;
-      g_hash_table_remove (self->instances, &context_type);
-      g_hash_table_foreach (self->instances, unref_value, NULL);
-    }
+  GType context_type = GZOCHID_TYPE_RESOLUTION_CONTEXT;
+
+  g_hash_table_remove (self->instances, &context_type);
+  g_hash_table_foreach (self->instances, unref_value, self->forsaken_instances);
 }
 
 static void
 gzochid_resolution_context_finalize (GObject *object)
 {
-  g_hash_table_destroy (GZOCHID_RESOLUTION_CONTEXT (object)->instances);
+  GzochidResolutionContext *self = GZOCHID_RESOLUTION_CONTEXT (object);
+  
+  g_hash_table_destroy (self->instances);
+  g_list_free (self->forsaken_instances);
 }
 
 static void
@@ -72,7 +82,7 @@ gzochid_resolution_context_class_init (GzochidResolutionContextClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-  /*  object_class->dispose = gzochid_resolution_context_dispose; */
+  object_class->dispose = gzochid_resolution_context_dispose;
   object_class->finalize = gzochid_resolution_context_finalize;
 }
 
@@ -83,9 +93,9 @@ gzochid_resolution_context_init (GzochidResolutionContext *self)
 
   *resolution_context_type = GZOCHID_TYPE_RESOLUTION_CONTEXT;
 
-  self->disposing = FALSE;
   self->instances = g_hash_table_new_full (g_int_hash, g_int_equal, free, NULL);
-
+  self->forsaken_instances = NULL;
+  
   /* Add the resolution context to its own instance cache. */
   
   g_hash_table_insert (self->instances, resolution_context_type, self);
@@ -406,6 +416,7 @@ construct_instance (GNode *node, gpointer data)
 	      GParamSpec pspec = ctor->parameters[i];
 	      GType ptype = pspec.value_type;
 	      GValue value = G_VALUE_INIT;
+	      GObject *obj = NULL;
 	      
 	      params[i].name = pspec.name;
 	      params[i].value = value;
@@ -413,19 +424,34 @@ construct_instance (GNode *node, gpointer data)
 	      g_value_init (&params[i].value, ptype);
 	      
 	      assert (g_hash_table_contains (context->instances, &ptype));
+	      obj = g_hash_table_lookup (context->instances, &ptype);
+	      
+	      g_value_take_object (&params[i].value, obj);
+	    }
+	 
+	  inst = g_object_newv (type, ctor->n_parameters, params);
 
-	      g_value_take_object
-		(&params[i].value,
-		 g_object_ref_sink
-		 (g_hash_table_lookup (context->instances, &ptype)));
+	  if (!g_object_is_floating (context))
+	    {
+	      /* 
+		 We passed the resolution context to this type's constructor and
+		 it sunk its floating reference. That's fine, but it'll create a
+		 reference cycle unless we mark this instance as "unreachable"
+		 from the context during disposal. 
+	      */
+	      
+	      g_object_ref (context);
+	      g_object_force_floating (G_OBJECT (context));
+	      g_object_force_floating (inst);
+
+	      context->forsaken_instances = g_list_prepend
+		(context->forsaken_instances, inst);
 	    }
 
-	  inst = g_object_newv (type, ctor->n_parameters, params);	
 	  free (params);
 	}
       else inst = g_object_new (type, NULL);
 
-      g_object_force_floating (inst);
       g_hash_table_insert (context->instances, type_key, inst);
     }
   free_constructor (ctor);
