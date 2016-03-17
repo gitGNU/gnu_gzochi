@@ -38,6 +38,19 @@ teardown_lock_table (test_lock_table_fixture *fixture, gconstpointer user_data)
 }
 
 static void
+test_check (test_lock_table_fixture *fixture, gconstpointer user_data)
+{
+  GBytes *key = g_bytes_new_static ("foo", 4);
+
+  g_assert_false (gzochid_lock_check (fixture->lock_table, 1, key, FALSE));
+  g_assert_true (gzochid_lock_check_and_set
+		 (fixture->lock_table, 1, key, FALSE, NULL));
+  g_assert_true (gzochid_lock_check (fixture->lock_table, 1, key, FALSE));
+
+  g_bytes_unref (key);
+}
+
+static void
 test_read_single (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
@@ -391,6 +404,9 @@ main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
+  g_test_add
+    ("/lock-mem/check-lock", test_lock_table_fixture, NULL, setup_lock_table,
+     test_check, teardown_lock_table);
   g_test_add
     ("/lock-mem/lock/read/single", test_lock_table_fixture, NULL,
      setup_lock_table, test_read_single, teardown_lock_table);

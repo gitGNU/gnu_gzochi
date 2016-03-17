@@ -1035,6 +1035,35 @@ find_locks_by_key (gzochid_lock_table *lock_table, GBytes *key)
 }
 
 gboolean
+gzochid_lock_check (gzochid_lock_table *lock_table, guint node_id, GBytes *key,
+		    gboolean for_write)
+{
+  GSequenceIter *iter = find_locks_by_key (lock_table, key);
+  
+  if (iter != NULL)
+    {
+      gzochid_locks *locks = g_sequence_get (iter);
+      GList *existing_lock_ptr = NULL;
+
+      assert (locks->locks != NULL);      
+
+      /* Find an existing lock for the specified key held by the specified 
+	 node. */
+      
+      existing_lock_ptr = g_list_find_custom
+	(locks->locks, &node_id, find_lock_with_node_id);
+
+      if (existing_lock_ptr != NULL)
+	{
+	  gzochid_lock *lock = existing_lock_ptr->data;
+	  return lock->for_write || !for_write;
+	}
+    }
+
+  return FALSE;
+}
+
+gboolean
 gzochid_lock_check_and_set (gzochid_lock_table *lock_table, guint node_id,
 			    GBytes *key, gboolean for_write,
 			    struct timeval *ret_timestamp)

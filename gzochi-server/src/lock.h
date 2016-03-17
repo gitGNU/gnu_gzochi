@@ -67,6 +67,12 @@ void gzochid_lock_table_free (gzochid_lock_table *);
 gboolean gzochid_lock_check_and_set
 (gzochid_lock_table *, guint, GBytes *, gboolean, struct timeval *);
 
+/* Checks whether a lock on the specified key is already set on behalf of the 
+   specified node for read or write, but does not change or acquire any 
+   locks. */
+
+gboolean gzochid_lock_check
+(gzochid_lock_table *, guint, GBytes *, gboolean);
 
 /* 
    Attempts to obtain a range lock on the specified key interval on behalf of 
@@ -88,6 +94,11 @@ gboolean gzochid_lock_check_and_set
 gboolean gzochid_lock_range_check_and_set
 (gzochid_lock_table *, guint, GBytes *, GBytes *, struct timeval *);
 
+/* Checks whether a range lock on the specified key interval is already set on
+   behalf of the specified node, but does not change or acquire any locks. */
+
+gboolean gzochid_lock_range_check
+(gzochid_lock_table *, guint, GBytes *, GBytes *);
 
 /* Completely releases the specified node's lock on the specified point lock. */
 
