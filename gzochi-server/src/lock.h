@@ -76,6 +76,10 @@ gboolean gzochid_lock_check_and_set
    of the conflicting lock, which may be an overlapping range lock or a point 
    lock held by another node. 
 
+   Either or both of the lower and upper bounds of the lock may be `NULL'
+   indicating that the range should be unbounded in that direction. (Locking a
+   range from `NULL' to `NULL' locks the entire keyspace.)
+   
    Range locks are (currently) exclusive and can only be obtained when no other
    nodes hold range locks that overlap the specified interval and no other nodes
    hold write locks on keys that fall within the interval.

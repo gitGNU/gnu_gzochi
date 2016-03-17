@@ -205,6 +205,52 @@ test_range_lock (test_lock_table_fixture *fixture, gconstpointer user_data)
 }
 
 static void
+test_range_lock_lower_null (test_lock_table_fixture *fixture,
+			    gconstpointer user_data)
+{
+  GBytes *key = g_bytes_new_static ("foo", 4);
+  GBytes *to = g_bytes_new_static ("foo2", 5);
+
+  g_assert_true (gzochid_lock_range_check_and_set
+		 (fixture->lock_table, 1, NULL, to, NULL));
+  g_assert_false (gzochid_lock_check_and_set
+		  (fixture->lock_table, 2, key, TRUE, NULL));
+
+  g_bytes_unref (to);
+  g_bytes_unref (key);
+}
+
+static void
+test_range_lock_upper_null (test_lock_table_fixture *fixture,
+			    gconstpointer user_data)
+{
+  GBytes *key = g_bytes_new_static ("foo2", 5);
+  GBytes *from = g_bytes_new_static ("foo", 4);
+
+  g_assert_true (gzochid_lock_range_check_and_set
+		 (fixture->lock_table, 1, from, NULL, NULL));
+  g_assert_false (gzochid_lock_check_and_set
+		  (fixture->lock_table, 2, key, TRUE, NULL));
+
+  g_bytes_unref (from);
+  g_bytes_unref (key);
+}
+
+static void
+test_range_lock_null_null (test_lock_table_fixture *fixture,
+			   gconstpointer user_data)
+{
+  GBytes *key = g_bytes_new_static ("foo", 4);
+  
+  g_assert_true (gzochid_lock_range_check_and_set
+		 (fixture->lock_table, 1, NULL, NULL, NULL));
+  g_assert_false (gzochid_lock_check_and_set
+		  (fixture->lock_table, 2, key, TRUE, NULL));
+    
+  g_bytes_unref (key);
+}
+
+static void
 test_range_lock_conflict_with_range_lock (test_lock_table_fixture *fixture,
 					  gconstpointer user_data)
 {
@@ -384,6 +430,15 @@ main (int argc, char *argv[])
   g_test_add
     ("/lock-mem/range-lock/single", test_lock_table_fixture, NULL,
      setup_lock_table, test_range_lock, teardown_lock_table);
+  g_test_add
+    ("/lock-mem/range-lock/lower-null", test_lock_table_fixture, NULL,
+     setup_lock_table, test_range_lock_lower_null, teardown_lock_table);
+  g_test_add
+    ("/lock-mem/range-lock/upper-null", test_lock_table_fixture, NULL,
+     setup_lock_table, test_range_lock_upper_null, teardown_lock_table);
+  g_test_add
+    ("/lock-mem/range-lock/null-null", test_lock_table_fixture, NULL,
+     setup_lock_table, test_range_lock_null_null, teardown_lock_table);
   g_test_add
     ("/lock-mem/range-lock/conflict-with-range-lock", test_lock_table_fixture,
      NULL, setup_lock_table, test_range_lock_conflict_with_range_lock,

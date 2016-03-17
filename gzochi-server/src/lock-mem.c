@@ -71,7 +71,8 @@ typedef struct _itree_node itree_node;
 struct _itree
 {
   itree_node *root; /* The root node. */
-  GCompareFunc comparator; /* The interval bound comparison function. */
+  GCompareFunc lower_comparator; /* The interval bound comparison function. */
+  GCompareFunc upper_comparator; /* The interval bound comparison function. */
 };
 
 typedef struct _itree itree;
@@ -113,12 +114,13 @@ free_itree_node (gpointer data)
 /* Create a new interval tree. */
 
 static itree *
-itree_new (GCompareFunc comparator)
+itree_new (GCompareFunc lower_comparator, GCompareFunc upper_comparator)
 {
   itree *t = malloc (sizeof (itree));
 
   t->root = NULL;
-  t->comparator = comparator;
+  t->lower_comparator = lower_comparator;
+  t->upper_comparator = upper_comparator;
   
   return t;
 }
@@ -182,8 +184,8 @@ itree_location (itree *itree, gpointer lower, gpointer upper)
 
   while (TRUE)
     {
-      gint lower_comparison = itree->comparator (lower, node->lower);
-      gint upper_comparison = itree->comparator (upper, node->upper);
+      gint lower_comparison = itree->lower_comparator (lower, node->lower);
+      gint upper_comparison = itree->upper_comparator (upper, node->upper);
 
       if (lower_comparison == 0 && upper_comparison == 0)
 	return node;
@@ -212,10 +214,10 @@ update_max_upper (itree *itree, itree_node *node)
   gpointer new_max_upper = node->upper;
 
   if (node->left != NULL
-      && itree->comparator (node->left->max_upper, new_max_upper) > 0)
+      && itree->upper_comparator (node->left->max_upper, new_max_upper) > 0)
     new_max_upper = node->left->max_upper;
   if (node->right != NULL
-      && itree->comparator (node->right->max_upper, new_max_upper) > 0)
+      && itree->upper_comparator (node->right->max_upper, new_max_upper) > 0)
     new_max_upper = node->right->max_upper;
 
   if (node->max_upper != new_max_upper)
@@ -345,8 +347,8 @@ itree_insert (itree *itree, gpointer lower, gpointer upper, gpointer data)
 
   if (node == NULL)
     itree->root = itree_node_new (lower, upper, data);
-  else if (itree->comparator (node->lower, lower) == 0
-	   && itree->comparator (node->upper, upper) == 0)
+  else if (itree->lower_comparator (node->lower, lower) == 0
+	   && itree->upper_comparator (node->upper, upper) == 0)
     node->data = data;
   else
     {
@@ -354,7 +356,7 @@ itree_insert (itree *itree, gpointer lower, gpointer upper, gpointer data)
 
       new_node->parent = node;      
       
-      if (itree->comparator (lower, node->lower) < 0)
+      if (itree->lower_comparator (lower, node->lower) < 0)
 	{
 	  node->left = new_node;
 	  node->balance_factor++; /* Adjust the balance factor. */
@@ -426,8 +428,8 @@ itree_remove (itree *itree, gpointer lower, gpointer upper)
   itree_node *node = itree_location (itree, lower, upper);
 
   if (node != NULL
-      && itree->comparator (node->lower, lower) == 0
-      && itree->comparator (node->upper, upper) == 0)
+      && itree->lower_comparator (node->lower, lower) == 0
+      && itree->upper_comparator (node->upper, upper) == 0)
     {
       itree_node *target = NULL;
       itree_node *parent = NULL;
@@ -503,20 +505,20 @@ itree_search_interval (itree *itree, gpointer from, gpointer to,
 
       stack = g_list_delete_link (stack, stack);
 
-      if (itree->comparator (from, node->max_upper) > 0
-	  && itree->comparator (to, node->max_upper) > 0)
+      if (itree->upper_comparator (from, node->max_upper) > 0
+	  && itree->upper_comparator (to, node->max_upper) > 0)
 
 	/* If the interval is entirely outside of the max upper bound in this
 	   sub-tree, there's no point in expanding it any further. */
 	
 	continue;
 
-      if ((itree->comparator (from, node->lower) >= 0
-	   && itree->comparator (from, node->upper) <= 0)
-	  || (itree->comparator (to, node->lower) >= 0
-	      && itree->comparator (to, node->upper) <= 0)
-	  || (itree->comparator (from, node->lower) <= 0
-	      && itree->comparator (to, node->upper) >= 0))
+      if ((itree->lower_comparator (from, node->lower) >= 0
+	   && itree->upper_comparator (from, node->upper) <= 0)
+	  || (itree->lower_comparator (to, node->lower) >= 0
+	      && itree->upper_comparator (to, node->upper) <= 0)
+	  || (itree->lower_comparator (from, node->lower) <= 0
+	      && itree->upper_comparator (to, node->upper) >= 0))
 	if (search_func (node->lower, node->upper, node->data, user_data))
 	  {
 	    g_list_free (stack);
@@ -551,15 +553,15 @@ itree_search (itree *itree, gpointer point, itree_search_func search_func,
 
       stack = g_list_delete_link (stack, stack);
 
-      if (itree->comparator (point, node->max_upper) > 0)
+      if (itree->upper_comparator (point, node->max_upper) > 0)
 
 	/* If the point falls beyond the max upper bound in this sub-tree, 
 	   there's no point in expanding it any further. */
 		
 	continue;
 
-      if (itree->comparator (point, node->lower) >= 0
-	  && itree->comparator (point, node->upper) <= 0)
+      if (itree->lower_comparator (point, node->lower) >= 0
+	  && itree->upper_comparator (point, node->upper) <= 0)
 	if (search_func (node->lower, node->upper, node->data, user_data))
 	  {
 	    g_list_free (stack);
@@ -831,6 +833,28 @@ node_locks_free (gzochid_node_locks *node_locks)
   free (node_locks);
 }
 
+/* Comparison function that sorts `NULL' before all non-`NULL' values. Use for
+   comparing the lower bounds of range locks. */
+
+static gint
+bytes_compare_null_first (gconstpointer o1, gconstpointer o2)
+{
+  if (o1 == NULL)
+    return o2 == NULL ? 0 : -1;
+  else return o2 == NULL ? 1 : g_bytes_compare (o1, o2);
+}
+
+/* Comparison function that sorts `NULL' after all non-`NULL' values. Use for
+   comparing the upper bounds of range locks. */
+
+static gint
+bytes_compare_null_last (gconstpointer o1, gconstpointer o2)
+{
+  if (o1 == NULL)
+    return o2 == NULL ? 0 : 1;
+  else return o2 == NULL ? -1 : g_bytes_compare (o1, o2);
+}
+
 /* 
    Create and return a pointer to a new `gzochid_lock_table' structure.
 
@@ -846,7 +870,8 @@ gzochid_lock_table_new (const char *scope)
   lock_table->locks = g_sequence_new (locks_free);
   lock_table->locks_by_timestamp = g_sequence_new (NULL);
 
-  lock_table->range_locks = itree_new (g_bytes_compare);
+  lock_table->range_locks =
+    itree_new (bytes_compare_null_first, bytes_compare_null_last);
   lock_table->range_locks_by_timestamp = g_sequence_new (NULL);
   
   lock_table->nodes_to_locks = g_hash_table_new_full
@@ -1288,7 +1313,7 @@ remove_lock (gzochid_lock_table *lock_table, gzochid_lock *lock)
       g_hash_table_remove (lock_table->nodes_to_locks, &lock->node_id);
     }
   
-  lock_free (lock, lock_table->key_destroy_fn);
+  lock_free (lock);
 }
 
 void
@@ -1337,10 +1362,10 @@ find_range_lock_with_owner (gpointer from, gpointer to, gpointer data,
 			    gpointer user_data)
 {
   gzochid_range_lock *lock = data;
-  range_lock_match_context *match_context = user_data;
-
-  if (g_bytes_compare (match_context->from, from) == 0
-      && g_bytes_compare (match_context->to, to) == 0
+  range_lock_match_context *match_context = user_data;  
+  
+  if (bytes_compare_null_first (match_context->from, from) == 0
+      && bytes_compare_null_last (match_context->to, to) == 0
       && lock->node_id == match_context->node_id)
     {
       match_context->range_lock = lock;
@@ -1438,5 +1463,7 @@ gzochid_lock_release_all (gzochid_lock_table *lock_table, guint node_id)
     return;
 
   g_list_foreach (node_locks->locks, release_lock, lock_table);
-  g_list_foreach (node_locks->range_locks, release_range_lock, lock_table);
+
+  if (g_hash_table_contains (lock_table->nodes_to_locks, &node_id))  
+    g_list_foreach (node_locks->range_locks, release_range_lock, lock_table);
 }
