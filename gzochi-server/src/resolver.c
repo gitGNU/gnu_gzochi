@@ -40,7 +40,7 @@ struct _GzochidResolutionContext
     resolution context that created them. They shouldn't be unref'd during the
     disposal of the context, because the results are unpredictable (usually a
     double `free'). 
-  */*
+  */
   
   GList *forsaken_instances;
 };
