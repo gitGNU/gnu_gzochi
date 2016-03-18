@@ -32,6 +32,7 @@ test_programs = \
 	test-game-protocol \
 	test-httpd \
 	test-lrucache \
+	test-oids \
 	test-reloc \
 	test-resolver \
 	test-scheme \
@@ -130,6 +131,12 @@ test_httpd_LDADD = $(top_builddir)/src/libgzochid_la-httpd.o \
 test_lrucache_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lrucache_SOURCES = test-lrucache.c
 test_lrucache_LDADD = $(top_builddir)/src/libgzochid_la-lrucache.o @GLIB_LIBS@
+
+test_oids_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_oids_SOURCES = test-oids.c
+test_oids_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
+	$(top_builddir)/src/libgzochid_la-storage-mem.o \
+	@GLIB_LIBS@
 
 test_reloc_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 	@GUILE_CFLAGS@
