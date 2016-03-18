@@ -23,6 +23,7 @@ SUBDIRS = api auth scheme storage
 test_programs = \
 	test-app-task \
 	test-auth \
+	test-config \
 	test-data \
 	test-descriptor \
 	test-durable-task \
@@ -85,6 +86,11 @@ test_data_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_data_SOURCES = test-data.c
 test_data_LDADD = $(top_builddir)/src/libgzochid.la \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+test_config_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
+test_config_SOURCES = test-config.c
+test_config_LDADD = $(top_builddir)/src/libgzochid_la-config.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_descriptor_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_descriptor_SOURCES = test-descriptor.c

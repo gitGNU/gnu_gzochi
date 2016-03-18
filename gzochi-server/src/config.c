@@ -1,5 +1,5 @@
 /* config.c: Configuration management routines for gzochid
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,11 +16,80 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "config.h"
+
+/* Boilerplate setup for the configuration object. */
+
+struct _GzochidConfiguration
+{
+  GObject parent_instance;
+  
+  GKeyFile *key_file; /* Ref to the configuration key file. */
+};
+
+G_DEFINE_TYPE (GzochidConfiguration, gzochid_configuration, G_TYPE_OBJECT);
+
+enum gzochid_configuration_properties
+  {
+    PROP_KEY_FILE = 1,
+    N_PROPERTIES
+  };
+
+static void
+gzochid_configuration_finalize (GObject *gobject)
+{
+  GzochidConfiguration *configuration = GZOCHID_CONFIGURATION (gobject);
+
+  g_key_file_unref (configuration->key_file);
+  
+  G_OBJECT_CLASS (gzochid_configuration_parent_class)->finalize (gobject);
+}
+
+static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+gzochid_configuration_set_property (GObject *object, guint property_id,
+				    const GValue *value, GParamSpec *pspec)
+{
+  GzochidConfiguration *self = GZOCHID_CONFIGURATION (object);
+
+  switch (property_id)
+    {
+    case PROP_KEY_FILE:
+      self->key_file = g_key_file_ref (g_value_get_pointer (value));
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+gzochid_configuration_class_init (GzochidConfigurationClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+  
+  object_class->finalize = gzochid_configuration_finalize;
+  object_class->set_property = gzochid_configuration_set_property;
+
+  obj_properties[PROP_KEY_FILE] = g_param_spec_pointer
+    ("key_file", "Configuration key file", "Set the configuration key file",
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
+
+  g_object_class_install_properties
+    (object_class, N_PROPERTIES, obj_properties);
+}
+
+static void
+gzochid_configuration_init (GzochidConfiguration *self)
+{
+}
 
 gboolean gzochid_config_to_boolean (char *str, gboolean def)
 {
@@ -53,8 +122,8 @@ long gzochid_config_to_long (char *str, long def)
   return def;
 }
 
-GHashTable *gzochid_config_keyfile_extract_config 
-(GKeyFile *key_file, char *group)
+GHashTable *
+gzochid_config_keyfile_extract_config (GKeyFile *key_file, const char *group)
 {
   unsigned int i = 0;
   gsize num_keys = 0;
@@ -68,4 +137,11 @@ GHashTable *gzochid_config_keyfile_extract_config
   
   free (keys);
   return config;
+}
+
+GHashTable *
+gzochid_configuration_extract_group (GzochidConfiguration *config,
+				     const char *group)
+{
+  return gzochid_config_keyfile_extract_config (config->key_file, group);
 }
