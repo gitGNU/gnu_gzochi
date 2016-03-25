@@ -1,5 +1,5 @@
 /* io.h: Prototypes and declarations for io.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@
 #ifndef GZOCHI_COMMON_IO_H
 #define GZOCHI_COMMON_IO_H
 
-int gzochi_common_io_read_int (unsigned char *, int);
-short gzochi_common_io_read_short (unsigned char *, int);
+int gzochi_common_io_read_int (const unsigned char *, int);
+short gzochi_common_io_read_short (const unsigned char *, int);
 
 void gzochi_common_io_write_int (int, unsigned char *, int);
 void gzochi_common_io_write_short (short, unsigned char *, int);
