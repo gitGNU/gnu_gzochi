@@ -25,6 +25,7 @@ test_programs = \
 	test-auth \
 	test-config \
 	test-data \
+	test-data-protocol \
 	test-descriptor \
 	test-durable-task \
 	test-event \
@@ -92,6 +93,12 @@ test_config_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_config_SOURCES = test-config.c
 test_config_LDADD = $(top_builddir)/src/libgzochid_la-config.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@
+
+test_data_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
+	@GZOCHI_COMMON_CFLAGS@
+test_data_protocol_SOURCES = test-data-protocol.c
+test_data_protocol_LDADD = $(top_builddir)/src/libgzochid_la-data-protocol.o \
+	@GLIB_LIBS@ @GZOCHI_COMMON_LIBS@
 
 test_descriptor_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_descriptor_SOURCES = test-descriptor.c
