@@ -24,6 +24,7 @@
 
 #include "config.h"
 #include "dataserver.h"
+#include "dataserver-protocol.h"
 #include "gzochid-storage.h"
 #include "lock.h"
 #include "oids.h"
@@ -198,6 +199,8 @@ gzochi_metad_data_server_class_init (GzochiMetadDataServerClass *klass)
 static void
 gzochi_metad_data_server_init (GzochiMetadDataServer *self)
 {
+  self->server_socket = gzochid_server_socket_new
+    (gzochi_metad_dataserver_server_protocol, NULL);
   self->application_stores = g_hash_table_new_full
     (g_str_hash, g_str_equal, (GDestroyNotify) free, (GDestroyNotify) free);
   self->port = 0;
