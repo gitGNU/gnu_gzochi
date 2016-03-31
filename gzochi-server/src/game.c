@@ -159,7 +159,7 @@ initialize_server (int from_state, int to_state, gpointer user_data)
   gzochid_game_context *game_context = user_data;
 
   game_context->server_socket = gzochid_server_socket_new
-    (gzochid_game_server_protocol, game_context);
+    ("Game server", gzochid_game_server_protocol, game_context);
   gzochid_server_socket_listen
     (game_context->socket_server, game_context->server_socket,
      game_context->port);

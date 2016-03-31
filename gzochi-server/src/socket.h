@@ -121,11 +121,11 @@ gpointer _gzochid_client_socket_get_protocol_data (gzochid_client_socket *);
 /* The following functions can be used to manipulate `gzochid_server_socket'
    structures. */
 
-/* Create and return a new server socket with the specified protocol and 
+/* Create and return a new server socket with the specified name, protocol and 
    callback data. */
 
 gzochid_server_socket *gzochid_server_socket_new
-(gzochid_server_protocol, gpointer);
+(char *, gzochid_server_protocol, gpointer);
 
 /* Frees the resources associated with the specified server socket. */
 

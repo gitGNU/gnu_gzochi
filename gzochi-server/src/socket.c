@@ -60,6 +60,7 @@ struct _gzochid_server_socket
 {
   GzochidSocketServer *server; /* A ref to the socket server. */
 
+  char *name; /* The server socket name, for logging. */
   GIOChannel *channel; /* The server socket IO channel. */
   struct sockaddr *addr; /* The actual address of the server socket. */
   socklen_t addrlen; /* The length of `addr'. */
@@ -87,12 +88,13 @@ struct _gzochid_client_socket
 };
 
 gzochid_server_socket *
-gzochid_server_socket_new (gzochid_server_protocol protocol,
+gzochid_server_socket_new (char *name, gzochid_server_protocol protocol,
 			   gpointer protocol_data)
 {
   gzochid_server_socket *server_socket =
     calloc (1, sizeof (gzochid_server_socket));
 
+  server_socket->name = strdup (name);
   server_socket->protocol = protocol;
   server_socket->protocol_data = protocol_data;
 
@@ -369,8 +371,8 @@ void gzochid_server_socket_listen
 
       if (getsockname (fd, sock->addr, &sock->addrlen) != 0)
 	g_critical ("Failed to get name of bound socket");
-      else g_message
-	     ("Game server listening on port %d", ntohs (bound_addr->sin_port));
+      else g_message ("%s listening on port %d", sock->name,
+		      ntohs (bound_addr->sin_port));
     }
 
   g_source_set_callback
