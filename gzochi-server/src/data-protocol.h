@@ -146,6 +146,12 @@
 
 #define GZOCHID_DATA_PROTOCOL_BINDING_RESPONSE 0x52
 
+/* Contains the object id bound to a particular name. See 
+   `gzochid_data_protocol_binding_key_response_write' below for format 
+   details. */
+
+#define GZOCHID_DATA_PROTOCOL_NEXT_BINDING_RESPONSE 0x53
+
 /*
   Requests the client release, by sending an object release request, all point
   locks (read and write) on a particular object id. Format:
@@ -342,6 +348,8 @@ void gzochid_data_object_response_free (gzochid_data_object_response *);
   Serialize the specified object response to the specified byte array. Format:
 
   `NULL'-terminated string: Name of the requesting game application
+  1 byte: 0x01 indicating success (and that object data follows), 
+    0x00 indicating failure
   2 bytes: The big-endian encoding of the length of the serialized object
     Two zeros indicates the absence of an object; else the object data follows
 */
@@ -392,8 +400,10 @@ void gzochid_data_binding_response_free (gzochid_data_binding_response *);
   Serialize the specified binding response to the specified byte array. Format:
 
   `NULL'-terminated string: Name of the requesting game application
+  1 byte: 0x01 indicating success (and that binding data follows), 
+    0x00 indicating failure
   `NULL'-terminated string: Hexadecimal string representation of the target oid
-    or 1 `NULL' byte to indicate a deletion
+    or 1 `NULL' byte to indicate an absent binding
 */
 
 void gzochid_data_protocol_binding_response_write
@@ -432,7 +442,9 @@ void gzochid_data_binding_key_response_free
   Format:
 
   `NULL'-terminated string: Name of the requesting game application
-  `NULL'-termianted string: Name of the next binding
+  1 byte: 0x01 indicating success (and that binding data follows), 
+    0x00 indicating failure
+  `NULL'-terminated string: Name of the next binding
     or 1 `NULL' byte to indicate the absence of a next binding
 */
 
