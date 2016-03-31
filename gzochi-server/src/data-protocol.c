@@ -839,7 +839,7 @@ gzochid_data_protocol_changeset_read (GBytes *data)
   if (len <= 2)
     return NULL;
 
-  num_object_changes = gzochi_common_io_read_short (bytes, offset);
+  num_binding_changes = gzochi_common_io_read_short (bytes, offset);
 
   offset += 2;
   len -= 2;
