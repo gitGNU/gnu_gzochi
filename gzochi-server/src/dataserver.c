@@ -619,13 +619,20 @@ gzochi_metad_dataserver_release_binding_range (GzochiMetadDataServer *server,
 
 void
 gzochi_metad_dataserver_release_all (GzochiMetadDataServer *server,
-				     guint node_id, char *app)
+				     guint node_id)
 {
-  gzochi_metad_dataserver_application_store *store =
-    ensure_open_application_store (server, app);
+  GHashTableIter iter;
+  gpointer value = NULL;
 
-  gzochid_lock_release_all (store->oids_locks, node_id);
-  gzochid_lock_release_all (store->names_locks, node_id);
+  g_hash_table_iter_init (&iter, server->application_stores);
+
+  while (g_hash_table_iter_next (&iter, NULL, &value))
+    {
+      gzochi_metad_dataserver_application_store *store = value;
+
+      gzochid_lock_release_all (store->oids_locks, node_id);
+      gzochid_lock_release_all (store->names_locks, node_id);
+    }
 }
 
 GQuark

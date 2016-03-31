@@ -135,10 +135,10 @@ void gzochi_metad_dataserver_release_binding_range
 (GzochiMetadDataServer *, guint, char *, char *, char *);
 
 /* Releases all locks (read / write / range) held by the specified node id 
-   within the specified data server and application. */ 
+   within the specified data server. */ 
 
 void gzochi_metad_dataserver_release_all
-(GzochiMetadDataServer *, guint, char *);
+(GzochiMetadDataServer *, guint);
 
 /* Process the specified changeset on behalf of the specified node id with 
    respect to the specified data server as a single, atomic transaction. Sets

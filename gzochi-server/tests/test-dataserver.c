@@ -465,7 +465,7 @@ test_release_all (dataserver_fixture *fixture, gconstpointer user_data)
   response3a = gzochi_metad_dataserver_request_object
     (fixture->server, 1, "test", oid, TRUE);
 
-  gzochi_metad_dataserver_release_all (fixture->server, 1, "test");
+  gzochi_metad_dataserver_release_all (fixture->server, 1);
 
   response1b = gzochi_metad_dataserver_request_next_binding
     (fixture->server, 2, "test", NULL);
