@@ -109,6 +109,10 @@ gzochi_metad_data_server_set_property (GObject *object, guint property_id,
     case PROP_CONFIGURATION:
       self->configuration = gzochid_configuration_extract_group
 	(GZOCHID_CONFIGURATION (g_value_get_object (value)), "data");
+
+      self->port = gzochid_config_to_boolean
+	(g_hash_table_lookup (self->configuration, "server.port"), 9001);
+
       break;
 
     case PROP_SOCKET_SERVER:
