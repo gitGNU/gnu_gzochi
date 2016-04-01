@@ -1,0 +1,58 @@
+#
+# The gzochi meta server configuration file.
+#
+
+# Configuration for the "admin" context, which includes the web monitoring
+# console.
+
+[admin]
+
+# Configuration for the web monitoring console.
+
+module.httpd.enabled = true
+module.httpd.port = 8800
+
+
+# Configuration for the "data" context, which governs the meta server's
+# data-serving functionality. 
+
+[data]
+
+# The port to listen on for connections to the data server from gzochi game
+# application servers.
+
+server.port = 9001
+
+# The root location for persistent game application data. See the manual
+# for more information.
+
+server.fs.data = @localstatedir@/gzochid/data
+
+# The parent directory for storage engine libraries. This path is used to 
+# resolve the absolute location of the storage engine specified by 
+# 'storage.engine' (see below).
+
+storage.engine.dir = @libdir@/gzochid/storage
+
+# The name of the storage engine to use to store game application data. Must be
+# one of bdb, hdb, lmdb, and mem; which correspond to Berkeley DB, hamsterdb, 
+# Symas Lightning DB, and gzochid's built-in B*tree-based storage engine,
+# respectively. Support for each storage engine (besides 'mem') depends on the
+# requisite module (and associated third-party database libraries) being 
+# installed
+# 
+# If this setting is omitted, the server will fall back to using the 'mem' 
+# storage engine, which means that game application data will not be persisted 
+# to disk. Note that this is not a safe configuration for a server in a 
+# production context!
+
+storage.engine = bdb
+
+# System-wide logging configuration.
+
+[log]
+
+# The lowest severity of log messages that will be recorded. Valid values are
+# ERR, WARNING, NOTICE, INFO, and DEBUG. 
+
+priority.threshold = INFO

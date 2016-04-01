@@ -24,12 +24,17 @@ SUBDIRS = api auth scheme storage
 
 bin_PROGRAMS = gzochid gzochi-dump gzochi-load gzochi-migrate
 dist_noinst_DATA = dtd/game.dtd dtd/migration.dtd
-dist_sysconf_DATA = conf/gzochid.conf
-EXTRA_DIST = conf/gzochid.conf.in
+dist_sysconf_DATA = conf/gzochi-metad.conf conf/gzochid.conf
+EXTRA_DIST = conf/gzochi-metad.conf conf/gzochid.conf.in
 
 substitute = sed -e 's,[@]datarootdir[@],$(datarootdir),g' \
 	-e 's,[@]libdir[@],$(libdir),g' \
 	-e 's,[@]localstatedir[@],$(localstatedir),g'
+
+conf/gzochi-metad.conf: conf/gzochi-metad.conf.in $(top_builddir)/config.status
+	mkdir -p $(builddir)/conf
+	$(substitute) < "$<" > "$@.out"
+	mv "$@.out" "$@"
 
 conf/gzochid.conf: conf/gzochid.conf.in $(top_builddir)/config.status
 	mkdir -p $(builddir)/conf
@@ -99,4 +104,4 @@ gzochi_migrate_CFLAGS = @CFLAGS@ \
 gzochi_migrate_SOURCES = gzochi-migrate.c toollib.c
 gzochi_migrate_LDADD = libgzochid.la @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
-CLEANFILES = conf/gzochid.conf
+CLEANFILES = conf/gzochi-metad.conf conf/gzochid.conf
