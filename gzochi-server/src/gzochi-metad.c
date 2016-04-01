@@ -18,6 +18,7 @@
 #include <config.h>
 #include <getopt.h>
 #include <glib.h>
+#include <glib-object.h>
 #include <libintl.h>
 #include <locale.h>
 #include <stdio.h>
