@@ -26,12 +26,15 @@ test_programs = \
 	test-config \
 	test-data \
 	test-data-protocol \
+	test-dataserver \
+	test-dataserver-protocol \
 	test-descriptor \
 	test-durable-task \
 	test-event \
 	test-fsm \
 	test-game-protocol \
 	test-httpd \
+	test-lock-mem \
 	test-lrucache \
 	test-oids \
 	test-reloc \
@@ -100,6 +103,31 @@ test_data_protocol_SOURCES = test-data-protocol.c
 test_data_protocol_LDADD = $(top_builddir)/src/libgzochid_la-data-protocol.o \
 	@GLIB_LIBS@ @GZOCHI_COMMON_LIBS@
 
+test_dataserver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
+	@GZOCHI_COMMON_CFLAGS@
+test_dataserver_SOURCES = test-dataserver.c
+test_dataserver_LDADD = $(top_builddir)/src/libgzochi_metad_la-dataserver.o \
+	$(top_builddir)/src/libgzochid_la-config.o \
+	$(top_builddir)/src/libgzochid_la-data-protocol.o \
+	$(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
+	$(top_builddir)/src/libgzochid_la-oids.o \
+	$(top_builddir)/src/libgzochid_la-resolver.o \
+	$(top_builddir)/src/libgzochid_la-socket.o \
+	$(top_builddir)/src/libgzochid_la-storage.o \
+	$(top_builddir)/src/libgzochid_la-storage-mem.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@ @GMODULE_LIBS@ @GZOCHI_COMMON_LIBS@
+
+test_dataserver_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
+	@GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+test_dataserver_protocol_SOURCES = test-dataserver-protocol.c
+test_dataserver_protocol_LDADD = \
+	$(top_builddir)/src/libgzochi_metad_la-dataserver-protocol.o \
+	$(top_builddir)/src/libgzochid_la-data-protocol.o \
+	$(top_builddir)/src/libgzochid_la-oids.o \
+	$(top_builddir)/src/libgzochid_la-resolver.o \
+	$(top_builddir)/src/libgzochid_la-socket.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
+
 test_descriptor_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_descriptor_SOURCES = test-descriptor.c
 test_descriptor_LDADD = $(top_builddir)/src/libgzochid_la-callback.o \
@@ -134,6 +162,11 @@ test_httpd_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
 test_httpd_SOURCES = test-httpd.c
 test_httpd_LDADD = $(top_builddir)/src/libgzochid_la-httpd.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @MICROHTTPD_LIBS@
+
+test_lock_mem_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_lock_mem_SOURCES = test-lock-mem.c
+test_lock_mem_LDADD = $(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
+	@GLIB_LIBS@
 
 test_lrucache_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lrucache_SOURCES = test-lrucache.c
