@@ -22,7 +22,7 @@ plugindir = $(libdir)/gzochid
 
 SUBDIRS = api auth scheme storage
 
-bin_PROGRAMS = gzochid gzochi-dump gzochi-load gzochi-migrate
+bin_PROGRAMS = gzochid gzochi-metad gzochi-dump gzochi-load gzochi-migrate
 dist_noinst_DATA = dtd/game.dtd dtd/migration.dtd
 dist_sysconf_DATA = conf/gzochi-metad.conf conf/gzochid.conf
 EXTRA_DIST = conf/gzochi-metad.conf conf/gzochid.conf.in
@@ -47,12 +47,12 @@ noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
 	config.h context.h data.h data-protocol.h dataserver.h \
 	dataserver-protocol.h debug.h descriptor.h durable-task.h event.h \
 	fmemopen.h fsm.h game.h game-protocol.h guile.h gzochid.h httpd.h \
-	httpd-app.h io.h lifecycle.h log.h lrucache.h oids.h protocol.h \
-	reloc.h resolver.h schedule.h scheme.h scheme-task.h session.h \
-	socket.h stats.h storage.h storage-mem.h task.h threads.h toollib.h \
-	tx.h txlog.h util.h
+	httpd-app.h httpd-meta.h io.h lifecycle.h lock.h log.h lrucache.h \
+	oids.h protocol.h reloc.h resolver.h schedule.h scheme.h scheme-task.h \
+	session.h socket.h stats.h storage.h storage-mem.h task.h threads.h \
+	toollib.h tx.h txlog.h util.h
 
-noinst_LTLIBRARIES = libgzochid.la
+noinst_LTLIBRARIES = libgzochid.la libgzochi-metad.la
 
 libgzochid_la_CFLAGS = @CFLAGS@ \
 	-DGZOCHID_AUTH_PLUGIN_DIR=\"$(plugindir)/auth\" \
@@ -103,5 +103,23 @@ gzochi_migrate_CFLAGS = @CFLAGS@ \
 	-Wall -Werror
 gzochi_migrate_SOURCES = gzochi-migrate.c toollib.c
 gzochi_migrate_LDADD = libgzochid.la @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+libgzochi_metad_la_CFLAGS = @CFLAGS@ \
+	-DGZOCHID_STORAGE_ENGINE_DIR=\"$(plugindir)/storage\" @GLIB_CFLAGS@ \
+	@GMODULE_CFLAGS@ @GTHREAD_CFLAGS@ @GOBJECT_CFLAGS@ @MICROHTTPD_CFLAGS@ \
+	@GZOCHI_COMMON_CFLAGS@ \
+	-Wall -Werror
+libgzochi_metad_la_SOURCES = config.c data-protocol.c dataserver.c \
+	dataserver-protocol.c httpd.c httpd-meta.c lock-mem.c log.c oids.c \
+	resolver.c socket.c storage.c storage-mem.c
+libgzochi_metad_la_LIBADD = @GLIB_LIBS@ @GMODULE_LIBS@ @GTHREAD_LIBS@ \
+	@GOBJECT_LIBS@ @MICROHTTPD_LIBS@ @GZOCHI_COMMON_LIBS@
+
+gzochi_metad_CFLAGS = @CFLAGS@ \
+	-DGZOCHI_METAD_CONF_LOCATION=$(sysconfdir)/gzochi-metad.conf \
+	@GLIB_CFLAGS@ @GOBJECT_LIBS@ @GTHREAD_CFLAGS@ -Wall -Werror
+
+gzochi_metad_SOURCES = gzochi-metad.c
+gzochi_metad_LDADD = libgzochi-metad.la
 
 CLEANFILES = conf/gzochi-metad.conf conf/gzochid.conf
