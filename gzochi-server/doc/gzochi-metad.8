@@ -1,0 +1,43 @@
+.TH GZOCHI-METAD 8 "April 1, 2016"
+.SH NAME
+.Nm gzochi-metad - the gzochi meta server
+.SH SYNOPSIS
+\fBgzochi-metad [\fR\fB\fIoptions\fR\fB]\fR
+.SH DESCRIPTION
+\fBgzochi-metad\fR, the meta server for the gzochi massively multiplayer online
+game development framework, is responsible for supporting gzochi game
+application servers in a high-availability game server cluster with data and
+coordination services. As its name suggests, it's a server for servers.
+.P
+When gzochi-metad starts, it begins listening for connections from gzochid
+processes, and optionally starts a web server that reports information about the
+state of the game server cluster.
+.P
+The \fBgzochi-metad\fR program has many options that can be specified at
+startup. For a complete list of options, run this command:
+.IP
+shell> \fBgzochi-metad \-\-help\fR
+.SH ENVIRONMENT
+.TP
+.B GZOCHI_METAD_CONF_LOCATION
+If \fB$GZOCHI_METAD_CONF_LOCATION\fR is set before \fBgzochi-metad\fR is
+started, its value is used as the full path to the meta server configuration
+file. This variable will be overriden by a command-line argument giving the
+location of the file, if present.
+.SH SEE ALSO
+.P
+The full documentation for \fBgzochi-metad\fR is maintained as a Texinfo
+manual. If the \fBinfo\fR and \fBgzochi-metad\fR programs are properly 
+installed at your site, the command
+.IP
+.B info gzochi-metad
+.P
+should give you access to the complete manual.
+.SH COPYRIGHT
+Copyright \(co 2016 Julian Graham. License GPLv3+: GNU GPL version 3
+or later <http://gnu.org/licenses/gpl.html>.
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+.SH AUTHOR
+Julian Graham (joolean@undecidable.net)

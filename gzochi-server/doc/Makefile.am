@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2015 Julian Graham
+# Copyright (C) 2016 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ ps: # do nothing for make ps
 
 gzochid_TEXINFOS = fdl.texi
 man_MANS = gzochid.8 \
+	gzochi-metad.8 \
 	gzochi-dump.1 \
 	gzochi-load.1 \
 	gzochi-migrate.1
