@@ -129,6 +129,8 @@ setup_dataserver (dataserver_fixture *fixture, gconstpointer user_data)
   GzochidResolutionContext *resolution_context = g_object_new
     (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
 
+  g_key_file_set_value (key_file, "data", "server.port", "0");
+  
   gzochid_resolver_provide (resolution_context, G_OBJECT (configuration), NULL);
 
   fixture->server = gzochid_resolver_require_full
