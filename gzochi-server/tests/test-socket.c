@@ -122,7 +122,7 @@ test_socket_fixture_set_up (test_socket_fixture *fixture,
   fixture->state = calloc (1, sizeof (test_client_state));
   fixture->socket_server = g_object_new (GZOCHID_TYPE_SOCKET_SERVER, NULL);
   fixture->server_socket = gzochid_server_socket_new
-    (test_server_protocol, fixture);
+    ("test", test_server_protocol, fixture);
 
   gzochid_server_socket_listen
     (fixture->socket_server, fixture->server_socket, 0);

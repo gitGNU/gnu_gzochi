@@ -71,7 +71,7 @@ game_protocol_fixture_set_up (game_protocol_fixture *fixture,
   
   fixture->game_context = gzochid_game_context_new ();
   fixture->server_socket = gzochid_server_socket_new
-    (game_server_wrapper_protocol, fixture);
+    ("test", game_server_wrapper_protocol, fixture);
   
   gzochid_server_socket_listen
     (fixture->game_context->socket_server, fixture->server_socket, 0);

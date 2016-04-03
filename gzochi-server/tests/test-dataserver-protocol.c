@@ -218,7 +218,7 @@ dataserver_protocol_fixture_set_up (dataserver_protocol_fixture *fixture,
     (GZOCHID_TYPE_SOCKET_SERVER, NULL);
   
   fixture->server_socket = gzochid_server_socket_new
-    (dataserver_server_wrapper_protocol, fixture);
+    ("test", dataserver_server_wrapper_protocol, fixture);
   
   gzochid_server_socket_listen
     (fixture->socket_server, fixture->server_socket, 0);
