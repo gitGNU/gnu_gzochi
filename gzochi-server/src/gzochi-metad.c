@@ -44,10 +44,20 @@
 #endif /* GZOCHI_METAD_CONF_LOCATION */
 
 #define GZOCHI_METAD_TYPE_ROOT_CONTEXT gzochi_metad_root_context_get_type ()
-G_DECLARE_FINAL_TYPE (GzochiMetadRootContext, gzochi_metad_root_context,
-		      GZOCHI_METAD, ROOT_CONTEXT, GObject);
 
 /* Boilerplate setup for the gzochi-metad root context. */
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochi_metad_root_context_get_type (void);
+
+struct _GzochiMetadRootContextClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _GzochiMetadRootContextClass GzochiMetadRootContextClass;
 
 /* The root context object. */
 
@@ -63,6 +73,14 @@ struct _GzochiMetadRootContext
   
   GzochiMetadDataServer *data_server; /* The meta server data server. */
 };
+
+typedef struct _GzochiMetadRootContext GzochiMetadRootContext;
+
+static inline GzochiMetadRootContext *
+GZOCHI_METAD_ROOT_CONTEXT (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_configuration_get_type (), GzochiMetadRootContext);
+}
 
 G_DEFINE_TYPE (GzochiMetadRootContext, gzochi_metad_root_context,
 	       G_TYPE_OBJECT);
