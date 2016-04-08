@@ -19,31 +19,63 @@
 #define GZOCHID_H
 
 #include <glib.h>
+#include <glib-object.h>
 
-#include "admin.h"
-#include "context.h"
+#include "config.h"
+#include "dataclient.h"
+#include "resolver.h"
 #include "socket.h"
 
-struct _gzochid_server_context
-{
-  gzochid_context base;
-  const char *gzochid_conf_path;
-  GThreadPool *pool;
+#define GZOCHID_TYPE_ROOT_CONTEXT gzochid_root_context_get_type ()
 
-  gzochid_context *admin_context;
-  gzochid_context *game_context;
+/* Boilerplate setup for the gzochid root context. */
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_root_context_get_type (void);
+
+struct _GzochidRootContextClass
+{
+  GObjectClass parent_class;
 };
 
-typedef struct _gzochid_server_context gzochid_server_context;
+typedef struct _GzochidRootContextClass GzochidRootContextClass;
 
-enum gzochid_state 
-  {
-    GZOCHID_STATE_INITIALIZING,
-    GZOCHID_STATE_RUNNING,
-    GZOCHID_STATE_STOPPED
-  };
+/* The root context object. */
 
-gzochid_server_context *gzochid_server_context_new (void);
-void gzochid_server_context_init (gzochid_server_context *);
+struct _GzochidRootContext
+{
+  GObject parent_intance;
+  
+  const char *gzochid_conf_path;
+  GzochidConfiguration *configuration; /* The server configuration. */
+  GzochidSocketServer *socket_server; /* The global socket server. */  
+
+  /*
+    A reference to the resolution context that "owns" the root context, for
+    use in bootstrapping other components that don't yet support automatic
+    resolution.
+  */
+
+  GzochidResolutionContext *resolution_context;
+
+  GzochidDataClient *data_client;
+  
+  /* Components that can't yet be auto-resolved. */
+
+  gzochid_context *admin_context; /* The admin service context. */
+  gzochid_context *game_server; /* The game server context. */
+};
+
+typedef struct _GzochidRootContext GzochidRootContext;
+
+static inline GzochidRootContext *
+GZOCHID_ROOT_CONTEXT (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_root_context_get_type (), GzochidRootContext);
+}
+
+/* End boilerplate. */
 
 #endif /* GZOCHID_H */

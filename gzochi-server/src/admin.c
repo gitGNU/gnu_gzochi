@@ -37,6 +37,7 @@ struct _gzochid_admin_context
 {
   gzochid_context base;
 
+  GzochidRootContext *root_context;
   GzochidHttpServer *http_server;
   
   GThreadPool *pool;
@@ -46,13 +47,7 @@ struct _gzochid_admin_context
 static void *
 initialize_guile (void *data)
 {
-  gzochid_context *context = data;
-  gzochid_server_context *server_context = 
-    (gzochid_server_context *) context->parent;
-
-  gzochid_api_admin_init 
-    ((gzochid_game_context *) server_context->game_context);
-
+  gzochid_api_admin_init (data);
   return NULL;
 }
 
@@ -77,12 +72,13 @@ initialize (int from_state, int to_state, gpointer user_data)
 	(g_hash_table_lookup (admin_context->config, "module.httpd.port"), 
 	 8000);
       
-      admin_context->http_server = gzochid_resolver_require
-	(GZOCHID_TYPE_HTTP_SERVER, NULL);
+      admin_context->http_server = gzochid_resolver_require_full
+	(admin_context->root_context->resolution_context,
+	 GZOCHID_TYPE_HTTP_SERVER, NULL);
       
       gzochid_httpd_app_register_handlers
 	(admin_context->http_server, (gzochid_game_context *)
-	 ((gzochid_server_context *) context->parent)->game_context);
+	 admin_context->root_context->game_server);
 
       gzochid_http_server_start (admin_context->http_server, port, NULL);
     }
@@ -98,7 +94,7 @@ initialize (int from_state, int to_state, gpointer user_data)
       gzochid_debug_context_init (debug_context, context, port);
     }
   
-  scm_with_guile (initialize_guile, context);
+  scm_with_guile (initialize_guile, admin_context->root_context->game_server);
   gzochid_fsm_to_state (context->fsm, GZOCHID_ADMIN_STATE_RUNNING);
 }
 
@@ -112,28 +108,36 @@ void
 gzochid_admin_context_free (gzochid_admin_context *context)
 {
   gzochid_context_free ((gzochid_context *) context);
+
+  if (context->root_context != NULL)
+    g_object_unref (context->root_context);
+  if (context->http_server != NULL)
+    g_object_unref (context->http_server);
+
   free (context);
 }
 
 void 
 gzochid_admin_context_init (gzochid_admin_context *context, 
-			    gzochid_context *parent, GHashTable *config)
+			    GzochidRootContext *root_context)
 {
-  gzochid_fsm *fsm = gzochid_fsm_new 
+  gzochid_fsm *fsm = gzochid_fsm_new
     ("admin", GZOCHID_ADMIN_STATE_INITIALIZING, "INITIALIZING");
 
   gzochid_fsm_add_state (fsm, GZOCHID_ADMIN_STATE_RUNNING, "RUNNING");
   gzochid_fsm_add_state (fsm, GZOCHID_ADMIN_STATE_STOPPED, "STOPPED");
 
-  context->config = g_hash_table_ref (config);
+  context->root_context = g_object_ref (root_context);
+  context->config = gzochid_configuration_extract_group
+    (root_context->configuration, "admin");
 
   gzochid_fsm_add_transition 
     (fsm, GZOCHID_ADMIN_STATE_INITIALIZING, GZOCHID_ADMIN_STATE_RUNNING);
   gzochid_fsm_add_transition 
     (fsm, GZOCHID_ADMIN_STATE_RUNNING, GZOCHID_ADMIN_STATE_STOPPED);
 
-  gzochid_fsm_on_enter 
+  gzochid_fsm_on_enter
     (fsm, GZOCHID_ADMIN_STATE_INITIALIZING, initialize, context);
 
-  gzochid_context_init ((gzochid_context *) context, parent, fsm);
+  gzochid_context_init ((gzochid_context *) context, NULL, fsm);
 }

@@ -27,8 +27,7 @@
 
 #include "admin.h"
 #include "config.h"
-#include "context.h"
-#include "fsm.h"
+#include "dataclient.h"
 #include "game.h"
 #include "guile.h"
 #include "gzochid.h"
@@ -44,6 +43,77 @@
 #define GZOCHID_CONF_LOCATION "/etc/gzochid.conf"
 #endif /* GZOCHID_CONF_LOCATION */
 
+G_DEFINE_TYPE (GzochidRootContext, gzochid_root_context, G_TYPE_OBJECT);
+
+enum gzochid_root_context_properties
+  {
+    PROP_CONFIGURATION = 1,
+    PROP_SOCKET_SERVER,
+    PROP_RESOLUTION_CONTEXT,
+    N_PROPERTIES
+  };
+
+static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+root_context_set_property (GObject *object, guint property_id,
+			   const GValue *value, GParamSpec *pspec)
+{
+  GzochidRootContext *self = GZOCHID_ROOT_CONTEXT (object);
+
+  switch (property_id)
+    {
+    case PROP_CONFIGURATION:
+      self->configuration = g_object_ref (g_value_get_object (value));
+      break;
+      
+    case PROP_SOCKET_SERVER:
+      self->socket_server = g_object_ref (g_value_get_object (value));
+      break;
+
+    case PROP_RESOLUTION_CONTEXT:
+      self->resolution_context = g_object_ref (g_value_get_object (value));
+      break;
+      
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+gzochid_root_context_class_init (GzochidRootContextClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->set_property = root_context_set_property;
+
+  obj_properties[PROP_CONFIGURATION] = g_param_spec_object
+    ("configuration", "Configuration", "Set the configuration",
+     GZOCHID_TYPE_CONFIGURATION,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+
+  obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
+    ("socket-server", "Socket server", "Set the socket server",
+     GZOCHID_TYPE_SOCKET_SERVER,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+
+  obj_properties[PROP_RESOLUTION_CONTEXT] = g_param_spec_object
+    ("resolution-context", "Resolution context", "Set the resolution context",
+     GZOCHID_TYPE_RESOLUTION_CONTEXT,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+
+  g_object_class_install_properties
+    (object_class, N_PROPERTIES, obj_properties);
+}
+
+static void
+gzochid_root_context_init (GzochidRootContext *self)
+{
+  self->admin_context = (gzochid_context *) gzochid_admin_context_new ();
+  self->game_server = (gzochid_context *) gzochid_game_context_new ();
+}
+
 static const struct option longopts[] =
   {
     { "config", required_argument, NULL, 'c' },
@@ -51,95 +121,6 @@ static const struct option longopts[] =
     { "version", no_argument, NULL, 'v' },
     { NULL, 0, NULL, 0 }
   };
-
-static void 
-initialize_async (gpointer data, gpointer user_data)
-{
-  gzochid_context *context = user_data;
-  gzochid_server_context *server_context = (gzochid_server_context *) context;
-
-  GKeyFile *key_file = g_key_file_new ();
-  GHashTable *admin_config = NULL;
-  GHashTable *game_config = NULL;  
-  GHashTable *log_config = NULL;
-
-  GError *err = NULL;
-
-  server_context->admin_context = 
-    (gzochid_context *) gzochid_admin_context_new ();
-  server_context->game_context =
-    (gzochid_context *) gzochid_game_context_new ();
-
-  g_key_file_load_from_file 
-    (key_file, server_context->gzochid_conf_path, G_KEY_FILE_NONE, &err);
-
-  if (err != NULL)
-    {
-      /* 
-	 The server has reasonable defaults for everything in gzochid.conf, so
-	 this condition is not fatal.
-      */
-
-      g_warning 
-	("Failed to load server configuration file %s: %s", 
-	 server_context->gzochid_conf_path, err->message);
-      g_error_free (err);
-    }
-
-  admin_config = gzochid_config_keyfile_extract_config (key_file, "admin");
-  game_config = gzochid_config_keyfile_extract_config (key_file, "game");
-  log_config = gzochid_config_keyfile_extract_config (key_file, "log");
-
-  if (g_hash_table_contains (log_config, "priority.threshold")) 
-    {
-      char *threshold = g_hash_table_lookup (log_config, "priority.threshold");
-
-      if (g_ascii_strncasecmp (threshold, "EMERG", 5) == 0)
-	gzochid_install_log_handler (G_LOG_LEVEL_ERROR);
-      else if (g_ascii_strncasecmp (threshold, "ALERT", 5) == 0)
-	gzochid_install_log_handler (G_LOG_LEVEL_ERROR);
-      else if (g_ascii_strncasecmp (threshold, "CRIT", 4) == 0)
-	gzochid_install_log_handler (G_LOG_LEVEL_ERROR);
-      else if (g_ascii_strncasecmp (threshold, "ERR", 3) == 0)
-	gzochid_install_log_handler (G_LOG_LEVEL_CRITICAL);
-      else if (g_ascii_strncasecmp (threshold, "WARNING", 7) == 0)
-	gzochid_install_log_handler (G_LOG_LEVEL_WARNING);
-      else if (g_ascii_strncasecmp (threshold, "NOTICE", 6) == 0)
-	gzochid_install_log_handler (G_LOG_LEVEL_MESSAGE);
-      else if (g_ascii_strncasecmp (threshold, "INFO", 4) == 0)
-	gzochid_install_log_handler (G_LOG_LEVEL_INFO);
-      else if (g_ascii_strncasecmp (threshold, "DEBUG", 5) == 0)
-	gzochid_install_log_handler (G_LOG_LEVEL_DEBUG);
-    }
-  else gzochid_install_log_handler (G_LOG_LEVEL_INFO);
-
-  gzochid_admin_context_init 
-    ((gzochid_admin_context *) server_context->admin_context, context, 
-     admin_config);
-  gzochid_game_context_init 
-    ((gzochid_game_context *) server_context->game_context, context, 
-     game_config);
-
-  gzochid_context_until 
-    (server_context->admin_context, GZOCHID_ADMIN_STATE_RUNNING);
-  gzochid_context_until 
-    (server_context->game_context, GZOCHID_GAME_STATE_RUNNING);
-
-  g_hash_table_unref (admin_config);
-  g_hash_table_unref (game_config);
-  g_hash_table_unref (log_config);
-
-  g_key_file_free (key_file);
-
-  gzochid_fsm_to_state (context->fsm, GZOCHID_STATE_RUNNING);
-}
-
-static void 
-initialize (int from_state, int to_state, gpointer user_data)
-{
-  gzochid_server_context *context = user_data;
-  gzochid_thread_pool_push (context->pool, initialize_async, NULL, NULL);
-}
 
 static void *
 initialize_guile_inner (void *ptr)
@@ -149,48 +130,9 @@ initialize_guile_inner (void *ptr)
 }
 
 static void 
-initialize_guile (int from_state, int to_state, gpointer user_data)
+initialize_guile ()
 {
   scm_with_guile (initialize_guile_inner, NULL);
-}
-
-gzochid_server_context *
-gzochid_server_context_new (void)
-{
-  return calloc (1, sizeof (gzochid_server_context));
-}
-
-void 
-gzochid_server_context_init (gzochid_server_context *context)
-{
-  gzochid_fsm *fsm = gzochid_fsm_new 
-    ("main", GZOCHID_STATE_INITIALIZING, "INITIALIZING");
-
-  gzochid_fsm_add_state (fsm, GZOCHID_STATE_RUNNING, "RUNNING");
-  gzochid_fsm_add_state (fsm, GZOCHID_STATE_STOPPED, "STOPPED");
-
-  context->pool = gzochid_thread_pool_new (context, 1, TRUE, NULL);
-
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_STATE_INITIALIZING, initialize_guile, context);
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_STATE_INITIALIZING, initialize, context);
-  
-  gzochid_fsm_add_transition 
-    (fsm, GZOCHID_STATE_INITIALIZING, GZOCHID_STATE_RUNNING);
-  gzochid_fsm_add_transition 
-    (fsm, GZOCHID_STATE_RUNNING, GZOCHID_STATE_STOPPED);
-
-  gzochid_context_init ((gzochid_context *) context, NULL, fsm);
-}
-
-void 
-gzochid_server_context_free (gzochid_server_context *context)
-{
-  gzochid_context *root_context = (gzochid_context *) context;
-  gzochid_fsm_free (root_context->fsm);
-
-  free (context);
 }
 
 static void
@@ -232,25 +174,86 @@ Copyright (C) %s Julian Graham\n\
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\
 This is free software: you are free to change and redistribute it.\n\
 There is NO WARRANTY, to the extent permitted by law.\n"),
-	  "2015");
+	  "2016");
+}
+
+/* Set the logging threshold. */
+
+static void
+initialize_logging (GKeyFile *key_file)
+{
+  GHashTable *log_config =
+    gzochid_config_keyfile_extract_config (key_file, "log");
+
+  if (g_hash_table_contains (log_config, "priority.threshold")) 
+    {
+      char *threshold = g_hash_table_lookup (log_config, "priority.threshold");
+
+      if (g_ascii_strncasecmp (threshold, "EMERG", 5) == 0)
+        gzochid_install_log_handler (G_LOG_LEVEL_ERROR);
+      else if (g_ascii_strncasecmp (threshold, "ALERT", 5) == 0)
+        gzochid_install_log_handler (G_LOG_LEVEL_ERROR);
+      else if (g_ascii_strncasecmp (threshold, "CRIT", 4) == 0)
+        gzochid_install_log_handler (G_LOG_LEVEL_ERROR);
+      else if (g_ascii_strncasecmp (threshold, "ERR", 3) == 0)
+        gzochid_install_log_handler (G_LOG_LEVEL_CRITICAL);
+      else if (g_ascii_strncasecmp (threshold, "WARNING", 7) == 0)
+        gzochid_install_log_handler (G_LOG_LEVEL_WARNING);
+      else if (g_ascii_strncasecmp (threshold, "NOTICE", 6) == 0)
+        gzochid_install_log_handler (G_LOG_LEVEL_MESSAGE);
+      else if (g_ascii_strncasecmp (threshold, "INFO", 4) == 0)
+        gzochid_install_log_handler (G_LOG_LEVEL_INFO);
+      else if (g_ascii_strncasecmp (threshold, "DEBUG", 5) == 0)
+        gzochid_install_log_handler (G_LOG_LEVEL_DEBUG);
+    }
+  else gzochid_install_log_handler (G_LOG_LEVEL_INFO);
+
+  g_hash_table_destroy (log_config);
+}
+
+static void
+root_context_start (GzochidRootContext *root_context)
+{
+  GHashTable *game_config = gzochid_configuration_extract_group
+    (root_context->configuration, "game");
+  
+  gzochid_game_context_init 
+    ((gzochid_game_context *) root_context->game_server, root_context);
+  gzochid_context_until (root_context->game_server, GZOCHID_GAME_STATE_RUNNING);
+
+  g_hash_table_unref (game_config);
+  
+  if (root_context->admin_context != NULL)
+    {  
+      gzochid_admin_context_init 
+	((gzochid_admin_context *) root_context->admin_context, root_context);
+      gzochid_context_until
+	(root_context->admin_context, GZOCHID_ADMIN_STATE_RUNNING);
+    }
 }
 
 int 
 main (int argc, char *argv[])
 {
-  gzochid_server_context *context = NULL;
+  GError *err = NULL;
+  
   const char *program_name = argv[0];
+  const char *conf_path = NULL;
   int optc = 0;
 
+  GKeyFile *key_file = g_key_file_new ();
+  GzochidConfiguration *configuration = NULL;
+  GzochidResolutionContext *resolution_context = g_object_new
+    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+  GzochidRootContext *root_context = NULL;
+  
   setlocale (LC_ALL, "");
-
-  context = gzochid_server_context_new ();
 
   while ((optc = getopt_long (argc, argv, "c:hv", longopts, NULL)) != -1)
     switch (optc)
       {
       case 'c':
-	context->gzochid_conf_path = strdup (optarg);
+	conf_path = strdup (optarg);
 	break;
       case 'v':
 	print_version ();
@@ -263,17 +266,48 @@ main (int argc, char *argv[])
       case '?': exit (EXIT_FAILURE);
       }
 
-  if (context->gzochid_conf_path == NULL)
+  if (conf_path == NULL)
     {
       const char *env = getenv ("GZOCHID_CONF_LOCATION");
-      context->gzochid_conf_path = env ? env : QUOTE(GZOCHID_CONF_LOCATION);
+      conf_path = env ? env : QUOTE(GZOCHID_CONF_LOCATION);
     }
 
-  g_info ("Reading configuration from %s", context->gzochid_conf_path);
+  g_info ("Reading configuration from %s", conf_path);
+  g_key_file_load_from_file (key_file, conf_path, G_KEY_FILE_NONE, &err);
+
+  if (err != NULL)
+    {
+      /* 
+	 The server has reasonable defaults for everything in gzochid.conf, so
+	 this condition is not fatal.
+      */
+
+      g_warning 
+	("Failed to load server configuration file %s: %s", conf_path,
+	 err->message);
+      g_error_free (err);
+    }
+
+  initialize_logging (key_file);
+
+  configuration = g_object_new
+    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
+  gzochid_resolver_provide (resolution_context, G_OBJECT (configuration), NULL);
   
-  gzochid_server_context_init (context);
-  gzochid_fsm_until (((gzochid_context *) context)->fsm, GZOCHID_STATE_STOPPED);
-  gzochid_server_context_free (context);
-	   
+  initialize_guile ();
+  root_context = gzochid_resolver_require_full
+    (resolution_context, GZOCHID_TYPE_ROOT_CONTEXT, &err);
+  
+  if (err != NULL)
+    {
+      g_error ("Failed to bootstrap gzochid: %s", err->message);
+      exit (1);
+    }
+
+  root_context->gzochid_conf_path = conf_path;  
+  root_context_start (root_context);
+  
+  g_main_loop_run (root_context->socket_server->main_loop);
+  
   return 0;
 }

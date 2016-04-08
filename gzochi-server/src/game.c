@@ -116,9 +116,8 @@ qualify_apps_dir (gzochid_game_context *context)
     return g_strdup (context->apps_dir);
   else
     {
-      gzochid_server_context *server_context =
-	(gzochid_server_context *) ((gzochid_context *) context)->parent;
-      gchar *basedir = g_path_get_dirname (server_context->gzochid_conf_path);
+      gchar *basedir = g_path_get_dirname
+	(context->root_context->gzochid_conf_path);
       gchar *path = g_strconcat (basedir, "/", context->apps_dir, NULL);
       
       g_free (basedir);
@@ -258,13 +257,15 @@ initialize_event_loop (int from_state, int to_state, gpointer user_data)
 gzochid_game_context *
 gzochid_game_context_new ()
 {
+  GMainContext *event_context = g_main_context_new ();
   gzochid_game_context *context = calloc (1, sizeof (gzochid_game_context));
 
   context->applications = g_hash_table_new (g_str_hash, g_str_equal);
   context->auth_plugins = g_hash_table_new (g_str_hash, g_str_equal);
-  context->socket_server = gzochid_resolver_require
-    (GZOCHID_TYPE_SOCKET_SERVER, NULL);
-  
+
+  context->event_loop = g_main_loop_new (event_context, FALSE);
+  context->task_queue = gzochid_schedule_task_queue_new (context->pool);
+
   return context;
 }
 
@@ -276,31 +277,37 @@ gzochid_game_context_free (gzochid_game_context *context)
   g_hash_table_destroy (context->applications);
   g_hash_table_destroy (context->auth_plugins);
 
-  g_object_unref (context->socket_server);
+  if (context->root_context != NULL)
+    g_object_unref (context->root_context);
+  if (context->socket_server != NULL)
+    g_object_unref (context->socket_server);
   
   free (context);
 } 
 
 void 
-gzochid_game_context_init (gzochid_game_context *context, 
-			   gzochid_context *parent, GHashTable *config)
+gzochid_game_context_init (gzochid_game_context *context,
+			   GzochidRootContext *root_context)
 {
   long tx_timeout_ms = 0;
   gzochid_fsm *fsm = gzochid_fsm_new 
     ("game", GZOCHID_GAME_STATE_INITIALIZING, "INITIALIZING");
-  GMainContext *event_context = g_main_context_new ();
-
-  gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_RUNNING, "RUNNING");
-  gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_STOPPED, "STOPPED");
-
-  context->event_loop = g_main_loop_new (event_context, FALSE);
+  GHashTable *config = gzochid_configuration_extract_group
+    (root_context->configuration, "game");
+  
+  context->root_context = g_object_ref (root_context);
+  context->socket_server = gzochid_resolver_require_full
+    (root_context->resolution_context, GZOCHID_TYPE_SOCKET_SERVER, NULL);
 
   context->pool = gzochid_thread_pool_new 
     (context, 
      gzochid_config_to_int 
      (g_hash_table_lookup (config, "thread_pool.max_threads"), 4), 
      TRUE, NULL);
-  context->task_queue = gzochid_schedule_task_queue_new (context->pool);
+  
+  gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_RUNNING, "RUNNING");
+  gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_STOPPED, "STOPPED");
+
 
   gzochid_schedule_task_queue_start (context->task_queue);
 
@@ -383,7 +390,9 @@ FOR PRODUCTION USE.");
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_complete, context);
   
-  gzochid_context_init ((gzochid_context *) context, parent, fsm);
+  gzochid_context_init ((gzochid_context *) context, NULL, fsm);
+
+  g_hash_table_destroy (config);
 }
 
 void 

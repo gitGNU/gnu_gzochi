@@ -24,6 +24,7 @@
 #include "app.h"
 #include "context.h"
 #include "event.h"
+#include "gzochid.h"
 #include "gzochid-storage.h"
 #include "schedule.h"
 #include "socket.h"
@@ -38,6 +39,7 @@ enum gzochid_game_state
 struct _gzochid_game_context 
 {
   gzochid_context base;
+  GzochidRootContext *root_context;
   GThreadPool *pool;
   gzochid_task_queue *task_queue;
   
@@ -68,8 +70,7 @@ typedef struct _gzochid_game_context gzochid_game_context;
 
 gzochid_game_context *gzochid_game_context_new ();
 void gzochid_game_context_free (gzochid_game_context *);
-void gzochid_game_context_init (gzochid_game_context *, gzochid_context *, 
-				GHashTable *);
+void gzochid_game_context_init (gzochid_game_context *, GzochidRootContext *);
 
 void gzochid_game_context_register_application (gzochid_game_context *, char *,
 						gzochid_application_context *);

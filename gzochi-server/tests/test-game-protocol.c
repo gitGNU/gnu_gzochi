@@ -70,6 +70,8 @@ game_protocol_fixture_set_up (game_protocol_fixture *fixture,
   g_test_log_set_fatal_handler (ignore_warnings, NULL);
   
   fixture->game_context = gzochid_game_context_new ();
+  fixture->game_context->socket_server = g_object_new
+    (GZOCHID_TYPE_SOCKET_SERVER, NULL);
   fixture->server_socket = gzochid_server_socket_new
     ("test", game_server_wrapper_protocol, fixture);
   

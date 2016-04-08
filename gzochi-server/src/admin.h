@@ -21,6 +21,7 @@
 #include <glib.h>
 
 #include "context.h"
+#include "gzochid.h"
 
 enum gzochid_admin_state 
   {
@@ -33,7 +34,6 @@ typedef struct _gzochid_admin_context gzochid_admin_context;
 
 gzochid_admin_context *gzochid_admin_context_new (void);
 void gzochid_admin_context_free (gzochid_admin_context *);
-void gzochid_admin_context_init 
-(gzochid_admin_context *, gzochid_context *, GHashTable *);
+void gzochid_admin_context_init (gzochid_admin_context *, GzochidRootContext *);
 
 #endif /* GZOCHID_ADMIN_H */
