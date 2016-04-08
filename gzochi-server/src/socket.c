@@ -263,6 +263,7 @@ free_client_socket (gpointer data)
 
 void gzochid_server_socket_free (gzochid_server_socket *sock)
 {
+  free (sock->name);
   free (sock);
 }
 
@@ -276,6 +277,26 @@ free_server_socket (gpointer data)
   free (sock->addr);
   
   gzochid_server_socket_free (sock);
+}
+
+/* Add the specified client to the socket server in the form of a watch. */
+
+static void
+add_client (GzochidSocketServer *server, gzochid_client_socket *sock)
+{
+  sock->read_source = g_io_create_watch 
+    (sock->channel, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP);
+
+  /* Set the read callback for the socket. `free_socket' is used as a
+     `GDestroyNotify' callback for the socket when this source is 
+     destroyed. */
+  
+  g_source_set_callback
+    (sock->read_source, (GSourceFunc) dispatch_client, sock,
+     free_client_socket);
+  g_source_attach (sock->read_source, server->main_context);
+  
+  sock->server = g_object_ref (server);  
 }
 
 static gboolean
@@ -310,22 +331,17 @@ dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
       g_io_channel_set_flags (channel, G_IO_FLAG_NONBLOCK, NULL);
       g_io_channel_set_buffered (channel, FALSE);
 
-      sock->read_source = g_io_create_watch 
-	(channel, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP);
-
-      /* Set the read callback for the socket. `free_socket' is used as a
-	 `GDestroyNotify' callback for the socket when this source is 
-	 destroyed. */
-      
-      g_source_set_callback
-	(sock->read_source, (GSourceFunc) dispatch_client, sock,
-	 free_client_socket);
-      g_source_attach (sock->read_source, server_socket->server->main_context);
-      
-      sock->server = g_object_ref (server_socket->server);
+      add_client (server_socket->server, sock);
     }
 
   return TRUE;
+}
+
+void
+gzochid_client_socket_listen (GzochidSocketServer *server,
+			      gzochid_client_socket *sock)
+{
+  add_client (server, sock);
 }
 
 void gzochid_server_socket_listen

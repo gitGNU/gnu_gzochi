@@ -90,6 +90,16 @@ typedef struct _gzochid_client_socket gzochid_client_socket;
 gzochid_client_socket *gzochid_client_socket_new
 (GIOChannel *, const char *, gzochid_client_protocol, gpointer);
 
+/* Attach the specified client socket to the specifeid socket server and begin
+   handling events according to its associated protocol.
+
+   This function can be used to listen for events on a client socket that was 
+   created explicitly - that is to say, not as the result of an `accept' 
+   invocation on a server socket. */
+
+void gzochid_client_socket_listen
+(GzochidSocketServer *, gzochid_client_socket *);
+
 /* Frees the resources associated with the specified client socket. */
 
 void gzochid_client_socket_free (gzochid_client_socket *);

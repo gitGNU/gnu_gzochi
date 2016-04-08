@@ -16,7 +16,9 @@
  */
 
 #include <assert.h>
+#include <fcntl.h>
 #include <glib.h>
+#include <glib-unix.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -178,6 +180,39 @@ test_socket_client_dispatch (test_socket_fixture *fixture,
   g_assert_cmpint (fixture->state->error_called, ==, 0);
 }
 
+static void
+test_socket_client_listen ()
+{
+  GError *err = NULL;
+  int pipe_flags = 0;
+  gint pipe_fds[2] = { 0 };
+  test_client_state state = { 0 };
+  GzochidSocketServer *socket_server = g_object_new
+    (GZOCHID_TYPE_SOCKET_SERVER, NULL);
+  gzochid_client_socket *client_socket = NULL;
+
+  g_unix_open_pipe (pipe_fds, 0, &err);
+  g_assert_no_error (err);
+
+  pipe_flags = fcntl (pipe_fds[0], F_GETFL, 0);
+  fcntl (pipe_fds[0], F_SETFL, pipe_flags | O_NONBLOCK);
+
+  pipe_flags = fcntl (pipe_fds[1], F_GETFL, 0);
+  fcntl (pipe_fds[1], F_SETFL, pipe_flags | O_NONBLOCK);
+
+  client_socket = gzochid_client_socket_new
+    (g_io_channel_unix_new (pipe_fds[0]), "test", test_client_protocol, &state);
+
+  gzochid_client_socket_listen (socket_server, client_socket);
+
+  write (pipe_fds[1], "\x01\x02\x03", 3);
+  
+  g_main_context_iteration (socket_server->main_context, FALSE);
+  g_assert_cmpint (state.can_dispatch_called, ==, 1);
+
+  g_object_unref (socket_server);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -191,6 +226,7 @@ main (int argc, char *argv[])
     ("/socket/client/dispatch", test_socket_fixture, NULL,
      test_socket_fixture_set_up, test_socket_client_dispatch,
      test_socket_fixture_tear_down);
+  g_test_add_func ("/socket/client/listen", test_socket_client_listen);
     
   return g_test_run ();
 }
