@@ -79,7 +79,7 @@ typedef struct _GzochiMetadRootContext GzochiMetadRootContext;
 static inline GzochiMetadRootContext *
 GZOCHI_METAD_ROOT_CONTEXT (gconstpointer ptr) {
   return G_TYPE_CHECK_INSTANCE_CAST
-    (ptr, gzochid_configuration_get_type (), GzochiMetadRootContext);
+    (ptr, gzochi_metad_root_context_get_type (), GzochiMetadRootContext);
 }
 
 G_DEFINE_TYPE (GzochiMetadRootContext, gzochi_metad_root_context,
