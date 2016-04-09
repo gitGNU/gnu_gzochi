@@ -80,6 +80,26 @@ storage.engine = bdb
 
 tx.timeout = 30
 
+# Configuration for the connection to the gzochi meta server, which supports
+# distributed, high-availability deployments of game applications.
+
+[metaserver]
+
+# Whether to enable the meta server client. Setting this option to "true" will
+# override the local storage engine configuration (see above) in favor of the
+# data client cache storage mechanism.
+
+client.enabled = false
+
+# The address of the meta server, in "host:port" form. Default to
+# "localhost:9001" if unspecified.
+
+server.address = localhost:9001
+
+# The interval (in secconds) between attempts to connect to the meta server.
+
+server.connect.interval.sec = 5
+
 # System-wide logging configuration.
 
 [log]

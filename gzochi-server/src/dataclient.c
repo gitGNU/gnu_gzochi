@@ -86,7 +86,7 @@ gzochid_data_client_set_property (GObject *object, guint property_id,
     {
     case PROP_CONFIGURATION:
       self->configuration = gzochid_configuration_extract_group
-	(GZOCHID_CONFIGURATION (g_value_get_object (value)), "dataclient");
+	(GZOCHID_CONFIGURATION (g_value_get_object (value)), "metaserver");
       break;
       
     case PROP_SOCKET_SERVER:
