@@ -230,6 +230,20 @@ root_context_start (GzochidRootContext *root_context)
       gzochid_context_until
 	(root_context->admin_context, GZOCHID_ADMIN_STATE_RUNNING);
     }
+
+  if (root_context->data_client != NULL)
+    {
+      GError *err = NULL;
+      
+      gzochid_dataclient_start (root_context->data_client, &err);
+
+      if (err != NULL)
+	{
+	  g_critical
+	    ("Failed to start data client: %s; exiting...", err->message);
+	  exit (EXIT_FAILURE);
+	}
+    }
 }
 
 int 
@@ -246,6 +260,8 @@ main (int argc, char *argv[])
   GzochidResolutionContext *resolution_context = g_object_new
     (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
   GzochidRootContext *root_context = NULL;
+
+  GHashTable *metaserver_config = NULL;
   
   setlocale (LC_ALL, "");
 
@@ -297,7 +313,15 @@ main (int argc, char *argv[])
   initialize_guile ();
   root_context = gzochid_resolver_require_full
     (resolution_context, GZOCHID_TYPE_ROOT_CONTEXT, &err);
-  
+
+  metaserver_config = gzochid_configuration_extract_group
+    (configuration, "metaserver");
+
+  if (gzochid_config_to_boolean
+      (g_hash_table_lookup (metaserver_config, "client.enabled"), FALSE))
+    root_context->data_client = gzochid_resolver_require_full
+      (root_context->resolution_context, GZOCHID_TYPE_DATA_CLIENT, NULL);
+    
   if (err != NULL)
     {
       g_error ("Failed to bootstrap gzochid: %s", err->message);
