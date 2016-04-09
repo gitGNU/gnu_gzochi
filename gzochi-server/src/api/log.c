@@ -58,15 +58,15 @@ SCM_DEFINE (primitive_log, "primitive-log", 2, 0, 0, (SCM priority, SCM msg),
   char *cmsg = scm_to_locale_string (msg);
 
   if (strcmp (cpriority, "err") == 0)
-    gzochid_tx_log (context, LOG_ERR, cmsg);
+    gzochid_tx_log (context, G_LOG_LEVEL_CRITICAL, cmsg);
   else if (strcmp (cpriority, "warning") == 0)
-    gzochid_tx_log (context, LOG_WARNING, cmsg);
+    gzochid_tx_log (context, G_LOG_LEVEL_WARNING, cmsg);
   else if (strcmp (cpriority, "notice") == 0)
-    gzochid_tx_log (context, LOG_NOTICE, cmsg);
+    gzochid_tx_log (context, G_LOG_LEVEL_MESSAGE, cmsg);
   else if (strcmp (cpriority, "info") == 0)
-    gzochid_tx_log (context, LOG_INFO, cmsg);
+    gzochid_tx_log (context, G_LOG_LEVEL_INFO, cmsg);
   else if (strcmp (cpriority, "debug") == 0)
-    gzochid_tx_log (context, LOG_DEBUG, cmsg);
+    gzochid_tx_log (context, G_LOG_LEVEL_DEBUG, cmsg);
 
   free (cpriority);
   free (cmsg);
