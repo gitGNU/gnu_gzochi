@@ -1,5 +1,5 @@
 /* gzochid-migrate.c: Utility for migrating game data schema
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -775,13 +775,15 @@ migrate_object (struct migration *m, char *oid_str)
   args[1] = oid_str;
 
   size_t oid_len = strlen (oid_str);
-  char *val = APP_STORAGE_INTERFACE (m->context)->get 
-    (m->visited_oids, oid_str, oid_len, NULL);
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (m->context);
+  gzochid_storage_transaction *tx = iface->transaction_begin
+    (m->context->storage_context);
+  char *val = iface->transaction_get
+    (tx, m->visited_oids, oid_str, oid_len, NULL);
       
   if (val == NULL)
     {
-      APP_STORAGE_INTERFACE (m->context)->put
-	(m->visited_oids, oid_str, oid_len, "", 1);
+      iface->transaction_put (tx, m->visited_oids, oid_str, oid_len, "", 1);
       if (gzochid_transaction_execute (migrate_object_tx, args) 
 	  != GZOCHID_TRANSACTION_SUCCESS && !m->explicit_rollback)
 	{
@@ -791,6 +793,9 @@ migrate_object (struct migration *m, char *oid_str)
       else free (oid_str);
     }
   else free (val);
+
+  iface->transaction_prepare (tx);
+  iface->transaction_commit (tx);
 }
 
 struct datum
@@ -804,12 +809,18 @@ next_key (struct migration *m, struct datum last_key)
 {
   struct datum key = { NULL, 0 };
   gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (m->context);
-
+  gzochid_storage_transaction *tx = iface->transaction_begin
+    (m->context->storage_context);
+  
   if (last_key.data == NULL)
-    key.data = iface->next_key (m->context->names, "o.", 2, &key.data_len);
-  else key.data = iface->next_key 
-	 (m->context->names, last_key.data, last_key.data_len, &key.data_len);
+    key.data = iface->transaction_next_key
+      (tx, m->context->names, "o.", 2, &key.data_len);
+  else key.data = iface->transaction_next_key 
+	 (tx, m->context->names, last_key.data, last_key.data_len,
+	  &key.data_len);
 
+  iface->transaction_rollback (tx);
+  
   if (key.data != NULL && strncmp ("o.", key.data, 2) != 0)
     {
       free (key.data);
@@ -839,10 +850,19 @@ run_migration (struct migration *m)
 
 	  if (key.data == NULL)
 	    break;
-	  else oid_str = APP_STORAGE_INTERFACE (m->context)->get 
-		 (m->context->names, key.data, key.data_len, NULL);
-	}
+	  else
+	    {
+	      gzochid_storage_engine_interface *iface =
+		APP_STORAGE_INTERFACE (m->context);
+	      gzochid_storage_transaction *tx = iface->transaction_begin
+		(m->context->storage_context);
 
+	      oid_str = iface->transaction_get 
+		(tx, m->context->names, key.data, key.data_len, NULL);
+	      iface->transaction_rollback (tx);
+	    }
+	}
+      
       migrate_object (m, oid_str);
     }
 }

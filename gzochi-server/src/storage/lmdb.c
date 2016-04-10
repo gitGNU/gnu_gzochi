@@ -1,5 +1,5 @@
 /* lmdb.c: Database storage routines for gzochid (Symas Lightning DB)
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -153,7 +153,6 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
 
   store->database = db;
   store->context = context;
-  g_mutex_init (&store->mutex);
 
   return store;
 }
@@ -163,7 +162,6 @@ close_store (gzochid_storage_store *store)
 {
   MDB_dbi *db = store->database;
 
-  g_mutex_clear (&store->mutex);
   mdb_dbi_close ((MDB_env *) store->context->environment, *db);
   free (store);
 }
@@ -181,18 +179,6 @@ destroy_store (gzochid_storage_context *context, char *path)
   assert (mdb_txn_commit (txn) == 0);
 
   free (db);
-}
-
-static void 
-lock (gzochid_storage_store *store)
-{
-  g_mutex_lock (&store->mutex);
-}
-
-static void 
-unlock (gzochid_storage_store *store)
-{
-  g_mutex_unlock (&store->mutex);
 }
 
 static gzochid_storage_transaction *
@@ -306,17 +292,6 @@ transaction_get (gzochid_storage_transaction *tx, gzochid_storage_store *store,
     }
 }
 
-static char *
-get (gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
-{
-  char *ret = NULL;
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-  ret = transaction_get (tx, store, key, key_len, len);
-  transaction_commit (tx);
-  
-  return ret;
-}
-
 static void 
 transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 		 char *key, size_t key_len, char *data, size_t data_len)
@@ -344,15 +319,6 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       tx->rollback = TRUE;
       tx->should_retry = retryable (ret);
     }
-}
-
-static void 
-put (gzochid_storage_store *store, char *key, size_t key_len, char *data, 
-     size_t data_len)
-{
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-  transaction_put (tx, store, key, key_len, data, data_len);
-  transaction_commit (tx);
 }
 
 static int 
@@ -386,15 +352,6 @@ transaction_delete (gzochid_storage_transaction *tx,
 	}
     }
   else return 0;
-}
-
-static int 
-delete (gzochid_storage_store *store, char *key, size_t key_len)
-{
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-  int ret = transaction_delete (tx, store, key, key_len);
-  transaction_commit (tx);
-  return ret;
 }
 
 static char *
@@ -437,15 +394,6 @@ transaction_first_key (gzochid_storage_transaction *tx,
       
       return data;
     }
-}
-
-static char *
-first_key (gzochid_storage_store *store, size_t *len)
-{
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-  char *ret = transaction_first_key (tx, store, len);
-  transaction_commit (tx);
-  return ret;
 }
 
 static char *
@@ -503,15 +451,6 @@ transaction_next_key (gzochid_storage_transaction *tx,
 }
 
 static char *
-next_key (gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
-{
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-  char *ret = transaction_next_key (tx, store, key, key_len, len);
-  transaction_commit (tx);
-  return ret;
-}
-
-static char *
 transaction_get_for_update (gzochid_storage_transaction *tx, 
 			    gzochid_storage_store *store, char *key, 
 			    size_t key_len, size_t *len)
@@ -529,14 +468,6 @@ static gzochid_storage_engine_interface interface =
     open,
     close_store,
     destroy_store,
-    lock,
-    unlock,
-
-    get,
-    put,
-    delete,
-    first_key,
-    next_key,
     
     transaction_begin,
     transaction_begin_timed,

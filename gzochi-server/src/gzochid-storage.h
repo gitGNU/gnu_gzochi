@@ -39,7 +39,6 @@ typedef struct _gzochid_storage_context  gzochid_storage_context;
 
 struct _gzochid_storage_store
 {
-  GMutex mutex;
   gzochid_storage_context *context;
   gpointer database;
 };
@@ -80,14 +79,6 @@ struct _gzochid_storage_engine_interface
      removing all associated files. */
 
   void (*destroy_store) (gzochid_storage_context *, char *);
-  void (*lock) (gzochid_storage_store *);
-  void (*unlock) (gzochid_storage_store *);
-
-  char *(*get) (gzochid_storage_store *, char *, size_t, size_t *);
-  void (*put) (gzochid_storage_store *, char *, size_t, char *, size_t);
-  int (*delete) (gzochid_storage_store *, char *, size_t);
-  char *(*first_key) (gzochid_storage_store *, size_t *);
-  char *(*next_key) (gzochid_storage_store *, char *, size_t, size_t *);
 
   gzochid_storage_transaction *(*transaction_begin) (gzochid_storage_context *);
   gzochid_storage_transaction *(*transaction_begin_timed)

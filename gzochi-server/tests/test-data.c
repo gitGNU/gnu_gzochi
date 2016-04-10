@@ -1,5 +1,5 @@
 /* test-data.c: Test routines for data.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -129,16 +129,23 @@ static void test_data_reference_finalize ()
   mpz_t z;
   char *key = NULL;
   gzochid_application_context *context = gzochid_application_context_new ();
-
+  gzochid_storage_transaction *tx = NULL;
+  
   application_context_init (context);
   reset_serialization_state ();
 
   mpz_init (z);
   key = mpz_get_str (NULL, 16, z);
 
-  gzochid_storage_engine_interface_mem.put 
-    (context->oids, key, strlen (key) + 1, "foo", 4);
+  tx = gzochid_storage_engine_interface_mem.transaction_begin
+    (context->storage_context);
 
+  gzochid_storage_engine_interface_mem.transaction_put 
+    (tx, context->oids, key, strlen (key) + 1, "foo", 4);
+
+  gzochid_storage_engine_interface_mem.transaction_prepare (tx);  
+  gzochid_storage_engine_interface_mem.transaction_commit (tx);  
+  
   free (key);
   mpz_clear (z);
 

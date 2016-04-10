@@ -113,6 +113,9 @@ persist_client_session (struct test_scheme_task_fixture *fixture,
   mpz_t oid;
   char *oid_str = NULL;
   GString *out = g_string_new (NULL);
+
+  gzochid_storage_transaction *tx = fixture->storage_interface
+    ->transaction_begin (fixture->context->storage_context);
   
   gzochid_client_session_serialization.serializer 
     (fixture->context, session, out, NULL);
@@ -121,8 +124,13 @@ persist_client_session (struct test_scheme_task_fixture *fixture,
   mpz_set_ui (oid, 1);
   oid_str = mpz_get_str (NULL, 16, oid);
   
-  fixture->storage_interface->put
-    (fixture->context->oids, oid_str, strlen (oid_str) + 1, out->str, out->len);
+  fixture->storage_interface->transaction_put
+    (tx, fixture->context->oids, oid_str, strlen (oid_str) + 1, out->str,
+     out->len);
+
+  fixture->storage_interface->transaction_prepare (tx);
+  fixture->storage_interface->transaction_commit (tx);
+  
   gzochid_data_set_binding_to_oid (fixture->context, "s.session.1", oid, NULL);
   
   mpz_clear (oid);
@@ -138,16 +146,22 @@ test_disconnected_worker_no_handler_inner (gpointer data)
   gzochid_client_session *session =
     gzochid_client_session_new (fixture->identity);
   char *oid_str = persist_client_session (fixture, session);
-
+  gzochid_storage_transaction *tx = NULL;
+  
   g_test_log_set_fatal_handler (ignore_warnings, NULL);
   
   gzochid_scheme_application_disconnected_worker
     (fixture->context, fixture->identity, oid_str);
 
-  g_assert_null
-    (fixture->storage_interface->get
-     (fixture->context->oids, oid_str, strlen (oid_str) + 1, NULL));
+  tx = fixture->storage_interface->transaction_begin
+    (fixture->context->storage_context);
 
+  g_assert_null
+    (fixture->storage_interface->transaction_get
+     (tx, fixture->context->oids, oid_str, strlen (oid_str) + 1, NULL));
+
+  fixture->storage_interface->transaction_rollback (tx);
+  
   free (oid_str);
   gzochid_client_session_free (session);
 }

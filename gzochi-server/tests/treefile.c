@@ -1,5 +1,5 @@
 /* treefile.c: A toy storage engine implementation for gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -156,7 +156,6 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
 
   store->context = context;
   store->database = treefile;
-  g_mutex_init (&store->mutex);
 
   return store;
 }
@@ -170,7 +169,6 @@ close_store (gzochid_storage_store *store)
   free (treefile->path);
   free (treefile);
 
-  g_mutex_clear (&store->mutex);
   free (store);
 }
 
@@ -178,18 +176,6 @@ static void
 destroy_store (gzochid_storage_context *context, char *path)
 {
   g_remove (path);
-}
-
-static void
-lock (gzochid_storage_store *store)
-{
-  g_mutex_lock (&store->mutex);
-}
-
-static void
-unlock (gzochid_storage_store *store)
-{
-  g_mutex_unlock (&store->mutex);
 }
 
 static gzochid_storage_transaction *
@@ -375,18 +361,6 @@ transaction_rollback (gzochid_storage_transaction *tx)
   free (tx);  
 }
 
-static char *
-get (gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
-{
-  char *value = NULL;
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-
-  value = transaction_get (tx, store, key, key_len, len);
-  transaction_rollback (tx);
-
-  return value;
-}
-
 static void
 transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 		 char *key, size_t key_len, char *value, size_t value_len)
@@ -406,15 +380,6 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
   g_tree_replace (tree, key_datum, value_datum);
 }
 
-static void
-put (gzochid_storage_store *store, char *key, size_t key_len, char *value,
-     size_t value_len)
-{
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-  transaction_put (tx, store, key, key_len, value, value_len);
-  transaction_commit (tx);
-}
-
 static int
 transaction_delete (gzochid_storage_transaction *tx,
 		    gzochid_storage_store *store, char *key, size_t key_len)
@@ -428,25 +393,6 @@ transaction_delete (gzochid_storage_transaction *tx,
   if (! g_tree_remove (tree, &key_datum))
     return GZOCHID_STORAGE_ENOTFOUND;
   else return 0;
-}
-
-static int
-delete (gzochid_storage_store *store, char *key, size_t key_len)
-{
-  int ret = 0;
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-  
-  ret = transaction_delete (tx, store, key, key_len);
-  
-  if (ret == 0)
-    transaction_commit (tx);
-  else
-    {
-      assert (ret != GZOCHID_STORAGE_ETXFAILURE);
-      transaction_rollback (tx);
-    }
-
-  return ret;
 }
 
 static gboolean
@@ -487,18 +433,6 @@ transaction_first_key (gzochid_storage_transaction *tx,
 }
 
 static char *
-first_key (gzochid_storage_store *store, size_t *key_len)
-{
-  char *key = NULL;
-
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-  key = transaction_first_key (tx, store, key_len);
-  transaction_rollback (tx);
-
-  return key;
-}
-
-static char *
 transaction_next_key (gzochid_storage_transaction *tx,
 		      gzochid_storage_store *store, char *key, size_t key_len,
 		      size_t *next_key_len)
@@ -531,19 +465,6 @@ transaction_next_key (gzochid_storage_transaction *tx,
 }
 
 static char *
-next_key (gzochid_storage_store *store, char *key, size_t key_len,
-	  size_t *next_key_len)
-{
-  char *next_key = NULL;
-
-  gzochid_storage_transaction *tx = transaction_begin (store->context);
-  next_key = transaction_next_key (tx, store, key, key_len, next_key_len);
-  transaction_rollback (tx);
-
-  return next_key;
-}
-
-static char *
 transaction_get_for_update (gzochid_storage_transaction *tx,
 			    gzochid_storage_store *store, char *key,
 			    size_t key_len, size_t *value_len)
@@ -561,14 +482,6 @@ static gzochid_storage_engine_interface interface =
     open,
     close_store,
     destroy_store,
-    lock,
-    unlock,
-
-    get,
-    put,
-    delete,
-    first_key,
-    next_key,
     
     transaction_begin,
     transaction_begin_timed,

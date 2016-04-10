@@ -1,5 +1,5 @@
 /* hdb.c: Database storage routines for gzochid (hamsterdb)
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -187,7 +187,6 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
 
   store->database = db;
   store->context = context;
-  g_mutex_init (&store->mutex);
 
   return store;
 }
@@ -197,7 +196,6 @@ close_store (gzochid_storage_store *store)
 {
   ham_db_t *db = store->database;
 
-  g_mutex_clear (&store->mutex);
   ham_db_close (db, 0);
   free (store);
 }
@@ -209,174 +207,6 @@ destroy_store (gzochid_storage_context *context, char *path)
   u_int16_t db_name = path_to_name (path);
 
   assert (ham_env_erase_db (db_env, db_name, 0) == HAM_SUCCESS);
-}
-
-static void 
-lock (gzochid_storage_store *store)
-{
-  g_mutex_lock (&store->mutex);
-}
-
-static void 
-unlock (gzochid_storage_store *store)
-{
-  g_mutex_unlock (&store->mutex);
-}
-
-static char *
-get (gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
-{
-  ham_db_t *db = store->database;
-  ham_key_t db_key;
-  ham_record_t db_data;
-  int ret = 0;
-
-  memset (&db_key, 0, sizeof (ham_key_t));
-  memset (&db_data, 0, sizeof (ham_record_t));
-
-  db_key.data = key;
-  db_key.size = key_len;
-
-  ret = ham_db_find (db, NULL, &db_key, &db_data, 0);
-  if (ret == HAM_SUCCESS)
-    {
-      char *data = NULL;
-      if (db_data.data != NULL)
-	{
-	  if (len != NULL)
-	    *len = db_data.size;
-	  data = malloc (sizeof (char) * db_data.size);
-	  data = memcpy (data, db_data.data, db_data.size);
-	}
-      return data;
-    }
-  else 
-    {
-      if (ret != HAM_KEY_NOT_FOUND)
-	g_warning ("Failed to retrieve key %s: %s", key, ham_strerror (ret));
-      return NULL;
-    }
-}
-
-static void 
-put (gzochid_storage_store *store, char *key, size_t key_len, char *data, 
-     size_t data_len)
-{
-  ham_db_t *db = store->database;
-  ham_key_t db_key;
-  ham_record_t db_data;
-  int ret = 0;
-
-  memset (&db_key, 0, sizeof (ham_key_t));
-  memset (&db_data, 0, sizeof (ham_record_t));
-
-  db_key.data = key;
-  db_key.size = key_len;
-
-  db_data.data = data;
-  db_data.size = data_len;
-
-  ret = ham_db_insert (db, NULL, &db_key, &db_data, HAM_OVERWRITE);
-
-  if (ret != HAM_SUCCESS)
-    g_warning ("Failed to store key %s: %s", key, ham_strerror (ret));
-}
-
-static int 
-delete (gzochid_storage_store *store, char *key, size_t key_len)
-{
-  ham_db_t *db = store->database;
-  ham_key_t db_key;
-  int ret = 0;
-
-  memset (&db_key, 0, sizeof (ham_key_t));
-  db_key.data = key;
-  db_key.size = key_len;
-
-  ret = ham_db_erase (db, NULL, &db_key, 0);
-
-  if (ret != HAM_SUCCESS)
-    {
-      g_warning ("Failed to delete key %s: %s", key, ham_strerror (ret));
-      if (ret == HAM_KEY_NOT_FOUND)
-	return GZOCHID_STORAGE_ENOTFOUND;
-      else return GZOCHID_STORAGE_EFAILURE;
-    }
-  return 0;
-}
-
-static char *
-first_key (gzochid_storage_store *store, size_t *len)
-{
-  char *data = NULL;
-  ham_db_t *db = store->database;
-  ham_cursor_t *cursor = NULL;
-  ham_key_t db_key;
-  ham_record_t db_value;
-  int ret = 0;
-
-  assert (ham_cursor_create (&cursor, db, NULL, 0) == HAM_SUCCESS);
-  memset (&db_key, 0, sizeof (ham_key_t));
-  memset (&db_value, 0, sizeof (ham_record_t));
-
-  ret = ham_cursor_find (cursor, &db_key, &db_value, HAM_FIND_GEQ_MATCH);
-  if (ret != HAM_SUCCESS)
-    {
-      if (ret != HAM_KEY_NOT_FOUND)
-	g_warning ("Failed to seek to first key: %s", ham_strerror (ret));
-      assert (ham_cursor_close (cursor) == HAM_SUCCESS);
-      return NULL;
-    }
-
-  assert (ham_cursor_close (cursor) == HAM_SUCCESS);
-
-  if (db_value.data != NULL)
-    {
-      if (len != NULL)
-	*len = db_value.size;
-      data = malloc (sizeof (char) * db_value.size);
-      data = memcpy (data, db_value.data, db_value.size);
-    }
-  return data;
-}
-
-static char *
-next_key (gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
-{
-  ham_db_t *db = store->database;
-  ham_cursor_t *cursor = NULL;
-  ham_key_t db_key;
-  ham_record_t db_value;
-  int ret = 0;
-
-  assert (ham_cursor_create (&cursor, db, NULL, 0) == HAM_SUCCESS);
-  memset (&db_key, 0, sizeof (ham_key_t));
-  memset (&db_value, 0, sizeof (ham_record_t));
-
-  db_key.data = key;
-  db_key.size = key_len;
-
-  ret = ham_cursor_find (cursor, &db_key, &db_value, HAM_FIND_GT_MATCH);
-  assert (ham_cursor_close (cursor) == HAM_SUCCESS);
-
-  if (ret == HAM_SUCCESS)
-    {
-      char *data = NULL;
-      if (db_value.data != NULL)
-	{
-	  if (len != NULL)
-	    *len = db_value.size;
-	  data = malloc (sizeof (char) * db_value.size);
-	  data = memcpy (data, db_value.data, db_value.size);
-	}
-      return data;
-    }
-  else 
-    {
-      if (ret != HAM_KEY_NOT_FOUND)
-	g_warning ("Failed to advance cursor: %s", ham_strerror (ret));
-      return NULL;
-    }
 }
 
 static gzochid_storage_transaction *
@@ -637,14 +467,6 @@ static gzochid_storage_engine_interface interface =
     open,
     close_store,
     destroy_store,
-    lock,
-    unlock,
-
-    get,
-    put,
-    delete,
-    first_key,
-    next_key,
     
     transaction_begin,
     transaction_begin_timed,

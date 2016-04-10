@@ -1,5 +1,5 @@
 /* bdb.c: Database storage routines for gzochid (Berkeley DB)
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -158,7 +158,6 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
 
   store->database = db;
   store->context = context;
-  g_mutex_init (&store->mutex);
 
   free (filename);
 
@@ -170,7 +169,6 @@ close_store (gzochid_storage_store *store)
 {
   DB *db = store->database;
 
-  g_mutex_clear (&store->mutex);
   db->close (db, 0);
   free (store);
 }
@@ -183,165 +181,6 @@ destroy_store (gzochid_storage_context *context, char *path)
 
   env->dbremove (env, NULL, filename, NULL, 0);
   g_free (filename);
-}
-
-static void 
-lock (gzochid_storage_store *store)
-{
-  g_mutex_lock (&store->mutex);
-}
-
-static void 
-unlock (gzochid_storage_store *store)
-{
-  g_mutex_unlock (&store->mutex);
-}
-
-static char *
-get (gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
-{
-  DB *db = store->database;
-  DBT db_key, db_data;
-  int ret = 0;
-
-  memset (&db_key, 0, sizeof (DBT));
-  memset (&db_data, 0, sizeof (DBT));
-
-  db_key.data = key;
-  db_key.size = key_len;
-
-  db_data.flags = DB_DBT_MALLOC;
-  ret = db->get (db, NULL, &db_key, &db_data, 0);
-  if (ret == 0)
-    {
-      if (db_data.data != NULL && len != NULL)
-	*len = db_data.size;
-      return db_data.data;
-    }
-  else 
-    {
-      if (ret != DB_NOTFOUND)
-	g_warning ("Failed to retrieve key %s: %s", key, db_strerror (ret));
-      return NULL;
-    }
-}
-
-static void 
-put (gzochid_storage_store *store, char *key, size_t key_len, char *data, 
-     size_t data_len)
-{
-  DB *db = store->database;
-  DBT db_key, db_data;
-  int ret = 0;
-
-  memset (&db_key, 0, sizeof (DBT));
-  memset (&db_data, 0, sizeof (DBT));
-
-  db_key.data = key;
-  db_key.size = key_len;
-
-  db_data.data = data;
-  db_data.size = data_len;
-
-  ret = db->put (db, NULL, &db_key, &db_data, 0);
-
-  if (ret != 0)
-    g_warning ("Failed to store key %s: %s", key, db_strerror (ret));
-}
-
-static int 
-delete (gzochid_storage_store *store, char *key, size_t key_len)
-{
-  DB *db = store->database;
-  DBT db_key;
-  int ret = 0;
-
-  memset (&db_key, 0, sizeof (DBT));
-  db_key.data = key;
-  db_key.size = key_len;
-
-  ret = db->del (db, NULL, &db_key, 0);
-
-  if (ret != 0)
-    {
-      g_warning ("Failed to delete key %s: %s", key, db_strerror (ret));
-      if (ret == DB_NOTFOUND)
-	return GZOCHID_STORAGE_ENOTFOUND;
-      else return GZOCHID_STORAGE_EFAILURE;
-    }
-  return 0;
-}
-
-static char *
-first_key (gzochid_storage_store *store, size_t *len)
-{
-  DB *db = store->database;
-  DBC *cursor = NULL;
-  DBT db_key, db_value;
-  int ret = 0;
-
-  db->cursor (db, NULL, &cursor, 0);
-  memset (&db_key, 0, sizeof (DBT));
-  memset (&db_value, 0, sizeof (DBT));
-
-  db_key.flags = DB_DBT_MALLOC;
-  ret = cursor->get (cursor, &db_key, &db_value, DB_FIRST);
-  if (ret != 0)
-    {
-      if (ret != DB_NOTFOUND)
-	g_warning ("Failed to seek to first key: %s", db_strerror (ret));
-      cursor->close (cursor);
-      return NULL;
-    }
-
-  cursor->close (cursor);
-
-  if (db_key.data != NULL && len != NULL)
-    *len = db_key.size;
-
-  return db_key.data;
-}
-
-static char *
-next_key (gzochid_storage_store *store, char *key, size_t key_len, size_t *len)
-{
-  DB *db = store->database;
-  DBC *cursor = NULL;
-  DBT db_key, db_value;
-  int ret = 0;
-
-  db->cursor (db, NULL, &cursor, 0);
-
-  memset (&db_key, 0, sizeof (DBT));
-  memset (&db_value, 0, sizeof (DBT));
-
-  db_key.data = key;
-  db_key.size = key_len;
-  db_key.flags = DB_DBT_MALLOC;
-
-  ret = cursor->get (cursor, &db_key, &db_value, DB_SET_RANGE);
-  if (ret == 0 
-      && db_key.size == key_len 
-      && memcmp (db_key.data, key, key_len) == 0)
-    {
-      free (db_key.data);
-      ret = cursor->get (cursor, &db_key, &db_value, DB_NEXT);
-    }
-
-  cursor->close (cursor);
-
-  if (ret == 0)
-    {
-      if (len != NULL)
-	*len = db_key.size;
-      return db_key.data;
-    }
-  else 
-    {
-      if (ret != DB_NOTFOUND)
-	g_warning ("Failed to advance cursor: %s", db_strerror (ret));
-      return NULL;
-    }
 }
 
 static gzochid_storage_transaction *
@@ -609,14 +448,6 @@ static gzochid_storage_engine_interface interface =
     open,
     close_store,
     destroy_store,
-    lock,
-    unlock,
-
-    get,
-    put,
-    delete,
-    first_key,
-    next_key,
     
     transaction_begin,
     transaction_begin_timed,

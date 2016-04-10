@@ -212,11 +212,6 @@ data_prepare (gpointer data)
   gzochid_storage_engine_interface *iface = 
     APP_STORAGE_INTERFACE (context->context);
 
-  iface->lock (context->context->oids);
-  iface->lock (context->context->names);
-
-  context->needs_unlock = TRUE;
-  
   while (reference_ptr != NULL)
     {
       if (!flush_reference (reference_ptr->data, context))
@@ -277,12 +272,7 @@ data_commit (gpointer data)
     APP_STORAGE_INTERFACE (context->context);
 
   iface->transaction_commit (context->transaction);
-
   finalize_references (context);
-
-  iface->unlock (context->context->names);
-  iface->unlock (context->context->oids);
-
   transaction_context_free (context);
 }
 
@@ -301,15 +291,7 @@ data_rollback (gpointer data)
 	APP_STORAGE_INTERFACE (context->context);
 
       iface->transaction_rollback (context->transaction);
-
       finalize_references (context);
-
-      if (context->needs_unlock)
-	{
-	  iface->unlock (context->context->names);
-	  iface->unlock (context->context->oids);
-	}
-      
       transaction_context_free (context);
     }
 }

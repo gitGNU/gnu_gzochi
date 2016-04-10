@@ -376,8 +376,12 @@ list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   GString *response_str = g_string_new (NULL);
   
   size_t klen = 0;
-  char *k = APP_STORAGE_INTERFACE (app_context)->first_key 
-    (app_context->oids, &klen);
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
+  gzochid_storage_transaction *tx = iface->transaction_begin
+    (app_context->storage_context);
+  char *k = iface->transaction_first_key (tx, app_context->oids, &klen);
+
+  iface->transaction_rollback (tx);
   
   g_string_append (response_str, "<html>\n");
   g_string_append (response_str, "  <body>\n");
@@ -394,9 +398,11 @@ list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
       g_string_append (response_str, "\">");
       g_string_append_len (response_str, k, klen - 1);
       g_string_append (response_str, "</a></li>\n");
-      
-      next_k = APP_STORAGE_INTERFACE (app_context)->next_key 
-	(app_context->oids, k, klen, &klen);
+
+      tx = iface->transaction_begin (app_context->storage_context);      
+      next_k = iface->transaction_next_key
+	(tx, app_context->oids, k, klen, &klen);
+      iface->transaction_rollback (tx);
       
       free (k);
       k = next_k;
@@ -420,8 +426,13 @@ render_oid (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   char *oid_str = g_match_info_fetch (match_info, 1);
   gzochid_application_context *app_context = request_context;
 
-  char *data = APP_STORAGE_INTERFACE (app_context)->get
-    (app_context->oids, oid_str, strlen (oid_str) + 1, &data_length);
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
+  gzochid_storage_transaction *tx = iface->transaction_begin
+    (app_context->storage_context);
+  char *data = iface->transaction_get
+    (tx, app_context->oids, oid_str, strlen (oid_str) + 1, &data_length);
+
+  iface->transaction_rollback (tx);
   
   free (oid_str);
 
@@ -454,9 +465,13 @@ list_names (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   
   size_t klen = 0;
   gzochid_application_context *app_context = request_context;
-  char *k = APP_STORAGE_INTERFACE (app_context)
-    ->first_key (app_context->names, &klen);
+  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
+  gzochid_storage_transaction *tx = iface->transaction_begin
+    (app_context->storage_context);
+  char *k = iface->transaction_first_key (tx, app_context->names, &klen);
 
+  iface->transaction_rollback (tx);
+  
   g_string_append (response_str, "<html>\n");
   g_string_append (response_str, "  <body>\n");
   g_string_append_printf 
@@ -470,10 +485,12 @@ list_names (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
       g_string_append (response_str, "      <li>");
       g_string_append_len (response_str, k, klen);
       g_string_append (response_str, "</li>\n");
-      
-      next_k = APP_STORAGE_INTERFACE (app_context)->next_key 
-	(app_context->names, k, klen, &klen);
 
+      tx = iface->transaction_begin (app_context->storage_context);      
+      next_k = iface->transaction_next_key
+	(tx, app_context->names, k, klen, &klen);
+      iface->transaction_rollback (tx);
+      
       free (k);
       k = next_k;
     }

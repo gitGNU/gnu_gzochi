@@ -1,5 +1,5 @@
 /* gzochi-load.c: Utility for importing data from game application databases
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -165,11 +165,18 @@ load_data (gzochid_storage_engine *engine, char *data_dir, char *db,
 	}
       else 
 	{
+	  gzochid_storage_transaction *tx = context->engine->interface
+	    ->transaction_begin (context->storage_context);
+
 	  value = read_line (line.data, line.data_len, line_num++);
-	  context->engine->interface->put 
-	    (context->store, key.data, key.data_len, value.data, 
+	  
+	  context->engine->interface->transaction_put 
+	    (tx, context->store, key.data, key.data_len, value.data, 
 	     value.data_len);
 
+	  context->engine->interface->transaction_prepare (tx);
+	  context->engine->interface->transaction_commit (tx);
+	  
 	  free (key.data);
 	  free (value.data);
 

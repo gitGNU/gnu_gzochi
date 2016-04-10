@@ -1,5 +1,5 @@
 /* test-session.c: Test routines for session.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -118,13 +118,18 @@ persist_callback (gzochid_application_context *context,
   SCM scm_callback = gzochid_scheme_create_callback
     (callback, SCM_BOOL_F, NULL);
   GError *err = NULL;
+  gzochid_storage_transaction *tx = NULL;
   
   gzochid_scheme_data_serialization.serializer
     (context, scm_callback, callback_str, &err);
 
-  gzochid_storage_engine_interface_mem.put
-    (context->oids, key, key_len, callback_str->str, callback_str->len);
-
+  tx = gzochid_storage_engine_interface_mem.transaction_begin
+    (context->storage_context);
+  gzochid_storage_engine_interface_mem.transaction_put
+    (tx, context->oids, key, key_len, callback_str->str, callback_str->len);
+  gzochid_storage_engine_interface_mem.transaction_prepare (tx);
+  gzochid_storage_engine_interface_mem.transaction_commit (tx);
+  
   mpz_set_str (callback->scm_oid, key, 16);
   
   g_string_free (callback_str, TRUE);
@@ -154,11 +159,12 @@ test_sweep_client_session_rollback_nonretryable ()
   gzochid_application_callback *disconnected_callback = NULL;
   gzochid_application_callback *received_message_callback = NULL;
   mpz_t received_message_callback_arg_oid, disconnected_callback_arg_oid;
+  gzochid_storage_transaction *tx = NULL;
   
   gzochid_client_session_handler handler; 
   
   GString *serialized_session = g_string_new ("");
-
+  
   /* Context and test setup. */
   
   mpz_init (received_message_callback_arg_oid);
@@ -181,10 +187,17 @@ test_sweep_client_session_rollback_nonretryable ()
   gzochid_client_session_serialization.serializer
     (context, session, serialized_session, NULL);
 
-  gzochid_storage_engine_interface_mem.put
-    (context->oids, "2", 2, serialized_session->str, serialized_session->len);
-  gzochid_storage_engine_interface_mem.put
-    (context->names, "s.session.0", 12, "2", 2);
+  tx = gzochid_storage_engine_interface_mem.transaction_begin
+    (context->storage_context);
+  
+  gzochid_storage_engine_interface_mem.transaction_put
+    (tx, context->oids, "2", 2, serialized_session->str,
+     serialized_session->len);
+  gzochid_storage_engine_interface_mem.transaction_put
+    (tx, context->names, "s.session.0", 12, "2", 2);
+
+  gzochid_storage_engine_interface_mem.transaction_prepare (tx);
+  gzochid_storage_engine_interface_mem.transaction_commit (tx);
 
   /* Execute the body of the test in a transaction. */
   
