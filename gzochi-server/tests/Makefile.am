@@ -115,7 +115,8 @@ test_dataserver_LDADD = $(top_builddir)/src/libgzochi_metad_la-dataserver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
 	$(top_builddir)/src/libgzochid_la-storage.o \
 	$(top_builddir)/src/libgzochid_la-storage-mem.o \
-	@GLIB_LIBS@ @GOBJECT_LIBS@ @GMODULE_LIBS@ @GZOCHI_COMMON_LIBS@
+	$(top_builddir)/src/libgzochid_la-util.o \
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@ @GMODULE_LIBS@
 
 test_dataserver_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
 	@GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
@@ -166,7 +167,8 @@ test_httpd_LDADD = $(top_builddir)/src/libgzochid_la-httpd.o \
 test_lock_mem_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lock_mem_SOURCES = test-lock-mem.c
 test_lock_mem_LDADD = $(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
-	@GLIB_LIBS@
+	$(top_builddir)/src/libgzochid_la-util.o \
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 
 test_lrucache_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lrucache_SOURCES = test-lrucache.c

@@ -1,5 +1,5 @@
 /* test-util.c: Test routines for util.c in gzochid.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,7 +24,8 @@
 
 #include "util.h"
 
-static void test_util_serialize_boolean ()
+static void
+test_util_serialize_boolean ()
 {
   GString *out = g_string_new ("");
 
@@ -40,7 +41,8 @@ static void test_util_serialize_boolean ()
   g_string_free (out, FALSE);
 }
 
-static void test_util_serialize_int ()
+static void
+test_util_serialize_int ()
 {
   GString *out = g_string_new ("");
   gzochid_util_serialize_int (1234, out);
@@ -52,7 +54,8 @@ static void test_util_serialize_int ()
   g_string_free (out, FALSE);
 }
 
-static void test_util_serialize_mpz ()
+static void
+test_util_serialize_mpz ()
 {
   GString *out = g_string_new ("");
   char *str = NULL;
@@ -75,7 +78,8 @@ static void test_util_serialize_mpz ()
   g_string_free (out, FALSE);
 }
 
-static void test_util_serialize_bytes ()
+static void
+test_util_serialize_bytes ()
 {
   GString *out = g_string_new ("");
   unsigned char bytes[3] = { 'a', 'b', 'c' };
@@ -93,7 +97,8 @@ static void test_util_serialize_bytes ()
   g_string_free (out, FALSE);
 }
 
-static void test_util_serialize_string ()
+static void
+test_util_serialize_string ()
 {
   GString *out = g_string_new ("");
 
@@ -109,7 +114,8 @@ static void test_util_serialize_string ()
   g_string_free (out, FALSE);
 }
 
-static void test_util_serialize_list ()
+static void
+test_util_serialize_list ()
 {
   GString *out = g_string_new ("");
   GList *lst = g_list_append 
@@ -146,7 +152,8 @@ static void test_util_serialize_list ()
   g_string_free (out, FALSE);
 }
 
-static void test_util_serialize_sequence ()
+static void
+test_util_serialize_sequence ()
 {
   GString *out = g_string_new ("");
   GSequence *seq = g_sequence_new (NULL);
@@ -186,7 +193,8 @@ static void test_util_serialize_sequence ()
   g_string_free (out, FALSE);
 }
 
-static void test_util_serialize_hash_table ()
+static void
+test_util_serialize_hash_table ()
 {
   GString *out = g_string_new ("");
   GHashTable *ht = g_hash_table_new (g_str_hash, g_str_equal);
@@ -225,7 +233,8 @@ static void test_util_serialize_hash_table ()
   g_string_free (out, FALSE);
 }
 
-static void test_util_serialize_timeval ()
+static void
+test_util_serialize_timeval ()
 {
   GString *out = g_string_new ("");
   struct timeval tv = { 1, 2 };
@@ -244,7 +253,8 @@ static void test_util_serialize_timeval ()
   g_string_free (out, FALSE);
 }
 
-static void test_util_deserialize_boolean ()
+static void
+test_util_deserialize_boolean ()
 {
   GString *in = g_string_new_len ("\001", 1);
 
@@ -256,14 +266,16 @@ static void test_util_deserialize_boolean ()
   g_string_free (in, FALSE);
 }
 
-static void test_util_deserialize_int ()
+static void
+test_util_deserialize_int ()
 {
   GString *in = g_string_new_len ("\001\002\003\004", 4);
   g_assert_cmpint (gzochid_util_deserialize_int (in), ==, 16909060);
   g_string_free (in, FALSE);
 }
 
-static void test_util_deserialize_mpz ()
+static void
+test_util_deserialize_mpz ()
 {
   GString *in = g_string_new_len ("\000\000\000\003\066\064\000", 7);
   mpz_t i;
@@ -276,7 +288,8 @@ static void test_util_deserialize_mpz ()
   g_string_free (in, FALSE);
 }
 
-static void test_util_deserialize_bytes ()
+static void
+test_util_deserialize_bytes ()
 {
   GString *in = g_string_new_len ("\000\000\000\003\144\145\146", 7);
   int len = 0;
@@ -291,7 +304,8 @@ static void test_util_deserialize_bytes ()
   g_string_free (in, FALSE);
 }
 
-static void test_util_deserialize_string ()
+static void
+test_util_deserialize_string ()
 {
   GString *in = g_string_new_len ("\000\000\000\020", 4);
   char *str = NULL;
@@ -305,7 +319,8 @@ static void test_util_deserialize_string ()
   g_string_free (in, FALSE);
 }
 
-static void test_util_deserialize_list ()
+static void
+test_util_deserialize_list ()
 {
   GString *in = g_string_new_len 
     ("\000\000\000\003"
@@ -323,7 +338,8 @@ static void test_util_deserialize_list ()
   g_string_free (in, FALSE);
 }
 
-static void test_util_deserialize_sequence ()
+static void
+test_util_deserialize_sequence ()
 {
   GString *in = g_string_new_len 
     ("\000\000\000\003"
@@ -348,7 +364,8 @@ static void test_util_deserialize_sequence ()
   g_string_free (in, FALSE);
 }
 
-static void test_util_deserialize_hash_table ()
+static void
+test_util_deserialize_hash_table ()
 {
   GString *in = g_string_new_len 
     ("\000\000\000\001"
@@ -367,7 +384,8 @@ static void test_util_deserialize_hash_table ()
   g_string_free (in, FALSE);
 }
 
-static void test_util_deserialize_timeval ()
+static void
+test_util_deserialize_timeval ()
 {
   GString *in = g_string_new_len ("\000\000\000\003\000\000\000\004", 8);
   struct timeval tv = gzochid_util_deserialize_timeval (in);
@@ -378,7 +396,52 @@ static void test_util_deserialize_timeval ()
   g_string_free (in, FALSE);
 }
 
-int main (int argc, char *argv[])
+static void
+test_util_bytes_compare_null_first_simple ()
+{
+  GBytes *b1 = g_bytes_new_static ("foo1", 5);
+  GBytes *b2 = g_bytes_new_static ("foo2", 5);
+
+  g_assert_cmpint (gzochid_util_bytes_compare_null_first (b1, b2), <, 0);
+
+  g_bytes_unref (b1);
+  g_bytes_unref (b2);
+}
+
+static void
+test_util_bytes_compare_null_first_null ()
+{
+  GBytes *b1 = g_bytes_new_static ("foo1", 5);
+
+  g_assert_cmpint (gzochid_util_bytes_compare_null_first (b1, NULL), >, 0);
+
+  g_bytes_unref (b1);
+}
+
+static void
+test_util_bytes_compare_null_last_simple ()
+{
+  GBytes *b1 = g_bytes_new_static ("foo1", 5);
+  GBytes *b2 = g_bytes_new_static ("foo2", 5);
+
+  g_assert_cmpint (gzochid_util_bytes_compare_null_last (b1, b2), <, 0);
+
+  g_bytes_unref (b1);
+  g_bytes_unref (b2);
+}
+
+static void
+test_util_bytes_compare_null_last_null ()
+{
+  GBytes *b1 = g_bytes_new_static ("foo1", 5);
+
+  g_assert_cmpint (gzochid_util_bytes_compare_null_first (b1, NULL), <, 0);
+
+  g_bytes_unref (b1);
+}
+
+int
+main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
@@ -404,6 +467,19 @@ int main (int argc, char *argv[])
   g_test_add_func 
     ("/util/deserialize/hash_table", test_util_deserialize_hash_table);
   g_test_add_func ("/util/deserialize/timeval", test_util_deserialize_timeval);
+
+  g_test_add_func
+    ("/util/bytes_compare_null_first/simple",
+     test_util_bytes_compare_null_first_simple);
+  g_test_add_func
+    ("/util/bytes_compare_null_first/null",
+     test_util_bytes_compare_null_first_null);
+  g_test_add_func
+    ("/util/bytes_compare_null_last/simple",
+     test_util_bytes_compare_null_last_simple);
+  g_test_add_func
+    ("/util/bytes_compare_null_last/null",
+     test_util_bytes_compare_null_last_simple);
   
   return g_test_run ();
 }

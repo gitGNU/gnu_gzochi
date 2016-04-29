@@ -1,5 +1,5 @@
 /* util.h: Prototypes and declarations for util.c
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -55,5 +55,15 @@ GHashTable *gzochid_util_deserialize_hash_table
 struct timeval gzochid_util_deserialize_timeval (GString *);
 
 gint gzochid_util_string_data_compare (gconstpointer, gconstpointer, gpointer);
+
+/* Comparison function that sorts `NULL' before all non-`NULL' values. Use for
+   comparing the lower bounds of range locks. */
+
+gint gzochid_util_bytes_compare_null_first (gconstpointer, gconstpointer);
+
+/* Comparison function that sorts `NULL' after all non-`NULL' values. Use for
+   comparing the upper bounds of range locks. */
+
+gint gzochid_util_bytes_compare_null_last (gconstpointer, gconstpointer);
 
 #endif /* GZOCHID_UTIL_H */

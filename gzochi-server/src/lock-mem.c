@@ -23,6 +23,7 @@
 #include <sys/time.h>
 
 #include "lock.h"
+#include "util.h"
 
 /*
   The following data structures and functions provide an implementation of an
@@ -833,28 +834,6 @@ node_locks_free (gzochid_node_locks *node_locks)
   free (node_locks);
 }
 
-/* Comparison function that sorts `NULL' before all non-`NULL' values. Use for
-   comparing the lower bounds of range locks. */
-
-static gint
-bytes_compare_null_first (gconstpointer o1, gconstpointer o2)
-{
-  if (o1 == NULL)
-    return o2 == NULL ? 0 : -1;
-  else return o2 == NULL ? 1 : g_bytes_compare (o1, o2);
-}
-
-/* Comparison function that sorts `NULL' after all non-`NULL' values. Use for
-   comparing the upper bounds of range locks. */
-
-static gint
-bytes_compare_null_last (gconstpointer o1, gconstpointer o2)
-{
-  if (o1 == NULL)
-    return o2 == NULL ? 0 : 1;
-  else return o2 == NULL ? -1 : g_bytes_compare (o1, o2);
-}
-
 /* 
    Create and return a pointer to a new `gzochid_lock_table' structure.
 
@@ -871,7 +850,9 @@ gzochid_lock_table_new (const char *scope)
   lock_table->locks_by_timestamp = g_sequence_new (NULL);
 
   lock_table->range_locks =
-    itree_new (bytes_compare_null_first, bytes_compare_null_last);
+    gzochid_itree_new
+    (gzochid_util_bytes_compare_null_first,
+     gzochid_util_bytes_compare_null_last);
   lock_table->range_locks_by_timestamp = g_sequence_new (NULL);
   
   lock_table->nodes_to_locks = g_hash_table_new_full
@@ -1393,8 +1374,8 @@ find_range_lock_with_owner (gpointer from, gpointer to, gpointer data,
   gzochid_range_lock *lock = data;
   range_lock_match_context *match_context = user_data;  
   
-  if (bytes_compare_null_first (match_context->from, from) == 0
-      && bytes_compare_null_last (match_context->to, to) == 0
+  if (gzochid_util_bytes_compare_null_first (match_context->from, from) == 0
+      && gzochid_util_bytes_compare_null_last (match_context->to, to) == 0
       && lock->node_id == match_context->node_id)
     {
       match_context->range_lock = lock;

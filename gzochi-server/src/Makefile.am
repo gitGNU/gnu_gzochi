@@ -113,7 +113,7 @@ libgzochi_metad_la_CFLAGS = @CFLAGS@ \
 	-Wall -Werror
 libgzochi_metad_la_SOURCES = config.c data-protocol.c dataserver.c \
 	dataserver-protocol.c httpd.c httpd-meta.c lock-mem.c log.c oids.c \
-	resolver.c socket.c storage.c storage-mem.c
+	resolver.c socket.c storage.c storage-mem.c util.c
 libgzochi_metad_la_LIBADD = @GLIB_LIBS@ @GMODULE_LIBS@ @GTHREAD_LIBS@ \
 	@GOBJECT_LIBS@ @MICROHTTPD_LIBS@ @GZOCHI_COMMON_LIBS@
 
