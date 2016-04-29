@@ -22,559 +22,9 @@
 #include <string.h>
 #include <sys/time.h>
 
+#include "itree.h"
 #include "lock.h"
 #include "util.h"
-
-/*
-  The following data structures and functions provide an implementation of an
-  interval tree, which can be used to associate opaque pointers with comparable 
-  intervals of an arbitrary, opaque type. Intersections between the intervals in
-  the tree and specified external intervals and points of the same type can be 
-  computed. Intervals are sorted on lower bound followed by upper bound; subtree
-  parents maintain a max upper bound over their children, which can be used for
-  subtree pruning during search.
-
-  This tree uses the AVL tree balancing algorithms to maintain an optimal 
-  height for the interval tree on key insertion and removal.
-*/
-
-/* The interval tree node structure. */
-
-struct _itree_node
-{
-  /* A pointer to the parent, or NULL if this is the root. */
-
-  struct _itree_node *parent; 
-
-  struct _itree_node *left; /* The left child, or NULL. */
-  struct _itree_node *right; /* The right child, or NULL. */
-  
-  gpointer lower; /* The interval lower bound. */
-  gpointer upper; /* The interval upper bound. */
-
-  /* The maximum upper bound across this node and the maximum upper bound of 
-     each of the left and right children. */
-
-  gpointer max_upper; 
-
-  gpointer data; /* The data associated with the interval. */
-
-  /* The height difference between the left and right subtrees. As per AVL, if 
-     this exceeds [ -1, 1 ], a rebalance is necessary. */
-
-  gint balance_factor; 
-};
-
-typedef struct _itree_node itree_node;
-
-/* The top-level interval tree structure. */
-
-struct _itree
-{
-  itree_node *root; /* The root node. */
-  GCompareFunc lower_comparator; /* The interval bound comparison function. */
-  GCompareFunc upper_comparator; /* The interval bound comparison function. */
-};
-
-typedef struct _itree itree;
-
-/* 
-   Typedef for the interval search tree function. Called with the lower and 
-   upper bounds of the overlapping interval, the data associated with the
-   overlapping interval, and the "user data" pointer passed to the search
-   function. 
-
-   Return `TRUE' from this function to halt a traversal, `FALSE' to continue.
-*/
-
-typedef gboolean (*itree_search_func) (gpointer, gpointer, gpointer, gpointer);
-
-/* Create a new interval tree node with the specified bounds and data. */
-
-static itree_node *
-itree_node_new (gpointer lower, gpointer upper, gpointer data)
-{
-  itree_node *node = calloc (1, sizeof (itree_node));
-
-  node->lower = lower;
-  node->upper = upper;
-  node->max_upper = upper;
-  node->data = data;
-
-  return node;
-}
-
-/* Free the interval tree node. */
-
-static void
-free_itree_node (gpointer data)
-{
-  free (data);
-}
-
-/* Create a new interval tree. */
-
-static itree *
-itree_new (GCompareFunc lower_comparator, GCompareFunc upper_comparator)
-{
-  itree *t = malloc (sizeof (itree));
-
-  t->root = NULL;
-  t->lower_comparator = lower_comparator;
-  t->upper_comparator = upper_comparator;
-  
-  return t;
-}
-
-/* Free the interval tree structure, including the internal nodes. */
-
-static void
-itree_free (itree *itree)
-{
-  if (itree->root != NULL)
-    {
-      GList *src = g_list_prepend (NULL, itree->root);
-      GList *dst = NULL;
-
-      /* Flatten the tree into a list via a pre-order traversal... */
-      
-      while (src != NULL)
-	{
-	  itree_node *node = src->data;
-
-	  src = g_list_delete_link (src, src);
-	  dst = g_list_prepend (dst, node);	  
-	  
-	  if (node->left != NULL)
-	    {
-	      src = g_list_prepend (src, node->left);
-	      dst = g_list_prepend (dst, node->left);
-	    }
-	  if (node->right != NULL)
-	    {
-	      src = g_list_prepend (src, node->right);
-	      dst = g_list_prepend (dst, node->right);
-	    }
-	}
-
-      /* ...then free all the nodes. */
-      
-      g_list_free_full (dst, free_itree_node);
-    }
-  
-  free (itree);
-}
-
-/* 
-   Find and return the node in the interval tree at which the specified interval
-   should be added. This node will be an exact match for that interval if it is
-   already in the tree, or the node that should be the interval's parent, as an
-   in-order successor or predecessor. 
-
-   Returns `NULL' if the tree is empty, indicating that the interval should be
-   added as the new root.
-*/
-
-static itree_node *
-itree_location (itree *itree, gpointer lower, gpointer upper)
-{
-  itree_node *node = itree->root;
-
-  if (node == NULL)
-    return NULL;
-
-  while (TRUE)
-    {
-      gint lower_comparison = itree->lower_comparator (lower, node->lower);
-      gint upper_comparison = itree->upper_comparator (upper, node->upper);
-
-      if (lower_comparison == 0 && upper_comparison == 0)
-	return node;
-      else if (lower_comparison < 0)
-	{
-	  if (node->left == NULL)
-	    return node;
-	  else node = node->left;
-	}
-      else if (node->right == NULL)
-	return node;
-      else node = node->right;
-    }
-}
-
-/* 
-   Update the maximum upper bound at the specified node, based on an examination
-   of the node itself and, non-recursively, the left and right children. 
-
-   Returns `TRUE' if the maximum upper bound was changed, `FALSE' otherwise.
-*/
-
-static gboolean
-update_max_upper (itree *itree, itree_node *node)
-{
-  gpointer new_max_upper = node->upper;
-
-  if (node->left != NULL
-      && itree->upper_comparator (node->left->max_upper, new_max_upper) > 0)
-    new_max_upper = node->left->max_upper;
-  if (node->right != NULL
-      && itree->upper_comparator (node->right->max_upper, new_max_upper) > 0)
-    new_max_upper = node->right->max_upper;
-
-  if (node->max_upper != new_max_upper)
-    {
-      node->max_upper = new_max_upper;
-      return TRUE;
-    }
-  else return FALSE;
-}
-
-/* Perform an upward rotation of the specified node in the specified direction
-   (`TRUE' for left, `FALSE' for right) re-attaching the displaced ancestor 
-   nodes to the specified node's descendants accordingly. */
-
-static void
-itree_rotate (itree *itree, itree_node *node, gboolean left)
-{
-  itree_node *parent = node->parent;
-
-  if (parent == NULL)
-    {
-      if (left)
-	node->left = itree->root;
-      else node->left = itree->root;
-      
-      itree->root = node;
-      node->parent = NULL;
-      
-      /* Update the max upper bound of the node in its new location. */
-
-      update_max_upper (itree, node); 
-      return;
-    }
-
-  if (left)
-    {
-      parent->right = node->left;
-      node->left = parent;
-    }
-  else
-    {
-      parent->left = node->right;
-      node->right = parent;
-    }
-  
-  /* Update the max upper bound of the node and that of its former parent, since
-     it is likely that both have been invalidated. */
-
-  update_max_upper (itree, parent);
-  update_max_upper (itree, node);
-  
-  if (parent->parent == NULL)
-    {
-      itree->root = node;
-      node->parent = NULL;
-    }
-  else
-    {
-      if (parent->parent->left == parent)
-	parent->parent->left = node;
-      else parent->parent->right = node;
-
-      /* ...and update the max upper bound of the grandparent for good 
-	 measure. */
-      
-      update_max_upper (itree, parent->parent);
-    }
-
-  parent->parent = node;
-}
-
-/* Perform the AVL "retrace insert" process from the specified node up to the 
-   root, rotating nodes and recalculating their maximum upper bounds as 
-   necessary. */
-
-static void
-itree_retrace_insert (itree *itree, itree_node *node)
-{
-  if (node->balance_factor < -1 || node->balance_factor > 1)
-    while (node->parent != NULL)
-      {
-	itree_node *parent = node->parent;
-
-	gboolean left = parent->left == node;
-	gint needs_rotation = left ? 1 : -1;
-	gint can_absorb = left ? -1 : 1;
-	
-	if (parent->balance_factor == needs_rotation)
-	  {
-	    if (node->balance_factor == can_absorb)
-	      itree_rotate (itree, node, left); 
-		
-	    itree_rotate (itree, parent, !left);
-	    break;
-	  }
-	else if (parent->balance_factor == can_absorb)
-	  {
-	    parent->balance_factor = 0;
-	    break;
-	  }
-	else parent->balance_factor = needs_rotation; 
-
-	node = node->parent;	
-      }
-
-  /* Once we've broken out of the loop, no more rotations are necessary, but
-     there might still be max upper bound recalculations to do. So keep doing
-     them until they stop having an effect. */
-  
-  while (node != NULL)
-    {
-      if (!update_max_upper (itree, node))
-	break;
-
-      node = node->parent;
-    }
-}
-
-/* Insert the specified interval into the tree and associate it with the 
-   specified value. If the interval is already in the tree, the associated value
-   is replaced. */
-
-static void
-itree_insert (itree *itree, gpointer lower, gpointer upper, gpointer data)
-{
-  itree_node *node = itree_location (itree, lower, upper);
-
-  if (node == NULL)
-    itree->root = itree_node_new (lower, upper, data);
-  else if (itree->lower_comparator (node->lower, lower) == 0
-	   && itree->upper_comparator (node->upper, upper) == 0)
-    node->data = data;
-  else
-    {
-      itree_node *new_node = itree_node_new (lower, upper, data);
-
-      new_node->parent = node;      
-      
-      if (itree->lower_comparator (lower, node->lower) < 0)
-	{
-	  node->left = new_node;
-	  node->balance_factor++; /* Adjust the balance factor. */
-	}
-      else
-	{
-	  node->right = new_node;
-	  node->balance_factor--; /* Adjust the balance factor. */
-	}
-
-      /* Adjust the tree structure as necessary. */
-      
-      itree_retrace_insert (itree, node);
-    }
-}
-
-/* Perform the AVL "retrace remove" process from the specified node up to the 
-   root, rotating nodes and recalculating their maximum upper bounds as 
-   necessary. */
-
-static void
-itree_retrace_remove (itree *itree, itree_node *node)
-{
-  while (node->parent != NULL)
-    {
-      itree_node *parent = node->parent;
-
-      gboolean right = parent->right == node;
-      itree_node *sibling = right ? parent->left : parent->right;
-      gint needs_rotation = right ? 1 : -1;
-      gint can_absorb = right ? -1 : 1;
-      
-      if (parent->balance_factor == needs_rotation)
-	{
-	  if (sibling->balance_factor == can_absorb)
-	    itree_rotate (itree, sibling, right);
-	  itree_rotate (itree, parent, !right);
-
-	  if (sibling->balance_factor == 0)
-	    break;
-	}
-      if (parent->balance_factor == 0)
-	{
-	  parent->balance_factor = needs_rotation;
-	  break;
-	}
-      else parent->balance_factor = 0;
-
-      node = node->parent;
-    }
-
-  /* As with "retrace insert," there may be some additional bounds 
-     recalculations to perform once the rotations are complete. */
-  
-  while (node != NULL)
-    {
-      if (!update_max_upper (itree, node))
-	break;
-      
-      node = node->parent;
-    }
-}
-
-/* Remove the specified interval and its associated data from the tree. */
-
-static void
-itree_remove (itree *itree, gpointer lower, gpointer upper)
-{
-  itree_node *node = itree_location (itree, lower, upper);
-
-  if (node != NULL
-      && itree->lower_comparator (node->lower, lower) == 0
-      && itree->upper_comparator (node->upper, upper) == 0)
-    {
-      itree_node *target = NULL;
-      itree_node *parent = NULL;
-      itree_node *new_child = NULL;
-
-      /* If the target node has both left and right children, it's not feasible
-	 to remove it from the structure of the tree. Instead, "swap" its value
-         with the value of a node that *is* safe to remove. */
-      
-      if (node->left != NULL && node->right != NULL)
-	{	  
-	  target = node->left;
-	  
-	  while (target->right != NULL)
-	    target = target->right;	  
-
-	  node->lower = target->lower;
-	  node->upper = target->upper;
-	  node->data = target->data;
-	}
-
-      /* ...but if it is safe to remove the node, do so. */
-      
-      else target = node;
-
-      parent = target->parent;
-      
-      if (target->left != NULL)
-	new_child = target->left;
-      else if (target->right != NULL)
-	new_child = target->right;
-      
-      if (new_child != NULL)
-	new_child->parent = parent;
-
-      if (parent == NULL)
-	itree->root = new_child;
-      else
-	{
-	  if (parent->left == target)
-	    parent->left = new_child;
-	  else if (parent->right == target)
-	    parent->right = new_child;
-	}
-
-      free_itree_node (target);
-
-      /* If the tree is not empty at this point, do a retrace to the root. */
-      
-      if (new_child != NULL)
-	itree_retrace_remove (itree, new_child);
-    }
-}
-
-/* Search the specified interval tree for intervals overlapping the specified 
-   interval (as indicated by the tree's comparator) invoking the specified 
-   search function with the specified "user data" pointer for every match. */
-
-static void
-itree_search_interval (itree *itree, gpointer from, gpointer to,
-		       itree_search_func search_func, gpointer user_data)
-{
-  GList *stack = NULL;
-
-  if (itree->root == NULL)
-    return;
-  
-  stack = g_list_prepend (NULL, itree->root);
-
-  while (stack != NULL)
-    {
-      itree_node *node = stack->data;
-
-      stack = g_list_delete_link (stack, stack);
-
-      if (itree->upper_comparator (from, node->max_upper) > 0
-	  && itree->upper_comparator (to, node->max_upper) > 0)
-
-	/* If the interval is entirely outside of the max upper bound in this
-	   sub-tree, there's no point in expanding it any further. */
-	
-	continue;
-
-      if ((itree->lower_comparator (from, node->lower) >= 0
-	   && itree->upper_comparator (from, node->upper) <= 0)
-	  || (itree->lower_comparator (to, node->lower) >= 0
-	      && itree->upper_comparator (to, node->upper) <= 0)
-	  || (itree->lower_comparator (from, node->lower) <= 0
-	      && itree->upper_comparator (to, node->upper) >= 0))
-	if (search_func (node->lower, node->upper, node->data, user_data))
-	  {
-	    g_list_free (stack);
-	    return;
-	  }
-      
-      if (node->right != NULL)
-	stack = g_list_prepend (stack, node->right);
-      if (node->left != NULL)
-	stack = g_list_prepend (stack, node->left);
-    }
-}
-
-/* Search the specified interval tree for intervals overlapping the specified 
-   point (as indicated by the tree's comparator) invoking the specified search 
-   function with the specified "user data" pointer for every match. */
-
-static void
-itree_search (itree *itree, gpointer point, itree_search_func search_func,
-	      gpointer user_data)
-{
-  GList *stack = NULL;
-
-  if (itree->root == NULL)
-    return;
-  
-  stack = g_list_prepend (NULL, itree->root);
-
-  while (stack != NULL)
-    {
-      itree_node *node = stack->data;
-
-      stack = g_list_delete_link (stack, stack);
-
-      if (itree->upper_comparator (point, node->max_upper) > 0)
-
-	/* If the point falls beyond the max upper bound in this sub-tree, 
-	   there's no point in expanding it any further. */
-		
-	continue;
-
-      if (itree->lower_comparator (point, node->lower) >= 0
-	  && itree->upper_comparator (point, node->upper) <= 0)
-	if (search_func (node->lower, node->upper, node->data, user_data))
-	  {
-	    g_list_free (stack);
-	    return;
-	  }
-      
-      if (node->right != NULL)
-	stack = g_list_prepend (stack, node->right);
-      if (node->left != NULL)
-	stack = g_list_prepend (stack, node->left);
-    }
-}
 
 /* 
    The following data structures and functions provide an implementation of the
@@ -661,7 +111,7 @@ struct _gzochid_lock_table
 
   GSequence *locks_by_timestamp; 
   
-  itree *range_locks; /* The interval tree of range locks. */
+  gzochid_itree *range_locks; /* The interval tree of range locks. */
 
   /* A sequence of range locks, ordered by timestamp, ascending. */
 
@@ -878,7 +328,7 @@ gzochid_lock_table_free (gzochid_lock_table *lock_table)
   /* The loop over `gzochid_node_locks' below takes care of freeing the
      individual range locks. */
   
-  itree_free (lock_table->range_locks);
+  gzochid_itree_free (lock_table->range_locks);
   g_sequence_free (lock_table->range_locks_by_timestamp);
 
   g_list_free_full (node_lock_lists, (GDestroyNotify) node_locks_free);
@@ -932,8 +382,9 @@ struct _range_lock_search_context
 
 typedef struct _range_lock_search_context range_lock_search_context;
 
-/* An `itree_search_func' implementation to locate the most recently-acquired 
-   range lock covering a specified key. Use with `range_lock_search_context'. */
+/* A `gzochid_itree_search_func' implementation to locate the most 
+   recently-acquired range lock covering a specified key. Use with 
+   `range_lock_search_context'. */
 
 static gboolean
 find_most_recent_covering_range_lock (gpointer from, gpointer to,
@@ -967,7 +418,7 @@ most_recent_covering_range_lock (gzochid_lock_table *lock_table,
   search_context.excluded_node_id = excluded_node_id;
   search_context.range_lock = NULL;
   
-  itree_search
+  gzochid_itree_search
     (lock_table->range_locks, key, find_most_recent_covering_range_lock,
      &search_context);
 
@@ -1192,8 +643,8 @@ gzochid_lock_check_and_set (gzochid_lock_table *lock_table, guint node_id,
   }
 }
 
-/* An `itree_search_func' implementation to locate range locks that overlap a 
-   specified key interval. Use with `range_lock_search_context'. */
+/* A `gzochid_itree_search_func' implementation to locate range locks that 
+   overlap a specified key interval. Use with `range_lock_search_context'. */
 
 static gboolean
 find_overlapping_range_lock (gpointer from, gpointer to, gpointer data,
@@ -1222,7 +673,7 @@ gzochid_lock_range_check_and_set (gzochid_lock_table *lock_table, guint node_id,
 
   /* Search for conflicting range locks. */
   
-  itree_search_interval
+  gzochid_itree_search_interval
     (lock_table->range_locks, from, to, find_overlapping_range_lock,
      &search_context);
 
@@ -1261,7 +712,7 @@ gzochid_lock_range_check_and_set (gzochid_lock_table *lock_table, guint node_id,
       node_locks = ensure_node_registration (lock_table, node_id);
       range_lock = range_lock_new (from, to, node_id);
 
-      itree_insert (lock_table->range_locks, from, to, range_lock);
+      gzochid_itree_insert (lock_table->range_locks, from, to, range_lock);
       node_locks->range_locks = g_list_prepend
 	(node_locks->range_locks, range_lock);
 
@@ -1360,9 +811,9 @@ struct _range_lock_match_context
 typedef struct _range_lock_match_context range_lock_match_context;
 
 /* 
-   An `itree_search_func' implementation to locate range locks with a specified
-   owner. Aborts the traversal on the first overlapping range lock owned by the
-   node. 
+   A `gzochid_itree_search_func' implementation to locate range locks with a 
+   specified owner. Aborts the traversal on the first overlapping range lock
+   owned by the node. 
 
    Use with `range_lock_match_context'. 
 */
@@ -1398,7 +849,8 @@ remove_range_lock (gzochid_lock_table *lock_table,
 
   /* Remove the range lock from the interval tree. */
   
-  itree_remove (lock_table->range_locks, range_lock->from, range_lock->to);
+  gzochid_itree_remove
+    (lock_table->range_locks, range_lock->from, range_lock->to);
 
   /* Remove the range lock from the timestamp-ordered range lock sequence. */
 
@@ -1432,7 +884,7 @@ gzochid_lock_release_range (gzochid_lock_table *lock_table, guint node_id,
   match_context.to = to;
   match_context.range_lock = NULL;
   
-  itree_search
+  gzochid_itree_search
     (lock_table->range_locks, from, find_range_lock_with_owner, &match_context);
 
   if (match_context.range_lock != NULL)  

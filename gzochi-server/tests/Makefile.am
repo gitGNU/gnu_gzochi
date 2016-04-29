@@ -34,6 +34,7 @@ test_programs = \
 	test-fsm \
 	test-game-protocol \
 	test-httpd \
+	test-itree \
 	test-lock-mem \
 	test-lrucache \
 	test-oids \
@@ -109,6 +110,7 @@ test_dataserver_SOURCES = test-dataserver.c
 test_dataserver_LDADD = $(top_builddir)/src/libgzochi_metad_la-dataserver.o \
 	$(top_builddir)/src/libgzochid_la-config.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
+	$(top_builddir)/src/libgzochid_la-itree.o \
 	$(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
 	$(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
@@ -164,9 +166,14 @@ test_httpd_SOURCES = test-httpd.c
 test_httpd_LDADD = $(top_builddir)/src/libgzochid_la-httpd.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @MICROHTTPD_LIBS@
 
+test_itree_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_itree_SOURCES = test-itree.c
+test_itree_LDADD = $(top_builddir)/src/libgzochid_la-itree.o @GLIB_LIBS@
+
 test_lock_mem_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lock_mem_SOURCES = test-lock-mem.c
 test_lock_mem_LDADD = $(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
+	$(top_builddir)/src/libgzochid_la-itree.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 

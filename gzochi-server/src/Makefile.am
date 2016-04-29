@@ -48,10 +48,10 @@ noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
 	dataclient-protocol.h dataserver.h dataserver-protocol.h debug.h \
 	descriptor.h durable-task.h event.h fmemopen.h fsm.h game.h \
 	game-protocol.h guile.h gzochid.h httpd.h httpd-app.h httpd-meta.h \
-	io.h lifecycle.h lock.h log.h lrucache.h oids.h protocol.h reloc.h \
-	resolver.h schedule.h scheme.h scheme-task.h session.h socket.h \
-	stats.h storage.h storage-mem.h task.h threads.h toollib.h tx.h \
-	txlog.h util.h
+	io.h itree.h lifecycle.h lock.h log.h lrucache.h oids.h protocol.h \
+	reloc.h resolver.h schedule.h scheme.h scheme-task.h session.h \
+	socket.h stats.h storage.h storage-mem.h task.h threads.h toollib.h \
+	tx.h txlog.h util.h
 
 noinst_LTLIBRARIES = libgzochid.la libgzochi-metad.la
 
@@ -66,9 +66,9 @@ libgzochid_la_SOURCES = admin.c app.c app-task.c auth.c callback.c channel.c \
 	config.c context.c data.c data-protocol.c dataclient.c \
 	dataclient-protocol.c debug.c descriptor.c durable-task.c event.c \
 	fmemopen.c fsm.c game.c game-protocol.c guile.c httpd.c httpd-app.c \
-	io.c lifecycle.c log.c lrucache.c oids.c reloc.c resolver.c schedule.c \
-	scheme.c scheme-task.c session.c socket.c stats.c storage.c \
-	storage-mem.c task.c threads.c tx.c txlog.c util.c
+	io.c itree.c lifecycle.c log.c lrucache.c oids.c reloc.c resolver.c \
+	schedule.c scheme.c scheme-task.c session.c socket.c stats.c storage.c \
+	storage-dataclient.c storage-mem.c task.c threads.c tx.c txlog.c util.c
 
 libgzochid_la_LIBADD = api/libgzochid-api.la @GZOCHI_COMMON_LIBS@ \
 	@GUILE_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ \
@@ -112,8 +112,8 @@ libgzochi_metad_la_CFLAGS = @CFLAGS@ \
 	@GZOCHI_COMMON_CFLAGS@ \
 	-Wall -Werror
 libgzochi_metad_la_SOURCES = config.c data-protocol.c dataserver.c \
-	dataserver-protocol.c httpd.c httpd-meta.c lock-mem.c log.c oids.c \
-	resolver.c socket.c storage.c storage-mem.c util.c
+	dataserver-protocol.c httpd.c httpd-meta.c itree.c lock-mem.c log.c \
+	oids.c resolver.c socket.c storage.c storage-mem.c util.c
 libgzochi_metad_la_LIBADD = @GLIB_LIBS@ @GMODULE_LIBS@ @GTHREAD_LIBS@ \
 	@GOBJECT_LIBS@ @MICROHTTPD_LIBS@ @GZOCHI_COMMON_LIBS@
 
