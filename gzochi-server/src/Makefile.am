@@ -68,7 +68,7 @@ libgzochid_la_SOURCES = admin.c app.c app-task.c auth.c callback.c channel.c \
 	fmemopen.c fsm.c game.c game-protocol.c guile.c httpd.c httpd-app.c \
 	io.c itree.c lifecycle.c log.c lrucache.c oids.c reloc.c resolver.c \
 	schedule.c scheme.c scheme-task.c session.c socket.c stats.c storage.c \
-	storage-dataclient.c storage-mem.c task.c threads.c tx.c txlog.c util.c
+	storage-mem.c task.c threads.c tx.c txlog.c util.c
 
 libgzochid_la_LIBADD = api/libgzochid-api.la @GZOCHI_COMMON_LIBS@ \
 	@GUILE_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ \
