@@ -38,6 +38,7 @@ test_programs = \
 	test-lock-mem \
 	test-lrucache \
 	test-oids \
+	test-oids-storage \
 	test-reloc \
 	test-resolver \
 	test-scheme \
@@ -113,6 +114,7 @@ test_dataserver_LDADD = $(top_builddir)/src/libgzochi_metad_la-dataserver.o \
 	$(top_builddir)/src/libgzochid_la-itree.o \
 	$(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
 	$(top_builddir)/src/libgzochid_la-oids.o \
+	$(top_builddir)/src/libgzochid_la-oids-storage.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
 	$(top_builddir)/src/libgzochid_la-storage.o \
@@ -184,6 +186,13 @@ test_lrucache_LDADD = $(top_builddir)/src/libgzochid_la-lrucache.o @GLIB_LIBS@
 test_oids_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_oids_SOURCES = test-oids.c
 test_oids_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
+	$(top_builddir)/src/libgzochid_la-storage-mem.o \
+	@GLIB_LIBS@
+
+test_oids_storage_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_oids_storage_SOURCES = test-oids-storage.c
+test_oids_storage_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
+	$(top_builddir)/src/libgzochid_la-oids-storage.o \
 	$(top_builddir)/src/libgzochid_la-storage-mem.o \
 	@GLIB_LIBS@
 

@@ -135,6 +135,9 @@ initialize_data (int from_state, int to_state, gpointer user_data)
   app_context->names = iface->open 
     (storage_context, names_db, GZOCHID_STORAGE_CREATE);
 
+  app_context->oid_strategy = gzochid_storage_oid_strategy_new
+    (iface, app_context->storage_context, app_context->meta);
+
   free (data_dir);
   free (meta_db);
   free (oids_db);

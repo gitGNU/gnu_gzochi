@@ -317,8 +317,8 @@ reserve_oids (gzochid_application_context *context)
       gzochid_data_oids_block new_block;
 
       assert (gzochid_oids_reserve_block
-	      (APP_STORAGE_INTERFACE (context), context->storage_context,
-	       context->meta, &new_block, NULL));
+	      (context->oid_strategy, &new_block, NULL));
+
       block_state = create_oid_block_state (&new_block);
       mpz_clear (new_block.block_start);
     }

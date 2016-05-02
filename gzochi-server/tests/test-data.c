@@ -24,6 +24,8 @@
 #include "data.h"
 #include "game.h"
 #include "io.h"
+#include "oids.h"
+#include "oids-storage.h"
 #include "storage-mem.h"
 #include "tx.h"
 
@@ -107,6 +109,10 @@ application_context_init (gzochid_application_context *context)
     (context->storage_context, "/dev/null", 0);
   context->names = gzochid_storage_engine_interface_mem.open 
     (context->storage_context, "/dev/null", 0);
+
+  context->oid_strategy = gzochid_storage_oid_strategy_new
+    (game_context->storage_engine->interface, context->storage_context,
+     context->meta);
 }
 
 static void
@@ -120,7 +126,9 @@ application_context_shutdown (gzochid_application_context *context)
   gzochid_storage_engine_interface_mem.close_store (context->oids);
   gzochid_storage_engine_interface_mem.close_store (context->names);
   gzochid_storage_engine_interface_mem.close_context (context->storage_context);
-					
+
+  gzochid_oid_allocation_strategy_free (context->oid_strategy);
+  
   gzochid_game_context_free (game_context);
 }
 

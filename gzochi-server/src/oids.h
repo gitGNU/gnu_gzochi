@@ -22,13 +22,8 @@
 #include <gmp.h>
 #include <stddef.h>
 
-#include "gzochid-storage.h"
-
-/* The following data structures and prototypes provide an object id allocation
-   strategy that uses the server's configured storage engine to maintain state
-   about allocated object id blocks. It is structured as an independent 
-   compilation unit to allow it to be shared between the gzochid application 
-   server and meta server. */ 
+/* The following data structures and prototypes provide a framework for 
+   implementations of object id allocation strategies. */
 
 enum GzochidOidError
   {
@@ -61,19 +56,56 @@ struct _gzochid_data_oids_block
 
 typedef struct _gzochid_data_oids_block gzochid_data_oids_block;
 
-/* 
-   Reserve a new block of object ids using the specified storage interface,
-   store context, and store to obtain and persist id allocation state. 
-   
-   If the allocation operation is successful, this function updates the 
-   specified `gzochid_data_oids_block' with information about the allocated
-   block and returns `TRUE'. Otherwise, it updates the specified `GError' (if
-   provided) and returns `FALSE'.
+/* The opaque oid allocation strategy type. */
+
+typedef struct _gzochid_oid_allocation_strategy
+gzochid_oid_allocation_strategy;
+
+/*
+  Function pointer prototype for oid allocation strategies.
+
+  Implementations of this function should identify the next free block of oids
+  and update the specified block pointer with the first oid in the new block as
+  well as the block size, and update any internal state as necessary. Returning
+  `TRUE' signals that the allocation was successful; `FALSE' that it failed, and
+  that further details may be found in the specified `GError'.
+*/
+
+typedef gboolean (*gzochid_oid_allocation_func)
+(gpointer, gzochid_data_oids_block *, GError **);
+
+/*
+  Intended for use by specific oid allocation strategy implementations.
+
+  Create and return a new `gzochid_oid_allocation_strategy' that uses the
+  specified allocation function (which will be passed the specified user data 
+  pointer as its first argument) to reserve blocks of oids. The 
+  `GDestroyNotify' callback, if specified, will be called on the user data 
+  pointer when the allocation strategy is freed via 
+  `gzochid_oid_allocation_strategy_free'.
+*/
+
+gzochid_oid_allocation_strategy *
+gzochid_oid_allocation_strategy_new
+(gzochid_oid_allocation_func, gpointer, GDestroyNotify);
+
+/* Free the specified oid allocation strategy, invoking its `GDestroyNotify' if
+   one was given at construction time. */
+
+void gzochid_oid_allocation_strategy_free (gzochid_oid_allocation_strategy *);
+
+/*
+  Reserve a new block of object ids using the specified allocation strategy to
+  obtain and persist id allocation state. 
+  
+  If the allocation operation is successful, this function updates the 
+  specified `gzochid_data_oids_block' with information about the allocated
+  block and returns `TRUE'. Otherwise, it updates the specified `GError' (if
+  provided) and returns `FALSE'.
 */
 
 gboolean gzochid_oids_reserve_block
-(gzochid_storage_engine_interface *, gzochid_storage_context *,
- gzochid_storage_store *, gzochid_data_oids_block *, GError **);
+(gzochid_oid_allocation_strategy *, gzochid_data_oids_block *, GError **);
 
 GQuark gzochid_oids_error_quark (void);
 

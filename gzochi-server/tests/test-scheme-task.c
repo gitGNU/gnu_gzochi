@@ -27,6 +27,8 @@
 #include "game.h"
 #include "guile.h"
 #include "gzochid-auth.h"
+#include "oids.h"
+#include "oids-storage.h"
 #include "scheme.h"
 #include "scheme-task.h"
 #include "storage-mem.h"
@@ -83,6 +85,10 @@ test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
     (fixture->context->storage_context, "/tmp/oids", GZOCHID_STORAGE_CREATE);
   fixture->context->names = fixture->storage_interface->open
     (fixture->context->storage_context, "/tmp/names", GZOCHID_STORAGE_CREATE);
+
+  fixture->context->oid_strategy = gzochid_storage_oid_strategy_new
+    (fixture->storage_interface, fixture->context->storage_context,
+     fixture->context->meta);
 }
 
 static void
@@ -100,6 +106,8 @@ test_scheme_task_fixture_teardown (struct test_scheme_task_fixture *fixture,
   fixture->storage_interface->close_store (fixture->context->names);
   fixture->storage_interface->close_context (fixture->context->storage_context);
 
+  gzochid_oid_allocation_strategy_free (fixture->context->oid_strategy);
+  
   free (game_context->storage_engine);
   gzochid_game_context_free (game_context);
   gzochid_application_context_free (fixture->context);
