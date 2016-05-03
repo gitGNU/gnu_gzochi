@@ -214,7 +214,7 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
 
   while (remaining >= 3)
     {
-      short len = gzochi_common_io_read_short
+      unsigned short len = gzochi_common_io_read_short
 	((unsigned char *) buffer->data, offset);
       
       if (++len > remaining - 2)
