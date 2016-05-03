@@ -264,7 +264,6 @@ gzochid_game_context_new ()
   context->auth_plugins = g_hash_table_new (g_str_hash, g_str_equal);
 
   context->event_loop = g_main_loop_new (event_context, FALSE);
-  context->task_queue = gzochid_schedule_task_queue_new (context->pool);
 
   return context;
 }
@@ -308,7 +307,7 @@ gzochid_game_context_init (gzochid_game_context *context,
   gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_RUNNING, "RUNNING");
   gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_STOPPED, "STOPPED");
 
-
+  context->task_queue = gzochid_schedule_task_queue_new (context->pool);
   gzochid_schedule_task_queue_start (context->task_queue);
 
   context->port = gzochid_config_to_int
@@ -349,9 +348,9 @@ gzochid_game_context_init (gzochid_game_context *context,
 
   if (context->storage_engine == NULL)
     {
-      g_info ("\
-Using in-memory storage for application data. THIS CONFIGURATION IS NOT SAFE \
-FOR PRODUCTION USE.");
+      g_info
+	("Using in-memory storage for application data. THIS CONFIGURATION IS "
+	 "NOT SAFE FOR PRODUCTION USE.");
 
       context->storage_engine = calloc (1, sizeof (gzochid_storage_engine));
       context->storage_engine->interface = 
