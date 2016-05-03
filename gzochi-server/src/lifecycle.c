@@ -28,6 +28,7 @@
 #include "guile.h"
 #include "gzochid-auth.h"
 #include "lifecycle.h"
+#include "oids-storage.h"
 #include "scheme-task.h"
 #include "session.h"
 #include "task.h"
