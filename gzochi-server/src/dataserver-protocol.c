@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <gzochi-common.h>
 #include <stdlib.h>
@@ -68,6 +69,9 @@ server_accept (GIOChannel *channel, const char *desc, gpointer data)
 
   client->sock = sock;
   client->dataserver = data;
+
+  g_message
+    ("Received connection from %s; assigning id %d", desc, client->node_id);
   
   return sock;
 }
@@ -117,6 +121,30 @@ read_str (const unsigned char *bytes, const size_t bytes_len, size_t *str_len)
     }
 }
 
+/*
+  Reads the run length encoded (via a two-byte big-endian prefix) byte buffer
+  and returns it. 
+
+  TODO: This function duplicates a function in `data-protocol.c'. Consider 
+  making them available via a shared utility.
+*/
+
+static GBytes *
+read_bytes (const unsigned char *bytes, const size_t bytes_len)
+{
+  short prefix = 0;
+  
+  if (bytes_len < 2)
+    return NULL;
+  
+  prefix = gzochi_common_io_read_short (bytes, 0);
+
+  if (prefix > bytes_len - 2)
+    return NULL;
+
+  return g_bytes_new (bytes + 2, prefix);
+}
+
 /* Processes the message payload following the `GZOZCHID_DATA_PROTOCOL_LOGIN'
    opcode. Returns `TRUE' if the message was successfully decoded, `FALSE'
    otherwise. */
@@ -137,7 +165,11 @@ dispatch_login (gzochi_metad_dataserver_client *client, unsigned char *data,
   /* The admin server base URL can be empty, but not absent. */
   
   if (admin_server_base_url == NULL)
-    return FALSE;
+    {
+      g_warning
+	("Received malformed 'LOGIN' message from node %d.", client->node_id);
+      return FALSE;
+    }
 
   if (str_len > 1)
     client->admin_server_base_url = strdup (admin_server_base_url);
@@ -164,7 +196,12 @@ dispatch_request_oids (gzochi_metad_dataserver_client *client,
   GByteArray *bytes = NULL;
 
   if (app == NULL || str_len <= 1)
-    return FALSE;
+    {
+      g_warning
+	("Received malformed 'REQUEST_OIDS' message from node %d.",
+	 client->node_id);
+      return FALSE;
+    }
   
   bytes = g_byte_array_new ();
   response = gzochi_metad_dataserver_reserve_oids
@@ -176,7 +213,8 @@ dispatch_request_oids (gzochi_metad_dataserver_client *client,
      encoded. */
 
   g_byte_array_prepend
-    (bytes, (unsigned char *) &(unsigned char[]) { 0, 0, 0x50 }, 3);
+    (bytes, (unsigned char *) &(unsigned char[])
+     { 0, 0, GZOCHID_DATA_PROTOCOL_OIDS_RESPONSE }, 3);
   gzochi_common_io_write_short (bytes->len - 3, bytes->data, 0);
   gzochid_client_socket_write (client->sock, bytes->data, bytes->len);
   
@@ -187,7 +225,7 @@ dispatch_request_oids (gzochi_metad_dataserver_client *client,
 }
 
 /* Processes the message payload following the 
-   `GZOZCHID_DATA_PROTOCOL_REQUEST_OBJECT' opcode. Returns `TRUE' if the 
+   `GZOZCHID_DATA_PROTOCOL_REQUEST_VALUE' opcode. Returns `TRUE' if the 
    message was successfully decoded, `FALSE' otherwise. 
 
    If the message was successfully decoded, the bytes encoding a 
@@ -196,24 +234,42 @@ dispatch_request_oids (gzochi_metad_dataserver_client *client,
 */
 
 static gboolean
-dispatch_request_object (gzochi_metad_dataserver_client *client,
-			 unsigned char *data, unsigned short len)
+dispatch_request_value (gzochi_metad_dataserver_client *client,
+			unsigned char *data, unsigned short len)
 {
-  mpz_t oid;
   size_t str_len = 0, offset = 0;
-  char *app = read_str (data, len, &str_len);
+  char *app = read_str (data, len, &str_len), *store = NULL;
   gboolean for_write = FALSE;
   GByteArray *bytes = NULL;
-  char *oid_str = NULL;
+  GBytes *key = NULL;
+  GError *err = NULL;
 
-  gzochid_data_object_response *response = NULL;
+  gzochid_data_response *response = NULL;
   
   if (app == NULL || str_len <= 1)
-    return FALSE;
-
+    {
+      g_warning
+	("Received malformed 'REQUEST_VALUE' message from node %d.",
+	 client->node_id);
+      return FALSE;
+    }
+  
   len -= str_len;
   offset += str_len;
 
+  store = read_str (data + offset, len, &str_len);
+
+  if (store == NULL || str_len <= 1)
+    {
+      g_warning
+	("Received malformed 'REQUEST_VALUE' message from node %d.",
+	 client->node_id);
+      return FALSE;
+    }
+
+  len -= str_len;
+  offset += str_len;
+  
   if (len <= 0)
     return FALSE;
 
@@ -222,136 +278,132 @@ dispatch_request_object (gzochi_metad_dataserver_client *client,
   len--;
   offset++;
   
-  oid_str = read_str (data + offset, len, &str_len);
+  key = read_bytes (data + offset, len);
 
-  if (oid_str == NULL || str_len <= 1)
-    return FALSE;
+  if (key == NULL)
+    {
+      g_warning
+	("Received malformed 'REQUEST_VALUE' message from node %d.",
+	 client->node_id);
+      return FALSE;
+    }
 
-  if (mpz_init_set_str (oid, oid_str, 16) < 0)
-    return FALSE;
+  response = gzochi_metad_dataserver_request_value
+    (client->dataserver, client->node_id, app, store, key, for_write, &err);
 
-  bytes = g_byte_array_new ();
+  if (response == NULL)
+    {
+      assert (err != NULL);
+
+      g_warning
+	("Failed to request value for application '%s': %s", app, err->message);
+
+      g_error_free (err);
+      g_bytes_unref (key);
+      return FALSE;
+    }
   
-  response = gzochi_metad_dataserver_request_object
-    (client->dataserver, client->node_id, app, oid, for_write);
-  gzochid_data_protocol_object_response_write (response, bytes);
+  bytes = g_byte_array_new ();  
+  gzochid_data_protocol_response_write (response, bytes);
 
   /* Pad with two `NULL' bytes to leave space for the actual length to be 
      encoded. */
 
   g_byte_array_prepend
-    (bytes, (unsigned char *) &(unsigned char[]) { 0, 0, 0x51 }, 3);
+    (bytes, (unsigned char *) &(unsigned char[])
+     { 0, 0, GZOCHID_DATA_PROTOCOL_VALUE_RESPONSE }, 3);
   gzochi_common_io_write_short (bytes->len - 3, bytes->data, 0);
   gzochid_client_socket_write (client->sock, bytes->data, bytes->len);
 
-  gzochid_data_object_response_free (response);
+  gzochid_data_response_free (response);
   g_byte_array_unref (bytes);
   
-  mpz_clear (oid);
-  return TRUE;
-}
-
-/*
-  Processes the message payload following the 
-  `GZOZCHID_DATA_PROTOCOL_REQUEST_BINDING' opcode. Returns `TRUE' if the 
-  message was successfully decoded, `FALSE' otherwise. 
-
-  If the message was successfully decoded, the bytes encoding a 
-  `gzochid_data_binding_response' structure will be written to the client
-  socket's send buffer. 
-*/
-
-static gboolean
-dispatch_request_binding (gzochi_metad_dataserver_client *client,
-			  unsigned char *data, unsigned short len)
-{
-  size_t str_len = 0, offset = 0;
-  char *app = read_str (data, len, &str_len);
-  gboolean for_write = FALSE;
-  GByteArray *bytes = NULL;
-  char *name = NULL;
-
-  gzochid_data_binding_response *response = NULL;
-
-  if (app == NULL || str_len <= 1)
-    return FALSE;
-
-  len -= str_len;
-  offset += str_len;
-
-  if (len <= 0)
-    return FALSE;
-
-  for_write = data[offset] == 1;
-
-  len--;
-  offset++;
-  
-  name = read_str (data + offset, len, &str_len);
-
-  if (name == NULL || str_len <= 1)
-    return FALSE;
-
-  bytes = g_byte_array_new ();
-  response = gzochi_metad_dataserver_request_binding
-    (client->dataserver, client->node_id, app, name, for_write);
-  gzochid_data_protocol_binding_response_write (response, bytes);
-
-  /* Pad with two `NULL' bytes to leave space for the actual length to be 
-     encoded. */
-
-  g_byte_array_prepend
-    (bytes, (unsigned char *) &(unsigned char[]) { 0, 0, 0x52 }, 3);
-  gzochi_common_io_write_short (bytes->len - 3, bytes->data, 0);
-  gzochid_client_socket_write (client->sock, bytes->data, bytes->len);
-
-  gzochid_data_binding_response_free (response);
-  g_byte_array_unref (bytes);
-
+  g_bytes_unref (key);
   return TRUE;
 }
 
 /* Processes the message payload following the 
-   `GZOZCHID_DATA_PROTOCOL_REQUEST_NEXT_BINDING' opcode. Returns `TRUE' if the 
+   `GZOZCHID_DATA_PROTOCOL_REQUEST_NEXT_KEY' opcode. Returns `TRUE' if the 
    message was successfully decoded, `FALSE' otherwise. */
 
 static gboolean
-dispatch_request_next_binding (gzochi_metad_dataserver_client *client,
-			       unsigned char *data, unsigned short len)
+dispatch_request_next_key (gzochi_metad_dataserver_client *client,
+			   unsigned char *data, unsigned short len)
 {
-  size_t str_len = 0;
-  char *app = read_str (data, len, &str_len);
-  char *name = NULL;
+  size_t str_len = 0, offset = 0;
+  char *app = read_str (data, len, &str_len), *store = NULL;
   GByteArray *bytes = NULL;
-
-  gzochid_data_binding_key_response *response = NULL;
+  GBytes *key = NULL; 
+  GError *err = NULL;
+  
+  gzochid_data_response *response = NULL;
 
   if (app == NULL || str_len <= 1)
-    return FALSE;
+    {
+      g_warning
+	("Received malformed 'REQUEST_NEXT_KEY' message from node %d.",
+	 client->node_id);
+      return FALSE;
+    }
 
-  name = read_str (data + str_len, len - str_len, &str_len);
+  len -= str_len;
+  offset += str_len;
 
-  if (name == NULL || str_len == 0)
-    return FALSE;
-  else if (str_len == 1)
-    name = NULL;
+  store = read_str (data + offset, len, &str_len);
+
+  if (store == NULL || str_len <= 1)
+    {
+      g_warning
+	("Received malformed 'REQUEST_NEXT_KEY' message from node %d.",
+	 client->node_id);
+      return FALSE;
+    }
+
+  len -= str_len;
+  offset += str_len;
+
+  key = read_bytes (data + offset, len);
+
+  if (key == NULL)
+    {
+      g_warning
+	("Received malformed 'REQUEST_NEXT_KEY' message from node %d.",
+	 client->node_id);
+      return FALSE;
+    }
+
+  response = gzochi_metad_dataserver_request_next_key
+    (client->dataserver, client->node_id, app, store, key, &err);
+
+  if (response == NULL)
+    {
+      assert (err != NULL);
+
+      g_warning
+	("Failed to request key range for application '%s': %s", app,
+	 err->message);
+
+      g_error_free (err);
+      g_bytes_unref (key);
+      return FALSE;
+    }
 
   bytes = g_byte_array_new ();
-  response = gzochi_metad_dataserver_request_next_binding
-    (client->dataserver, client->node_id, app, name);
-  gzochid_data_protocol_binding_key_response_write (response, bytes);
+  gzochid_data_protocol_response_write (response, bytes);
 
   /* Pad with two `NULL' bytes to leave space for the actual length to be 
      encoded. */
 
   g_byte_array_prepend
-    (bytes, (unsigned char *) &(unsigned char[]) { 0, 0, 0x53 }, 3);
+    (bytes, (unsigned char *) &(unsigned char[])
+     { 0, 0, GZOCHID_DATA_PROTOCOL_NEXT_KEY_RESPONSE }, 3);
   gzochi_common_io_write_short (bytes->len - 3, bytes->data, 0);
   gzochid_client_socket_write (client->sock, bytes->data, bytes->len);
 
-  gzochid_data_binding_key_response_free (response);
+  gzochid_data_response_free (response);
   g_byte_array_unref (bytes);
-
+  g_bytes_unref (key);
+  
   return TRUE;
 }
 
@@ -371,6 +423,9 @@ dispatch_submit_changeset (gzochi_metad_dataserver_client *client,
 
   if (changeset == NULL)
     {
+      g_warning
+	("Received malformed 'SUBMIT_CHANGESET' message from node %d.",
+	 client->node_id);
       g_bytes_unref (bytes);
       return FALSE;
     }
@@ -390,100 +445,91 @@ dispatch_submit_changeset (gzochi_metad_dataserver_client *client,
 }
 
 /* Processes the message payload following the 
-   `GZOZCHID_DATA_PROTOCOL_RELEASE_OBJECT' opcode. Returns `TRUE' if the 
+   `GZOZCHID_DATA_PROTOCOL_RELEASE_KEY' opcode. Returns `TRUE' if the 
    message was successfully decoded, `FALSE' otherwise. */
 
 static gboolean
-dispatch_release_object (gzochi_metad_dataserver_client *client,
-			 unsigned char *data, unsigned short len)
-{
-  size_t str_len = 0;
-  char *app = read_str (data, len, &str_len);
-  char *oid_str = NULL;
-  mpz_t oid;
-
-  if (app == NULL || str_len <= 1)
-    return FALSE;
-
-  oid_str = read_str (data + str_len, len - str_len, &str_len);
-
-  if (oid_str == NULL || str_len <= 1)
-    return FALSE;
-
-  if (mpz_init_set_str (oid, oid_str, 16) < 0)
-    return FALSE;
-  
-  gzochi_metad_dataserver_release_object
-    (client->dataserver, client->node_id, app, oid);
-  mpz_clear (oid);
-
-  return TRUE;
-}
-
-/* Processes the message payload following the 
-   `GZOZCHID_DATA_PROTOCOL_RELEASE_BINDING' opcode. Returns `TRUE' if the 
-   message was successfully decoded, `FALSE' otherwise. */
-
-static gboolean
-dispatch_release_binding (gzochi_metad_dataserver_client *client,
-			  unsigned char *data, unsigned short len)
-{
-  size_t str_len = 0;
-  char *app = read_str (data, len, &str_len);
-  char *name = NULL;
-
-  if (app == NULL || str_len <= 1)
-    return FALSE;
-
-  name = read_str (data + str_len, len - str_len, &str_len);
-
-  if (name == NULL || str_len <= 1)
-    return FALSE;
-
-  gzochi_metad_dataserver_release_binding
-    (client->dataserver, client->node_id, app, name);
-
-  return TRUE;
-}
-
-/* Processes the message payload following the 
-   `GZOZCHID_DATA_PROTOCOL_RELEASE_BINDING_RANGE' opcode. Returns `TRUE' if the 
-   message was successfully decoded, `FALSE' otherwise. */
-
-static gboolean
-dispatch_release_binding_range (gzochi_metad_dataserver_client *client,
-				unsigned char *data, unsigned short len)
+dispatch_release_key (gzochi_metad_dataserver_client *client,
+		      unsigned char *data, unsigned short len)
 {
   size_t str_len = 0, offset = 0;
-  char *app = read_str (data, len, &str_len);
-  char *from = NULL, *to = NULL;
+  char *app = read_str (data, len, &str_len), *store = NULL;
+  GBytes *key = NULL;
 
   if (app == NULL || str_len <= 1)
     return FALSE;
 
   len -= str_len;
   offset += str_len;
-  
-  from = read_str (data + offset, len, &str_len);
-  
-  if (from == NULL || str_len == 0)
+
+  store = read_str (data + offset, len, &str_len);
+
+  if (store == NULL || str_len <= 1)
     return FALSE;
-  else if (str_len == 1)
-    from = NULL;
 
   len -= str_len;
   offset += str_len;
 
-  to = read_str (data + offset, len, &str_len);
+  key = read_bytes (data + offset, len);
 
-  if (to == NULL || str_len == 0)
+  if (key == NULL)
     return FALSE;
-  else if (str_len == 1)
-    to = NULL;
   
-  gzochi_metad_dataserver_release_binding_range
-    (client->dataserver, client->node_id, app, from, to);
+  gzochi_metad_dataserver_release_key
+    (client->dataserver, client->node_id, app, store, key);
+  g_bytes_unref (key);
 
+  return TRUE;
+}
+
+/* Processes the message payload following the 
+   `GZOZCHID_DATA_PROTOCOL_RELEASE_KEY_RANGE' opcode. Returns `TRUE' if the 
+   message was successfully decoded, `FALSE' otherwise. */
+
+static gboolean
+dispatch_release_key_range (gzochi_metad_dataserver_client *client,
+			    unsigned char *data, unsigned short len)
+{
+  size_t str_len = 0, offset = 0;
+  char *app = read_str (data, len, &str_len), *store = NULL;
+  GBytes *from_key = NULL, *to_key = NULL;
+
+  if (app == NULL || str_len <= 1)
+    return FALSE;
+
+  len -= str_len;
+  offset += str_len;
+
+  store = read_str (data + offset, len, &str_len);
+
+  if (store == NULL || str_len <= 1)
+    return FALSE;
+
+  len -= str_len;
+  offset += str_len;
+
+  from_key = read_bytes (data + offset, len);
+
+  if (from_key == NULL)
+    return FALSE;
+
+  len -= 2 + g_bytes_get_size (from_key);
+  offset += 2 + g_bytes_get_size (from_key);
+  
+  to_key = read_bytes (data + offset, len);
+
+  if (to_key == NULL)
+    {
+      g_bytes_unref (from_key);
+      return FALSE;
+    }
+  
+  gzochi_metad_dataserver_release_range
+    (client->dataserver, client->node_id, app, store, from_key, to_key);
+
+  g_bytes_unref (from_key);
+  g_bytes_unref (to_key);
+  
   return TRUE;
 }
 
@@ -505,20 +551,16 @@ dispatch_message (gzochi_metad_dataserver_client *client,
       dispatch_login (client, payload, len); break;
     case GZOCHID_DATA_PROTOCOL_REQUEST_OIDS:
       dispatch_request_oids (client, payload, len); break;
-    case GZOCHID_DATA_PROTOCOL_REQUEST_OBJECT:
-      dispatch_request_object (client, payload, len); break;
-    case GZOCHID_DATA_PROTOCOL_REQUEST_BINDING:
-      dispatch_request_binding (client, payload, len); break;
-    case GZOCHID_DATA_PROTOCOL_REQUEST_NEXT_BINDING:
-      dispatch_request_next_binding (client, payload, len); break;
+    case GZOCHID_DATA_PROTOCOL_REQUEST_VALUE:
+      dispatch_request_value (client, payload, len); break;
+    case GZOCHID_DATA_PROTOCOL_REQUEST_NEXT_KEY:
+      dispatch_request_next_key (client, payload, len); break;
     case GZOCHID_DATA_PROTOCOL_SUBMIT_CHANGESET:
       dispatch_submit_changeset (client, payload, len); break;
-    case GZOCHID_DATA_PROTOCOL_RELEASE_OBJECT:
-      dispatch_release_object (client, payload, len); break;
-    case GZOCHID_DATA_PROTOCOL_RELEASE_BINDING:
-      dispatch_release_binding (client, payload, len); break;
-    case GZOCHID_DATA_PROTOCOL_RELEASE_BINDING_RANGE:
-      dispatch_release_binding_range (client, payload, len); break;
+    case GZOCHID_DATA_PROTOCOL_RELEASE_KEY:
+      dispatch_release_key (client, payload, len); break;
+    case GZOCHID_DATA_PROTOCOL_RELEASE_KEY_RANGE:
+      dispatch_release_key_range (client, payload, len); break;
       
     default:
       g_warning ("Unexpected opcode %d received from client", opcode);

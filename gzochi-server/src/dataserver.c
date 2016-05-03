@@ -28,6 +28,7 @@
 #include "gzochid-storage.h"
 #include "lock.h"
 #include "oids.h"
+#include "oids-storage.h"
 #include "socket.h"
 #include "storage.h"
 #include "storage-mem.h"
@@ -35,6 +36,17 @@
 #ifndef GZOCHID_STORAGE_ENGINE_DIR
 #define GZOCHID_STORAGE_ENGINE_DIR "./storage"
 #endif /* GZOCHID_STORAGE_ENGINE_DIR */
+
+/* A store with an associated lock table. */
+
+struct _gzochi_metad_dataserver_lockable_store
+{
+  gzochid_storage_store *store; /* The persistent store. */
+  gzochid_lock_table *locks; /* The lock table. */
+};
+
+typedef struct _gzochi_metad_dataserver_lockable_store
+gzochi_metad_dataserver_lockable_store;
 
 /* The dataserver-side representation of the storage for a gzochi game 
    application, somewhat analogous to a `gzochid_application_context' 
@@ -45,12 +57,16 @@ struct _gzochi_metad_dataserver_application_store
   char *name; /* The name of the application. */
   gzochid_storage_context *storage_context; /* The storage context. */
 
-  gzochid_storage_store *oids; /* The object store. */
-  gzochid_storage_store *names; /* The binding store. */
+  gzochi_metad_dataserver_lockable_store *oids; /* The lockable object store. */
+
+  /* The lockable binding store. */
+  
+  gzochi_metad_dataserver_lockable_store *names;
   gzochid_storage_store *meta; /* The metadata store. */
 
-  gzochid_lock_table *oids_locks; /* Lock table for the object store. */
-  gzochid_lock_table *names_locks; /* Lock table for the binding store. */
+  /* The oid allocation strategy. */
+  
+  gzochid_oid_allocation_strategy *oid_strategy; 
 };
 
 typedef struct _gzochi_metad_dataserver_application_store
@@ -75,7 +91,7 @@ struct _GzochiMetadDataServer
   /* Mapping application name to `gzochi_metad_dataserver_application_store'. */
 
   GHashTable *application_stores; 
-  
+
   gzochid_server_socket *server_socket; /* The dataserver's server socket. */
 
   /* The port on which the server listens. This may be zero to indicate the 
@@ -135,14 +151,17 @@ close_application_store (gpointer key, gpointer value, gpointer user_data)
   GzochiMetadDataServer *server = user_data;
   gzochi_metad_dataserver_application_store *store = value;
   
-  STORAGE_INTERFACE (server)->close_store (store->oids);
-  STORAGE_INTERFACE (server)->close_store (store->names);
+  STORAGE_INTERFACE (server)->close_store (store->oids->store);
+  gzochid_lock_table_free (store->oids->locks);
+  free (store->oids);
+  
+  STORAGE_INTERFACE (server)->close_store (store->names->store);
+  gzochid_lock_table_free (store->names->locks);
+  free (store->names);
+
   STORAGE_INTERFACE (server)->close_store (store->meta);
 
   STORAGE_INTERFACE (server)->close_context (store->storage_context);
-
-  gzochid_lock_table_free (store->oids_locks);
-  gzochid_lock_table_free (store->names_locks);
 
   return TRUE;
 }
@@ -204,7 +223,7 @@ static void
 gzochi_metad_data_server_init (GzochiMetadDataServer *self)
 {
   self->server_socket = gzochid_server_socket_new
-    ("Data server", gzochi_metad_dataserver_server_protocol, NULL);
+    ("Data server", gzochi_metad_dataserver_server_protocol, self);
   self->application_stores = g_hash_table_new_full
     (g_str_hash, g_str_equal, (GDestroyNotify) free, (GDestroyNotify) free);
   self->port = 0;
@@ -247,25 +266,27 @@ FOR PRODUCTION USE.");
     (self->socket_server, self->server_socket, self->port);
 }
 
-/* Convert the specified object id to a `GBytes' and return it. The returned
-   `GBytes' should be unref'd via `g_bytes_unref' when no longer needed. */
+/* Switch on the specified store name to return either the oids store or the
+   named binding store, or set an error if the name was not "oids" or 
+   "names." */
 
-static GBytes *
-oid_to_bytes (mpz_t oid)
+static gzochi_metad_dataserver_lockable_store *
+get_lockable_store (gzochi_metad_dataserver_application_store *store,
+		    char *name, GError **err)
 {
-  char *oid_str = mpz_get_str (NULL, 16, oid);
-  return g_bytes_new_with_free_func
-    (oid_str, strlen (oid_str) + 1, (GDestroyNotify) free, oid_str);
-}
+  if (strcmp (name, "oids") == 0)
+    return store->oids;
+  else if (strcmp (name, "names") == 0)
+    return store->names;
+  else
+    {
+      g_set_error
+	(err, GZOCHI_METAD_DATASERVER_ERROR,
+	 GZOCHI_METAD_DATASERVER_ERROR_STORE_NAME, "Invalid store name '%s'.",
+	 name);
 
-/* Convert the specified `NULL'-terminated string to a `GBytes' and return it. 
-   The returned `GBytes' should be unref'd via `g_bytes_unref' when no longer 
-   needed. */
-
-static GBytes *
-str_to_bytes (char *str)
-{
-  return g_bytes_new (str, strlen (str) + 1);
+      return NULL;
+    }
 }
 
 /* 
@@ -289,17 +310,25 @@ ensure_open_application_store (const GzochiMetadDataServer *server,
 	malloc (sizeof (gzochi_metad_dataserver_application_store));
       gzochid_storage_engine_interface *iface = STORAGE_INTERFACE (server);
 
+      g_message ("Initializing application storage for '%s'.", app);
+      
       store->storage_context = iface->initialize ((char *) app);
 
-      store->oids = iface->open
+      store->oids = malloc (sizeof (gzochi_metad_dataserver_lockable_store));
+      store->oids->store = iface->open
 	(store->storage_context, "oids", GZOCHID_STORAGE_CREATE);
-      store->names = iface->open
+      store->oids->locks = gzochid_lock_table_new ("oids"); 
+
+      store->names = malloc (sizeof (gzochi_metad_dataserver_lockable_store));
+      store->names->store = iface->open
 	(store->storage_context, "names", GZOCHID_STORAGE_CREATE);
+      store->names->locks = gzochid_lock_table_new ("names"); 
+
       store->meta = iface->open
 	(store->storage_context, "meta", GZOCHID_STORAGE_CREATE);
 
-      store->oids_locks = gzochid_lock_table_new ("oids");
-      store->names_locks = gzochid_lock_table_new ("names");
+      store->oid_strategy = gzochid_storage_oid_strategy_new
+	(iface, store->storage_context, store->meta);
       
       g_hash_table_insert (server->application_stores, strdup (app), store);
       return store;
@@ -312,129 +341,105 @@ gzochi_metad_dataserver_reserve_oids (GzochiMetadDataServer *server,
 {
   gzochid_data_oids_block oids_block;
   gzochid_data_reserve_oids_response *response = NULL;
-  gzochi_metad_dataserver_application_store *store =
+  gzochi_metad_dataserver_application_store *app_store =
     ensure_open_application_store (server, app);
-  
+
   assert (gzochid_oids_reserve_block
-	  (STORAGE_INTERFACE (server), store->storage_context, store->meta,
-	   &oids_block, NULL));
+	  (app_store->oid_strategy, &oids_block, NULL));
 
   response = gzochid_data_reserve_oids_response_new (app, &oids_block);
   mpz_clear (oids_block.block_start);
   return response;
 }
 
-gzochid_data_object_response *
-gzochi_metad_dataserver_request_object (GzochiMetadDataServer *server,
-					guint node_id, char *app, mpz_t oid,
-					gboolean for_write)
+gzochid_data_response *
+gzochi_metad_dataserver_request_value (GzochiMetadDataServer *server,
+				       guint node_id, char *app,
+				       char *store_name, GBytes *key,
+				       gboolean for_write, GError **err)
 {
-  gzochid_data_object_response *response = NULL;
-  gzochi_metad_dataserver_application_store *store =
+  gzochid_data_response *response = NULL;
+  gzochi_metad_dataserver_application_store *app_store =
     ensure_open_application_store (server, app);
-  GBytes *key = oid_to_bytes (oid);
-      
+
+  GError *local_err = NULL;
+  gzochi_metad_dataserver_lockable_store *store = get_lockable_store
+    (app_store, store_name, &local_err);
+  
   struct timeval most_recent_lock;
 
+  if (store == NULL)
+    {
+      g_propagate_error (err, local_err);
+      return NULL;
+    }
+  
   if (gzochid_lock_check_and_set
-      (store->oids_locks, node_id, key, for_write, &most_recent_lock))
+      (store->locks, node_id, key, for_write, &most_recent_lock))
     {
       size_t data_len = 0;
-      gzochid_storage_transaction *transaction =
-	STORAGE_INTERFACE (server)->transaction_begin (store->storage_context);
+      gzochid_storage_transaction *transaction = STORAGE_INTERFACE (server)
+	->transaction_begin (app_store->storage_context);
       char *data = STORAGE_INTERFACE (server)->transaction_get
-	(transaction, store->oids, (char *) g_bytes_get_data (key, NULL),
+	(transaction, store->store, (char *) g_bytes_get_data (key, NULL),
 	 g_bytes_get_size (key), &data_len);
 
       if (data != NULL)
 	{
 	  GBytes *data_bytes = g_bytes_new_with_free_func
 	    (data, data_len, (GDestroyNotify) free, data);
-	  response = gzochid_data_object_response_new (app, TRUE, data_bytes);
+	  response = gzochid_data_response_new
+	    (app, store_name, TRUE, data_bytes);
 
 	  /* Turn ownership of the data over to the response object. */
 
 	  g_bytes_unref (data_bytes);
 	}
-      else response = gzochid_data_object_response_new (app, TRUE, NULL);
+      else response = gzochid_data_response_new (app, store_name, TRUE, NULL);
 
       STORAGE_INTERFACE (server)->transaction_rollback (transaction);
-    }
-  else response = gzochid_data_object_response_new (app, FALSE, NULL);
 
-  g_bytes_unref (key);
-  
-  return response;
+      return response;
+    }
+  else return gzochid_data_response_new (app, store_name, FALSE, NULL);
 }
 
-gzochid_data_binding_response *
-gzochi_metad_dataserver_request_binding (GzochiMetadDataServer *server,
-					 guint node_id, char *app, char *name,
-					 gboolean for_write)
+gzochid_data_response *
+gzochi_metad_dataserver_request_next_key (GzochiMetadDataServer *server,
+					  guint node_id, char *app,
+					  char *store_name, GBytes *key,
+					  GError **err)
 {
-  gzochid_data_binding_response *response = NULL;
-  gzochi_metad_dataserver_application_store *store =
+  gzochid_data_response *response = NULL;
+  gzochi_metad_dataserver_application_store *app_store =
     ensure_open_application_store (server, app);
-  GBytes *key = str_to_bytes (name);
-      
-  struct timeval most_recent_lock;
-
-  if (gzochid_lock_check_and_set
-      (store->names_locks, node_id, key, for_write, &most_recent_lock))
-    {
-      size_t data_len = 0;
-      gzochid_storage_transaction *transaction =
-	STORAGE_INTERFACE (server)->transaction_begin (store->storage_context);
-      char *data = STORAGE_INTERFACE (server)->transaction_get
-	(transaction, store->names, (char *) g_bytes_get_data (key, NULL),
-	 g_bytes_get_size (key), &data_len);
-      
-      assert (!transaction->rollback);	
-      
-      if (data != NULL)
-	{
-	  mpz_t oid;
-
-	  mpz_init_set_str (oid, data, 16);
-	  response = gzochid_data_binding_response_oid_new (app, oid);
-
-	  mpz_clear (oid);
-	  free (data);
-	}
-      else response = gzochid_data_binding_response_new (app, TRUE);
-
-      STORAGE_INTERFACE (server)->transaction_rollback (transaction);
-    }
-  else response = gzochid_data_binding_response_new (app, FALSE);
-
-  g_bytes_unref (key);
-
-  return response;
-}
-
-gzochid_data_binding_key_response *
-gzochi_metad_dataserver_request_next_binding (GzochiMetadDataServer *server,
-					      guint node_id, char *app,
-					      char *name)
-{
-  gzochid_data_binding_key_response *response = NULL;
-  gzochi_metad_dataserver_application_store *store =
-    ensure_open_application_store (server, app);
-  GBytes *from_key = name == NULL ? NULL : str_to_bytes (name);
   GBytes *to_key = NULL;
   
+  GError *local_err = NULL;
+  gzochi_metad_dataserver_lockable_store *store = get_lockable_store
+    (app_store, store_name, &local_err);
+
   struct timeval most_recent_lock;
 
   size_t data_len = 0;
-  gzochid_storage_transaction *transaction =
-    STORAGE_INTERFACE (server)->transaction_begin (store->storage_context);
+  gzochid_storage_transaction *transaction = NULL;
   char *data = NULL;
 
-  if (from_key == NULL)
+  if (store == NULL)
+    {
+      g_propagate_error (err, local_err);
+      return NULL;
+    }
+  
+  transaction = STORAGE_INTERFACE (server)->transaction_begin
+    (app_store->storage_context);
+  
+  if (key == NULL)
     data = STORAGE_INTERFACE (server)->transaction_first_key
-      (transaction, store->names, &data_len);
+      (transaction, store->store, &data_len);
   else data = STORAGE_INTERFACE (server)->transaction_next_key
-	 (transaction, store->names, name, strlen (name) + 1, &data_len);
+	 (transaction, store->store, (char *) g_bytes_get_data (key, NULL),
+	  g_bytes_get_size (key), &data_len);
   
   assert (!transaction->rollback);
   
@@ -445,12 +450,10 @@ gzochi_metad_dataserver_request_next_binding (GzochiMetadDataServer *server,
   STORAGE_INTERFACE (server)->transaction_rollback (transaction);
 
   if (!gzochid_lock_range_check_and_set
-      (store->names_locks, node_id, from_key, to_key, &most_recent_lock))
-    response = gzochid_data_binding_key_response_new (app, FALSE, NULL);
-  else response = gzochid_data_binding_key_response_new (app, TRUE, data);
+      (store->locks, node_id, key, to_key, &most_recent_lock))
+    response = gzochid_data_response_new (app, store_name, FALSE, NULL);
+  else response = gzochid_data_response_new (app, store_name, TRUE, to_key);
 
-  if (from_key != NULL)
-    g_bytes_unref (from_key);
   if (to_key != NULL)
     g_bytes_unref (to_key);
   
@@ -465,41 +468,51 @@ gzochi_metad_dataserver_process_changeset (GzochiMetadDataServer *server,
 {
   gint i = 0;
   gboolean needs_rollback = FALSE;
-  gzochi_metad_dataserver_application_store *store =
+  gzochi_metad_dataserver_application_store *app_store =
     ensure_open_application_store (server, changeset->app);
   gzochid_storage_transaction *transaction =
-    STORAGE_INTERFACE (server)->transaction_begin (store->storage_context);
-  
-  for (; i < changeset->object_changes->len; i++)
+    STORAGE_INTERFACE (server)->transaction_begin (app_store->storage_context);
+
+  for (; i < changeset->changes->len; i++)
     {
-      gzochid_data_object_change object = g_array_index
-	(changeset->object_changes, gzochid_data_object_change, i);
-      GBytes *key = oid_to_bytes (object.oid);      
-      
+      gzochid_data_change change = g_array_index
+	(changeset->changes, gzochid_data_change, i);
+      GError *local_err = NULL;
+      gzochi_metad_dataserver_lockable_store *store = get_lockable_store
+	(app_store, change.store, &local_err);
+
+      if (store == NULL)
+	{
+	  g_propagate_error (err, local_err);
+	  needs_rollback = TRUE;
+	  break;
+	}
+
       if (!gzochid_lock_check_and_set
-	  (store->oids_locks, node_id, key, TRUE, NULL))
+	  (store->locks, node_id, change.key, TRUE, NULL))
 	{
 	  g_set_error
 	    (err, GZOCHI_METAD_DATASERVER_ERROR,
 	     GZOCHI_METAD_DATASERVER_ERROR_LOCK_CONFLICT,
 	     "Attempted to commit change to oid '%s' without write lock.",
-	     (char *) g_bytes_get_data (key, NULL));
+	     (char *) g_bytes_get_data (change.key, NULL));
 
 	  needs_rollback = TRUE;
-	  g_bytes_unref (key);
 	  break;
 	}
 
-	if (object.delete)
+	if (change.delete)
 	  STORAGE_INTERFACE (server)->transaction_delete
-	    (transaction, store->oids, (char *) g_bytes_get_data (key, NULL),
-	     g_bytes_get_size (key));
+	    (transaction, store->store,
+	     (char *) g_bytes_get_data (change.key, NULL),
+	     g_bytes_get_size (change.key));
 
 	else STORAGE_INTERFACE (server)->transaction_put
-	       (transaction, store->oids,
-		(char *) g_bytes_get_data (key, NULL), g_bytes_get_size (key),
-		(char *) g_bytes_get_data (object.data, NULL),
-		g_bytes_get_size (object.data));
+	       (transaction, store->store,
+		(char *) g_bytes_get_data (change.key, NULL),
+		g_bytes_get_size (change.key),
+		(char *) g_bytes_get_data (change.data, NULL),
+		g_bytes_get_size (change.data));
 
 	if (transaction->rollback)
 	  {
@@ -507,67 +520,12 @@ gzochi_metad_dataserver_process_changeset (GzochiMetadDataServer *server,
 	      (err, GZOCHI_METAD_DATASERVER_ERROR,
 	       GZOCHI_METAD_DATASERVER_ERROR_LOCK_CONFLICT,
 	       "Transaction failure writing oid '%s'.",
-	       (char *) g_bytes_get_data (key, NULL));
+	       (char *) g_bytes_get_data (change.key, NULL));
 
 	    needs_rollback = TRUE;
-	    g_bytes_unref (key);
 	    break;
 	  }
-	else g_bytes_unref (key);	
     }
-		
-  
-  if (err != NULL)
-    for (i = 0; i < changeset->binding_changes->len; i++)
-      {
-	gzochid_data_binding_change binding = g_array_index
-	  (changeset->binding_changes, gzochid_data_binding_change, i);
-	GBytes *key = str_to_bytes (binding.name);
-	
-	if (!gzochid_lock_check_and_set
-	    (store->names_locks, node_id, key, TRUE, NULL))
-	  {
-	    g_set_error
-	      (err, GZOCHI_METAD_DATASERVER_ERROR,
-	       GZOCHI_METAD_DATASERVER_ERROR_LOCK_CONFLICT,
-	       "Attempted to commit change to binding '%s' without write lock.",
-	       (char *) g_bytes_get_data (key, NULL));
-	    
-	    needs_rollback = TRUE;
-	    g_bytes_unref (key);
-	    break;
-	  }
-	
-	if (binding.delete)
-	  STORAGE_INTERFACE (server)->transaction_delete
-	    (transaction, store->names, (char *) g_bytes_get_data (key, NULL),
-	     g_bytes_get_size (key));
-
-	else
-	  {
-	    GBytes *data = oid_to_bytes (binding.oid);
-		
-	    STORAGE_INTERFACE (server)->transaction_put
-	      (transaction, store->names, (char *) g_bytes_get_data (key, NULL),
-	       g_bytes_get_size (key), (char *) g_bytes_get_data (data, NULL),
-	       g_bytes_get_size (data));
-
-	    g_bytes_unref (data);
-	  }
-
-	g_bytes_unref (key);
-	
-	if (transaction->rollback)
-	  {
-	    g_set_error
-	      (err, GZOCHI_METAD_DATASERVER_ERROR,
-	       GZOCHI_METAD_DATASERVER_ERROR_LOCK_CONFLICT,
-	       "Transaction failure writing binding '%s'.", binding.name);
-
-	    needs_rollback = TRUE;
-	    break;
-	  }
-      }
     
   if (needs_rollback)
     STORAGE_INTERFACE (server)->transaction_rollback (transaction);
@@ -582,46 +540,50 @@ gzochi_metad_dataserver_process_changeset (GzochiMetadDataServer *server,
 }
 
 void
-gzochi_metad_dataserver_release_object (GzochiMetadDataServer *server,
-					guint node_id, char *app, mpz_t oid)
+gzochi_metad_dataserver_release_key (GzochiMetadDataServer *server,
+				     guint node_id, char *app, char *store_name,
+				     GBytes *key)
 {
-  gzochi_metad_dataserver_application_store *store =
+  gzochi_metad_dataserver_application_store *app_store =
     ensure_open_application_store (server, app);
-  GBytes *key = oid_to_bytes (oid);
 
-  gzochid_lock_release (store->oids_locks, node_id, key);  
-  g_bytes_unref (key);
-}
+  GError *local_err = NULL;
+  gzochi_metad_dataserver_lockable_store *store = get_lockable_store
+    (app_store, store_name, &local_err);
 
-void
-gzochi_metad_dataserver_release_binding (GzochiMetadDataServer *server,
-					 guint node_id, char *app, char *name)
-{
-  gzochi_metad_dataserver_application_store *store =
-    ensure_open_application_store (server, app);
-  GBytes *key = str_to_bytes (name);
-
-  gzochid_lock_release (store->names_locks, node_id, key);
-  g_bytes_unref (key);
-}
-
-void
-gzochi_metad_dataserver_release_binding_range (GzochiMetadDataServer *server,
-					       guint node_id, char *app,
-					       char *first_key, char *last_key)
-{
-  gzochi_metad_dataserver_application_store *store =
-    ensure_open_application_store (server, app);
-  GBytes *first_key_bytes = first_key == NULL ? NULL : str_to_bytes (first_key);
-  GBytes *last_key_bytes = last_key == NULL ? NULL : str_to_bytes (last_key);
+  if (local_err != NULL)
+    {
+      g_warning
+	("Failed to release key for application '%s': %s", app,
+	 local_err->message);
+      g_error_free (local_err);
+    }
   
-  gzochid_lock_release_range
-    (store->names_locks, node_id, first_key_bytes, last_key_bytes);
+  gzochid_lock_release (store->locks, node_id, key);  
+}
 
-  if (first_key_bytes != NULL)
-    g_bytes_unref (first_key_bytes);
-  if (last_key_bytes != NULL)
-    g_bytes_unref (last_key_bytes);
+void
+gzochi_metad_dataserver_release_range (GzochiMetadDataServer *server,
+				       guint node_id, char *app,
+				       char *store_name, GBytes *first_key,
+				       GBytes *last_key)
+{
+  gzochi_metad_dataserver_application_store *app_store =
+    ensure_open_application_store (server, app);
+  
+  GError *local_err = NULL;
+  gzochi_metad_dataserver_lockable_store *store = get_lockable_store
+    (app_store, store_name, &local_err);
+
+  if (local_err != NULL)
+    {
+      g_warning
+	("Failed to release key for application '%s': %s", app,
+	 local_err->message);
+      g_error_free (local_err);
+    }
+
+  gzochid_lock_release_range (store->locks, node_id, first_key, last_key);
 }
 
 void
@@ -637,8 +599,8 @@ gzochi_metad_dataserver_release_all (GzochiMetadDataServer *server,
     {
       gzochi_metad_dataserver_application_store *store = value;
 
-      gzochid_lock_release_all (store->oids_locks, node_id);
-      gzochid_lock_release_all (store->names_locks, node_id);
+      gzochid_lock_release_all (store->oids->locks, node_id);
+      gzochid_lock_release_all (store->names->locks, node_id);
     }
 }
 

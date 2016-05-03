@@ -52,39 +52,29 @@
 #define GZOCHID_DATA_PROTOCOL_REQUEST_OIDS 0x20
 
 /*
-  Request from the data server the serialized form of the object with a 
-  specified id, establishing a point lock on that id. Format:
+  Request from the data server the bytes associated with a specified key, 
+  establishing a point lock on that key. Format:
   
   `NULL'-terminated string: Name of the requesting game application
+  `NULL'-terminated string: Name of the target store
   1 byte (0x00 or 0x01) indicating whether the object should be locked for write
-  `NULL'-terminated string: Hexadecimal string representation of the target oid
+  2 bytes: The big-endian encoding of the length of the key; the key bytes 
+    follow
 */
 
-#define GZOCHID_DATA_PROTOCOL_REQUEST_OBJECT 0x21
+#define GZOCHID_DATA_PROTOCOL_REQUEST_VALUE 0x21
 
 /*
-  Request from the data server the oid to which the specified name is bound,
-  establishing a point lock on that name. Format:
+  Request from the data server the key that falls directly after the specified 
+  key establishing a range lock on the interval between the two keys. Format:
   
   `NULL'-terminated string: Name of the requesting game application
-  1 byte (0x00 or 0x01) indicating whether the binding should be locked for
-    write
-  `NULL'-terminated string: The target binding name
+  `NULL'-terminated string: Name of the target store
+  2 bytes: The big-endian encoding of the length of the key
+    Two zeros indicates a request for the first key, else the key bytes follow
 */
 
-#define GZOCHID_DATA_PROTOCOL_REQUEST_BINDING 0x22
-
-/*
-  Request from the data server the name of the binding that falls directly
-  after the specified binding name, establishing a range lock on the key 
-  interval between the two keys. Format:
-   
-  `NULL'-terminated string: Name of the requesting game application
-  `NULL'-terminated string: The target binding name
-    or 1 `NULL' byte to request the first binding
-*/
-
-#define GZOCHID_DATA_PROTOCOL_REQUEST_NEXT_BINDING 0x23
+#define GZOCHID_DATA_PROTOCOL_REQUEST_NEXT_KEY 0x22
 
 /* Transmit a series of object and binding modifications to the data server for
    persistence as a single, transactional unit. See 
@@ -93,35 +83,30 @@
 #define GZOCHID_DATA_PROTOCOL_SUBMIT_CHANGESET 0x30
 
 /*
-  Release the point lock on the specified object id. Format:
+  Release the point lock on the specified object key. Format:
   
   `NULL'-terminated string: Name of the requesting game application
-  `NULL'-terminated string: Hexadecimal string representation of the target oid
+  `NULL'-terminated string: Name of the target store
+  2 bytes: The big-endian encoding of the length of the key; the key bytes 
+    follow
 */  
 
-#define GZOCHID_DATA_PROTOCOL_RELEASE_OBJECT 0x40
-
-/*
-  Release the point lock on the specified binding name. Format:
-  
-  `NULL'-terminated string: Name of the requesting game application
-  `NULL'-terminated string: The target binding name
-*/  
-
-#define GZOCHID_DATA_PROTOCOL_RELEASE_BINDING 0x41
+#define GZOCHID_DATA_PROTOCOL_RELEASE_KEY 0x40
 
 /*
   Release the range lock on the key interval between between the specified start
   and end keys. specified binding name. Format:
   
   `NULL'-terminated string: Name of the requesting game application
-  `NULL'-terminated string: The first binding in the key range
-    or 1 `NULL' byte to indicate the beginning of the key space
-  `NULL'-terminated string: The last binding in the key range
-    or 1 `NULL' byte to indicate the end of the key space
+  `NULL'-terminated string: Name of the target store
+  2 bytes: The big-endian encoding of the length of the lower key
+    Two zeros indicates the beginning of the key space, else the key bytes 
+    follow
+  2 bytes: The big-endian encoding of the length of the upper key
+    Two zeros indicates the end of the key space, else the key bytes follow
 */  
 
-#define GZOCHID_DATA_PROTOCOL_RELEASE_BINDING_RANGE 0x42
+#define GZOCHID_DATA_PROTOCOL_RELEASE_KEY_RANGE 0x42
 
 /* The following opcodes are for messages sent from the server to the client. */
 
@@ -137,40 +122,14 @@
 #define GZOCHID_DATA_PROTOCOL_OIDS_RESPONSE 0x50
 
 /* Contains the serialized object data stored at a particular oid. See 
-   `gzochid_data_protocol_object_response_write' below for format details. */
+   `gzochid_data_protocol_value_response_write' below for format details. */
 
-#define GZOCHID_DATA_PROTOCOL_OBJECT_RESPONSE 0x51
-
-/* Contains the object id bound to a particular name. See 
-   `gzochid_data_protocol_binding_response_write' below for format details. */
-
-#define GZOCHID_DATA_PROTOCOL_BINDING_RESPONSE 0x52
+#define GZOCHID_DATA_PROTOCOL_VALUE_RESPONSE 0x51
 
 /* Contains the object id bound to a particular name. See 
-   `gzochid_data_protocol_binding_key_response_write' below for format 
-   details. */
+   `gzochid_data_protocol_key_response_write' below for format details. */
 
-#define GZOCHID_DATA_PROTOCOL_NEXT_BINDING_RESPONSE 0x53
-
-/*
-  Requests the client release, by sending an object release request, all point
-  locks (read and write) on a particular object id. Format:
-
-  `NULL'-terminated string: Name of the requesting game application
-  `NULL'-terminated string: Hexadecimal string representation of the target oid
-*/
-
-#define GZOCHID_DATA_PROTOCOL_REQUEST_OBJECT_RELEASE 0x60
-
-/*
-  Requests the client release, by sending a binding release request, all point
-  locks (read and write) on a particular binding. Format:
-
-  `NULL'-terminated string: Name of the requesting game application
-  `NULL'-terminated string: Name of the requested binding  
-*/
-
-#define GZOCHID_DATA_PROTOCOL_REQUEST_BINDING_RELEASE 0x61
+#define GZOCHID_DATA_PROTOCOL_NEXT_KEY_RESPONSE 0x52
 
 /* A response to a request to reserve a block of oids. */
 
@@ -183,17 +142,18 @@ struct _gzochid_data_reserve_oids_response
 typedef struct _gzochid_data_reserve_oids_response
 gzochid_data_reserve_oids_response;
 
-/* A response to a request for the object data at a specified oid. */
+/* A response to a request. */
 
-struct _gzochid_data_object_response
+struct _gzochid_data_response
 {
   char *app; /* The requesting application name. */
+  char *store; /* The target store name. */
   gboolean success; /* Whether the request was successful. */
 
   union
   {
-    /* If the request was successful, the target object data, or `NULL' if no 
-       such object exists. */
+    /* If the request was successful, the requested data, or `NULL' if the no
+       such data exists. */
 
     GBytes *data; 
 
@@ -204,76 +164,19 @@ struct _gzochid_data_object_response
   };
 };
 
-typedef struct _gzochid_data_object_response gzochid_data_object_response;
+typedef struct _gzochid_data_response gzochid_data_response;
 
-/* A response to a request for the oid and a specified binding. */
+/* A change to the key-value binding to be made as part of a changeset. */
 
-struct _gzochid_data_binding_response
+struct _gzochid_data_change
 {
-  char *app; /* The requesting application name. */
-  gboolean success; /* Whether the request was successful. */
-  gboolean present; /* Whether the binding exists. */
-
-  union
-  {
-    /* If the request was successful and the binding exists, the target oid. */
-
-    mpz_t oid; 
-
-    /* If the request was unsuccessful, the amount of time to wait before 
-       retrying. */
-
-    struct timeval timeout;
-  };
+  char *store; /* The target store name. */
+  gboolean delete;  /* Whether the binding should be deleted. */
+  GBytes *key; /* The target key. */
+  GBytes *data; /* The new data for the key, if not deleting, else `NULL'. */
 };
 
-typedef struct _gzochid_data_binding_response gzochid_data_binding_response;
-
-/* A response to a request for the name of the next sequential binding. */
-
-struct _gzochid_data_binding_key_response
-{
-  char *app; /* The requesting application name. */
-  gboolean success; /* Whether the request was successful. */
-
-  union
-  {
-    /* If the request was successful, the next sequential binding name, or 
-       `NULL' if no such binding exists. */
-
-    char *name;
-    
-    /* If the request was unsuccessful, the amount of time to wait before 
-       retrying. */
-    
-    struct timeval timeout;
-  };
-};
-
-typedef struct _gzochid_data_binding_key_response
-gzochid_data_binding_key_response;
-
-/* A change to an object to be made as part of a changeset. */
-
-struct _gzochid_data_object_change
-{
-  gboolean delete; /* Whether the object should be deleted. */
-  mpz_t oid; /* The targer oid. */
-  GBytes *data; /* The new data for the object, if not deleting, else `NULL'. */
-};
-
-typedef struct _gzochid_data_object_change gzochid_data_object_change;
-
-/* A change to a binding to be made as part ofa changeset. */
-
-struct _gzochid_data_binding_change
-{
-  gboolean delete; /* Whether the binding should be deleted. */
-  char *name; /* The target binding name. */
-  mpz_t oid; /* The new value for the binding, if not deleting. */
-};
-
-typedef struct _gzochid_data_binding_change gzochid_data_binding_change;
+typedef struct _gzochid_data_change gzochid_data_change;
 
 /* A set of changes to objects and bindings to be persisted. */
 
@@ -281,13 +184,9 @@ struct _gzochid_data_changeset
 {
   char *app; /* The requesting application name. */
 
-  /* The array of `gzochid_data_object_change' structs. */
+  /* An array of `gzochid_data_change' structs. */
   
-  GArray *object_changes; 
-
-  /* The array of `gzochid_data_binding_change' structs. */
-
-  GArray *binding_changes;
+  GArray *changes; 
 };
 
 typedef struct _gzochid_data_changeset gzochid_data_changeset;
@@ -329,33 +228,34 @@ gzochid_data_reserve_oids_response *
 gzochid_data_protocol_reserve_oids_response_read (GBytes *);
 
 /*
-  Construct and return a new object response with the specified application 
-  name, success flag, and object bytes; this last argument may be `NULL' to
-  indicate the absence of data for the requested oid.
+  Construct and return a new response with the specified application and store
+  names, success flag, and value bytes; this last argument may be `NULL' to
+  indicate the absence of data for the requested key.
 
   The pointer returned by this function should be freed with 
-  `gzochid_data_object_response_free'.
+  `gzochid_data_response_free'.
 */
 
-gzochid_data_object_response *
-gzochid_data_object_response_new (char *, gboolean, GBytes *);
+gzochid_data_response *
+gzochid_data_response_new (char *, char *, gboolean, GBytes *);
 
-/* Free the specified object response. */
+/* Free the specified response. */
 
-void gzochid_data_object_response_free (gzochid_data_object_response *);
+void gzochid_data_response_free (gzochid_data_response *);
 
 /* 
   Serialize the specified object response to the specified byte array. Format:
 
   `NULL'-terminated string: Name of the requesting game application
-  1 byte: 0x01 indicating success (and that object data follows), 
+  `NULL'-terminated string: Name of the target store
+  1 byte: 0x01 indicating success (and that value data follows), 
     0x00 indicating failure
-  2 bytes: The big-endian encoding of the length of the serialized object
-    Two zeros indicates the absence of an object; else the object data follows
+  2 bytes: The big-endian encoding of the length of the value
+    Two zeros indicates the absence of a value; else the value data follows
 */
 
-void gzochid_data_protocol_object_response_write
-(gzochid_data_object_response *, GByteArray *);
+void gzochid_data_protocol_response_write
+(gzochid_data_response *, GByteArray *);
 
 /*
   Deserialize and return an object response from the specified byte buffer,
@@ -363,117 +263,12 @@ void gzochid_data_protocol_object_response_write
   response. 
 
   The pointer returned by this function should be freed with 
-  `gzochid_data_object_response_free'.
+  `gzochid_data_response_free'.
 */
 
-gzochid_data_object_response *gzochid_data_protocol_object_response_read
-(GBytes *);
+gzochid_data_response *gzochid_data_protocol_response_read (GBytes *);
 
-/*
-  Construct and return a new successful binding response with the specified 
-  application name and oid.
-
-  The pointer returned by this function should be freed with 
-  `gzochid_data_binding_response_free'.
-*/
-
-gzochid_data_binding_response *gzochid_data_binding_response_oid_new
-(char *, mpz_t);
-
-/*
-  Construct and return a new binding response with the specified application 
-  name and success flag; if the flag value is `TRUE' the response indicates the
-  absence of an oid for the requested binding.
-
-  The pointer returned by this function should be freed with 
-  `gzochid_data_binding_key_response_free'.
-*/
-
-gzochid_data_binding_response *gzochid_data_binding_response_new
-(char *, gboolean);
-
-/* Free the specified binding response. */
-
-void gzochid_data_binding_response_free (gzochid_data_binding_response *);
-
-/* 
-  Serialize the specified binding response to the specified byte array. Format:
-
-  `NULL'-terminated string: Name of the requesting game application
-  1 byte: 0x01 indicating success (and that binding data follows), 
-    0x00 indicating failure
-  `NULL'-terminated string: Hexadecimal string representation of the target oid
-    or 1 `NULL' byte to indicate an absent binding
-*/
-
-void gzochid_data_protocol_binding_response_write
-(gzochid_data_binding_response *, GByteArray *);
-
-/*
-  Deserialize and return a binding response from the specified byte buffer, or 
-  return `NULL' if the buffer does not contain a correctly-serialized response. 
-
-  The pointer returned by this function should be freed with 
-  `gzochid_data_binding_response_free'.
-*/
-
-gzochid_data_binding_response *
-gzochid_data_protocol_binding_response_read (GBytes *);
-
-/*
-  Construct and return a new binding key response with the specified application
-  name, success flag, and next binding key; this last argument may be `NULL' to
-  indicate the absence of a next binding.
-
-  The pointer returned by this function should be freed with 
-  `gzochid_data_binding_key_resonse_free'.
-*/
-
-gzochid_data_binding_key_response *gzochid_data_binding_key_response_new
-(char *, gboolean, char *);
-
-/* Free the specified binding key response. */
-
-void gzochid_data_binding_key_response_free
-(gzochid_data_binding_key_response *);
-
-/* 
-  Serialize the specified binding key response to the specified byte array. 
-  Format:
-
-  `NULL'-terminated string: Name of the requesting game application
-  1 byte: 0x01 indicating success (and that binding data follows), 
-    0x00 indicating failure
-  `NULL'-terminated string: Name of the next binding
-    or 1 `NULL' byte to indicate the absence of a next binding
-*/
-
-void gzochid_data_protocol_binding_key_response_write
-(gzochid_data_binding_key_response *, GByteArray *);
-
-/*
-  Deserialize and return a binding key response from the specified byte buffer,
-  or return `NULL' if the buffer does not contain a correctly-serialized 
-  response. 
-
-  The pointer returned by this function should be freed with 
-  `gzochid_data_binding_key_response_free'.
-*/
-
-gzochid_data_binding_key_response *
-gzochid_data_protocol_binding_key_response_read (GBytes *);
-
-/*
-  Construct and return a new changeset with the specified application name, and
-  object and binding change arrays, which should be arrays with elements of type
-  `gzochid_data_object_change' and `gzochid_data_binding_change', 
-  respectively.
-
-  The pointer returned by this function should be freed with 
-  `gzochid_data_changeset_free'.
-*/
-
-gzochid_data_changeset *gzochid_data_changeset_new (char *, GArray *, GArray *);
+gzochid_data_changeset *gzochid_data_changeset_new (char *, GArray *);
 
 /* Free the specified changeset. */
 
@@ -483,22 +278,15 @@ void gzochid_data_changeset_free (gzochid_data_changeset *);
   Serialize the specified changeset object to the specified byte array. Format:
 
   `NULL'-terminated string: Name of the requesting game application
-  2 bytes: The big-endian encoding of the number of object changes
-  [object changes; see below]
-  2 bytes: The big-endian encoding of the number of binding changes
-  [binding changes; see below]
+  2 bytes: The big-endian encoding of the number of changes
+  [changes; see below]
 
-  The format of each object change is:
+  The format of each change is:
 
-  `NULL'-terminated string: Hexadecimal string representation of the target oid
-  2 bytes: The big-endian encoding of the length of the serialized object
-    Two zeros indicates a deletion; else the object data follows
-
-  The format of each binding change is:
-
-  `NULL'-terminated string: The target binding name
-  `NULL'-terminated string: Hexadecimal string representation of the target oid
-    or 1 `NULL' byte to indicate a deletion
+  `NULL'-terminated string: Name of the target store
+  2 bytes: The big-endian encoding of the length of the key; key bytes follow
+  2 bytes: The big-endian encoding of the length of the value
+    Two zeros indicates a deletion; else the data follows
  */
 
 void gzochid_data_protocol_changeset_write

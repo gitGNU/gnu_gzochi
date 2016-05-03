@@ -59,6 +59,11 @@ enum
        binding requests. */
     
     GZOCHI_METAD_DATASERVER_ERROR_LOCK_CONFLICT,
+
+    /* The store name was not one of "oids" or "names." */
+    
+    GZOCHI_METAD_DATASERVER_ERROR_STORE_NAME,
+    
     GZOCHI_METAD_DATASERVER_ERROR_FAILED /* Generic data server failure. */
   };
 
@@ -85,54 +90,37 @@ gzochid_data_reserve_oids_response *gzochi_metad_dataserver_reserve_oids
 (GzochiMetadDataServer *, guint, char *);
 
 /* Requests from the specified data server on behalf of the specified node id
-   the contents of object with the specified id in the specified application's 
-   persistent store (optionally locking it for write) and returns a 
-   `gzochid_data_object_response' (which should be freed via 
-   `gzochid_data_object_response_free' when no longer necessary) describing the
+   the value with the specified key in one of the specified application's 
+   persistent stores (optionally locking it for write) and returns a 
+   `gzochid_data_response' (which should be freed via 
+   `gzochid_data_response_free' when no longer necessary) describing the
    outcome of the request. */
 
-gzochid_data_object_response *gzochi_metad_dataserver_request_object
-(GzochiMetadDataServer *, guint, char *, mpz_t, gboolean);
+gzochid_data_response *gzochi_metad_dataserver_request_value
+(GzochiMetadDataServer *, guint, char *, char *, GBytes *, gboolean, GError **);
 
 /* Requests from the specified data server on behalf of the specified node id
-   the oid bound to the specified name in the specified application's
-   persistent store (optionally locking it for write) and returns a 
-   `gzochid_data_binding_response' (which should be freed via 
-   `gzochid_data_binding_response_free' when no longer necessary) describing the
-   outcome of the request. */
+   the key that immediately follows the specified key in one of the specified 
+   application's persistent stores and returns a `gzochid_data_response' 
+   (which should be freed via `gzochid_data_response_free' when no longer 
+   necessary) describing the outcome of the request. */
 
-gzochid_data_binding_response *gzochi_metad_dataserver_request_binding
-(GzochiMetadDataServer *, guint, char *, char *, gboolean);
+gzochid_data_response *gzochi_metad_dataserver_request_next_key
+(GzochiMetadDataServer *, guint, char *, char *, GBytes *, GError **);
 
-/* Requests from the specified data server on behalf of the specified node id
-   the name of the binding that falls immediately after the specified binding in
-   the specified application's persistent store, and returns a 
-   `gzochid_data_binding_key_response' (which should be freed via 
-   `gzochid_data_binding_key_response_free' when no longer necessary) describing
-   the outcome of the request. */
+/* Releases all locks held by the specified node id on the specified key
+   within the specified data server, application, and store. */ 
 
-gzochid_data_binding_key_response *gzochi_metad_dataserver_request_next_binding
-(GzochiMetadDataServer *, guint, char *, char *);
-
-/* Releases all locks held by the specified node id on the specified object id
-   within the specified data server and application. */ 
-
-void gzochi_metad_dataserver_release_object
-(GzochiMetadDataServer *, guint, char *, mpz_t);
-
-/* Releases all locks held by the specified node id on the specified binding
-   within the specified data server and application. */ 
-
-void gzochi_metad_dataserver_release_binding
-(GzochiMetadDataServer *, guint, char *, char *);
+void gzochi_metad_dataserver_release_key
+(GzochiMetadDataServer *, guint, char *, char *, GBytes *);
 
 /* Releases the range lock held by the specified node id on the specified 
-   binding interval (as established by a previous call to 
-   `gzochi_metad_dataserver_request_next_binding') within the specified data 
-   server and application. */ 
+   key interval (as established by a previous call to 
+   `gzochi_metad_dataserver_request_next_key') within the specified data server,
+   application, and store. */ 
 
-void gzochi_metad_dataserver_release_binding_range
-(GzochiMetadDataServer *, guint, char *, char *, char *);
+void gzochi_metad_dataserver_release_range
+(GzochiMetadDataServer *, guint, char *, char *, GBytes *, GBytes *);
 
 /* Releases all locks (read / write / range) held by the specified node id 
    within the specified data server. */ 

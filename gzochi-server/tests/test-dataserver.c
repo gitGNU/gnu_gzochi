@@ -163,10 +163,10 @@ test_reserve_oids (dataserver_fixture *fixture, gconstpointer user_data)
 }
 
 static void
-test_request_object (dataserver_fixture *fixture, gconstpointer user_data)
+test_request_value (dataserver_fixture *fixture, gconstpointer user_data)
 {
-  mpz_t test_oid;
-  gzochid_data_object_response *response = NULL;
+  gzochid_data_response *response = NULL;
+  GBytes *key = g_bytes_new_static ("1", 2);
   GBytes *expected = g_bytes_new_static ("foo", 4);
 
   test_storage_initialize (NULL);
@@ -174,125 +174,63 @@ test_request_object (dataserver_fixture *fixture, gconstpointer user_data)
   
   put (oids, "1", 2, "foo", 4);
   
-  mpz_init (test_oid);
-  mpz_set_ui (test_oid, 1);
-
-  response = gzochi_metad_dataserver_request_object
-    (fixture->server, 1, "test", test_oid, FALSE);
+  response = gzochi_metad_dataserver_request_value
+    (fixture->server, 1, "test", "oids", key, FALSE, NULL);
 
   g_assert_true (response->success);
   g_assert_true (g_bytes_equal (response->data, expected));
 
   g_bytes_unref (expected);
-  gzochid_data_object_response_free (response);
-  mpz_clear (test_oid);
+  g_bytes_unref (key);
+  
+  gzochid_data_response_free (response);
 }
 
 static void
-test_request_object_not_found (dataserver_fixture *fixture,
-			       gconstpointer user_data)
+test_request_value_not_found (dataserver_fixture *fixture,
+			      gconstpointer user_data)
 {
-  mpz_t test_oid;
-  gzochid_data_object_response *response = NULL;
+  gzochid_data_response *response = NULL;
+  GBytes *key = g_bytes_new_static ("1", 2);
   
-  mpz_init (test_oid);
-  mpz_set_ui (test_oid, 1);
-  
-  response = gzochi_metad_dataserver_request_object
-    (fixture->server, 1, "test", test_oid, FALSE);
+  response = gzochi_metad_dataserver_request_value
+    (fixture->server, 1, "test", "oids", key, FALSE, NULL);
 
   g_assert_true (response->success);
   g_assert_null (response->data);
 
-  gzochid_data_object_response_free (response);
-  mpz_clear (test_oid);
+  gzochid_data_response_free (response);
+  g_bytes_unref (key);
 }
 
 static void
-test_request_object_failure (dataserver_fixture *fixture,
-			     gconstpointer user_data)
+test_request_value_failure (dataserver_fixture *fixture,
+			    gconstpointer user_data)
 {
-  mpz_t test_oid;
-  gzochid_data_object_response *response1 = NULL;
-  gzochid_data_object_response *response2 = NULL;
+  GBytes *key = g_bytes_new_static ("1", 2);
+  gzochid_data_response *response1 = NULL;
+  gzochid_data_response *response2 = NULL;
   
-  mpz_init (test_oid);
-  mpz_set_ui (test_oid, 1);
-  
-  response1 = gzochi_metad_dataserver_request_object
-    (fixture->server, 1, "test", test_oid, TRUE);
-  response2 = gzochi_metad_dataserver_request_object
-    (fixture->server, 2, "test", test_oid, FALSE);
+  response1 = gzochi_metad_dataserver_request_value
+    (fixture->server, 1, "test", "oids", key, TRUE, NULL);
+  response2 = gzochi_metad_dataserver_request_value
+    (fixture->server, 2, "test", "oids", key, FALSE, NULL);
 
   g_assert_false (response2->success);
 
-  gzochid_data_object_response_free (response1);
-  gzochid_data_object_response_free (response2);
-  mpz_clear (test_oid);
+  gzochid_data_response_free (response1);
+  gzochid_data_response_free (response2);
+  g_bytes_unref (key);
 }
 
 static void
-test_request_binding (dataserver_fixture *fixture, gconstpointer user_data)
+test_request_next_key (dataserver_fixture *fixture, gconstpointer user_data)
 {
-  mpz_t expected;
-  gzochid_data_binding_response *response = NULL;
-
-  mpz_init (expected);
-  mpz_set_ui (expected, 1);
-  
-  test_storage_initialize (NULL);
-  test_storage_open (test_context, "names", GZOCHID_STORAGE_CREATE);
-  
-  put (names, "test-binding", 13, "1", 2);
-
-  response = gzochi_metad_dataserver_request_binding
-    (fixture->server, 1, "test", "test-binding", FALSE);
-
-  g_assert_true (response->success);
-  g_assert_true (response->present);
-  g_assert (mpz_cmp (response->oid, expected) == 0);
-  
-  mpz_clear (expected);
-  gzochid_data_binding_response_free (response);
-}
-
-static void
-test_request_binding_not_found (dataserver_fixture *fixture,
-				gconstpointer user_data)
-{
-  gzochid_data_binding_response *response =
-    gzochi_metad_dataserver_request_binding
-    (fixture->server, 1, "test", "test-binding", FALSE);
-
-  g_assert_true (response->success);
-  g_assert_false (response->present);
-
-  gzochid_data_binding_response_free (response);  
-}
-
-static void
-test_request_binding_failure (dataserver_fixture *fixture,
-			      gconstpointer user_data)
-{
-  gzochid_data_binding_response *response1 = NULL;
-  gzochid_data_binding_response *response2 = NULL;
-  
-  response1 = gzochi_metad_dataserver_request_binding
-    (fixture->server, 1, "test", "test-binding", TRUE);
-  response2 = gzochi_metad_dataserver_request_binding
-    (fixture->server, 2, "test", "test-binding", FALSE);
-
-  g_assert_false (response2->success);
-
-  gzochid_data_binding_response_free (response1);
-  gzochid_data_binding_response_free (response2);
-}
-
-static void
-test_request_next_binding (dataserver_fixture *fixture, gconstpointer user_data)
-{
-  gzochid_data_binding_key_response *response1 = NULL;
-  gzochid_data_binding_response *response2 = NULL;
+  GBytes *key = g_bytes_new_static ("a", 2);
+  GBytes *middle_key = g_bytes_new_static ("a1", 2);
+  GBytes *next_key = g_bytes_new_static ("b", 2);
+  gzochid_data_response *response1 = NULL;
+  gzochid_data_response *response2 = NULL;
 
   test_storage_initialize (NULL);
   test_storage_open (test_context, "names", GZOCHID_STORAGE_CREATE);
@@ -300,69 +238,79 @@ test_request_next_binding (dataserver_fixture *fixture, gconstpointer user_data)
   put (names, "a", 2, "1", 2);
   put (names, "b", 2, "2", 2);
 
-  response1 = gzochi_metad_dataserver_request_next_binding
-    (fixture->server, 1, "test", "a");
+  response1 = gzochi_metad_dataserver_request_next_key
+    (fixture->server, 1, "test", "names", key, NULL);
 
   g_assert_true (response1->success);
-  g_assert_nonnull (response1->name);
-  g_assert_cmpstr (response1->name, ==, "b");
+  g_assert_nonnull (response1->data);
+  g_assert_true (g_bytes_equal (next_key, response1->data));
   
-  response2 = gzochi_metad_dataserver_request_binding
-    (fixture->server, 2, "test", "a1", TRUE);
+  response2 = gzochi_metad_dataserver_request_value
+    (fixture->server, 2, "test", "names", middle_key, TRUE, NULL);
 
   g_assert_false (response2->success);
 
-  gzochid_data_binding_key_response_free (response1);
-  gzochid_data_binding_response_free (response2);
+  gzochid_data_response_free (response1);
+  gzochid_data_response_free (response2);
+
+  g_bytes_unref (key);
+  g_bytes_unref (middle_key);
+  g_bytes_unref (next_key);
 }
 
 static void
-test_request_next_binding_null (dataserver_fixture *fixture,
-				gconstpointer user_data)
+test_request_next_key_null (dataserver_fixture *fixture,
+			    gconstpointer user_data)
 {
-  gzochid_data_binding_key_response *response = NULL;
+  GBytes *expected = g_bytes_new_static ("a", 2);
+  gzochid_data_response *response = NULL;
 
   test_storage_initialize (NULL);
   test_storage_open (test_context, "names", GZOCHID_STORAGE_CREATE);
   
   put (names, "a", 2, "1", 2);
 
-  response = gzochi_metad_dataserver_request_next_binding
-    (fixture->server, 1, "test", NULL);
+  response = gzochi_metad_dataserver_request_next_key
+    (fixture->server, 1, "test", "names", NULL, NULL);
 
   g_assert_true (response->success);
-  g_assert_nonnull (response->name);
-  g_assert_cmpstr (response->name, ==, "a");
+  g_assert_nonnull (response->data);
+  g_assert_true (g_bytes_equal (expected, response->data));
 
-  gzochid_data_binding_key_response_free (response);
+  gzochid_data_response_free (response);
+  g_bytes_unref (expected);
 }
 
 static void
-test_request_next_binding_not_found (dataserver_fixture *fixture,
+test_request_next_key_not_found (dataserver_fixture *fixture,
 				     gconstpointer user_data)
 {
-  gzochid_data_binding_key_response *response = NULL;
+  GBytes *key = g_bytes_new_static ("a", 2);
+  gzochid_data_response *response = NULL;
 
   test_storage_initialize (NULL);
   test_storage_open (test_context, "names", GZOCHID_STORAGE_CREATE);
   
   put (names, "a", 2, "1", 2);
 
-  response = gzochi_metad_dataserver_request_next_binding
-    (fixture->server, 1, "test", "a");
+  response = gzochi_metad_dataserver_request_next_key
+    (fixture->server, 1, "test", "names", key, NULL);
 
   g_assert_true (response->success);
-  g_assert_null (response->name);
+  g_assert_null (response->data);
 
-  gzochid_data_binding_key_response_free (response);
+  gzochid_data_response_free (response);
+  g_bytes_unref (key);
 }
 
 static void
-test_request_next_binding_failure (dataserver_fixture *fixture,
+test_request_next_key_failure (dataserver_fixture *fixture,
 				   gconstpointer user_data)
 {
-  gzochid_data_binding_key_response *response1 = NULL;
-  gzochid_data_binding_key_response *response2 = NULL;
+  GBytes *key1 = g_bytes_new_static ("a", 2);
+  GBytes *key2 = g_bytes_new_static ("b", 2);
+  gzochid_data_response *response1 = NULL;
+  gzochid_data_response *response2 = NULL;
 
   test_storage_initialize (NULL);
   test_storage_open (test_context, "names", GZOCHID_STORAGE_CREATE);
@@ -371,193 +319,174 @@ test_request_next_binding_failure (dataserver_fixture *fixture,
   put (names, "b", 2, "2", 2);
   put (names, "c", 2, "3", 2);
 
-  response1 = gzochi_metad_dataserver_request_next_binding
-    (fixture->server, 1, "test", "a");
-  response2 = gzochi_metad_dataserver_request_next_binding
-    (fixture->server, 2, "test", "b");
+  response1 = gzochi_metad_dataserver_request_next_key
+    (fixture->server, 1, "test", "names", key1, NULL);
+  response2 = gzochi_metad_dataserver_request_next_key
+    (fixture->server, 2, "test", "names", key2, NULL);
 
   g_assert_false (response2->success);
   
-  gzochid_data_binding_key_response_free (response1);
-  gzochid_data_binding_key_response_free (response2);  
+  gzochid_data_response_free (response1);
+  gzochid_data_response_free (response2);
+
+  g_bytes_unref (key1);
+  g_bytes_unref (key2);
 }
 
 static void
-test_release_object (dataserver_fixture *fixture, gconstpointer user_data)
+test_release_key (dataserver_fixture *fixture, gconstpointer user_data)
 {
-  mpz_t test_oid;
-  gzochid_data_object_response *response1 = NULL;
-  gzochid_data_object_response *response2 = NULL;
+  GBytes *key = g_bytes_new_static ("1", 2);
+  gzochid_data_response *response1 = NULL;
+  gzochid_data_response *response2 = NULL;
 
-  mpz_init (test_oid);
-  mpz_set_ui (test_oid, 1);
-
-  response1 = gzochi_metad_dataserver_request_object
-    (fixture->server, 1, "test", test_oid, TRUE);
-  gzochi_metad_dataserver_release_object (fixture->server, 1, "test", test_oid);
-  response2 = gzochi_metad_dataserver_request_object
-    (fixture->server, 2, "test", test_oid, TRUE);
+  response1 = gzochi_metad_dataserver_request_value
+    (fixture->server, 1, "test", "oids", key, TRUE, NULL);
+  gzochi_metad_dataserver_release_key
+    (fixture->server, 1, "test", "oids", key);
+  response2 = gzochi_metad_dataserver_request_value
+    (fixture->server, 2, "test", "oids", key, TRUE, NULL);
 
   g_assert_true (response2->success);
 
-  mpz_clear (test_oid);
-  
-  gzochid_data_object_response_free (response1);
-  gzochid_data_object_response_free (response2);
+  gzochid_data_response_free (response1);
+  gzochid_data_response_free (response2);
+
+  g_bytes_unref (key);
 }
 
 static void
-test_release_binding (dataserver_fixture *fixture, gconstpointer user_data)
+test_release_key_range (dataserver_fixture *fixture,
+			gconstpointer user_data)
 {
-  gzochid_data_binding_response *response1 = NULL;
-  gzochid_data_binding_response *response2 = NULL;
+  GBytes *key = g_bytes_new_static ("test-binding", 13); 
+  gzochid_data_response *response1 = NULL;
+  gzochid_data_response *response2 = NULL;
 
-  response1 = gzochi_metad_dataserver_request_binding
-    (fixture->server, 1, "test", "test-binding", TRUE);
-  gzochi_metad_dataserver_release_binding
-    (fixture->server, 1, "test", "test-binding");
-  response2 = gzochi_metad_dataserver_request_binding
-    (fixture->server, 2, "test", "test-binding", TRUE);
+  response1 = gzochi_metad_dataserver_request_next_key
+    (fixture->server, 1, "test", "names", NULL, NULL);
+  gzochi_metad_dataserver_release_range
+    (fixture->server, 1, "test", "names", NULL, NULL);
+  response2 = gzochi_metad_dataserver_request_value
+    (fixture->server, 2, "test", "names", key, TRUE, NULL);
 
   g_assert_true (response2->success);
 
-  gzochid_data_binding_response_free (response1);
-  gzochid_data_binding_response_free (response2);
-}
+  gzochid_data_response_free (response1);
+  gzochid_data_response_free (response2);
 
-static void
-test_release_binding_range (dataserver_fixture *fixture,
-			    gconstpointer user_data)
-{
-  gzochid_data_binding_key_response *response1 = NULL;
-  gzochid_data_binding_response *response2 = NULL;
-
-  response1 = gzochi_metad_dataserver_request_next_binding
-    (fixture->server, 1, "test", NULL);
-  gzochi_metad_dataserver_release_binding_range
-    (fixture->server, 1, "test", NULL, NULL);
-  response2 = gzochi_metad_dataserver_request_binding
-    (fixture->server, 2, "test", "test-binding", TRUE);
-
-  g_assert_true (response2->success);
-
-  gzochid_data_binding_key_response_free (response1);
-  gzochid_data_binding_response_free (response2);
+  g_bytes_unref (key);
 }
 
 static void
 test_release_all (dataserver_fixture *fixture, gconstpointer user_data)
 {
-  mpz_t oid;
-  gzochid_data_binding_key_response *response1a =
-    gzochi_metad_dataserver_request_next_binding
-    (fixture->server, 1, "test", NULL);
-  gzochid_data_binding_response *response2a =
-    gzochi_metad_dataserver_request_binding
-    (fixture->server, 1, "test", "test-binding", TRUE);
-  gzochid_data_object_response *response3a = NULL;
-
-  gzochid_data_binding_key_response *response1b = NULL;
-  gzochid_data_binding_response *response2b = NULL;
-  gzochid_data_object_response *response3b = NULL;
+  GBytes *key1 = g_bytes_new_static ("test-binding", 13);
+  GBytes *key2 = g_bytes_new_static ("1", 2);
   
-  mpz_init (oid);
-  mpz_set_ui (oid, 1);  
+  gzochid_data_response *response1a = gzochi_metad_dataserver_request_next_key
+    (fixture->server, 1, "test", "names", NULL, NULL);
+  gzochid_data_response *response2a = gzochi_metad_dataserver_request_value
+    (fixture->server, 1, "test", "names", key1, TRUE, NULL);
+  gzochid_data_response *response3a = NULL;
 
-  response3a = gzochi_metad_dataserver_request_object
-    (fixture->server, 1, "test", oid, TRUE);
+  gzochid_data_response *response1b = NULL;
+  gzochid_data_response *response2b = NULL;
+  gzochid_data_response *response3b = NULL;
+  
+  response3a = gzochi_metad_dataserver_request_value
+    (fixture->server, 1, "test", "oids", key2, TRUE, NULL);
 
   gzochi_metad_dataserver_release_all (fixture->server, 1);
 
-  response1b = gzochi_metad_dataserver_request_next_binding
-    (fixture->server, 2, "test", NULL);
+  response1b = gzochi_metad_dataserver_request_next_key
+    (fixture->server, 2, "test", "names", NULL, NULL);
 
   g_assert_true (response1b->success);
   
-  response2b = gzochi_metad_dataserver_request_binding
-    (fixture->server, 2, "test", "test-binding", TRUE);
+  response2b = gzochi_metad_dataserver_request_value
+    (fixture->server, 2, "test", "names", key1, TRUE, NULL);
 
   g_assert_true (response2b->success);
 
-  response3b = gzochi_metad_dataserver_request_object
-    (fixture->server, 2, "test", oid, TRUE);
+  response3b = gzochi_metad_dataserver_request_value
+    (fixture->server, 2, "test", "oids", key2, TRUE, NULL);
   
   g_assert_true (response3b->success);
 
-  mpz_clear (oid);
-  
-  gzochid_data_binding_key_response_free (response1a);
-  gzochid_data_binding_key_response_free (response1b);
+  gzochid_data_response_free (response1a);
+  gzochid_data_response_free (response1b);
 
-  gzochid_data_binding_response_free (response2a);
-  gzochid_data_binding_response_free (response2b);
+  gzochid_data_response_free (response2a);
+  gzochid_data_response_free (response2b);
 
-  gzochid_data_object_response_free (response3a);
-  gzochid_data_object_response_free (response3b);
+  gzochid_data_response_free (response3a);
+  gzochid_data_response_free (response3b);
+
+  g_bytes_unref (key1);
+  g_bytes_unref (key2);
 }
 
 static void
 test_process_changeset (dataserver_fixture *fixture, gconstpointer user_data)
 {
   GError *err = NULL;
-  GArray *object_changes = g_array_sized_new
-    (FALSE, FALSE, sizeof (gzochid_data_object_change), 3);
-  GArray *binding_changes = g_array_sized_new
-    (FALSE, FALSE, sizeof (gzochid_data_binding_change), 3);
+  GArray *changes = g_array_sized_new
+    (FALSE, FALSE, sizeof (gzochid_data_change), 6);
   char *data = NULL;
   
   gzochid_storage_engine_interface *iface =
     &gzochid_storage_engine_interface_mem;
 
-  gzochid_data_object_change object_change1;
-  gzochid_data_object_change object_change2;
-  gzochid_data_object_change object_change3;
+  gzochid_data_change object_change1;
+  gzochid_data_change object_change2;
+  gzochid_data_change object_change3;
 
-  gzochid_data_binding_change binding_change1;
-  gzochid_data_binding_change binding_change2;
-  gzochid_data_binding_change binding_change3;
+  gzochid_data_change binding_change1;
+  gzochid_data_change binding_change2;
+  gzochid_data_change binding_change3;
 
   gzochid_data_changeset *changeset = NULL;
   gzochid_storage_transaction *transaction = NULL;
 
+  object_change1.store = strdup ("oids");
   object_change1.delete = FALSE;
+  object_change1.key = g_bytes_new_static ("1", 2);
   object_change1.data = g_bytes_new_static ("bar", 4);
-  mpz_init (object_change1.oid);
-  mpz_set_ui (object_change1.oid, 1);
 
+  object_change2.store = strdup ("oids");
   object_change2.delete = TRUE;
+  object_change2.key = g_bytes_new_static ("2", 2);
   object_change2.data = NULL;
-  mpz_init (object_change2.oid);
-  mpz_set_ui (object_change2.oid, 2);
 
+  object_change3.store = strdup ("oids");
   object_change3.delete = FALSE;
+  object_change3.key = g_bytes_new_static ("3", 2);
   object_change3.data = g_bytes_new_static ("baz", 4);
-  mpz_init (object_change3.oid);
-  mpz_set_ui (object_change3.oid, 3);
   
-  g_array_insert_val (object_changes, 0, object_change1);
-  g_array_insert_val (object_changes, 1, object_change2);
-  g_array_insert_val (object_changes, 2, object_change3);
+  g_array_insert_val (changes, 0, object_change1);
+  g_array_insert_val (changes, 1, object_change2);
+  g_array_insert_val (changes, 2, object_change3);
 
+  binding_change1.store = strdup ("names");
   binding_change1.delete = FALSE;
-  binding_change1.name = strdup ("binding-1");
-  mpz_init (binding_change1.oid);
-  mpz_set_ui (binding_change1.oid, 2);
+  binding_change1.key = g_bytes_new_static ("binding-1", 10);
+  binding_change1.data = g_bytes_new_static ("2", 2);
 
+  binding_change2.store = strdup ("names");
   binding_change2.delete = TRUE;
-  binding_change2.name = strdup ("binding-2");
+  binding_change2.key = g_bytes_new_static ("binding-2", 10);
 
+  binding_change3.store = strdup ("names");
   binding_change3.delete = FALSE;
-  binding_change3.name = strdup ("binding-3");
-  mpz_init (binding_change3.oid);
-  mpz_set_ui (binding_change3.oid, 3);
+  binding_change3.key = g_bytes_new_static ("binding-3", 10);
+  binding_change3.data = g_bytes_new_static ("3", 2);
   
-  g_array_insert_val (binding_changes, 0, binding_change1);
-  g_array_insert_val (binding_changes, 1, binding_change2);
-  g_array_insert_val (binding_changes, 2, binding_change3);
+  g_array_insert_val (changes, 3, binding_change1);
+  g_array_insert_val (changes, 4, binding_change2);
+  g_array_insert_val (changes, 5, binding_change3);
 
-  changeset = gzochid_data_changeset_new
-    ("test", object_changes, binding_changes);
+  changeset = gzochid_data_changeset_new ("test", changes);
   
   test_storage_initialize (NULL);
   test_storage_open (test_context, "oids", GZOCHID_STORAGE_CREATE);
@@ -608,8 +537,7 @@ test_process_changeset (dataserver_fixture *fixture, gconstpointer user_data)
   iface->transaction_rollback (transaction);
 
   gzochid_data_changeset_free (changeset);
-  g_array_unref (object_changes);
-  g_array_unref (binding_changes);
+  g_array_unref (changes);
 }
 
 int
@@ -630,40 +558,29 @@ main (int argc, char *argv[])
   
   g_test_add ("/dataserver/reserve-oids", dataserver_fixture, NULL,
 	      setup_dataserver, test_reserve_oids, teardown_dataserver);
-  g_test_add ("/dataserver/request-object", dataserver_fixture, NULL,
-	      setup_dataserver, test_request_object, teardown_dataserver);
-  g_test_add ("/dataserver/request-object/not-found", dataserver_fixture, NULL,
-	      setup_dataserver, test_request_object_not_found,
+  g_test_add ("/dataserver/request-value", dataserver_fixture, NULL,
+	      setup_dataserver, test_request_value, teardown_dataserver);
+  g_test_add ("/dataserver/request-value/not-found", dataserver_fixture, NULL,
+	      setup_dataserver, test_request_value_not_found,
 	      teardown_dataserver);
-  g_test_add ("/dataserver/request-object/failure", dataserver_fixture, NULL,
-	      setup_dataserver, test_request_object_failure,
+  g_test_add ("/dataserver/request-value/failure", dataserver_fixture, NULL,
+	      setup_dataserver, test_request_value_failure,
 	      teardown_dataserver);
-  g_test_add ("/dataserver/request-binding", dataserver_fixture, NULL,
-	      setup_dataserver, test_request_binding, teardown_dataserver);
-  g_test_add ("/dataserver/request-binding/not-found", dataserver_fixture, NULL,
-	      setup_dataserver, test_request_binding_not_found,
+  g_test_add ("/dataserver/request-next-key", dataserver_fixture, NULL,
+	      setup_dataserver, test_request_next_key, teardown_dataserver);
+  g_test_add ("/dataserver/request-next-key/null", dataserver_fixture, NULL,
+	      setup_dataserver, test_request_next_key_null,
 	      teardown_dataserver);
-  g_test_add ("/dataserver/request-binding/failure", dataserver_fixture, NULL,
-	      setup_dataserver, test_request_binding_failure,
+  g_test_add ("/dataserver/request-next-key/not-found", dataserver_fixture,
+	      NULL, setup_dataserver, test_request_next_key_not_found,
 	      teardown_dataserver);
-  g_test_add ("/dataserver/request-next-binding", dataserver_fixture, NULL,
-	      setup_dataserver, test_request_next_binding, teardown_dataserver);
-  g_test_add ("/dataserver/request-next-binding/null", dataserver_fixture, NULL,
-	      setup_dataserver, test_request_next_binding_null,
+  g_test_add ("/dataserver/request-next-key/failure", dataserver_fixture,
+	      NULL, setup_dataserver, test_request_next_key_failure,
 	      teardown_dataserver);
-  g_test_add ("/dataserver/request-next-binding/not-found", dataserver_fixture,
-	      NULL, setup_dataserver, test_request_next_binding_not_found,
-	      teardown_dataserver);
-  g_test_add ("/dataserver/request-next-binding/failure", dataserver_fixture,
-	      NULL, setup_dataserver, test_request_next_binding_failure,
-	      teardown_dataserver);
-  g_test_add ("/dataserver/release-object", dataserver_fixture, NULL,
-	      setup_dataserver, test_release_object, teardown_dataserver);
-  g_test_add ("/dataserver/release-binding", dataserver_fixture, NULL,
-	      setup_dataserver, test_release_binding, teardown_dataserver);
-  g_test_add ("/dataserver/release-binding-range", dataserver_fixture, NULL,
-	      setup_dataserver, test_release_binding_range,
-	      teardown_dataserver);
+  g_test_add ("/dataserver/release-key", dataserver_fixture, NULL,
+	      setup_dataserver, test_release_key, teardown_dataserver);
+  g_test_add ("/dataserver/release-key-range", dataserver_fixture, NULL,
+	      setup_dataserver, test_release_key_range, teardown_dataserver);
   g_test_add ("/dataserver/release-all", dataserver_fixture, NULL,
 	      setup_dataserver, test_release_all, teardown_dataserver);
   g_test_add ("/dataserver/process-changeset", dataserver_fixture, NULL,

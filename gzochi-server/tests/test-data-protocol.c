@@ -63,46 +63,46 @@ test_changeset ()
   GBytes *bytes = NULL, *data = NULL;
   GByteArray *arr = g_byte_array_new ();
 
-  GArray *object_changes = g_array_sized_new
-    (FALSE, TRUE, sizeof (gzochid_data_object_change), 2);
-  GArray *binding_changes = g_array_sized_new
-    (FALSE, TRUE, sizeof (gzochid_data_binding_change), 2);
+  GArray *changes = g_array_sized_new
+    (FALSE, TRUE, sizeof (gzochid_data_change), 4);
   
   gzochid_data_changeset *changeset1 = NULL;
   gzochid_data_changeset *changeset2 = NULL;
 
-  gzochid_data_object_change *object_change1 =
-    &g_array_index (object_changes, gzochid_data_object_change, 0);
-  gzochid_data_object_change *object_change2 =
-    &g_array_index (object_changes, gzochid_data_object_change, 1);
+  gzochid_data_change *object_change1a =
+    &g_array_index (changes, gzochid_data_change, 0);
+  gzochid_data_change *object_change2a =
+    &g_array_index (changes, gzochid_data_change, 1);
 
-  gzochid_data_binding_change *binding_change1 =
-    &g_array_index (binding_changes, gzochid_data_binding_change, 0);
-  gzochid_data_binding_change *binding_change2 =
-    &g_array_index (binding_changes, gzochid_data_binding_change, 1);
+  gzochid_data_change *binding_change1a =
+    &g_array_index (changes, gzochid_data_change, 2);
+  gzochid_data_change *binding_change2a =
+    &g_array_index (changes, gzochid_data_change, 3);
 
-  g_array_set_size (object_changes, 2);
-  g_array_set_size (binding_changes, 2);
+  gzochid_data_change *object_change1b = NULL;
+  gzochid_data_change *object_change2b = NULL;
+  gzochid_data_change *binding_change1b = NULL;
+  gzochid_data_change *binding_change2b = NULL;
+    
+  g_array_set_size (changes, 4);
+
+  object_change1a->store = strdup ("oids");
+  object_change1a->delete = TRUE;
+  object_change1a->key = g_bytes_new_static ("1", 2);
+
+  object_change2a->store = strdup ("oids");
+  object_change2a->key = g_bytes_new_static ("2", 2);
+  object_change2a->data = g_bytes_new_static ("foo", 4);
+
+  binding_change1a->store = strdup ("names");
+  binding_change1a->delete = TRUE;
+  binding_change1a->key = g_bytes_new_static ("foo", 4);
+
+  binding_change2a->store = strdup ("names");
+  binding_change2a->key = g_bytes_new_static ("bar", 4);
+  binding_change2a->data = g_bytes_new_static ("3", 2);
   
-  object_change1->delete = TRUE;  
-  mpz_init (object_change1->oid);
-  mpz_set_ui (object_change1->oid, 1);
-
-  data = g_bytes_new_static ("foo", 4);
-  
-  mpz_init (object_change2->oid);
-  mpz_set_ui (object_change2->oid, 2);
-  object_change2->data = g_bytes_ref (data);
-
-  binding_change1->delete = TRUE;
-  binding_change1->name = strdup ("foo");
-
-  binding_change2->name = strdup ("bar");
-  mpz_init (binding_change2->oid);
-  mpz_set_ui (binding_change2->oid, 3);
-  
-  changeset1 = gzochid_data_changeset_new
-    ("test", object_changes, binding_changes);
+  changeset1 = gzochid_data_changeset_new ("test", changes);
   
   gzochid_data_protocol_changeset_write (changeset1, arr);
 
@@ -111,269 +111,113 @@ test_changeset ()
 
   g_assert_nonnull (changeset2);
   
-  object_change1 = &g_array_index
-    (object_changes, gzochid_data_object_change, 0);
-  object_change2 = &g_array_index
-    (object_changes, gzochid_data_object_change, 1);
+  object_change1b = &g_array_index (changes, gzochid_data_change, 0);
+  object_change2b = &g_array_index (changes, gzochid_data_change, 1);
 
-  binding_change1 = &g_array_index
-    (binding_changes, gzochid_data_binding_change, 0);
-  binding_change2 = &g_array_index
-    (binding_changes, gzochid_data_binding_change, 1);
+  binding_change1b = &g_array_index (changes, gzochid_data_change, 2);
+  binding_change2b = &g_array_index (changes, gzochid_data_change, 3);
 
-  g_assert (mpz_cmp_ui (object_change1->oid, 1) == 0);
-  g_assert_true (object_change1->delete);
-  g_assert (mpz_cmp_ui (object_change2->oid, 2) == 0);
-  g_assert_false (object_change2->delete);
-  g_assert_true (g_bytes_equal (data, object_change2->data));
+  g_assert_true (g_bytes_equal (object_change1a->key, object_change1b->key));
+  g_assert_true (object_change1b->delete);
+  g_assert_true (g_bytes_equal (object_change2a->key, object_change2b->key));
+  g_assert_false (object_change2b->delete);
+  g_assert_true (g_bytes_equal (object_change2a->data, object_change2b->data));
 
-  g_assert_cmpstr (binding_change1->name, ==, "foo");
-  g_assert_true (binding_change1->delete);
-  g_assert_cmpstr (binding_change2->name, ==, "bar");
-  g_assert_false (binding_change2->delete);
-  g_assert (mpz_cmp_ui (binding_change2->oid, 3) == 0);
+  g_assert_true (g_bytes_equal (binding_change1a->key, binding_change1b->key));
+  g_assert_true (binding_change1b->delete);
+  g_assert_true (g_bytes_equal (binding_change2a->key, binding_change2b->key));
+  g_assert_false (binding_change2b->delete);
+  g_assert_true (g_bytes_equal (binding_change2a->data,
+				binding_change2b->data));
   
   gzochid_data_changeset_free (changeset1);
   gzochid_data_changeset_free (changeset2);
-  
-  g_array_unref (object_changes);
-  g_array_unref (binding_changes);
 
   g_bytes_unref (bytes);
-  g_bytes_unref (data);
+  g_array_unref (changes);
 }
 
 static void
-test_object_response_success ()
+test_data_response_success ()
 {
   GBytes *bytes = NULL;
   GByteArray *arr = g_byte_array_new ();
-  gzochid_data_object_response *response1 = NULL;
-  gzochid_data_object_response *response2 = NULL;
+  gzochid_data_response *response1 = NULL;
+  gzochid_data_response *response2 = NULL;
   GBytes *data = g_bytes_new_static ("foo\000bar", 8);
 
-  response1 = gzochid_data_object_response_new ("test", TRUE, data);
+  response1 = gzochid_data_response_new ("test", "oids", TRUE, data);
 
-  gzochid_data_protocol_object_response_write (response1, arr);
+  gzochid_data_protocol_response_write (response1, arr);
 
   bytes = g_byte_array_free_to_bytes (arr);
-  response2 = gzochid_data_protocol_object_response_read (bytes);
+  response2 = gzochid_data_protocol_response_read (bytes);
 
   g_assert_nonnull (response2);
   g_assert_cmpstr (response2->app, ==, "test");
+  g_assert_cmpstr (response2->store, ==, "oids");
   g_assert_true (response2->success);
   g_assert_nonnull (response2->data);
   g_assert_true (g_bytes_equal (data, response2->data));
   
-  gzochid_data_object_response_free (response1);
-  gzochid_data_object_response_free (response2);
+  gzochid_data_response_free (response1);
+  gzochid_data_response_free (response2);
 
   g_bytes_unref (data);  
   g_bytes_unref (bytes);
 }
 
 static void
-test_object_response_not_found ()
+test_data_response_not_found ()
 {
   GBytes *bytes = NULL;
   GByteArray *arr = g_byte_array_new ();
-  gzochid_data_object_response *response1 = NULL;
-  gzochid_data_object_response *response2 = NULL;
+  gzochid_data_response *response1 = NULL;
+  gzochid_data_response *response2 = NULL;
 
-  response1 = gzochid_data_object_response_new ("test", TRUE, NULL);
+  response1 = gzochid_data_response_new ("test", "names", TRUE, NULL);
 
-  gzochid_data_protocol_object_response_write (response1, arr);
+  gzochid_data_protocol_response_write (response1, arr);
 
   bytes = g_byte_array_free_to_bytes (arr);
-  response2 = gzochid_data_protocol_object_response_read (bytes);
+  response2 = gzochid_data_protocol_response_read (bytes);
 
   g_assert_nonnull (response2);
   g_assert_cmpstr (response2->app, ==, "test");
+  g_assert_cmpstr (response2->store, ==, "names");
   g_assert_true (response2->success);
   g_assert_null (response2->data);
   
-  gzochid_data_object_response_free (response1);
-  gzochid_data_object_response_free (response2);
+  gzochid_data_response_free (response1);
+  gzochid_data_response_free (response2);
 
   g_bytes_unref (bytes);
 }
 
 static void
-test_object_response_failure ()
+test_data_response_failure ()
 {
   GBytes *bytes = NULL;
   GByteArray *arr = g_byte_array_new ();
-  gzochid_data_object_response *response1 = NULL;
-  gzochid_data_object_response *response2 = NULL;
+  gzochid_data_response *response1 = NULL;
+  gzochid_data_response *response2 = NULL;
 
-  response1 = gzochid_data_object_response_new ("test", FALSE, NULL);
+  response1 = gzochid_data_response_new ("test", "oids", FALSE, NULL);
 
-  gzochid_data_protocol_object_response_write (response1, arr);
+  gzochid_data_protocol_response_write (response1, arr);
 
   bytes = g_byte_array_free_to_bytes (arr);
-  response2 = gzochid_data_protocol_object_response_read (bytes);
+  response2 = gzochid_data_protocol_response_read (bytes);
 
   g_assert_nonnull (response2);
   g_assert_cmpstr (response2->app, ==, "test");
+  g_assert_cmpstr (response2->store, ==, "oids");
   g_assert_false (response2->success);
   g_assert_null (response2->data);
   
-  gzochid_data_object_response_free (response1);
-  gzochid_data_object_response_free (response2);
+  gzochid_data_response_free (response1);
+  gzochid_data_response_free (response2);
 
-  g_bytes_unref (bytes);
-}
-
-static void
-test_binding_response_success ()
-{
-  mpz_t oid;
-  GBytes *bytes = NULL;
-  GByteArray *arr = g_byte_array_new ();
-  gzochid_data_binding_response *response1 = NULL;
-  gzochid_data_binding_response *response2 = NULL;
-
-  mpz_init (oid);
-  mpz_set_ui (oid, 123);
-  
-  response1 = gzochid_data_binding_response_oid_new ("test", oid);
-  
-  gzochid_data_protocol_binding_response_write (response1, arr);
-
-  bytes = g_byte_array_free_to_bytes (arr);
-  response2 = gzochid_data_protocol_binding_response_read (bytes);
-
-  g_assert_nonnull (response2);
-  g_assert_cmpstr (response2->app, ==, "test");
-  g_assert_true (response2->success);
-  g_assert_true (response2->present);
-  g_assert (mpz_cmp_ui (response2->oid, 123) == 0);
-  
-  gzochid_data_binding_response_free (response1);
-  gzochid_data_binding_response_free (response2);
-  g_bytes_unref (bytes);
-  mpz_clear (oid);
-}
-
-static void
-test_binding_response_not_found ()
-{
-  GBytes *bytes = NULL;
-  GByteArray *arr = g_byte_array_new ();
-  gzochid_data_binding_response *response1 = NULL;
-  gzochid_data_binding_response *response2 = NULL;
-
-  response1 = gzochid_data_binding_response_new ("test", TRUE);
-  
-  gzochid_data_protocol_binding_response_write (response1, arr);
-
-  bytes = g_byte_array_free_to_bytes (arr);
-  response2 = gzochid_data_protocol_binding_response_read (bytes);
-
-  g_assert_nonnull (response2);
-  g_assert_cmpstr (response2->app, ==, "test");
-  g_assert_true (response2->success);
-  g_assert_false (response2->present);
-  
-  gzochid_data_binding_response_free (response1);
-  gzochid_data_binding_response_free (response2);
-  g_bytes_unref (bytes);
-}
-
-static void
-test_binding_response_failure ()
-{
-  GBytes *bytes = NULL;
-  GByteArray *arr = g_byte_array_new ();
-  gzochid_data_binding_response *response1 = NULL;
-  gzochid_data_binding_response *response2 = NULL;
-
-  response1 = gzochid_data_binding_response_new ("test", FALSE);
-  
-  gzochid_data_protocol_binding_response_write (response1, arr);
-
-  bytes = g_byte_array_free_to_bytes (arr);
-  response2 = gzochid_data_protocol_binding_response_read (bytes);
-
-  g_assert_nonnull (response2);
-  g_assert_cmpstr (response2->app, ==, "test");
-  g_assert_false (response2->success);
-  g_assert_false (response2->present);
-  
-  gzochid_data_binding_response_free (response1);
-  gzochid_data_binding_response_free (response2);
-  g_bytes_unref (bytes);
-}
-
-static void
-test_binding_key_response_success ()
-{
-  GBytes *bytes = NULL;
-  GByteArray *arr = g_byte_array_new ();
-  gzochid_data_binding_key_response *response1 =
-    gzochid_data_binding_key_response_new ("test", TRUE, "foo");
-  gzochid_data_binding_key_response *response2 = NULL;
-  
-  gzochid_data_protocol_binding_key_response_write (response1, arr);
-
-  bytes = g_byte_array_free_to_bytes (arr);
-  response2 = gzochid_data_protocol_binding_key_response_read (bytes);
-
-  g_assert_nonnull (response2);
-  g_assert_cmpstr (response2->app, ==, "test");
-  g_assert_true (response2->success);
-  g_assert_cmpstr (response2->name, ==, "foo");
-  
-  gzochid_data_binding_key_response_free (response1);
-  gzochid_data_binding_key_response_free (response2);
-  g_bytes_unref (bytes);
-}
-
-static void
-test_binding_key_response_not_found ()
-{
-  GBytes *bytes = NULL;
-  GByteArray *arr = g_byte_array_new ();
-  gzochid_data_binding_key_response *response1 =
-    gzochid_data_binding_key_response_new ("test", TRUE, NULL);
-  gzochid_data_binding_key_response *response2 = NULL;
-
-  gzochid_data_protocol_binding_key_response_write (response1, arr);
-
-  bytes = g_byte_array_free_to_bytes (arr);
-  response2 = gzochid_data_protocol_binding_key_response_read (bytes);
-
-  g_assert_nonnull (response2);
-  g_assert_cmpstr (response2->app, ==, "test");
-  g_assert_true (response2->success);
-  g_assert_null (response2->name);
-    
-  gzochid_data_binding_key_response_free (response1);
-  gzochid_data_binding_key_response_free (response2);
-  g_bytes_unref (bytes);
-}
-
-static void
-test_binding_key_response_failure ()
-{
-  GBytes *bytes = NULL;
-  GByteArray *arr = g_byte_array_new ();
-  gzochid_data_binding_key_response *response1 =
-    gzochid_data_binding_key_response_new ("test", FALSE, NULL);
-  gzochid_data_binding_key_response *response2 = NULL;
-
-  gzochid_data_protocol_binding_key_response_write (response1, arr);
-
-  bytes = g_byte_array_free_to_bytes (arr);
-  response2 = gzochid_data_protocol_binding_key_response_read (bytes);
-
-  g_assert_nonnull (response2);
-  g_assert_cmpstr (response2->app, ==, "test");
-  g_assert_false (response2->success);
-  g_assert_null (response2->name);
-    
-  gzochid_data_binding_key_response_free (response1);
-  gzochid_data_binding_key_response_free (response2);
   g_bytes_unref (bytes);
 }
 
@@ -386,23 +230,11 @@ main (int argc, char *argv[])
     ("/data-protocol/reserve-oids-response", test_reserve_oids_response);
   g_test_add_func ("/data-protocol/changeset", test_changeset);
   g_test_add_func
-    ("/data-protocol/object-response/success", test_object_response_success);
-  g_test_add_func ("/data-protocol/object-response/not-found",
-		   test_object_response_not_found);
+    ("/data-protocol/data-response/success", test_data_response_success);
+  g_test_add_func ("/data-protocol/data-response/not-found",
+		   test_data_response_not_found);
   g_test_add_func
-    ("/data-protocol/object-response/failure", test_object_response_failure);
-  g_test_add_func
-    ("/data-protocol/binding-response/success", test_binding_response_success);
-  g_test_add_func ("/data-protocol/binding-response/not-found",
-		   test_binding_response_not_found);
-  g_test_add_func
-    ("/data-protocol/binding-response/failure", test_binding_response_failure);
-  g_test_add_func ("/data-protocol/binding-key-response/success",
-		   test_binding_key_response_success);
-  g_test_add_func ("/data-protocol/binding-key-response/not-found",
-		   test_binding_key_response_not_found);
-  g_test_add_func ("/data-protocol/binding-key-response/failure",
-		   test_binding_key_response_failure);
+    ("/data-protocol/data-response/failure", test_data_response_failure);
   
   return g_test_run ();
 }
