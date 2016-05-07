@@ -186,7 +186,9 @@ struct _gzochid_data_changeset
 
   /* An array of `gzochid_data_change' structs. */
   
-  GArray *changes; 
+  GArray *changes;
+
+  GDestroyNotify free_func; /* Change cleanup function, optionally `NULL'. */
 };
 
 typedef struct _gzochid_data_changeset gzochid_data_changeset;
@@ -268,7 +270,18 @@ void gzochid_data_protocol_response_write
 
 gzochid_data_response *gzochid_data_protocol_response_read (GBytes *);
 
+/* Create and return a new changeset with the specified gzochi game application
+   name and change array. */
+
 gzochid_data_changeset *gzochid_data_changeset_new (char *, GArray *);
+
+/* Create and return a new changeset with the specified gzochi game application
+   name and change array. The `GDestroyNotify' function, if provided, will be
+   applied to each element in the change array when 
+   `gzochid_data_changeset_free' is called.*/
+
+gzochid_data_changeset *gzochid_data_changeset_new_with_free_func
+(char *, GArray *, GDestroyNotify);
 
 /* Free the specified changeset. */
 

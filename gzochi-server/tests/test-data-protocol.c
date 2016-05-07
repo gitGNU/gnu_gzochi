@@ -133,6 +133,20 @@ test_changeset ()
   gzochid_data_changeset_free (changeset1);
   gzochid_data_changeset_free (changeset2);
 
+  free (object_change1a->store);
+  g_bytes_unref (object_change1a->key);
+  
+  free (object_change2a->store);
+  g_bytes_unref (object_change2a->key);
+  g_bytes_unref (object_change2a->data);
+
+  free (binding_change1a->store);
+  g_bytes_unref (binding_change1a->key);
+
+  free (binding_change2a->store);
+  g_bytes_unref (binding_change2a->key);
+  g_bytes_unref (binding_change2a->data);
+
   g_bytes_unref (bytes);
   g_array_unref (changes);
 }

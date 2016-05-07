@@ -536,6 +536,28 @@ test_process_changeset (dataserver_fixture *fixture, gconstpointer user_data)
   
   iface->transaction_rollback (transaction);
 
+  free (object_change1.store);
+  g_bytes_unref (object_change1.key);
+  g_bytes_unref (object_change1.data);
+  
+  free (object_change2.store);
+  g_bytes_unref (object_change2.key);
+
+  free (object_change3.store);
+  g_bytes_unref (object_change3.key);
+  g_bytes_unref (object_change3.data);
+
+  free (binding_change1.store);
+  g_bytes_unref (binding_change1.key);
+  g_bytes_unref (binding_change1.data);
+
+  free (binding_change2.store);
+  g_bytes_unref (binding_change2.key);
+
+  free (binding_change3.store);
+  g_bytes_unref (binding_change3.key);
+  g_bytes_unref (binding_change3.data);
+  
   gzochid_data_changeset_free (changeset);
   g_array_unref (changes);
 }

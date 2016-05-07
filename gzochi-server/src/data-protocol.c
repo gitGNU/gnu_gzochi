@@ -346,15 +346,23 @@ gzochid_data_protocol_response_read (GBytes *data)
 }
 
 gzochid_data_changeset *
-gzochid_data_changeset_new (char *app, GArray *changes)
+gzochid_data_changeset_new_with_free_func (char *app, GArray *changes,
+					   GDestroyNotify free_func)
 {
   gzochid_data_changeset *changeset =
     g_slice_alloc (sizeof (gzochid_data_changeset));
 
   changeset->app = strdup (app);
   changeset->changes = g_array_ref (changes);
+  changeset->free_func = free_func;
   
   return changeset;
+}
+
+gzochid_data_changeset *
+gzochid_data_changeset_new (char *app, GArray *changes)
+{
+  return gzochid_data_changeset_new_with_free_func (app, changes, NULL);
 }
 
 /* Frees the memory held by the internal pointers for a change record. The 
@@ -385,12 +393,18 @@ changes_clear (GArray *arr, int up_to)
 
 void
 gzochid_data_changeset_free (gzochid_data_changeset *changeset)
-{
+{  
   free (changeset->app);
 
-  changes_clear (changeset->changes, changeset->changes->len);
-  g_array_unref (changeset->changes);
+  if (changeset->free_func != NULL)
+    {
+      int i = 0;
+      for (; i < changeset->changes->len; i++)
+	changeset->free_func
+	  (&g_array_index (changeset->changes, gzochid_data_change, i));
+    }
   
+  g_array_unref (changeset->changes);
   g_slice_free (gzochid_data_changeset, changeset);
 }
 
@@ -562,7 +576,8 @@ gzochid_data_protocol_changeset_read (GBytes *data)
     }
   else changes = g_array_new (FALSE, FALSE, sizeof (gzochid_data_change));
   
-  changeset = gzochid_data_changeset_new (app, changes);
+  changeset = gzochid_data_changeset_new_with_free_func
+    (app, changes, (GDestroyNotify) change_clear);
 
   /* Transfer ownership to the changeset record. */
   
