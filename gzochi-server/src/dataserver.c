@@ -163,6 +163,8 @@ close_application_store (gpointer key, gpointer value, gpointer user_data)
 
   STORAGE_INTERFACE (server)->close_context (store->storage_context);
 
+  gzochid_oid_allocation_strategy_free (store->oid_strategy);
+  
   return TRUE;
 }
 

@@ -137,5 +137,5 @@ gzochid_storage_oid_strategy_new (gzochid_storage_engine_interface *engine,
   context->storage_context = storage_context;
   context->store = store;
   
-  return gzochid_oid_allocation_strategy_new (allocate, context, NULL);
+  return gzochid_oid_allocation_strategy_new (allocate, context, free);
 }
