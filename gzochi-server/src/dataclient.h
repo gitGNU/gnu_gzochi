@@ -20,6 +20,9 @@
 
 #include <glib.h>
 #include <glib-object.h>
+#include <sys/time.h>
+
+#include "data-protocol.h"
 
 /* The core data client type definitions. */
 
@@ -84,6 +87,86 @@ void gzochid_dataclient_stop (GzochidDataClient *);
    of the client protocol. */
 
 void gzochid_dataclient_nullify_connection (GzochidDataClient *);
+
+/* Function pointer typedef for a "success" callback to a request for a value or
+   binding. The `GBytes' argument may be null if the request was successful
+   (i.e., a lock was established) but the value was missing. */
+
+typedef void (*gzochid_dataclient_success_callback) (GBytes *, gpointer);
+
+/* Function pointer typedef for a "failure" callback to a request for a value or
+   binding; generally indicates a failure to obtain a required lock. The 
+   timestamp gives a suggested time to wait before retrying the request. */
+
+typedef void (*gzochid_dataclient_failure_callback) (struct timeval, gpointer);
+
+/* Function pointer typedef for a response to a request for a block of oids.
+   Object id reservations may not fail; an invocation of this callback indicates
+   a successful reservation of the specified block. */
+
+typedef void (*gzochid_dataclient_oids_callback)
+(gzochid_data_oids_block, gpointer);
+
+/* Request a block of oids for objects belonging to the specified gzochi game 
+   application, with the response delivered via the specified callback, which 
+   will be invoked with the specified user data pointer. */
+
+void gzochid_dataclient_reserve_oids
+(GzochidDataClient *, char *, gzochid_dataclient_oids_callback, gpointer);
+
+/* Request a value from the specified store (which must be "oids" or "names") 
+   associated with the specified gzochi game application. The response to this
+   request will be delivered to the specified success or failure callback (with
+   associated user data pointer) as appropriate. */
+
+void gzochid_dataclient_request_value
+(GzochidDataClient *, char *, char *, GBytes *, gboolean,
+ gzochid_dataclient_success_callback, gpointer,
+ gzochid_dataclient_failure_callback, gpointer);
+
+/*
+  Request the key from the specified store (which must be "oids" or "names") 
+  associated with the specified gzochi game application that follows the 
+  specified key in lexicographical order. The response to this request will be 
+  delivered to the specified success or failure callback (with associated user 
+  data pointer) as appropriate.
+  
+  The key argument may be `NULL' to indicate that the first key in the store
+  should be returned.
+*/
+
+void gzochid_dataclient_request_next_key
+(GzochidDataClient *, char *, char *, GBytes *,
+ gzochid_dataclient_success_callback, gpointer,
+ gzochid_dataclient_failure_callback, gpointer);
+
+/* Submit the specified array of changes against the specified gzochi game 
+   application to the data server. */
+
+void gzochid_dataclient_submit_changeset
+(GzochidDataClient *, char *, GArray *);
+
+/* The following functions are used by the dataclient protocol to notify the 
+   client of a response to a previously-submitted request. With the exception of
+   usage in test code, they should not be called outside of the protocol's flow
+   of control. */
+
+/* Notify the client that a response to an oid reservation request has 
+   arrived. */
+
+void gzochid_dataclient_received_oids
+(GzochidDataClient *, gzochid_data_reserve_oids_response *);
+
+/* Notify the client that a response to a value request has arrived. */
+
+void gzochid_dataclient_received_value
+(GzochidDataClient *, gzochid_data_response *);
+
+/* Notify the client that a response to a key range request has arrived. */
+
+void gzochid_dataclient_received_next_key
+(GzochidDataClient *, gzochid_data_response *);
+
 
 GQuark gzochid_data_client_error_quark ();
 

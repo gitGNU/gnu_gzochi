@@ -26,6 +26,7 @@ test_programs = \
 	test-config \
 	test-data \
 	test-data-protocol \
+	test-dataclient \
 	test-dataserver \
 	test-dataserver-protocol \
 	test-descriptor \
@@ -104,6 +105,17 @@ test_data_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
 test_data_protocol_SOURCES = test-data-protocol.c
 test_data_protocol_LDADD = $(top_builddir)/src/libgzochid_la-data-protocol.o \
 	@GLIB_LIBS@ @GZOCHI_COMMON_LIBS@
+
+test_dataclient_CFLAGS = -I$(top_srcdir)/src \
+	@GLIB_CFLAGS@ @GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+test_dataclient_SOURCES = test-dataclient.c
+test_dataclient_LDADD = \
+	$(top_builddir)/src/libgzochid_la-config.o \
+	$(top_builddir)/src/libgzochid_la-data-protocol.o \
+	$(top_builddir)/src/libgzochid_la-dataclient.o \
+	$(top_builddir)/src/libgzochid_la-resolver.o \
+	$(top_builddir)/src/libgzochid_la-socket.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
 test_dataserver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
 	@GZOCHI_COMMON_CFLAGS@

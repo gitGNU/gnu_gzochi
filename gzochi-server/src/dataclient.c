@@ -15,22 +15,71 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <errno.h>
 #include <glib.h>
 #include <glib-object.h>
+#include <gzochi-common.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
 #include "config.h"
+#include "data-protocol.h"
 #include "dataclient.h"
 #include "dataclient-protocol.h"
 #include "socket.h"
+
+/* Captures callback configuration for a request issued through the data 
+   client. */
+
+struct _dataclient_callback_registration
+{
+  /* The expected opcode of the response. Used as a kind of check bit to ensure
+     that the correct response is being processed on behalf of a request. */
+
+  unsigned char expected_opcode; 
+  
+  /* The success callback. */
+
+  gzochid_dataclient_success_callback success_callback; 
+
+  gpointer success_data; /* Closure data for the success callback. */
+
+  /* The failure callback. */
+  
+  gzochid_dataclient_failure_callback failure_callback;
+
+  gpointer failure_data; /* Closure data for the failure callback. */
+};
+
+typedef struct _dataclient_callback_registration
+dataclient_callback_registration;
+
+/* Holds the state of active callbacks for value and oid requests. */
+
+struct _dataclient_callback_queue
+{  
+  GMutex mutex; /* Mutex to protect the list of registrations */
+
+  /* The oids callback function. */
+
+  gzochid_dataclient_oids_callback oids_callback; 
+
+  gpointer oids_callback_data; /* Closure data for the oids callback. */  
+
+  /* List of `dataclient_callback_registration' objects. */
+
+  GList *callback_registrations; 
+};
+
+typedef struct _dataclient_callback_queue dataclient_callback_queue;
 
 /* Boilerplate setup for the data client object. */
 
@@ -42,6 +91,10 @@ struct _GzochidDataClient
 
   GHashTable *configuration; /* The data client configuration table. */
 
+  /* A map of application names to `dataclient_callback_queue' objects. */
+  
+  GHashTable *application_callback_queues; 
+
   /* The socket server for the data client. */
 
   GzochidSocketServer *socket_server;
@@ -50,6 +103,11 @@ struct _GzochidDataClient
 
   gzochid_client_socket *client_socket;
 
+  /* A buffer of bytes to be sent to the data server pending the availability of
+     a connected client socket. */
+  
+  GByteArray *outbound_messages;
+  
   char *hostname; /* Meta server hostname. */
   unsigned int port; /* Meta server port. */
 
@@ -59,6 +117,11 @@ struct _GzochidDataClient
   guint connect_attempt_interval_seconds;
   
   GThread *thread; /* The connection maintenance thread. */
+  
+  /* Whether the connection maintenance thread should stay alive. */
+
+  gboolean running; 
+
   GMutex mutex; /* Mutex protecting the client socket. */
   GCond cond; /* Condition variable coordinating connection maintenance. */
 };
@@ -105,7 +168,10 @@ gzochid_data_client_finalize (GObject *gobject)
   GzochidDataClient *client = GZOCHID_DATA_CLIENT (gobject);
 
   g_hash_table_destroy (client->configuration);
+  g_hash_table_destroy (client->application_callback_queues);
 
+  g_byte_array_unref (client->outbound_messages);
+  
   g_mutex_clear (&client->mutex);
   g_cond_clear (&client->cond);
 }
@@ -141,14 +207,101 @@ gzochid_data_client_class_init (GzochidDataClientClass *klass)
     (object_class, N_PROPERTIES, obj_properties);
 }
 
+/* Create and return a new callback registration object with the specified
+   expected opcode and success and failure callback (with associated user data
+   pointers. This object should freed via `free' when no longer needed. */
+
+static dataclient_callback_registration *
+create_callback
+(unsigned char expected_opcode,
+ gzochid_dataclient_success_callback success_callback, gpointer success_data,
+ gzochid_dataclient_failure_callback failure_callback, gpointer failure_data)
+{
+  dataclient_callback_registration *registration =
+    malloc (sizeof (dataclient_callback_registration));
+
+  registration->expected_opcode = expected_opcode;
+  
+  registration->success_callback = success_callback;
+  registration->success_data = success_data;
+
+  registration->failure_callback = failure_callback;
+  registration->failure_data = failure_data;
+
+  return registration;
+}
+
+/* Frees the callback queue structure, including all pending callbacks. */
+
+static void
+free_callback_queue (dataclient_callback_queue *queue)
+{
+  g_mutex_clear (&queue->mutex);
+  g_list_free_full (queue->callback_registrations, free);
+  free (queue);
+}
+
+/*
+  Returns the callback queue structure associated with the specified gzochi 
+  game application name, creating one if necessary.
+
+  Note that in order to support safe concurrent access to the queue's internal
+  fields, the callback queue is returned with its mutex locked. Callers must
+  unlock release the queue when they are done using it via a call to 
+  `release_callback_queue'.
+*/
+
+static dataclient_callback_queue *
+acquire_callback_queue (GzochidDataClient *client, char *app)
+{
+  dataclient_callback_queue *queue = NULL;
+  
+  g_mutex_lock (&client->mutex);
+
+  if (g_hash_table_contains (client->application_callback_queues, app))   
+    queue = g_hash_table_lookup (client->application_callback_queues, app);
+  else
+    {
+      queue = malloc (sizeof (dataclient_callback_queue));
+
+      g_mutex_init (&queue->mutex);
+
+      queue->oids_callback = NULL;
+      queue->oids_callback_data = NULL;
+      queue->callback_registrations = NULL;
+
+      g_hash_table_insert
+	(client->application_callback_queues, strdup (app), queue);
+    }
+
+  g_mutex_lock (&queue->mutex);  
+  g_mutex_unlock (&client->mutex);
+
+  return queue;
+}
+
+/* Releases the specified callback queue structure. */
+
+static void
+release_callback_queue (dataclient_callback_queue *queue)
+{
+  g_mutex_unlock (&queue->mutex);
+}
+
 static void
 gzochid_data_client_init (GzochidDataClient *self)
 {
+  self->application_callback_queues = g_hash_table_new_full
+    (g_str_hash, g_str_equal, free, (GDestroyNotify) free_callback_queue);
+
+  self->outbound_messages = g_byte_array_new ();
+
+  self->running = FALSE;
   g_mutex_init (&self->mutex);
   g_cond_init (&self->cond);
 }
 
-/* End boiletplate. */
+/* End boilerplate. */
 
 /* Attempts to connect to the specified hostname and port. Returns a new 
    `gzochid_client_socket' on success, `NULL' on failure (in which case the
@@ -159,6 +312,7 @@ attempt_connect (GzochidDataClient *client, char *hostname, unsigned int port,
 		 GError **err)
 {
   int sock;
+  GIOChannel *channel = NULL;
   struct sockaddr_in name;
   struct hostent *hostinfo = NULL;
   char *connection_description = NULL;
@@ -212,10 +366,16 @@ attempt_connect (GzochidDataClient *client, char *hostname, unsigned int port,
 #endif
 
   connection_description = g_strdup_printf ("%s:%d", hostname, port);
+
+  channel = g_io_channel_unix_new (sock);
+  
+  g_io_channel_set_encoding (channel, NULL, NULL);
+  g_io_channel_set_flags (channel, G_IO_FLAG_NONBLOCK, NULL);
+  g_io_channel_set_buffered (channel, FALSE);
   
   client_socket = gzochid_client_socket_new
-    (g_io_channel_unix_new (sock), connection_description,
-     gzochid_dataclient_client_protocol, client);
+    (channel, connection_description, gzochid_dataclient_client_protocol,
+     client);
 
   g_free (connection_description);
 
@@ -239,7 +399,7 @@ ensure_connection (gpointer data)
 
   g_mutex_lock (&client->mutex);
 
-  while (TRUE)
+  while (client->running)
     {
       /* Is the socket disconnected? */
       
@@ -276,6 +436,15 @@ ensure_connection (gpointer data)
 	      g_info ("Connected to meta server at %s:%d.", client->hostname,
 		      client->port);
 
+	      if (client->outbound_messages->len > 0)
+		{
+		  gzochid_client_socket_write
+		    (client->client_socket, client->outbound_messages->data,
+		     client->outbound_messages->len);
+
+		  g_byte_array_set_size (client->outbound_messages, 0);
+		}
+	      
 	      /* Notify any waiting clients that the connection is open for
 		 business. */
 	      
@@ -288,6 +457,7 @@ ensure_connection (gpointer data)
       g_cond_wait (&client->cond, &client->mutex);
     }
 
+  g_mutex_unlock (&client->mutex);  
   return NULL;
 }
 
@@ -313,16 +483,27 @@ extract_hostname_port (GzochidDataClient *dataclient, GError **err)
     {
       GMatchInfo *match_info = NULL;
       GRegex *address_regex = g_regex_new ("([^:]+):(\\d{1,5})", 0, 0, NULL);  
+      gboolean matched = g_regex_match
+	(address_regex, hostname_port, 0, &match_info);
 
-      if (g_regex_match (address_regex, hostname_port, 0, &match_info))
+      g_regex_unref (address_regex);
+      
+      if (matched)
 	{
-	  dataclient->hostname = g_match_info_fetch (match_info, 1);
-	  dataclient->port = atoi (g_match_info_fetch (match_info, 2));
+	  gchar *port_str = g_match_info_fetch (match_info, 2);
 
+	  dataclient->hostname = g_match_info_fetch (match_info, 1);
+	  dataclient->port = atoi (port_str);
+
+	  g_free (port_str);
+	  g_match_info_free (match_info);
+	  
 	  return TRUE;
 	}
       else
 	{
+	  g_match_info_free (match_info);
+	  
 	  g_set_error
 	    (err, GZOCHID_DATA_CLIENT_ERROR, GZOCHID_DATA_CLIENT_ERROR_ADDRESS,
 	     "Invalid meta server address: %s", hostname_port);
@@ -347,7 +528,10 @@ gzochid_dataclient_start (GzochidDataClient *dataclient, GError **err)
   dataclient->connect_attempt_interval_seconds = gzochid_config_to_int
     (g_hash_table_lookup (dataclient->configuration,
 			  "server.connect.interval.sec"), 5);
+
+  /* Set the running flag to keep the maintenance loop going. */
   
+  dataclient->running = TRUE;
   dataclient->thread = g_thread_new
     ("dataclient-conn", ensure_connection, dataclient);
 }
@@ -355,6 +539,26 @@ gzochid_dataclient_start (GzochidDataClient *dataclient, GError **err)
 void
 gzochid_dataclient_stop (GzochidDataClient *dataclient)
 {
+  if (dataclient->thread != NULL)
+    {
+      g_free (dataclient->hostname);
+      dataclient->hostname = NULL;
+      dataclient->port = 0;
+      
+      g_mutex_lock (&dataclient->mutex);
+
+      /* Unset the running flag and wake up the maintenance thread so that it
+	 can exit. */
+      
+      dataclient->running = FALSE;
+      g_cond_signal (&dataclient->cond);
+
+      g_mutex_unlock (&dataclient->mutex);
+
+      /* Ensure that the maintenance thread has exited. */
+      
+      g_thread_join (dataclient->thread);
+    }
 }
 
 void
@@ -366,6 +570,271 @@ gzochid_dataclient_nullify_connection (GzochidDataClient *dataclient)
 
   g_cond_signal (&dataclient->cond);
   g_mutex_unlock (&dataclient->mutex);
+}
+
+/*
+  Convenience function to write the specified opcode and byte payload to the
+  connected metaserver.
+
+  This function does not attempt to recover from cases in which a message is 
+  only partially sent before the socket is disconnected. Under these 
+  circumstances, clients should make no assumptions about the state of submitted
+  changesets and should purge all internal state. */
+
+static void
+write_message (GzochidDataClient *client, guchar opcode, GBytes *payload)
+{
+  size_t len = 0;
+  const unsigned char *data = g_bytes_get_data (payload, &len);
+  unsigned char *buf = malloc (sizeof (unsigned char) * (len + 3));
+
+  /* Prefix the message with its length. */
+  
+  gzochi_common_io_write_short (len, buf, 0);
+  buf[2] = opcode;
+  memcpy (buf + 3, data, len);
+
+  g_mutex_lock (&client->mutex);
+
+  
+  if (client->client_socket != NULL)
+
+    /* Queue up the bytes to sent on the socket. */
+    
+    gzochid_client_socket_write (client->client_socket, buf, len + 3);
+  else
+
+    /* If the client is known to be disconnected, queue up the message bytes to
+       be sent on reconnnect. */
+    
+    g_byte_array_append (client->outbound_messages, buf, len + 3);
+  
+  g_mutex_unlock (&client->mutex);
+  
+  free (buf);
+}
+
+void
+gzochid_dataclient_received_oids (GzochidDataClient *client,
+				  gzochid_data_reserve_oids_response *response)
+{
+  dataclient_callback_queue *queue = acquire_callback_queue
+    (client, response->app);
+
+  /* If somebody's waiting for oids, let them know. */
+  
+  if (queue->oids_callback != NULL)
+    {
+      queue->oids_callback (response->block, queue->oids_callback_data);
+
+      /* Null out the oids callback after receipt. */
+      
+      queue->oids_callback = NULL;
+      queue->oids_callback_data = NULL;
+    }
+
+  release_callback_queue (queue);
+}
+
+void
+gzochid_dataclient_reserve_oids (GzochidDataClient *client, char *app,
+				 gzochid_dataclient_oids_callback callback,
+				 gpointer user_data)
+{
+  GBytes *message_bytes = g_bytes_new (app, strlen (app) + 1);
+  dataclient_callback_queue *queue = acquire_callback_queue (client, app);
+  
+  write_message (client, GZOCHID_DATA_PROTOCOL_REQUEST_OIDS, message_bytes);
+  g_bytes_unref (message_bytes);
+
+  /* The client is responsible for synchronizing / serializing calls to this
+     function. */
+  
+  assert (queue->oids_callback == NULL);
+  queue->oids_callback = callback;
+  queue->oids_callback_data = user_data;
+
+  release_callback_queue (queue);
+}
+
+/* Convenience function to handle the processing of a message received in
+   response to a value or sequential key request, and representing a successful
+   or unsuccessful fulfillment of the request. Some error checking is performed
+   to ensure that responses message are received in the same order in which the
+   requests were submitted. */
+
+static void
+process_queued_callback (dataclient_callback_queue *queue, unsigned char opcode,
+			 gzochid_data_response *response)
+{
+  GList *callback_link = queue->callback_registrations;
+  dataclient_callback_registration *callbacks = callback_link->data;
+
+  queue->callback_registrations = g_list_delete_link
+    (queue->callback_registrations, queue->callback_registrations);
+
+  /* Check that the message opcode is the same as the opcode expected by the
+     callback registration at the head of the queue. */
+  
+  if (opcode != callbacks->expected_opcode)
+    g_warning
+      ("Received response %d for %s/%s; expected response %d.", opcode,
+       response->app, response->store, callbacks->expected_opcode);
+  else if (response->success)
+    callbacks->success_callback (response->data, callbacks->success_data);
+  else callbacks->failure_callback (response->timeout, callbacks->failure_data);
+
+  free (callbacks);      
+}
+
+void
+gzochid_dataclient_received_value (GzochidDataClient *client,
+				   gzochid_data_response *response)
+{
+  dataclient_callback_queue *queue = acquire_callback_queue
+    (client, response->app);
+
+  if (queue->callback_registrations == NULL)
+    g_warning
+      ("Received value for %s/%s but no callbacks registered.", response->app,
+       response->store);
+  else process_queued_callback
+	 (queue, GZOCHID_DATA_PROTOCOL_VALUE_RESPONSE, response);
+
+  release_callback_queue (queue);
+}
+
+void
+gzochid_dataclient_request_value
+(GzochidDataClient *client, char *app, char *store, GBytes *key,
+ gboolean for_write, gzochid_dataclient_success_callback success_callback,
+ gpointer success_data, gzochid_dataclient_failure_callback failure_callback,
+ gpointer failure_data)
+{
+  dataclient_callback_queue *queue = acquire_callback_queue (client, app);
+  GByteArray *payload = g_byte_array_new ();
+  const unsigned char *key_bytes = NULL;
+  size_t payload_len = 0, key_len = 0;
+  GBytes *payload_bytes = NULL;
+
+  /* Serialize the value request message. */
+  
+  g_byte_array_append (payload, (unsigned char *) app, strlen (app) + 1);
+  g_byte_array_append (payload, (unsigned char *) store, strlen (store) + 1);
+  g_byte_array_append
+    (payload, (unsigned char *) &(unsigned char[]) { for_write ? 1 : 0 }, 1);
+
+  key_bytes = g_bytes_get_data (key, &key_len);
+
+  /* Grow the byte array by 2 bytes. */
+  
+  payload_len = payload->len;
+  g_byte_array_set_size (payload, payload_len + 2);
+
+  /* Write the key length directly to the buffer. */
+  
+  gzochi_common_io_write_short (key_len, payload->data, payload_len);
+  
+  g_byte_array_append (payload, key_bytes, key_len);
+  
+  payload_bytes = g_byte_array_free_to_bytes (payload);
+  write_message (client, GZOCHID_DATA_PROTOCOL_REQUEST_VALUE, payload_bytes);
+  g_bytes_unref (payload_bytes);
+
+  /* Add a callback registration to the queue. */
+  
+  queue->callback_registrations = g_list_append
+    (queue->callback_registrations,
+     create_callback (GZOCHID_DATA_PROTOCOL_VALUE_RESPONSE,
+		      success_callback, success_data,
+		      failure_callback, failure_data));
+
+  release_callback_queue (queue);
+}
+
+void
+gzochid_dataclient_received_next_key (GzochidDataClient *client,
+				      gzochid_data_response *response)
+{
+  dataclient_callback_queue *queue = acquire_callback_queue
+    (client, response->app);
+
+  if (queue->callback_registrations == NULL)
+    g_warning
+      ("Received key range response for %s/%s but no callbacks registered.",
+       response->app, response->store);
+  else process_queued_callback
+	 (queue, GZOCHID_DATA_PROTOCOL_NEXT_KEY_RESPONSE, response);
+
+  release_callback_queue (queue);
+}
+
+void
+gzochid_dataclient_request_next_key
+(GzochidDataClient *client, char *app, char *store, GBytes *key,
+ gzochid_dataclient_success_callback success_callback, gpointer success_data,
+ gzochid_dataclient_failure_callback failure_callback, gpointer failure_data)
+{
+  dataclient_callback_queue *queue = acquire_callback_queue (client, app);
+  GByteArray *payload = g_byte_array_new ();
+  GBytes *payload_bytes = NULL;
+  
+  /* Serialize the key request message. */
+
+  g_byte_array_append (payload, (unsigned char *) app, strlen (app) + 1);
+  g_byte_array_append (payload, (unsigned char *) store, strlen (store) + 1);
+
+  if (key != NULL)
+    {
+      size_t payload_len = 0, key_len = 0;
+      const unsigned char *key_bytes = g_bytes_get_data (key, &key_len);
+
+      /* Grow the byte array by 2 bytes. */
+      
+      payload_len = payload->len;
+      g_byte_array_set_size (payload, payload_len + 2);
+
+      /* Write the key length directly to the buffer. */
+  
+      gzochi_common_io_write_short (key_len, payload->data, payload_len);
+
+      g_byte_array_append (payload, key_bytes, key_len);
+    }
+  else g_byte_array_append
+	 (payload, (unsigned char *) &(unsigned char[]) { 0, 0 }, 2);
+
+  payload_bytes = g_byte_array_free_to_bytes (payload);
+  write_message (client, GZOCHID_DATA_PROTOCOL_REQUEST_NEXT_KEY, payload_bytes);
+  g_bytes_unref (payload_bytes);
+  
+  /* Add a callback registration to the queue. */
+
+  queue->callback_registrations = g_list_append
+    (queue->callback_registrations,
+     create_callback (GZOCHID_DATA_PROTOCOL_NEXT_KEY_RESPONSE,
+		      success_callback, success_data,
+		      failure_callback, failure_data));
+
+  release_callback_queue (queue);
+}
+
+void
+gzochid_dataclient_submit_changeset
+(GzochidDataClient *client, char *app, GArray *changes)
+{
+  gzochid_data_changeset *changeset = gzochid_data_changeset_new (app, changes);
+  GByteArray *payload = g_byte_array_new ();
+  GBytes *payload_bytes = NULL;
+
+  /* Serialize the changeset submission message. */
+  
+  gzochid_data_protocol_changeset_write (changeset, payload);
+
+  payload_bytes = g_byte_array_free_to_bytes (payload); 
+  write_message (client, GZOCHID_DATA_PROTOCOL_SUBMIT_CHANGESET, payload_bytes);
+  g_bytes_unref (payload_bytes);
+
+  gzochid_data_changeset_free (changeset);
 }
 
 GQuark
