@@ -39,6 +39,7 @@ test_programs = \
 	test-lock-mem \
 	test-lrucache \
 	test-oids \
+	test-oids-dataclient \
 	test-oids-storage \
 	test-reloc \
 	test-resolver \
@@ -200,6 +201,12 @@ test_oids_SOURCES = test-oids.c
 test_oids_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-storage-mem.o \
 	@GLIB_LIBS@
+
+test_oids_dataclient_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
+test_oids_dataclient_SOURCES = test-oids-dataclient.c
+test_oids_dataclient_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
+	$(top_builddir)/src/libgzochid_la-oids-dataclient.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_oids_storage_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_oids_storage_SOURCES = test-oids-storage.c
