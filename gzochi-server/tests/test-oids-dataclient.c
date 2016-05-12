@@ -19,6 +19,7 @@
 #include <glib-object.h>
 #include <gmp.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "dataclient.h"
 #include "oids-dataclient.h"
@@ -40,19 +41,34 @@ gzochid_data_client_init (GzochidDataClient *self)
 {
 }
 
+static gpointer
+reserve_oids_inner (gpointer data)
+{
+  gpointer *args = data;
+  gzochid_data_oids_block block;
+  gzochid_dataclient_oids_callback callback = args[0];
+  gpointer callback_data = args[1];
+  
+  mpz_init_set_ui (block.block_start, 1);
+  block.block_size = 100;
+  
+  callback (block, callback_data);
+
+  mpz_clear (block.block_start);
+  free (args);
+}
+
 void
 gzochid_dataclient_reserve_oids (GzochidDataClient *client, char *app,
 				 gzochid_dataclient_oids_callback callback,
 				 gpointer data)
 {
-  gzochid_data_oids_block block;
+  gpointer *args = malloc (sizeof (gpointer) * 2);
 
-  mpz_init_set_ui (block.block_start, 1);
-  block.block_size = 100;
+  args[0] = callback;
+  args[1] = data;
   
-  callback (block, data);
-
-  mpz_clear (block.block_start);
+  g_thread_new ("fake-main-loop", reserve_oids_inner, args);
 }
 
 static void
