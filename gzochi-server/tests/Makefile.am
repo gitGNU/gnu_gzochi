@@ -48,6 +48,7 @@ test_programs = \
 	test-scheme-task \
 	test-session \
 	test-socket \
+	test-storage-dataclient \
 	test-storage-mem \
 	test-task \
 	test-util
@@ -276,6 +277,16 @@ test_socket_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_socket_SOURCES = test-socket.c
 test_socket_LDADD = $(top_builddir)/src/libgzochid_la-socket.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@
+
+test_storage_dataclient_CFLAGS = -I$(top_srcdir)/src \
+	@GZOCHI_COMMON_CFLAGS@ @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
+test_storage_dataclient_SOURCES = test-storage-dataclient.c
+test_storage_dataclient_LDADD = \
+	$(top_builddir)/src/libgzochid_la-itree.o \
+	$(top_builddir)/src/libgzochid_la-storage-dataclient.o \
+	$(top_builddir)/src/libgzochid_la-storage-mem.o \
+	$(top_builddir)/src/libgzochid_la-util.o \
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_storage_mem_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_storage_mem_SOURCES = test-storage-mem.c
