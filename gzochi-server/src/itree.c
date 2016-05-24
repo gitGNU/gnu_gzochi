@@ -474,14 +474,6 @@ gzochid_itree_search_interval (gzochid_itree *itree, gpointer from, gpointer to,
 
       stack = g_list_delete_link (stack, stack);
 
-      if (itree->upper_comparator (from, node->max_upper) > 0
-	  && itree->upper_comparator (to, node->max_upper) > 0)
-
-	/* If the interval is entirely outside of the max upper bound in this
-	   sub-tree, there's no point in expanding it any further. */
-	
-	continue;
-
       if ((itree->lower_comparator (from, node->lower) >= 0
 	   && itree->upper_comparator (from, node->upper) <= 0)
 	  || (itree->lower_comparator (to, node->lower) >= 0
@@ -494,6 +486,14 @@ gzochid_itree_search_interval (gzochid_itree *itree, gpointer from, gpointer to,
 	    return;
 	  }
       
+      if (itree->upper_comparator (from, node->max_upper) > 0
+	  && itree->upper_comparator (to, node->max_upper) > 0)
+
+	/* If the interval is entirely outside of the max upper bound in this
+	   sub-tree, there's no point in expanding it any further. */
+	
+	continue;
+
       if (node->right != NULL)
 	stack = g_list_prepend (stack, node->right);
       if (node->left != NULL)
@@ -518,13 +518,6 @@ gzochid_itree_search (gzochid_itree *itree, gpointer point,
 
       stack = g_list_delete_link (stack, stack);
 
-      if (itree->upper_comparator (point, node->max_upper) > 0)
-
-	/* If the point falls beyond the max upper bound in this sub-tree, 
-	   there's no point in expanding it any further. */
-		
-	continue;
-
       if (itree->lower_comparator (point, node->lower) >= 0
 	  && itree->upper_comparator (point, node->upper) <= 0)
 	if (search_func (node->lower, node->upper, node->data, user_data))
@@ -533,6 +526,13 @@ gzochid_itree_search (gzochid_itree *itree, gpointer point,
 	    return;
 	  }
       
+      if (itree->upper_comparator (point, node->max_upper) > 0)
+
+	/* If the point falls beyond the max upper bound in this sub-tree, 
+	   there's no point in expanding it any further. */
+		
+	continue;
+
       if (node->right != NULL)
 	stack = g_list_prepend (stack, node->right);
       if (node->left != NULL)
