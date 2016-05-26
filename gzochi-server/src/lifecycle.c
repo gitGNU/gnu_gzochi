@@ -28,9 +28,11 @@
 #include "guile.h"
 #include "gzochid-auth.h"
 #include "lifecycle.h"
+#include "oids-dataclient.h"
 #include "oids-storage.h"
 #include "scheme-task.h"
 #include "session.h"
+#include "storage-dataclient.h"
 #include "task.h"
 
 G_LOCK_DEFINE_STATIC (load_path);
@@ -104,22 +106,25 @@ initialize_data (int from_state, int to_state, gpointer user_data)
   gzochid_storage_context *storage_context = NULL;
   gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
 
-  if (!g_file_test (data_dir, G_FILE_TEST_EXISTS))
+  if (game_context->storage_engine->handle != NULL)
     {
-      g_message 
-	("Work directory %s does not exist; creating...", data_dir);
-      if (g_mkdir_with_parents (data_dir, 493) != 0)
+      if (!g_file_test (data_dir, G_FILE_TEST_EXISTS))
 	{
-	  g_critical ("Unable to create work directory %s.", data_dir);
+	  g_message 
+	    ("Work directory %s does not exist; creating...", data_dir);
+	  if (g_mkdir_with_parents (data_dir, 493) != 0)
+	    {
+	      g_critical ("Unable to create work directory %s.", data_dir);
+	      exit (EXIT_FAILURE);
+	    }
+	}
+      else if (!g_file_test (data_dir, G_FILE_TEST_IS_DIR))
+	{
+	  g_critical ("%s is not a directory.", data_dir);
 	  exit (EXIT_FAILURE);
 	}
     }
-  else if (!g_file_test (data_dir, G_FILE_TEST_IS_DIR))
-    {
-      g_critical ("%s is not a directory.", data_dir);
-      exit (EXIT_FAILURE);
-    }
-
+  
   storage_context = iface->initialize (data_dir);
 
   if (storage_context == NULL)
@@ -128,6 +133,13 @@ initialize_data (int from_state, int to_state, gpointer user_data)
       exit (EXIT_FAILURE);
     }
 
+  if (iface == &gzochid_storage_engine_interface_dataclient)
+    {
+      assert (game_context->root_context->data_client != NULL);
+      gzochid_dataclient_storage_context_set_dataclient
+	(storage_context, game_context->root_context->data_client);
+    }
+  
   app_context->storage_context = storage_context;
   app_context->meta = iface->open 
     (storage_context, meta_db, GZOCHID_STORAGE_CREATE);
@@ -136,8 +148,14 @@ initialize_data (int from_state, int to_state, gpointer user_data)
   app_context->names = iface->open 
     (storage_context, names_db, GZOCHID_STORAGE_CREATE);
 
-  app_context->oid_strategy = gzochid_storage_oid_strategy_new
-    (iface, app_context->storage_context, app_context->meta);
+  /* If we're using the dataclient storage engine, we need to use the dataclient
+     oid allocation strategy. */
+  
+  if (iface == &gzochid_storage_engine_interface_dataclient)
+    app_context->oid_strategy = gzochid_dataclient_oid_strategy_new
+      (game_context->root_context->data_client, app_context->descriptor->name);
+  else app_context->oid_strategy = gzochid_storage_oid_strategy_new
+	 (iface, app_context->storage_context, app_context->meta);
 
   free (data_dir);
   free (meta_db);

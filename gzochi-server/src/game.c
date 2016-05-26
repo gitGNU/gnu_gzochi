@@ -40,6 +40,7 @@
 #include "scheme-task.h"
 #include "socket.h"
 #include "storage.h"
+#include "storage-dataclient.h"
 #include "storage-mem.h"
 #include "task.h"
 #include "threads.h"
@@ -326,7 +327,25 @@ gzochid_game_context_init (gzochid_game_context *context,
       strdup (g_hash_table_lookup (config, "auth.plugin.dir"));
   else context->auth_plugin_dir = GZOCHID_AUTH_PLUGIN_DIR;
 
-  if (g_hash_table_contains (config, "storage.engine"))
+  if (context->root_context->data_client != NULL)
+    {
+      char *conf_storage_engine = g_hash_table_lookup
+	(config, "storage.engine");
+
+      if (conf_storage_engine != NULL)
+	g_info
+	  ("Meta server client configuration detected; ignoring configured "
+	   "storage engine '%s'.", conf_storage_engine);
+      else g_info
+	     ("Meta server client configuration detected; using data client "
+	      "storage engine.");
+
+      context->storage_engine = calloc (1, sizeof (gzochid_storage_engine));
+
+      context->storage_engine->interface = 
+	&gzochid_storage_engine_interface_dataclient;
+    }
+  else if (g_hash_table_contains (config, "storage.engine"))
     {
       char *dir = NULL;
       char *env = getenv ("GZOCHID_STORAGE_ENGINE_DIR");
