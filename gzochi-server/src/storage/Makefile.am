@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2015 Julian Graham
+# Copyright (C) 2016 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,25 +26,7 @@ if HAVE_BDB
 plugin_LTLIBRARIES += bdb.la
 endif
 
-if HAVE_HDB
-plugin_LTLIBRARIES += hdb.la
-endif
-
-if HAVE_LMDB
-plugin_LTLIBRARIES += lmdb.la
-endif
-
 bdb_la_SOURCES = bdb.c
 bdb_la_CFLAGS = @GLIB_CFLAGS@ @BDB_CFLAGS@ -Wall -Werror
 bdb_la_LIBADD = @GLIB_LIBS@ @BDB_LIBS@
 bdb_la_LDFLAGS = -module -avoid-version
-
-hdb_la_SOURCES = hdb.c
-hdb_la_CFLAGS = @GLIB_CFLAGS@ @HDB_CFLAGS@ -Wall -Werror
-hdb_la_LIBADD = @GLIB_LIBS@ @HDB_LIBS@
-hdb_la_LDFLAGS = -module -avoid-version
-
-lmdb_la_SOURCES = lmdb.c
-lmdb_la_CFLAGS = @GLIB_CFLAGS@ @LMDB_CFLAGS@ -Wall -Werror
-lmdb_la_LIBADD = @GLIB_LIBS@ @LMDB_LIBS@
-lmdb_la_LDFLAGS = -module -avoid-version

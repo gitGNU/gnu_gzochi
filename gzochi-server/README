@@ -103,18 +103,6 @@ features of gzochid.
   clients of gzochid game applications. It is available from 
   http://web.mit.edu/kerberos/ .
 
-  - Symas Lightning Memory-Mapped Database (LMDB), at least version 0.9.11
-
-  LMDB is available as an optional storage backend for gzochid, for users who
-  cannot or do not wish to use BerkeleyDB. It is distributed as part of the
-  OpenLDAP project, and can be downloaded from http://www.openldap.org/ .
-
-  - hamsterdb (HDB), at least version 2.1.7
-
-  HDB is available as an optional storage backend for gzochid, for users who
-  cannot or do not wish to use BerkeleyDB. It is available from 
-  http://hamsterdb.com/ .
-
 
 Special Instructions For Some Systems =========================================
 
