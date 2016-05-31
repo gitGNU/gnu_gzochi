@@ -1,5 +1,5 @@
 /* mock-data.c: Test-time replacements for data.c routines.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 
 static mpz_t next_oid;
 static GHashTable *oids = NULL;
+static GHashTable *oids_to_references = NULL;
 static GHashTable *bindings = NULL;
 
 static gzochid_data_managed_reference *
@@ -42,6 +43,9 @@ create_empty_reference (gzochid_application_context *context, mpz_t oid,
  
   reference->state = GZOCHID_MANAGED_REFERENCE_STATE_EMPTY;
   reference->serialization = serialization;
+
+  g_hash_table_insert
+    (oids_to_references, mpz_get_str (NULL, 16, oid), reference);
   
   return reference;
 }
@@ -51,7 +55,15 @@ gzochid_data_create_reference_to_oid
 (gzochid_application_context *context, gzochid_io_serialization *serialization,
  mpz_t oid)
 {
-  return create_empty_reference (context, oid, serialization);
+  char *oid_str = mpz_get_str (NULL, 16, oid);
+  gzochid_data_managed_reference *ref = NULL;
+  
+  if (g_hash_table_contains (oids_to_references, oid_str))
+    ref = g_hash_table_lookup (oids_to_references, oid_str);
+  else ref = create_empty_reference (context, oid, serialization);
+
+  free (oid_str);
+  return ref;
 }
 
 gzochid_data_managed_reference *
@@ -62,8 +74,9 @@ gzochid_data_create_reference
   mpz_t oid;
   gzochid_data_managed_reference *ref = NULL;
   
-  mpz_init (oid);
-
+  mpz_init_set (oid, next_oid);
+  mpz_add_ui (next_oid, next_oid, 1);
+      
   ref = create_empty_reference (context, oid, serialization);
   ref->obj = data;
 
@@ -75,6 +88,11 @@ void
 gzochid_data_mark 
 (gzochid_application_context *context, gzochid_io_serialization *serialization,
  gpointer data, GError **error)
+{
+}
+
+void
+gzochid_data_remove_object (gzochid_data_managed_reference *ref, GError **err)
 {
 }
 
@@ -133,5 +151,7 @@ gzochid_test_mock_data_initialize ()
 {
   mpz_init (next_oid);
   oids = g_hash_table_new_full (g_str_hash, g_str_equal, free, NULL);
+  oids_to_references = g_hash_table_new_full
+    (g_str_hash, g_str_equal, free, NULL);
   bindings = g_hash_table_new_full (g_str_hash, g_str_equal, free, NULL);
 }

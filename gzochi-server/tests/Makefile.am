@@ -42,6 +42,7 @@ test_programs = \
 	test-oids \
 	test-oids-dataclient \
 	test-oids-storage \
+	test-queue \
 	test-reloc \
 	test-resolver \
 	test-scheme \
@@ -224,6 +225,13 @@ test_oids_storage_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-oids-storage.o \
 	$(top_builddir)/src/libgzochid_la-storage-mem.o \
 	@GLIB_LIBS@
+
+test_queue_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_queue_SOURCES = test-queue.c mock-data.c
+test_queue_LDADD = $(top_builddir)/src/libgzochid_la-io.o \
+	$(top_builddir)/src/libgzochid_la-queue.o \
+	$(top_builddir)/src/libgzochid_la-util.o \
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 
 test_reloc_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 	@GUILE_CFLAGS@
