@@ -202,10 +202,10 @@ deserialize_queue (gzochid_application_context *app_context, GString *in,
       
       gzochid_util_deserialize_mpz (in, oid);
       queue->head = gzochid_data_create_reference_to_oid
-	(app_context, &gzochid_durable_queue_serialization, oid);
+	(app_context, &gzochid_durable_queue_element_serialization, oid);
       gzochid_util_deserialize_mpz (in, oid);
       queue->tail = gzochid_data_create_reference_to_oid
-	(app_context, &gzochid_durable_queue_serialization, oid);
+	(app_context, &gzochid_durable_queue_element_serialization, oid);
 
       mpz_clear (oid);
     }
