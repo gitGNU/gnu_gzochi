@@ -1643,8 +1643,9 @@ static btree_node *
 search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
 {
   btree_node *node = tx_root (bt, btx);
+  gboolean is_root = TRUE;
   btree_datum search_datum;
-
+  
   search_datum.data = (unsigned char *) key;
   search_datum.data_len = key_len;
 
@@ -1652,7 +1653,8 @@ search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
     {
       GError *err = NULL;
       btree_node *child = NULL;
-
+      gboolean node_is_leaf_parent = FALSE;
+      
       if (node == NULL)
 	return NULL;
 
@@ -1671,6 +1673,7 @@ search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
 
 	  if (child->value.data != NULL)
 	    {
+	      node_is_leaf_parent = TRUE;
 	      if (compare_result == 0)
 		return child;
 	    }
@@ -1686,10 +1689,13 @@ search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
 	    }
 	}
 
-      if (child == NULL)
+      if (child == NULL && (node_is_leaf_parent || is_root))
 	return node;
       else
-	node = child;
+	{
+	  node = child;
+	  is_root = FALSE;
+	}
     }
 
   return node;
