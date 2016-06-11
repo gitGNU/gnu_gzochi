@@ -191,8 +191,11 @@ flush_reference (gzochid_data_managed_reference *reference,
 	 gzochid_application_data_event_new (BYTES_WRITTEN, out->len));
 
       g_string_free (out, TRUE);
-
-      break;
+      
+      if (context->transaction->rollback)
+	return FALSE;
+      else break;
+      
     case GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED:
     case GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED: break;
     default:
