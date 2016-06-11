@@ -69,7 +69,8 @@ gzochid_oid_holder_new (void)
   gzochid_oid_holder *holder = malloc (sizeof (gzochid_oid_holder));
 
   mpz_init (holder->oid);
-
+  holder->err = NULL;
+  
   return holder;
 }
 
@@ -77,6 +78,10 @@ void
 gzochid_oid_holder_free (gzochid_oid_holder *holder)
 {
   mpz_clear (holder->oid);
+
+  if (holder->err != NULL)
+    g_error_free (holder->err);
+  
   free (holder);
 }
 

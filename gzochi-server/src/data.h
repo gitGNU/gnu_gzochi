@@ -47,6 +47,7 @@ typedef enum
 struct _gzochid_oid_holder
 {
   mpz_t oid;
+  GError *err;
 };
 
 typedef struct _gzochid_oid_holder gzochid_oid_holder;

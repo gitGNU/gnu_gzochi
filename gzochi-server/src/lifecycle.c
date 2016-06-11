@@ -396,6 +396,7 @@ void
 gzochid_application_client_logged_in (gzochid_application_context *context, 
 				      gzochid_game_client *client)
 {
+  GError *err = NULL;
   gzochid_auth_identity *identity = gzochid_game_client_get_identity (client);
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
@@ -411,7 +412,21 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   mpz_t session_oid;
   
   mpz_init (session_oid);
-  gzochid_client_session_persist (context, session, session_oid);
+  gzochid_client_session_persist (context, session, session_oid, &err);
+
+  if (err != NULL)
+    {
+      g_warning
+	("Failed to bind session oid for identity '%s'; disconnecting: %s",
+	 gzochid_auth_identity_name (identity), err->message);
+
+      mpz_clear (session_oid);
+      g_error_free (err);
+      
+      gzochid_game_client_disconnect (client);
+      return;
+    }
+
   session_oid_str = mpz_get_str (NULL, 16, session_oid);
   mpz_clear (session_oid);
 

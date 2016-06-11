@@ -587,6 +587,7 @@ static void
 persistence_task_worker (gzochid_application_context *context,
 			 gzochid_auth_identity *identity, gpointer data)
 {
+  GError *local_err = NULL;
   gzochid_persistence_task_data *persistence_task = data;
   GString *binding = g_string_new (persistence_task->prefix);
   char *oid_str = NULL;
@@ -600,9 +601,14 @@ persistence_task_worker (gzochid_application_context *context,
   g_string_append (binding, oid_str);
   free (oid_str);
 
+  g_clear_error (&persistence_task->holder->err);
+  
   gzochid_data_set_binding_to_oid 
-    (context, binding->str, persistence_task->holder->oid, NULL);
+    (context, binding->str, persistence_task->holder->oid, &local_err);
 
+  if (local_err != NULL)
+    g_propagate_error (&persistence_task->holder->err, local_err);
+  
   g_string_free (binding, TRUE);
 }
 
@@ -650,7 +656,8 @@ gzochid_data_persistence_task_new
 
 void 
 gzochid_client_session_persist (gzochid_application_context *context, 
-				gzochid_client_session *session, mpz_t oid)
+				gzochid_client_session *session, mpz_t oid,
+				GError **err)
 {
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
@@ -662,7 +669,13 @@ gzochid_client_session_persist (gzochid_application_context *context,
   gzochid_schedule_run_task (game_context->task_queue, task);  
   gzochid_task_free (task);
 
-  mpz_set (oid, holder->oid);
+  if (holder->err != NULL)
+    {
+      g_propagate_error (err, holder->err);
+      holder->err = NULL;
+    }
+  else mpz_set (oid, holder->oid);
+  
   gzochid_oid_holder_free (holder);
 }
 

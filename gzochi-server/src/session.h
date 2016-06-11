@@ -1,5 +1,5 @@
 /* session.h: Prototypes and declarations for session.c
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -82,7 +82,7 @@ void gzochid_client_session_send_message
  short);
 
 void gzochid_client_session_persist 
-(gzochid_application_context *, gzochid_client_session *, mpz_t);
+(gzochid_application_context *, gzochid_client_session *, mpz_t, GError **);
 void gzochid_sweep_client_sessions (gzochid_application_context *, GError **);
 
 #endif /* GZOCHID_SESSION_H */
