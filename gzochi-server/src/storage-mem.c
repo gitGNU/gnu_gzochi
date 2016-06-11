@@ -1972,7 +1972,8 @@ merge_distribute (btree_node *prev, btree_node *node, btree_node *next,
       
       if (!tx_set_parent (child, btx, next)
 	  || (child_next == NULL
-	      && !tx_set_next_sibling (child, btx, first_next_child)))
+	      && (!tx_set_next_sibling (child, btx, first_next_child)
+		  || !tx_set_prev_sibling (first_next_child, btx, child))))
 	return FALSE;
 
       next_slots--;
