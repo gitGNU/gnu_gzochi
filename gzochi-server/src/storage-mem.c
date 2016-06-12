@@ -561,7 +561,7 @@ lock_detect (btree_environment *btree_env)
 	}
     }
 
-  ret = g_list_length (q) != g_list_length (l);
+  ret = g_list_length (q) != g_list_length (btree_env->transactions);
 
   g_list_free (l);
   g_list_free (q);

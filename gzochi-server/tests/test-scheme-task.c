@@ -114,12 +114,10 @@ test_scheme_task_fixture_teardown (struct test_scheme_task_fixture *fixture,
   gzochid_auth_identity_unref (fixture->identity);
 }
 
-static char *
+static void
 persist_client_session (struct test_scheme_task_fixture *fixture,
 			gzochid_client_session *session)
 {
-  mpz_t oid;
-  char *oid_str = NULL;
   GString *out = g_string_new (NULL);
 
   gzochid_storage_transaction *tx = fixture->storage_interface
@@ -128,58 +126,51 @@ persist_client_session (struct test_scheme_task_fixture *fixture,
   gzochid_client_session_serialization.serializer 
     (fixture->context, session, out, NULL);
   
-  mpz_init (oid);
-  mpz_set_ui (oid, 1);
-  oid_str = mpz_get_str (NULL, 16, oid);
-  
   fixture->storage_interface->transaction_put
-    (tx, fixture->context->oids, oid_str, strlen (oid_str) + 1, out->str,
-     out->len);
+    (tx, fixture->context->oids, "1", 2, out->str, out->len);
+  fixture->storage_interface->transaction_put
+    (tx, fixture->context->names, "s.session.1", 12, "1", 2);
 
   fixture->storage_interface->transaction_prepare (tx);
   fixture->storage_interface->transaction_commit (tx);
   
-  gzochid_data_set_binding_to_oid (fixture->context, "s.session.1", oid, NULL);
-  
-  mpz_clear (oid);
   g_string_free (out, TRUE);
-
-  return oid_str;
 }
 
 static void 
 test_disconnected_worker_no_handler_inner (gpointer data)
 {
   struct test_scheme_task_fixture *fixture = data;
-  gzochid_client_session *session =
-    gzochid_client_session_new (fixture->identity);
-  char *oid_str = persist_client_session (fixture, session);
-  gzochid_storage_transaction *tx = NULL;
   
   g_test_log_set_fatal_handler (ignore_warnings, NULL);
   
   gzochid_scheme_application_disconnected_worker
-    (fixture->context, fixture->identity, oid_str);
-
-  tx = fixture->storage_interface->transaction_begin
-    (fixture->context->storage_context);
-
-  g_assert_null
-    (fixture->storage_interface->transaction_get
-     (tx, fixture->context->oids, oid_str, strlen (oid_str) + 1, NULL));
-
-  fixture->storage_interface->transaction_rollback (tx);
-  
-  free (oid_str);
-  gzochid_client_session_free (session);
+    (fixture->context, fixture->identity, "1");
 }
 
 static void 
 test_disconnected_worker_no_handler (struct test_scheme_task_fixture *fixture,
 				     gconstpointer user_data)
 {
+  gzochid_storage_transaction *tx = NULL;
+  gzochid_client_session *session =
+    gzochid_client_session_new (fixture->identity);
+
+  persist_client_session (fixture, session);
+
   gzochid_transaction_execute
     (test_disconnected_worker_no_handler_inner, fixture);
+
+  tx = fixture->storage_interface->transaction_begin
+    (fixture->context->storage_context);
+
+  g_assert_null
+    (fixture->storage_interface->transaction_get
+     (tx, fixture->context->oids, "1", 2, NULL));
+
+  fixture->storage_interface->transaction_rollback (tx);
+
+  gzochid_client_session_free (session);
 }
 
 static SCM 
@@ -214,9 +205,6 @@ static void
 test_logged_in_worker_throws_exception_inner (gpointer data)
 {
   struct test_scheme_task_fixture *fixture = data;
-  gzochid_client_session *session =
-    gzochid_client_session_new (fixture->identity);
-  char *oid_str = persist_client_session (fixture, session);
   
   SCM module = scm_c_resolve_module ("test");
   SCM logged_in = scm_c_make_gsubr 
@@ -229,29 +217,31 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
     ("logged-in-exception", test_module);
   
   gzochid_scheme_application_logged_in_worker
-    (fixture->context, fixture->identity, oid_str);
+    (fixture->context, fixture->identity, "1");
 
-  free (oid_str);
   g_list_free (test_module);
   gzochid_application_callback_free (fixture->context->descriptor->logged_in);
-  gzochid_client_session_free (session);
 }
 
 static void 
 test_logged_in_worker_throws_exception
 (struct test_scheme_task_fixture *fixture, gconstpointer user_data)
 {
+  gzochid_client_session *session =
+    gzochid_client_session_new (fixture->identity);
+
+  persist_client_session (fixture, session);
+
   gzochid_transaction_execute 
     (test_logged_in_worker_throws_exception_inner, fixture);
+
+  gzochid_client_session_free (session);
 }
 
 static void 
 test_logged_in_worker_returns_unspecified_inner (gpointer data)
 {
   struct test_scheme_task_fixture *fixture = data;
-  gzochid_client_session *session =
-    gzochid_client_session_new (fixture->identity);
-  char *oid_str = persist_client_session (fixture, session);
     
   SCM module = scm_c_resolve_module ("test");
   SCM logged_in = scm_c_make_gsubr 
@@ -264,20 +254,24 @@ test_logged_in_worker_returns_unspecified_inner (gpointer data)
     ("logged-in-unspecified", test_module);
 
   gzochid_scheme_application_logged_in_worker
-    (fixture->context, fixture->identity, oid_str);
+    (fixture->context, fixture->identity, "1");
 
-  free (oid_str);
   g_list_free (test_module);
   gzochid_application_callback_free (fixture->context->descriptor->logged_in);
-  gzochid_client_session_free (session);
 }
 
 static void 
 test_logged_in_worker_returns_unspecified
 (struct test_scheme_task_fixture *fixture, gconstpointer data)
 {
+  gzochid_client_session *session =
+    gzochid_client_session_new (fixture->identity);
+  persist_client_session (fixture, session);
+
   gzochid_transaction_execute 
     (test_logged_in_worker_returns_unspecified_inner, fixture);
+
+  gzochid_client_session_free (session);
 }
 
 static void 
