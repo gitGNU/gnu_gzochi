@@ -1680,6 +1680,7 @@ search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
 	  else if (compare_result < 0)
 	    break;
 
+	  prev = child;
 	  child = tx_next_sibling (child, btx, &err);
 
 	  if (err != NULL)
@@ -1689,13 +1690,15 @@ search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
 	    }
 	}
 
-      if (child == NULL && (node_is_leaf_parent || is_root))
-	return node;
-      else
+      if (child == NULL)
 	{
-	  node = child;
-	  is_root = FALSE;
+	  if (node_is_leaf_parent || is_root)
+	    return node;
+	  else node = prev;
 	}
+      else node = child;
+      
+      is_root = FALSE;
     }
 
   return node;
