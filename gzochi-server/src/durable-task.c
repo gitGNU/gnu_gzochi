@@ -438,10 +438,15 @@ gzochid_restart_tasks (gzochid_application_context *context)
       if (err != NULL)
 	{
 	  assert (err->code == GZOCHID_DATA_ERROR_NOT_FOUND);
+
 	  gzochid_tx_warning 
 	    (context, "Task handle not found for resubmitted task.");
 	  g_error_free (err);
+
 	  err = NULL;
+	  
+	  gzochid_data_remove_binding (context, next_binding, &err);
+	  assert (err == NULL);
 	}
       else 
 	{
@@ -450,6 +455,7 @@ gzochid_restart_tasks (gzochid_application_context *context)
 	     wrap_durable_task (context, oid, &err));
 
 	  assert (err == NULL);
+	  num_tasks++;
 	}
 
       next_next_binding = 
@@ -459,7 +465,6 @@ gzochid_restart_tasks (gzochid_application_context *context)
 
       free (next_binding);
       next_binding = next_next_binding;
-      num_tasks++;
     }
 
   if (num_tasks == 1)
