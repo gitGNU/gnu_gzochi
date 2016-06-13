@@ -71,7 +71,8 @@ static SCM scm_make_object_removed_condition;
 static SCM scm_make_name_exists_condition;
 static SCM scm_make_name_not_bound_condition;
 
-GQuark gzochid_scheme_error_quark (void)
+GQuark
+gzochid_scheme_error_quark (void)
 {
   return g_quark_from_static_string ("gzochid-scheme-error-quark");
 }
@@ -556,7 +557,8 @@ gzochid_scheme_create_channel (gzochid_channel *channel, mpz_t oid)
   SCM scm_oid = scm_string_to_number
     (scm_from_locale_string (oid_str), scm_from_short (16));
   SCM ret = scm_call_2 
-    (scm_make_channel, scm_oid, scm_from_locale_string (channel->name));
+    (scm_make_channel, scm_oid, scm_from_locale_string
+     (gzochid_channel_name (channel)));
 
   free (oid_str);
   scm_gc_protect_object (ret);

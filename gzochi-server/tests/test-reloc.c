@@ -1,5 +1,5 @@
 /* test-reloc.c: Test routines for reloc.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,10 +20,19 @@
 #include <stddef.h>
 
 #include "app.h"
+#include "channel.h"
 #include "io.h"
 #include "reloc.h"
 #include "scheme.h"
 #include "tx.h"
+
+/* Fake implementation to avoid having to pull in `channel.o'. */
+
+const char *
+gzochid_channel_name (gzochid_channel *channel)
+{
+  return NULL;
+}
 
 static int prepare (gpointer data) { return TRUE; }
 static void commit (gpointer data) { }

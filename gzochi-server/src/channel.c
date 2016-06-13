@@ -48,6 +48,19 @@ enum gzochid_channel_operation
     GZOCHID_CHANNEL_OP_CLOSE
   };
 
+struct _gzochid_channel
+{
+  char *name;
+
+  unsigned char *id;
+  short id_len;
+
+  GSequence *sessions;
+
+  mpz_t oid;
+  mpz_t scm_oid;
+};
+
 struct _gzochid_channel_pending_operation
 {
   enum gzochid_channel_operation type;
@@ -916,6 +929,18 @@ gzochid_channel_free (gzochid_channel *channel)
   mpz_clear (channel->scm_oid);
   g_sequence_free (channel->sessions);
   free (channel);
+}
+
+void
+gzochid_channel_scm_oid (gzochid_channel *channel, mpz_t scm_oid)
+{
+  mpz_set (scm_oid, channel->scm_oid);
+}
+
+const char *
+gzochid_channel_name (gzochid_channel *channel)
+{
+  return channel->name;
 }
 
 static gzochid_channel_transaction_context *

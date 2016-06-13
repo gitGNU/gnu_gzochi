@@ -1,5 +1,5 @@
 /* channel.c: Primitive functions for user-facing gzochid channel API
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
  */
 
 #include <glib.h>
+#include <gmp.h>
 #include <libguile.h>
 #include <stddef.h>
 
@@ -31,14 +32,21 @@
 SCM_DEFINE (primitive_create_channel, "primitive-create-channel", 1, 0, 0,
 	    (SCM name), "Create a new channel with the specified name.")
 {
+  mpz_t scm_oid;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
-  gzochid_channel *channel = gzochid_channel_create (context, cname);
-  gzochid_data_managed_reference *scm_reference = 
-    gzochid_data_create_reference_to_oid 
-    (context, &gzochid_scheme_data_serialization, channel->scm_oid);
+  gzochid_channel *channel = gzochid_channel_create (context, cname);  
+  gzochid_data_managed_reference *scm_reference = NULL;
 
+  mpz_init (scm_oid);
+  gzochid_channel_scm_oid (channel, scm_oid);
+  
+  gzochid_data_create_reference_to_oid 
+    (context, &gzochid_scheme_data_serialization, scm_oid);
+
+  mpz_clear (scm_oid);
+  
   gzochid_data_dereference (scm_reference, NULL);
   gzochid_api_check_transaction ();
 
@@ -58,9 +66,17 @@ SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
   free (cname);
   if (channel != NULL)
     {
-      gzochid_data_managed_reference *scm_reference = 
-	gzochid_data_create_reference_to_oid 
-	(context, &gzochid_scheme_data_serialization, channel->scm_oid);
+      mpz_t scm_oid;
+      gzochid_data_managed_reference *scm_reference = NULL;
+
+      mpz_init (scm_oid);
+      gzochid_channel_scm_oid (channel, scm_oid);
+      
+      scm_reference = gzochid_data_create_reference_to_oid 
+	(context, &gzochid_scheme_data_serialization, scm_oid);
+
+      mpz_clear (scm_oid);
+      
       gzochid_data_dereference (scm_reference, &err);
 
       if (err == NULL)

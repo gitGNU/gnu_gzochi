@@ -26,25 +26,12 @@
 #include "session.h"
 #include "task.h"
 
-typedef struct _gzochid_channel
-{
-  char *name;
-
-  unsigned char *id;
-  short id_len;
-
-  GSequence *sessions;
-
-  mpz_t oid;
-  mpz_t scm_oid;
-} gzochid_channel;
+typedef struct _gzochid_channel gzochid_channel;
 
 extern gzochid_io_serialization gzochid_channel_serialization;
 
-gzochid_channel *gzochid_channel_create 
-(gzochid_application_context *, char *name);
-gzochid_channel *gzochid_channel_get 
-(gzochid_application_context *, char *name);
+gzochid_channel *gzochid_channel_create (gzochid_application_context *, char *);
+gzochid_channel *gzochid_channel_get (gzochid_application_context *, char *);
 gzochid_channel *gzochid_channel_new (char *);
 void gzochid_channel_free (gzochid_channel *);
 
@@ -55,5 +42,19 @@ void gzochid_channel_leave
 void gzochid_channel_send 
 (gzochid_application_context *, gzochid_channel *,  unsigned char *, short);
 void gzochid_channel_close (gzochid_application_context *, gzochid_channel *);
+
+/* Sets the specified `mpz' to the oid of the specified channel's Scheme
+   representation. */
+
+void gzochid_channel_scm_oid (gzochid_channel *, mpz_t);
+
+/*
+  Returns the specified channel's name.
+  
+  The returned pointer is owned by the channel and should not be modified or
+  freed by the caller. 
+*/   
+
+const char *gzochid_channel_name (gzochid_channel *);
 
 #endif /* GZOCHID_CHANNEL_H */

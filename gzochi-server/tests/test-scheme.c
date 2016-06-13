@@ -1,5 +1,5 @@
 /* test-scheme.c: Test routines for scheme.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,9 +21,18 @@
 #include <stdlib.h>
 
 #include "app.h"
+#include "channel.h"
 #include "guile.h"
 #include "scheme.h"
 #include "util.h"
+
+/* Fake implementation to avoid having to pull in `channel.o'. */
+
+const char *
+gzochid_channel_name (gzochid_channel *channel)
+{
+  return NULL;
+}
 
 static void
 test_serialization_exception ()
