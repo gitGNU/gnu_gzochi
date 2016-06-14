@@ -1652,7 +1652,7 @@ search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
   while (TRUE)
     {
       GError *err = NULL;
-      btree_node *child = NULL;
+      btree_node *child = NULL, *prev = NULL;
       gboolean node_is_leaf_parent = FALSE;
       
       if (node == NULL)
