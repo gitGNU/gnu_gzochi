@@ -1,5 +1,5 @@
 /* data.c: Application data management routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -428,7 +428,8 @@ create_new_reference (gzochid_application_context *context, void *ptr,
     gzochid_transaction_context (&data_participant);
   gzochid_data_managed_reference *reference = 
     calloc (1, sizeof (gzochid_data_managed_reference));
-
+  char *oid_str = NULL;
+  
   reference->context = context;
   
   mpz_init (reference->oid);
@@ -438,6 +439,25 @@ create_new_reference (gzochid_application_context *context, void *ptr,
   reference->serialization = serialization;
   reference->obj = ptr;
 
+  /*
+    Once this function returns, callers will have an oid of the object that will
+    be the permanent / effective oid if the current transaction commits. To
+    prevent a flurry of contention around the end of the transaction, take a
+    write lock on the oid now, first checking to make sure the underlying 
+    storage transaction is in a good state.
+  */
+  
+  if (!tx_context->transaction->rollback)
+    {
+      oid_str = mpz_get_str (NULL, 16, reference->oid);
+  
+      APP_STORAGE_INTERFACE (context)->transaction_get_for_update
+	(tx_context->transaction, tx_context->context->oids, oid_str, 
+	 strlen (oid_str) + 1, NULL);
+      
+      free (oid_str);
+    }
+  
   return reference;
 }
 
