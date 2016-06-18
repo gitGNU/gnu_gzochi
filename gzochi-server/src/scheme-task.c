@@ -267,8 +267,9 @@ gzochid_scheme_application_logged_in_worker
     }
   else
     {
-      session->handler = gzochid_with_application_context 
-	(context, identity, unpack_handler, handler);
+      gzochid_client_session_set_handler
+	(session, gzochid_with_application_context 
+	 (context, identity, unpack_handler, handler));
 
       gzochid_data_mark 
 	(context, &gzochid_client_session_serialization, session, &err);
@@ -281,7 +282,8 @@ gzochid_scheme_application_logged_in_worker
 	    (context, &gzochid_scm_location_aware_serialization, 
 	     scm_session_reloc);
 
-	  mpz_set (session->scm_oid, reloc_reference->oid);
+	  gzochid_client_session_set_scm_oid
+	    (session, reloc_reference->oid);
 	  gzochid_client_session_send_login_success (context, session);
 	}
       else g_error_free (err);
@@ -330,8 +332,8 @@ gzochid_scheme_application_received_message_worker
   bv = gzochid_scheme_create_bytevector (message, *message_len_ptr);
   callback_reference =
     gzochid_data_create_reference_to_oid
-    (context, &gzochid_scheme_data_serialization, 
-     session->handler->received_message->scm_oid);
+    (context, &gzochid_scheme_data_serialization,
+     gzochid_client_session_get_handler (session)->received_message->scm_oid);
 
   gzochid_data_dereference (callback_reference, &err);
 
@@ -400,7 +402,7 @@ gzochid_scheme_application_disconnected_worker
   /* A client may disconnect before the login process has completed or after
      it has failed enough times to stop being retried. */
 
-  if (session->handler == NULL)
+  if (gzochid_client_session_get_handler (session) == NULL)
     {
       /* In that case, don't bother trying to dredge up its disconnect handler.
 	 Just jump straight to removing the session from the data store. */
@@ -415,7 +417,7 @@ gzochid_scheme_application_disconnected_worker
   callback_reference =
     gzochid_data_create_reference_to_oid
     (context, &gzochid_scheme_data_serialization, 
-     session->handler->disconnected->scm_oid);
+     gzochid_client_session_get_handler (session)->disconnected->scm_oid);
 
   gzochid_data_dereference (callback_reference, &err);
   

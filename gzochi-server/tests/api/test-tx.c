@@ -24,6 +24,7 @@
 #include "../channel.h"
 #include "../guile.h"
 #include "../gzochid-auth.h"
+#include "../session.h"
 #include "../tx.h"
 
 #include "tx.h"
@@ -33,6 +34,14 @@
 
 const char *
 gzochid_channel_name (gzochid_channel *channel)
+{
+  return NULL;
+}
+
+/* Fake implementation to avoid having to pull in `session.o'. */
+
+gzochid_auth_identity *
+gzochid_client_session_identity (gzochid_client_session *session)
 {
   return NULL;
 }

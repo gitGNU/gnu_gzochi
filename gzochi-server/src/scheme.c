@@ -503,12 +503,11 @@ gzochid_scheme_create_client_session (gzochid_client_session *session,
 				      mpz_t oid)
 {
   char *oid_str = mpz_get_str (NULL, 16, oid);
-
+  SCM name = scm_from_locale_string
+    (gzochid_auth_identity_name (gzochid_client_session_identity (session)));
+  
   SCM scm_oid = scm_c_locale_stringn_to_number (oid_str, strlen (oid_str), 16);
-  SCM ret = scm_call_2
-    (scm_make_client_session, 
-     scm_from_locale_string (gzochid_auth_identity_name (session->identity)),
-     scm_oid);
+  SCM ret = scm_call_2 (scm_make_client_session, name, scm_oid);
 
   scm_gc_protect_object (ret);
   free (oid_str);

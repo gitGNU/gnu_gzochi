@@ -330,7 +330,6 @@ close_channel (gzochid_application_context *context,
   gzochid_data_managed_reference *channel_reference =
     gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, op->target_channel);
-  gzochid_channel_side_effects_transaction_context *tx_context = NULL;
 
   char *channel_oid_str = NULL; 
   gzochid_channel *channel = NULL;
@@ -350,7 +349,6 @@ close_channel (gzochid_application_context *context,
   mpz_init (session_oid);
   channel_oid_str = mpz_get_str (NULL, 16, op->target_channel);
   iter = g_sequence_get_begin_iter (channel->sessions);
-  tx_context = join_side_effects_transaction (context, channel);
 
   g_mutex_lock (&context->client_mapping_lock);
 
@@ -358,8 +356,6 @@ close_channel (gzochid_application_context *context,
     {
       char *session_oid_str = g_sequence_get (iter);
       gzochid_data_managed_reference *session_reference = NULL;
-      gzochid_client_session *session = NULL;
-      GSequenceIter *session_iter = NULL;
 
       mpz_set_str (session_oid, session_oid_str, 16);
 
@@ -384,31 +380,7 @@ close_channel (gzochid_application_context *context,
 	      continue;
 	    }
 	}
-	
-      session = session_reference->obj;
-      session_iter = g_sequence_lookup
-	(session->channels, channel_oid_str, gzochid_util_string_data_compare,
-	 NULL);
-
-      if (session_iter != NULL)
-	{
-	  g_sequence_remove (session_iter);
-
-	  gzochid_data_mark 
-	    (context, &gzochid_client_session_serialization, session, &err);
-	      
-	  if (err == NULL)
-	    tx_context->messages = g_list_append
-	      (tx_context->messages,
-	       gzochid_channel_message_new
-	       (context, GZOCHID_CHANNEL_MESSAGE_LEAVE, session_oid_str));
-	  else
-	    {
-	      g_error_free (err);
-	      break;
-	    }
-	}
-      
+            
       iter = g_sequence_iter_next (iter);
     }
         
@@ -535,9 +507,6 @@ join_channel (gzochid_application_context *context,
       g_sequence_insert_sorted 
 	(channel->sessions, session_oid_str, gzochid_util_string_data_compare,
 	 NULL);
-      g_sequence_insert_sorted
-	(session->channels, mpz_get_str (NULL, 16, channel_reference->oid), 
-	 gzochid_util_string_data_compare, NULL);
       tx_context->messages = g_list_append 
 	(tx_context->messages, gzochid_channel_message_new 
 	 (context, GZOCHID_CHANNEL_MESSAGE_JOIN, session_oid_str));
@@ -569,7 +538,6 @@ leave_channel (gzochid_application_context *context,
     (gzochid_channel_pending_operation *) member_op;
 
   gzochid_channel *channel = NULL;
-  gzochid_client_session *session = NULL;
 
   gzochid_data_managed_reference *channel_reference =
     gzochid_data_create_reference_to_oid 
@@ -597,7 +565,6 @@ leave_channel (gzochid_application_context *context,
     }
 
   channel = channel_reference->obj;
-  session = session_reference->obj;
 
   session_oid_str = mpz_get_str (NULL, 16, session_reference->oid);
   iter = g_sequence_lookup 
@@ -610,10 +577,6 @@ leave_channel (gzochid_application_context *context,
 
       tx_context = join_side_effects_transaction (context, channel);
 
-      g_sequence_remove (iter);
-      iter = g_sequence_lookup
-	(session->channels, channel_oid_str, 
-	 gzochid_util_string_data_compare, NULL);
       g_sequence_remove (iter);
       
       tx_context->messages = g_list_append 
@@ -629,8 +592,6 @@ leave_channel (gzochid_application_context *context,
 	  g_error_free (err);
 	  return;
 	}
-      gzochid_data_mark 
-	(context, &gzochid_client_session_serialization, session, NULL);
     }
   else free (session_oid_str);
 }

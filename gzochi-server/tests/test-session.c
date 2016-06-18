@@ -182,7 +182,7 @@ test_sweep_client_session_rollback_nonretryable ()
   
   handler = (gzochid_client_session_handler)
     { received_message_callback, disconnected_callback };
-  session->handler = &handler;
+  gzochid_client_session_set_handler (session, &handler);
 
   gzochid_client_session_serialization.serializer
     (context, session, serialized_session, NULL);

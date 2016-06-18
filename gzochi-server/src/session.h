@@ -46,17 +46,6 @@ struct _gzochid_client_session_handler
 
 typedef struct _gzochid_client_session_handler gzochid_client_session_handler;
 
-struct _gzochid_client_session
-{
-  gzochid_auth_identity *identity;
-  gzochid_client_session_handler *handler;
-  gboolean connected;
-
-  GSequence *channels;
-
-  mpz_t scm_oid;
-};
-
 typedef struct _gzochid_client_session gzochid_client_session;
 
 extern gzochid_io_serialization gzochid_client_session_serialization;
@@ -80,6 +69,28 @@ void gzochid_client_session_send_login_failure
 void gzochid_client_session_send_message 
 (gzochid_application_context *, gzochid_client_session *, unsigned char *, 
  short);
+
+gzochid_auth_identity *gzochid_client_session_identity
+(gzochid_client_session *);
+
+/* Sets the specified `mpz_t' to the oid of the specified session's Scheme
+   representation. */
+
+void gzochid_client_session_scm_oid (gzochid_client_session *, mpz_t);
+
+/* Returns the oid of the specified channel's Scheme representation. */
+
+void gzochid_client_session_set_scm_oid (gzochid_client_session *, mpz_t);
+
+/* Returns the lifecycle handler of the specified channel. */
+
+gzochid_client_session_handler *gzochid_client_session_get_handler
+(gzochid_client_session *);
+
+/* Sets the lifecycle handler for the specified channel. */
+
+void gzochid_client_session_set_handler
+(gzochid_client_session *, gzochid_client_session_handler *);
 
 void gzochid_client_session_persist 
 (gzochid_application_context *, gzochid_client_session *, mpz_t, GError **);

@@ -48,6 +48,17 @@ enum gzochid_client_session_operation
     GZOCHID_CLIENT_SESSION_OP_MESSAGE
   };
 
+struct _gzochid_client_session
+{
+  gzochid_auth_identity *identity;
+  gzochid_client_session_handler *handler;
+  gboolean connected;
+
+  GSequence *channels;
+
+  mpz_t scm_oid;
+};
+
 struct _gzochid_client_session_pending_operation
 {
   enum gzochid_client_session_operation type;
@@ -506,6 +517,38 @@ gzochid_client_session_disconnect (gzochid_application_context *context,
   else g_error_free (err);
 
   free (oid_str);
+}
+
+gzochid_auth_identity *
+gzochid_client_session_identity (gzochid_client_session *session)
+{
+  return session->identity;
+}
+
+void
+gzochid_client_session_scm_oid (gzochid_client_session *session, mpz_t scm_oid)
+{
+  mpz_set (scm_oid, session->scm_oid);
+}
+
+void
+gzochid_client_session_set_scm_oid (gzochid_client_session *session,
+				    mpz_t scm_oid)
+{
+  mpz_set (session->scm_oid, scm_oid);
+}
+
+gzochid_client_session_handler *
+gzochid_client_session_get_handler (gzochid_client_session *session)
+{
+  return session->handler;
+}
+
+void
+gzochid_client_session_set_handler (gzochid_client_session *session,
+				    gzochid_client_session_handler *handler)
+{
+  session->handler = handler;
 }
 
 void 
