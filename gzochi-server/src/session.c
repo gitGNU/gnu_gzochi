@@ -54,8 +54,6 @@ struct _gzochid_client_session
   gzochid_client_session_handler *handler;
   gboolean connected;
 
-  GSequence *channels;
-
   mpz_t scm_oid;
 };
 
@@ -299,12 +297,7 @@ deserialize_client_session (gzochid_application_context *context, GString *in,
 {
   gzochid_auth_identity *identity = 
     gzochid_auth_identity_deserializer (context, in, NULL);
-  GSequence *channels = gzochid_util_deserialize_sequence 
-    (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string, free);
   gzochid_client_session *session = gzochid_client_session_new (identity);
-
-  g_sequence_free (session->channels);
-  session->channels = channels;
 
   gzochid_util_deserialize_mpz (in, session->scm_oid);
 
@@ -334,9 +327,6 @@ serialize_client_session (gzochid_application_context *context, gpointer obj,
   gzochid_client_session *session = obj;
 
   gzochid_auth_identity_serializer (context, session->identity, out, NULL);
-  gzochid_util_serialize_sequence 
-    (session->channels, 
-     (void (*) (gpointer, GString *)) gzochid_util_serialize_string, out);
   gzochid_util_serialize_mpz (session->scm_oid, out);
   if (session->handler != NULL)
     {
@@ -363,7 +353,6 @@ finalize_client_session (gzochid_application_context *context, gpointer obj)
   gzochid_client_session *session = obj;
 
   gzochid_auth_identity_finalizer (context, session->identity);
-  g_sequence_free (session->channels);
   mpz_clear (session->scm_oid);
 
   if (session->handler != NULL)
@@ -462,7 +451,6 @@ gzochid_client_session_new (gzochid_auth_identity *identity)
     calloc (1, sizeof (gzochid_client_session));
 
   session->identity = gzochid_auth_identity_ref (identity);
-  session->channels = g_sequence_new (NULL);
   mpz_init (session->scm_oid);
 
   return session;
@@ -472,7 +460,6 @@ void
 gzochid_client_session_free (gzochid_client_session *session)
 {
   gzochid_auth_identity_unref (session->identity);
-  g_sequence_free (session->channels);
   mpz_clear (session->scm_oid);
   
   free (session);
