@@ -41,6 +41,11 @@ gzochid_application_context_new (void)
   g_mutex_init (&context->free_oids_lock);
   g_mutex_init (&context->client_mapping_lock);
 
+  context->channel_oids_to_local_session_oids = g_hash_table_new_full
+    (g_str_hash, g_str_equal, free, (GDestroyNotify) g_sequence_free);
+
+  g_mutex_init (&context->channel_mapping_lock);
+  
   context->event_source = gzochid_application_event_source_new ();
   context->stats = calloc (1, sizeof (gzochid_application_stats));
   return context;
@@ -60,6 +65,10 @@ gzochid_application_context_free (gzochid_application_context *app_context)
   g_mutex_clear (&app_context->free_oids_lock);
   g_mutex_clear (&app_context->client_mapping_lock);
 
+  g_hash_table_destroy (app_context->channel_oids_to_local_session_oids);
+
+  g_mutex_clear (&app_context->channel_mapping_lock);
+  
   gzochid_application_event_source_free (app_context->event_source);
   free (app_context->stats);
 

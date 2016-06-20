@@ -88,6 +88,12 @@ struct _gzochid_application_context
   GHashTable *oids_to_clients;
   GHashTable *clients_to_oids;
   GMutex client_mapping_lock;
+
+  /* A mapping of channel oid strings to `GSequences' of session oid strings.*/
+
+  GHashTable *channel_oids_to_local_session_oids; 
+
+  GMutex channel_mapping_lock; /* Protects the channel oid mapping. */
   
   gzochid_application_event_source *event_source;
   gzochid_application_stats *stats;
