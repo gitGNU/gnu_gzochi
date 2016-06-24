@@ -255,6 +255,15 @@ channel_side_effect_commit (gpointer data)
       sessions = g_hash_table_lookup
 	(tx_context->app_context->channel_oids_to_local_session_oids,
 	 tx_context->side_effect->channel_oid_str);
+
+      if (sessions == NULL)
+	{
+	  sessions = g_sequence_new (free);
+
+	  g_hash_table_insert
+	    (tx_context->app_context->channel_oids_to_local_session_oids,
+	     strdup (tx_context->side_effect->channel_oid_str), sessions);
+	}
       
       if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_SEND)
 	{
@@ -301,7 +310,6 @@ channel_side_effect_commit (gpointer data)
 	}
       else
 	{
-
 	  if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_JOIN
 	      || tx_context->side_effect->op == GZOCHID_CHANNEL_OP_LEAVE)
 	    {
@@ -317,7 +325,8 @@ channel_side_effect_commit (gpointer data)
 		{
 		  if (iter == NULL)
 		    g_sequence_insert_sorted
-		      (sessions, membership_side_effect->session_oid_str,
+		      (sessions,
+		       strdup (membership_side_effect->session_oid_str),
 		       gzochid_util_string_data_compare, NULL);
 		}
 	      else if (iter != NULL)
@@ -749,6 +758,7 @@ channel_commit (gpointer data)
 {
   gzochid_channel_transaction_context *tx_context = data;
   gzochid_application_context *app_context = tx_context->context;
+
   gzochid_game_context *game_context =
     (gzochid_game_context *) ((gzochid_context *) app_context)->parent;
 
