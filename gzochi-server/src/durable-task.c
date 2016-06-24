@@ -143,8 +143,7 @@ gzochid_serialize_application_task
 gzochid_application_task_serialization *
 gzochid_lookup_task_serialization (char *name)
 {
-  return (gzochid_application_task_serialization *) 
-    g_hash_table_lookup (serialization_registry, name);
+  return g_hash_table_lookup (serialization_registry, name);
 }
 
 void 
@@ -280,8 +279,7 @@ serialize_durable_task_handle
 (gzochid_application_context *context, gpointer data, GString *out, 
  GError **err)
 {
-  gzochid_durable_application_task_handle *handle = 
-    (gzochid_durable_application_task_handle *) data;
+  gzochid_durable_application_task_handle *handle = data;
 
   gzochid_util_serialize_mpz (handle->task_data_reference->oid, out);
   gzochid_util_serialize_string (handle->serialization->name, out);
@@ -301,8 +299,7 @@ static void
 finalize_durable_task_handle (gzochid_application_context *context, 
 			      gpointer data)
 {
-  gzochid_durable_application_task_handle *handle = 
-    (gzochid_durable_application_task_handle *) data;
+  gzochid_durable_application_task_handle *handle = data;
 
   gzochid_auth_identity_finalizer (context, handle->identity);
   free (handle);
@@ -499,8 +496,16 @@ build_durable_task_handle
   target.tv_usec += delay.tv_usec;
 
   task_data_reference = gzochid_data_create_reference 
-    (task->context, serialization->data_serialization, task->data);
+    (task->context, serialization->data_serialization, task->data, &local_err);
 
+  /* Creating a new reference may fail if the transaction's in a bad state. */
+  
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return NULL;
+    }
+  
   if (period != NULL)
     durable_task_handle = create_durable_periodic_task_handle
       (task_data_reference, serialization, task->identity, target, *period);
@@ -509,8 +514,14 @@ build_durable_task_handle
 
   handle_reference = gzochid_data_create_reference 
     (task->context, &gzochid_durable_application_task_handle_serialization, 
-     durable_task_handle);
-    
+     durable_task_handle, &local_err);
+  
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return NULL;
+    }
+  
   oid_str = mpz_get_str (NULL, 16, handle_reference->oid);
   oid_strlen = strlen (oid_str);
   prefix_len = strlen (PENDING_TASK_PREFIX);
@@ -542,13 +553,12 @@ durable_task_application_worker (gzochid_application_context *context,
 				 gzochid_auth_identity *identity, gpointer data)
 {
   GError *err = NULL;
-  gzochid_durable_application_task *task = 
-    (gzochid_durable_application_task *) data;
+  gzochid_durable_application_task *task = data;
   gzochid_task_transaction_context *tx_context = NULL;
   gzochid_data_managed_reference *handle_reference =
     gzochid_data_create_reference_to_oid
     (context, &gzochid_durable_application_task_handle_serialization, 
-     task->handle_oid);   
+     task->handle_oid);
   gzochid_durable_application_task_handle *handle = NULL;
   gzochid_application_task *inner_task = NULL;
 
@@ -560,8 +570,7 @@ durable_task_application_worker (gzochid_application_context *context,
       return;
     }
       
-  handle = (gzochid_durable_application_task_handle *) handle_reference->obj;
-
+  handle = handle_reference->obj;
   gzochid_data_dereference (handle->task_data_reference, &err);
 
   if (err != NULL)
@@ -674,19 +683,26 @@ gzochid_schedule_delayed_durable_task
 {
   GError *err = NULL;      
   gzochid_durable_application_task_handle *handle = 
-    build_durable_task_handle (task, serialization, delay, NULL, &err);
+    gzochid_create_durable_application_task_handle
+    (task, serialization, delay, NULL, &err);
 
   if (err == NULL)
     {
       gzochid_data_managed_reference *handle_reference = 
 	gzochid_data_create_reference 
 	(context, &gzochid_durable_application_task_handle_serialization, 
-	 handle);
+	 handle, &err);
+
+      /* Creating a new reference may fail if the transaction's in a bad 
+	 state. */
       
-      schedule_durable_task 
-	(context, wrap_durable_task (context, handle_reference->oid, NULL));
+      if (err == NULL)      
+	schedule_durable_task 
+	  (context, wrap_durable_task (context, handle_reference->oid, NULL));
     }
-  else g_error_free (err);
+
+  if (err != NULL)
+    g_error_free (err);
 }
 
 gzochid_periodic_task_handle *
@@ -705,14 +721,25 @@ gzochid_schedule_periodic_durable_task
       gzochid_data_managed_reference *handle_reference = 
 	gzochid_data_create_reference 
 	(context, &gzochid_durable_application_task_handle_serialization, 
-	 handle);
-      
-      schedule_durable_task 
-	(context, wrap_durable_task (context, handle_reference->oid, NULL));
-    }
-  else g_error_free (err);
+	 handle, &err);
 
-  return handle;
+      /* Creating a new reference may fail if the transaction's in a bad 
+	 state. */
+
+      if (err == NULL)
+	schedule_durable_task 
+	  (context, wrap_durable_task (context, handle_reference->oid, NULL));
+    }
+
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return NULL;
+    }
+  else return handle;
+      
+    }
+
 }
 
 void 

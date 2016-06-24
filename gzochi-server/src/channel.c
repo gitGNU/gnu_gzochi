@@ -889,23 +889,38 @@ gzochid_channel *
 gzochid_channel_create (gzochid_application_context *context, char *name)
 {
   GError *err = NULL;
-  char *binding = make_channel_binding (name);
+  char *binding = NULL;
   gzochid_channel *channel = gzochid_channel_new (name);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, &gzochid_channel_serialization, channel);
+    (context, &gzochid_channel_serialization, channel, NULL);
   gzochid_data_managed_reference *scm_reference = NULL;
   SCM scm_channel = SCM_BOOL_F;
+
+  if (reference == NULL)
+    {
+      gzochid_channel_free (channel);
+      return NULL;
+    }
   
   mpz_set (channel->oid, reference->oid);
   scm_channel = gzochid_scheme_create_channel (channel, reference->oid);
   scm_reference = gzochid_data_create_reference
-    (context, &gzochid_scheme_data_serialization, scm_channel);
+    (context, &gzochid_scheme_data_serialization, scm_channel, NULL);
+
+  if (scm_reference == NULL)
+    {
+      gzochid_channel_free (channel);
+      return NULL;
+    }
+  
   mpz_set (channel->scm_oid, scm_reference->oid);
   
   channel->id = (unsigned char *) mpz_get_str (NULL, 16, channel->oid);
   channel->id_len = strlen ((char *) channel->id);
 
+  binding = make_channel_binding (name);
   gzochid_data_set_binding_to_oid (context, binding, reference->oid, &err);
+
   if (err != NULL)
     {
       free (binding);
@@ -935,14 +950,26 @@ gzochid_channel_join (gzochid_application_context *context,
 		      gzochid_channel *channel, 
 		      gzochid_client_session *session)
 {
-  gzochid_data_managed_reference *channel_reference = 
-    gzochid_data_create_reference 
-    (context, &gzochid_channel_serialization, channel);
-  gzochid_data_managed_reference *session_reference = 
-    gzochid_data_create_reference 
-    (context, &gzochid_client_session_serialization, session);
+  gzochid_data_managed_reference *channel_reference = NULL;
+  gzochid_data_managed_reference *session_reference = NULL;
   gzochid_channel_transaction_context *tx_context = join_transaction (context);
 
+  channel_reference = gzochid_data_create_reference 
+    (context, &gzochid_channel_serialization, channel, NULL);
+
+  /* The reference for the channel must already be cached in the current
+     transaction context. */
+  
+  assert (channel_reference != NULL);
+  
+  session_reference = gzochid_data_create_reference 
+    (context, &gzochid_client_session_serialization, session, NULL);
+
+  /* The reference for the session must already be cached in the current
+     transaction context. */
+
+  assert (session_reference != NULL);
+  
   tx_context->operations = g_list_append 
     (tx_context->operations, 
      create_join_operation (channel_reference->oid, session_reference->oid));
@@ -953,14 +980,26 @@ gzochid_channel_leave (gzochid_application_context *context,
 		       gzochid_channel *channel, 
 		       gzochid_client_session *session)
 {
-  gzochid_data_managed_reference *channel_reference = 
-    gzochid_data_create_reference 
-    (context, &gzochid_channel_serialization, channel);
-  gzochid_data_managed_reference *session_reference = 
-    gzochid_data_create_reference 
-    (context, &gzochid_client_session_serialization, session);
+  gzochid_data_managed_reference *channel_reference = NULL;
+  gzochid_data_managed_reference *session_reference = NULL;
   gzochid_channel_transaction_context *tx_context = join_transaction (context);
 
+  channel_reference = gzochid_data_create_reference 
+    (context, &gzochid_channel_serialization, channel, NULL);
+
+  /* The reference for the channel must already be cached in the current
+     transaction context. */
+
+  assert (channel_reference != NULL);
+
+  session_reference =  gzochid_data_create_reference 
+    (context, &gzochid_client_session_serialization, session, NULL);
+
+  /* The reference for the session must already be cached in the current
+     transaction context. */
+
+  assert (session_reference != NULL);
+  
   tx_context->operations = g_list_append 
     (tx_context->operations, 
      create_leave_operation (channel_reference->oid, session_reference->oid));
@@ -971,11 +1010,17 @@ gzochid_channel_send (gzochid_application_context *context,
 		      gzochid_channel *channel, unsigned char *message,
 		      short len)
 {
-  gzochid_data_managed_reference *channel_reference = 
-    gzochid_data_create_reference 
-    (context, &gzochid_channel_serialization, channel);
+  gzochid_data_managed_reference *channel_reference = NULL;
   gzochid_channel_transaction_context *tx_context = join_transaction (context);
 
+  channel_reference = gzochid_data_create_reference 
+    (context, &gzochid_channel_serialization, channel, NULL);
+
+  /* The reference for the channel must already be cached in the current
+     transaction context. */
+
+  assert (channel_reference != NULL);
+  
   tx_context->operations = g_list_append 
     (tx_context->operations,
      create_send_operation (channel_reference->oid, message, len));
@@ -985,11 +1030,17 @@ void
 gzochid_channel_close (gzochid_application_context *context,
 		       gzochid_channel *channel)
 {
-  gzochid_data_managed_reference *channel_reference = 
-    gzochid_data_create_reference 
-    (context, &gzochid_channel_serialization, channel);
+  gzochid_data_managed_reference *channel_reference = NULL;
   gzochid_channel_transaction_context *tx_context = join_transaction (context);
-  
+
+  channel_reference = gzochid_data_create_reference 
+    (context, &gzochid_channel_serialization, channel, NULL);
+
+  /* The reference for the channel must already be cached in the current
+     transaction context. */
+
+  assert (channel_reference != NULL);
+    
   tx_context->operations = g_list_append 
     (tx_context->operations, create_close_operation (channel_reference->oid));
 }

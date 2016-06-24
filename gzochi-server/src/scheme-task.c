@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <gmp.h>
 #include <gzochi-common.h>
@@ -127,8 +128,14 @@ gzochid_scheme_application_initialized_worker
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
 
   callback_reference = gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, callback);
+    (context, &gzochid_scheme_data_serialization, callback, NULL);
+  
+  /* Creating a reference to a new object requires that the transaction be in a
+     good state, but there's no reason it shouldn't be healthy during 
+     initialization. */
 
+  assert (callback_reference != NULL); 
+  
   gzochid_transaction_join (&scheme_participant, NULL);
 
   gzochid_scheme_invoke_callback 
@@ -162,10 +169,13 @@ scm_to_callback (gzochid_application_context *context, SCM scm_callback)
   GList *module = gzochid_scheme_callback_module (scm_callback);
   char *procedure = gzochid_scheme_callback_procedure (scm_callback);
   gzochid_data_managed_reference *reference = 
-    gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, scm_callback);
+    gzochid_data_create_reference
+    (context, &gzochid_scheme_data_serialization, scm_callback, NULL);
 
-  return gzochid_application_callback_new (procedure, module, reference->oid);
+  if (reference == NULL) /* Can happen on transaction timeout. */
+    return NULL;
+  else return gzochid_application_callback_new
+	 (procedure, module, reference->oid);
 }
 
 static gpointer 
@@ -236,8 +246,13 @@ gzochid_scheme_application_logged_in_worker
 
   cb = gzochid_scheme_create_callback (context->descriptor->logged_in, NULL);
   callback_reference = gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, cb);
+    (context, &gzochid_scheme_data_serialization, cb, NULL);
 
+  /* If the transaction fails here (or has already failed) just return. */
+  
+  if (callback_reference == NULL)
+    return;
+  
   gzochid_transaction_join (&scheme_participant, NULL);
 
   handler = gzochid_scheme_invoke_callback 
@@ -273,6 +288,7 @@ gzochid_scheme_application_logged_in_worker
 
       gzochid_data_mark 
 	(context, &gzochid_client_session_serialization, session, &err);
+
       if (err == NULL)
 	{
 	  gzochid_scm_location_info *scm_session_reloc = 
@@ -280,13 +296,18 @@ gzochid_scheme_application_logged_in_worker
 	  gzochid_data_managed_reference *reloc_reference = 
 	    gzochid_data_create_reference 
 	    (context, &gzochid_scm_location_aware_serialization, 
-	     scm_session_reloc);
+	     scm_session_reloc, &err);
 
-	  gzochid_client_session_set_scm_oid
-	    (session, reloc_reference->oid);
-	  gzochid_client_session_send_login_success (context, session);
+	  if (err == NULL)
+	    {
+	      gzochid_client_session_set_scm_oid
+		(session, reloc_reference->oid);
+	      gzochid_client_session_send_login_success (context, session);
+	    }
 	}
-      else g_error_free (err);
+      
+      if (err != NULL)
+	g_error_free (err);
     }
 }
 

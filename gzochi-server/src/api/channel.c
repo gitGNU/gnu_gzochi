@@ -38,19 +38,27 @@ SCM_DEFINE (primitive_create_channel, "primitive-create-channel", 1, 0, 0,
   char *cname = scm_to_locale_string (name);
   gzochid_channel *channel = gzochid_channel_create (context, cname);  
   gzochid_data_managed_reference *scm_reference = NULL;
+  SCM ret = SCM_BOOL_F;
 
-  mpz_init (scm_oid);
-  gzochid_channel_scm_oid (channel, scm_oid);
+  /* `gzochid_channel_create' may return `NULL' if the transaction has gotten
+     into a bad state. */
   
-  gzochid_data_create_reference_to_oid 
-    (context, &gzochid_scheme_data_serialization, scm_oid);
+  if (channel != NULL)
+    {  
+      mpz_init (scm_oid);
+      gzochid_channel_scm_oid (channel, scm_oid);
+  
+      scm_reference = gzochid_data_create_reference_to_oid 
+	(context, &gzochid_scheme_data_serialization, scm_oid);
 
-  mpz_clear (scm_oid);
+      mpz_clear (scm_oid);
   
-  gzochid_data_dereference (scm_reference, NULL);
+      gzochid_data_dereference (scm_reference, NULL);      
+      ret = scm_reference->obj;
+    }
+  
   gzochid_api_check_transaction ();
-
-  return (SCM) scm_reference->obj;
+  return ret;
 }
 
 SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,

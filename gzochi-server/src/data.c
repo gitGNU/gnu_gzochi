@@ -483,7 +483,7 @@ get_reference_by_oid (gzochid_application_context *context, mpz_t oid,
 
 static gzochid_data_managed_reference *
 get_reference_by_ptr (gzochid_application_context *context, void *ptr, 
-		      gzochid_io_serialization *serialization)
+		      gzochid_io_serialization *serialization, GError **err)
 {
   gzochid_data_transaction_context *tx_context = 
     gzochid_transaction_context (&data_participant);
@@ -495,6 +495,17 @@ get_reference_by_ptr (gzochid_application_context *context, void *ptr,
       char *key = NULL;
 
       reference = create_new_reference (context, ptr, serialization);
+
+      if (tx_context->transaction->rollback)
+	{
+	  gzochid_transaction_mark_for_rollback 
+	    (&data_participant, tx_context->transaction->should_retry);
+	  g_set_error 
+	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	     "Transaction rolled back while creating new reference.");
+	  return NULL;
+	}
+      
       key = mpz_get_str (NULL, 16, reference->oid);
 
       assert (g_hash_table_lookup 
@@ -765,8 +776,12 @@ gzochid_data_set_binding (gzochid_application_context *context, char *name,
     g_propagate_error (err, local_err);
   else 
     {
-      reference = get_reference_by_ptr (context, data, serialization);
-      set_binding (tx_context, name, reference->oid, err);
+      reference = get_reference_by_ptr
+	(context, data, serialization, &local_err);
+      if (local_err == NULL)
+	set_binding (tx_context, name, reference->oid, &local_err);
+      if (local_err != NULL)
+	g_propagate_error (err, local_err);
     }
 }
 
@@ -837,25 +852,17 @@ gzochid_data_binding_exists (gzochid_application_context *context, char *name,
 
 gzochid_data_managed_reference *gzochid_data_create_reference
 (gzochid_application_context *context, 
- gzochid_io_serialization *serialization, void *ptr)
+ gzochid_io_serialization *serialization, void *ptr, GError **err)
 {
-  GError *err = NULL;
-  join_transaction (context, &err);
+  GError *local_err = NULL;
+  join_transaction (context, &local_err);
 
-  if (err != NULL)
+  if (local_err != NULL)
     {
-      mpz_t oid;
-      gzochid_data_managed_reference *ret = NULL;
-
-      g_error_free (err);
-      mpz_init (oid);      
-      ret = create_empty_reference (context, oid, serialization);
-      mpz_clear (oid);
-
-      return ret;
+      g_propagate_error (err, local_err);
+      return NULL;
     }
-
-  return get_reference_by_ptr (context, ptr, serialization);
+  return get_reference_by_ptr (context, ptr, serialization, err);
 }
 
 gzochid_data_managed_reference *
@@ -917,9 +924,10 @@ gzochid_data_mark (gzochid_application_context *context,
       return;
     }
 
-  reference = get_reference_by_ptr (context, ptr, serialization);
+  reference = get_reference_by_ptr (context, ptr, serialization, err);
 
-  if (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW
+  if (reference != NULL
+      && reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW
       && reference->state != GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED)
     {
       char *data = NULL;

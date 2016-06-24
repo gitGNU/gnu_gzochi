@@ -1,5 +1,5 @@
 /* data.c: Primitive functions for user-facing gzochi data management API
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -39,15 +39,21 @@ SCM_DEFINE (primitive_create_reference, "primitive-create-reference", 1, 0, 0,
     gzochid_api_ensure_current_application_context ();
   gzochid_scm_location_info *obj_loc = gzochid_scm_location_get (context, obj);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, &gzochid_scm_location_aware_serialization, obj_loc);
+    (context, &gzochid_scm_location_aware_serialization, obj_loc, NULL);
   SCM ret = SCM_BOOL_F;
 
-  scm_gc_protect_object (obj);
-
-  ret = gzochid_scheme_create_managed_reference (reference);
+  /* The reference returned may be `NULL' if this is a new object and the
+     transaction failed to obtain a lock (transaction timeout, e.g.). In that
+     case, the call to `gzochid_api_check_transaction' will return 
+     non-locally. */
   
+  if (reference != NULL)
+    {  
+      scm_gc_protect_object (obj);
+      ret = gzochid_scheme_create_managed_reference (reference);
+    }
+   
   gzochid_api_check_transaction ();
-
   return ret;
 }
 
@@ -217,7 +223,7 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
   else
     {
       /* `gzochid_data_binding_exists' should never return TRUE if there was
-	 an GError. */
+	 a GError. */
       
       assert (err == NULL);
       
@@ -238,21 +244,31 @@ SCM_DEFINE (primitive_remove_object_x, "primitive-remove-object!", 1, 0, 0,
     gzochid_api_ensure_current_application_context ();
   gzochid_scm_location_info *obj_loc = gzochid_scm_location_get (context, obj);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, &gzochid_scm_location_aware_serialization, obj_loc);
+    (context, &gzochid_scm_location_aware_serialization, obj_loc, NULL);
 
-  scm_gc_protect_object (obj);    
+  /*
+    The reference returned may be `NULL' if this is a new object and the
+    transaction failed to obtain a lock (transaction timeout, e.g.). 
 
-  gzochid_data_remove_object (reference, NULL);
+    ...But when used properly, this function shouldn't be called with new 
+    objects, only those that were previously dereferenced. So there's little
+    risk of transaction failure, but `gzochid_api_check_transaction' will handle
+    it if necessary. 
+  */
 
+  if (reference != NULL)
+    {
+      scm_gc_protect_object (obj);    
+      gzochid_data_remove_object (reference, NULL);
+    }
+  
   gzochid_api_check_transaction ();
-
   return SCM_UNSPECIFIED;
 }
 
 SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
 	    (SCM obj), "Mark a managed record that has been modified.")
 {
-  GError *err = NULL;
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
   gzochid_scm_location_info *obj_loc = gzochid_scm_location_get (context, obj);
@@ -260,7 +276,7 @@ SCM_DEFINE (primitive_mark_for_write_x, "primitive-mark-for-write!", 1, 0, 0,
   scm_gc_protect_object (obj);    
 
   gzochid_data_mark 
-    (context, &gzochid_scm_location_aware_serialization, obj_loc, &err);
+    (context, &gzochid_scm_location_aware_serialization, obj_loc, NULL);
 
   gzochid_api_check_transaction ();
 

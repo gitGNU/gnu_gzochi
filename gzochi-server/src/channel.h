@@ -1,5 +1,5 @@
 /* channel.h: Prototypes and declarations for channel.c
- * Copyright (C) 2011 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -29,6 +29,14 @@
 typedef struct _gzochid_channel gzochid_channel;
 
 extern gzochid_io_serialization gzochid_channel_serialization;
+
+/*
+  Create and return a new channel with the specified name in the specified game
+  application context.
+
+  Returns `NULL' if the transaction could not be created; e.g., if the current
+  transaction is marked for rollback.
+*/
 
 gzochid_channel *gzochid_channel_create (gzochid_application_context *, char *);
 gzochid_channel *gzochid_channel_get (gzochid_application_context *, char *);

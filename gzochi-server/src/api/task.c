@@ -1,5 +1,5 @@
 /* task.c: Primitive functions for user-facing gzochi task management API
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <gmp.h>
 #include <libguile.h>
@@ -89,11 +90,26 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
 	  handle = gzochid_schedule_periodic_durable_task 
 	    (context, identity, scheme_task, 
 	     &gzochid_scheme_task_serialization, delay_tv, period_tv);
-	  reference = gzochid_data_create_reference 
-	    (context, &gzochid_durable_application_task_handle_serialization, 
-	     handle);
+
+	  /* Scheduling a durable task can fail, since it depends on the health
+	     of the current transaction... */	     
 	  
-	  ret = gzochid_scheme_create_periodic_task_handle (reference->oid);
+	  if (handle != NULL)
+	    {
+	      reference = gzochid_data_create_reference 
+		(context,
+		 &gzochid_durable_application_task_handle_serialization, 
+		 handle, NULL);
+
+	      /* ...but if it succeeds, the managed reference for the handle
+		 should already be part of the state of the current
+		 transactional state, and there's no reason it for it to be
+		 `NULL'. */
+	      
+	      assert (reference != NULL);
+	      
+	      ret = gzochid_scheme_create_periodic_task_handle (reference->oid);
+	    }
 	  
 	  gzochid_api_check_transaction ();
 	  

@@ -247,12 +247,30 @@ gzochid_durable_queue_offer (gzochid_durable_queue *queue,
 			     gzochid_io_serialization *serialization,
 			     gpointer data, GError **err)
 {
+  GError *local_err = NULL;
   gzochid_durable_queue_element *elt = gzochid_durable_queue_element_new ();
-  gzochid_data_managed_reference *elt_ref = gzochid_data_create_reference
-    (queue->app_context, &gzochid_durable_queue_element_serialization, elt);
-  gzochid_data_managed_reference *data_ref = gzochid_data_create_reference
-    (queue->app_context, serialization, data);
+  gzochid_data_managed_reference *elt_ref = NULL; 
+  gzochid_data_managed_reference *data_ref = NULL; 
 
+  elt_ref = gzochid_data_create_reference
+    (queue->app_context, &gzochid_durable_queue_element_serialization, elt,
+     &local_err);
+  
+  if (local_err == NULL)
+    data_ref = gzochid_data_create_reference
+      (queue->app_context, serialization, data, &local_err);
+  else gzochid_durable_queue_element_free (elt);
+
+  /* Creating the reference to the new element wrapper or to the element itself
+     may fail if the transaction isn't healthy. If that happens, propagate the
+     error and bail out. */
+  
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return;
+    }
+  
   mpz_set (elt->oid, data_ref->oid);
   elt->next = NULL;
 
@@ -265,8 +283,6 @@ gzochid_durable_queue_offer (gzochid_durable_queue *queue,
     }
   else
     {
-      GError *local_err = NULL;
-      
       gzochid_data_dereference (queue->tail, &local_err);
 
       if (local_err == NULL)
@@ -275,13 +291,15 @@ gzochid_durable_queue_offer (gzochid_durable_queue *queue,
 	     set the tail to be the new link. */
 	  
 	  gzochid_durable_queue_element *tail_elt = queue->tail->obj;
-	  gzochid_data_managed_reference *new_tail =
-	    gzochid_data_create_reference
-	    (queue->app_context, &gzochid_durable_queue_element_serialization,
-	     elt);
 	  
-	  tail_elt->next = new_tail;
-	  queue->tail = new_tail;
+	  if (local_err != NULL)
+	    {
+	      g_propagate_error (err, local_err);
+	      return;
+	    }
+	  
+	  tail_elt->next = elt_ref;
+	  queue->tail = elt_ref;
 
 	  /* Mark the old tail for modification. */
 	  

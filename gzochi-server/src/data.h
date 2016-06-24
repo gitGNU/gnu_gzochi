@@ -1,5 +1,5 @@
 /* data.h: Prototypes and declarations for data.c
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -36,13 +36,12 @@
 
 GQuark gzochid_data_error_quark (void);
 
-typedef enum
+enum GzochidDataError
   {
     GZOCHID_DATA_ERROR_NOT_FOUND,
     GZOCHID_DATA_ERROR_TRANSACTION,
     GZOCHID_DATA_ERROR_FAILED
-  }
-  GzochidDataError;
+  };
 
 struct _gzochid_oid_holder
 {
@@ -108,8 +107,27 @@ gboolean gzochid_data_binding_exists
 char *gzochid_data_next_binding_oid 
 (gzochid_application_context *, char *, mpz_t, GError **);
 
+/*
+  Return a managed reference for the specified pointer within the target gzochi
+  game application context. The data will be serialized via the specified 
+  serialization when the current transaction commits.
+
+  The pointer returned by this function is owned by the data transaction 
+  context, and should not be freed or otherwise modified. This function will 
+  return the same pointer in response to multiple calls for the same pointer
+  within the same transaction.
+
+  The first time this function is called for a particular pointer - i.e., when a
+  new object is being added to the data store - the container attempts to
+  establish a write lock on the new object id. If this causes the transaction to
+  fail (because of a timeout) or if it has already failed, this function will
+  return `NULL' and set the error return argument accordingly.
+*/
+
 gzochid_data_managed_reference *gzochid_data_create_reference
-(gzochid_application_context *, gzochid_io_serialization *, void *);
+(gzochid_application_context *, gzochid_io_serialization *, void *, GError **);
+
+
 gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
 (gzochid_application_context *, gzochid_io_serialization *, mpz_t);
 

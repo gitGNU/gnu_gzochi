@@ -490,8 +490,11 @@ gzochid_client_session_disconnect (gzochid_application_context *context,
   gzochid_client_session_transaction_context *tx_context = 
     join_transaction (context);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, &gzochid_client_session_serialization, session);
+    (context, &gzochid_client_session_serialization, session, NULL);
 
+  /* A reference to the session should already exist in the transaction. */
+  
+  assert (reference != NULL);
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
@@ -545,8 +548,11 @@ gzochid_client_session_send_login_success (gzochid_application_context *context,
   gzochid_client_session_transaction_context *tx_context =
     join_transaction (context);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, &gzochid_client_session_serialization, session);
+    (context, &gzochid_client_session_serialization, session, NULL);
 
+  /* A reference to the session should already exist in the transaction. */
+
+  assert (reference != NULL);
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
   assert (tx_context->login_operation == NULL);
   
@@ -561,8 +567,11 @@ gzochid_client_session_send_login_failure (gzochid_application_context *context,
   gzochid_client_session_transaction_context *tx_context =
     join_transaction (context);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, &gzochid_client_session_serialization, session);
+    (context, &gzochid_client_session_serialization, session, NULL);
 
+  /* A reference to the session should already exist in the transaction. */
+
+  assert (reference != NULL);
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
   assert (tx_context->login_operation == NULL);
 
@@ -578,8 +587,11 @@ gzochid_client_session_send_message (gzochid_application_context *context,
   gzochid_client_session_transaction_context *tx_context =
     join_transaction (context);
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, &gzochid_client_session_serialization, session);
+    (context, &gzochid_client_session_serialization, session, NULL);
 
+  /* A reference to the session should already exist in the transaction. */
+
+  assert (reference != NULL);
   assert (reference->state != GZOCHID_MANAGED_REFERENCE_STATE_NEW);
 
   tx_context->operations = g_list_append 
@@ -619,15 +631,24 @@ persistence_task_worker (gzochid_application_context *context,
 {
   GError *local_err = NULL;
   gzochid_persistence_task_data *persistence_task = data;
-  GString *binding = g_string_new (persistence_task->prefix);
+  GString *binding = NULL;
   char *oid_str = NULL;
 
   gzochid_data_managed_reference *reference = gzochid_data_create_reference 
-    (context, persistence_task->serialization, persistence_task->data);
+    (context, persistence_task->serialization, persistence_task->data,
+     &local_err);
+
+  if (local_err != NULL)
+    {
+      g_propagate_error (&persistence_task->holder->err, local_err);
+      return;
+    }
   
   mpz_set (persistence_task->holder->oid, reference->oid);
   
   oid_str = mpz_get_str (NULL, 16, persistence_task->holder->oid);
+
+  binding = g_string_new (persistence_task->prefix);
   g_string_append (binding, oid_str);
   free (oid_str);
 
