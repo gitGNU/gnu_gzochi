@@ -104,6 +104,7 @@ void gzochid_data_remove_binding
 
 gboolean gzochid_data_binding_exists 
 (gzochid_application_context *, char *, GError **);
+
 char *gzochid_data_next_binding_oid 
 (gzochid_application_context *, char *, mpz_t, GError **);
 
@@ -127,12 +128,33 @@ char *gzochid_data_next_binding_oid
 gzochid_data_managed_reference *gzochid_data_create_reference
 (gzochid_application_context *, gzochid_io_serialization *, void *, GError **);
 
-
 gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
 (gzochid_application_context *, gzochid_io_serialization *, mpz_t);
 
-void gzochid_data_dereference 
-(gzochid_data_managed_reference *reference, GError **);
+/*
+  Returns the object referenced by the specified managed reference, retrieving 
+  it from the data store and deserializing it if necessary. A read lock will be
+  synchronously established on the object. 
+
+  If the object cannot be retrieved or the lock cannot be established, this 
+  function will return `NULL' and set the error return argument accordingly.
+*/
+
+void *gzochid_data_dereference (gzochid_data_managed_reference *, GError **);
+
+/*
+  Returns the object referenced by the specified managed reference, retrieving 
+  it from the data store and deserializing it if necessary. A write lock will be
+  synchronously established on the object. 
+
+  If the object cannot be retrieved or the write lock cannot be established, 
+  this function will return `NULL' and set the error return argument 
+  accordingly.
+*/
+
+void *gzochid_data_dereference_for_update (gzochid_data_managed_reference *,
+					   GError **);
+
 void gzochid_data_remove_object (gzochid_data_managed_reference *, GError **);
 void gzochid_data_mark 
 (gzochid_application_context *, gzochid_io_serialization *, void *, GError **);

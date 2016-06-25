@@ -522,23 +522,37 @@ get_reference_by_ptr (gzochid_application_context *context, void *ptr,
 
 static void 
 dereference (gzochid_data_transaction_context *context, 
-	     gzochid_data_managed_reference *reference, GError **err)
+	     gzochid_data_managed_reference *reference, gboolean for_update,
+	     GError **err)
 {
   size_t data_len = 0;
   char *oid_str = NULL; 
   char *data = NULL; 
   GString *in = NULL;
   
-  if (reference->obj != NULL 
+  if (reference->obj != NULL
       || reference->state == GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY)
-    return;
+    {
+      /* Does the lock need to be upgraded? */
+      
+      if (for_update &&
+	  reference->state == GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED)
+	gzochid_data_mark
+	  (context->context, reference->serialization, reference->obj, err);
+      
+      return;
+    }
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
   g_debug ("Retrieving data for reference '%s'.", oid_str);
 
-  data = APP_STORAGE_INTERFACE (context->context)->transaction_get
-    (context->transaction, context->context->oids, oid_str, 
-     strlen (oid_str) + 1, &data_len);
+  if (for_update)
+    data = APP_STORAGE_INTERFACE (context->context)->transaction_get_for_update
+      (context->transaction, context->context->oids, oid_str, 
+       strlen (oid_str) + 1, &data_len);
+  else data = APP_STORAGE_INTERFACE (context->context)->transaction_get
+	 (context->transaction, context->context->oids, oid_str, 
+	  strlen (oid_str) + 1, &data_len);
 
   if (context->transaction->rollback)
     {
@@ -573,6 +587,8 @@ dereference (gzochid_data_transaction_context *context,
 
       if (local_err != NULL)
 	g_propagate_error (err, local_err);	  
+      else if (for_update)
+	reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
       else reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED;
       
       g_hash_table_insert (context->oids_to_references, oid_str, reference);
@@ -702,7 +718,7 @@ gzochid_data_get_binding (gzochid_application_context *context, char *name,
   reference = get_reference_by_oid (context, oid, serialization);  
   mpz_clear (oid);
 
-  dereference (tx_context, reference, err);
+  dereference (tx_context, reference, FALSE, err);
   return reference->obj;
 }
 
@@ -882,7 +898,7 @@ gzochid_data_create_reference_to_oid (gzochid_application_context *context,
   else return get_reference_by_oid (context, oid, serialization);
 }
 
-void 
+void *
 gzochid_data_dereference (gzochid_data_managed_reference *reference, 
 			  GError **err)
 {
@@ -892,7 +908,24 @@ gzochid_data_dereference (gzochid_data_managed_reference *reference,
   
   if (local_err != NULL)
     g_propagate_error (err, local_err);
-  else dereference (tx_context, reference, err);
+  else dereference (tx_context, reference, FALSE, err);
+
+  return reference->obj;
+}
+
+void *
+gzochid_data_dereference_for_update (gzochid_data_managed_reference *reference, 
+				     GError **err)
+{
+  GError *local_err = NULL;
+  gzochid_data_transaction_context *tx_context = 
+    join_transaction (reference->context, &local_err);
+  
+  if (local_err != NULL)
+    g_propagate_error (err, local_err);
+  else dereference (tx_context, reference, TRUE, err);
+
+  return reference->obj;
 }
 
 void 
