@@ -2006,10 +2006,13 @@ merge (btree_node *node, unsigned int num_children, btree_transaction *btx)
   unsigned int required_children = node->min_children - num_children;
   btree_node *next = NULL;
   btree_node *prev = NULL;
+  btree_node *parent = NULL;
   unsigned int num_next = 0, spare_next = 0, next_slots = 0;
   unsigned int num_prev = 0, spare_prev = 0, prev_slots = 0;
 
-  next = tx_next_sibling (node, btx, &err);
+  parent = tx_parent (node, btx, &err);
+  if (err == NULL)
+    next = tx_next_sibling (node, btx, &err);
   if (err == NULL && next != NULL)
     num_next = count_children (btx, next, &err);
   if (err == NULL)
@@ -2020,6 +2023,34 @@ merge (btree_node *node, unsigned int num_children, btree_transaction *btx)
   if (err != NULL)
     {
       g_error_free (err);
+      return FALSE;
+    }
+
+  if (next == NULL && prev == NULL && parent != NULL)
+    {
+      /* Ordinarily, a node with too few children is guaranteed to have siblings
+	 it can merge with because its parent has the same commitment to 
+	 maintain minimuma and maximum child counts. However, this isn't the 
+	 case with interstitial children of the root, which is allowed to have a
+	 single child node. So if an "only child" of the root needs a merge,
+	 just delete it and attach its children directly to the root. */
+      
+      btree_node *child = tx_first_child (node, btx, &err);
+      btree_node *child_ptr = child;
+
+      if (mark_node_deleted (btx, node))
+	{
+	  while (child_ptr != NULL && err == NULL)
+	    {
+	      tx_set_parent (child_ptr, btx, parent);
+	      child_ptr = tx_next_sibling (child_ptr, btx, &err);	  
+	    }
+	  
+	  if (err == NULL)
+	    return tx_set_first_child (parent, btx, child_ptr);
+	  else g_error_free (err);
+	}
+
       return FALSE;
     }
 
