@@ -403,7 +403,10 @@ gzochid_scheme_application_disconnected_worker
     (context, &gzochid_client_session_serialization, session_oid);
   mpz_clear (session_oid);
 
-  gzochid_data_dereference (session_reference, &err);
+  /* Obtain a preemptive write lock on the session object, as it's most likely 
+     going to be removed later in the same transaction. */
+  
+  gzochid_data_dereference_for_update (session_reference, &err);
 
   if (err != NULL)
     {
