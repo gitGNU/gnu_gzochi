@@ -174,7 +174,7 @@ flush_reference_failure (gpointer data)
   gzochid_application_context *context = data;
 
   gzochid_data_create_reference
-    (context, &test_serialization_failure_serializer, str);
+    (context, &test_serialization_failure_serializer, str, NULL);
 }
 
 static void

@@ -112,7 +112,7 @@ test_periodic_cancel_inner0 (gpointer data)
      &task_serialization, immediate, immediate);
   gzochid_data_managed_reference *handle_ref = gzochid_data_create_reference 
     (context->app_context, 
-     &gzochid_durable_application_task_handle_serialization, handle);
+     &gzochid_durable_application_task_handle_serialization, handle, NULL);
 
   mpz_set (context->handle_oid, handle_ref->oid);
 }

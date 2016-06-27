@@ -69,7 +69,7 @@ gzochid_data_create_reference_to_oid
 gzochid_data_managed_reference *
 gzochid_data_create_reference
 (gzochid_application_context *context, gzochid_io_serialization *serialization,
- gpointer data)
+ gpointer data, GError **err)
 {
   mpz_t oid;
   gzochid_data_managed_reference *ref = NULL;
@@ -109,7 +109,7 @@ gzochid_data_set_binding_to_oid
     free (oid_str);
 }
 
-void
+void *
 gzochid_data_dereference 
 (gzochid_data_managed_reference *reference, GError **error)
 {
@@ -119,7 +119,7 @@ gzochid_data_dereference
 
   if (reference->obj != NULL
       || reference->state == GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY)
-    return;
+    return reference->obj;
 
   oid_str = mpz_get_str (NULL, 16, reference->oid);
   data = g_hash_table_lookup (oids, oid_str); 
@@ -129,7 +129,8 @@ gzochid_data_dereference
   reference->obj = reference->serialization->deserializer 
     (reference->context, in, NULL);
   g_string_free (in, TRUE);
-  return;
+
+  return reference->obj;
 }
 
 void
