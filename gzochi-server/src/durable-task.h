@@ -1,5 +1,5 @@
 /* durable-task.h: Prototypes and declarations for durable-task.c
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,7 +23,6 @@
 
 #include "app.h"
 #include "app-task.h"
-#include "data.h"
 #include "gzochid-auth.h"
 #include "io.h"
 
@@ -48,20 +47,6 @@ struct _gzochid_application_task_serialization
 typedef struct _gzochid_application_task_serialization
 gzochid_application_task_serialization;
 
-struct _gzochid_durable_application_task_handle
-{
-  gzochid_application_task_serialization *serialization;
-
-  gzochid_application_worker task_worker;
-  gzochid_data_managed_reference *task_data_reference;
-
-  gzochid_auth_identity *identity;
-  
-  gboolean repeats;
-  struct timeval period;
-  struct timeval target_execution_time;
-};
-
 typedef struct _gzochid_durable_application_task_handle
 gzochid_durable_application_task_handle;
 
@@ -70,13 +55,7 @@ typedef gzochid_durable_application_task_handle gzochid_periodic_task_handle;
 extern gzochid_io_serialization 
 gzochid_durable_application_task_handle_serialization;
 
-gzochid_application_task *gzochid_deserialize_application_task 
-(gzochid_application_context *, gzochid_application_task_serialization *, 
- GString *);
 
-void gzochid_serialize_application_task 
-(gzochid_application_context *, gzochid_application_task_serialization *, 
- gzochid_application_task *, GString *);
 
 void gzochid_schedule_durable_task
 (gzochid_application_context *, gzochid_auth_identity *, 

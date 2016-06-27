@@ -1,5 +1,5 @@
 /* durable-task.c: Persistent task management routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -42,6 +42,20 @@ struct _gzochid_durable_application_task
 
 typedef struct _gzochid_durable_application_task
 gzochid_durable_application_task;
+
+struct _gzochid_durable_application_task_handle
+{
+  gzochid_application_task_serialization *serialization;
+
+  gzochid_application_worker task_worker;
+  gzochid_data_managed_reference *task_data_reference;
+
+  gzochid_auth_identity *identity;
+  
+  gboolean repeats;
+  struct timeval period;
+  struct timeval target_execution_time;
+};
 
 static int 
 task_prepare (gpointer data)
@@ -112,32 +126,6 @@ join_transaction (gzochid_application_context *context)
     }
 
   return tx_context;
-}
-
-gzochid_application_task *
-gzochid_deserialize_application_task 
-(gzochid_application_context *context, 
- gzochid_application_task_serialization *serialization, GString *in)
-{
-  gzochid_auth_identity *identity = 
-    gzochid_auth_identity_deserializer (context, in, NULL);
-  gzochid_application_worker worker = 
-    serialization->worker_serialization->deserializer (context, in);
-  gpointer data = serialization->data_serialization->deserializer 
-    (context, in, NULL);
-  return gzochid_application_task_new (context, identity, worker, data);
-}
-
-void 
-gzochid_serialize_application_task 
-(gzochid_application_context *context,
- gzochid_application_task_serialization *serialization, 
- gzochid_application_task *task, GString *out)
-{
-  gzochid_auth_identity_serializer (context, task->identity, out, NULL);
-  serialization->worker_serialization->serializer (context, task->worker, out);
-  serialization->data_serialization->serializer 
-    (context, task->data, out, NULL);
 }
 
 gzochid_application_task_serialization *
