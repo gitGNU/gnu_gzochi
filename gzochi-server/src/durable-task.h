@@ -56,6 +56,28 @@ extern gzochid_io_serialization
 gzochid_durable_application_task_handle_serialization;
 
 
+/*
+  Creates and returns a new `gzochid_durable_task_handle' instance representing
+  the specified durable application task, with the specified schedule delay and
+  repeat period (or `NULL' if this task should not repeat).
+
+  When this function returns successfully, the serialized form of the specified
+  task has been persisted to the data store within the current transaction, and
+  added to the pending task journal to allow it to be resubmitted upon container
+  restart. However, it has not been scheduled within the current transaction.
+  Use `gzochid_schedule_durable_task_handle' below to do that - if desired - or
+  call one of the other `gzochid_schedule_*' variants to create the handle and
+  schedule it at the same time.
+
+  If the task and its binding cannot be created because the current transaction
+  is not in a healthy state, this function will return `NULL' and set the error
+  return argument appropriately.
+*/
+
+gzochid_durable_application_task_handle *
+gzochid_create_durable_application_task_handle
+(gzochid_application_task *, gzochid_application_task_serialization *,
+ struct timeval, struct timeval *, GError **);
 
 void gzochid_schedule_durable_task
 (gzochid_application_context *, gzochid_auth_identity *, 
@@ -70,6 +92,12 @@ gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task
 (gzochid_application_context *, gzochid_auth_identity *, 
  gzochid_application_task *, gzochid_application_task_serialization *, 
  struct timeval, struct timeval);
+
+/* Schedules the specified durable task handle within the context of the current
+   transaction.*/
+
+void gzochid_schedule_durable_task_handle
+(gzochid_application_context *, gzochid_durable_application_task_handle *);
 
 void gzochid_cancel_periodic_task 
 (gzochid_application_context *, gzochid_periodic_task_handle *);
