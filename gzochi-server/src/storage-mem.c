@@ -2616,11 +2616,15 @@ get_internal (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       /* `search' never returns NULL unless there was a problem with the
 	 transaction. */
 
+      g_warning ("Failed to retrieve key %s in transaction.", key);
+      
       mark_for_rollback (tx, TRUE);
       return NULL;
     }
   else if (update && tx_lock_node (node, btx, TRUE, NULL) != SUCCESS)
     {
+      g_warning ("Failed to lock retrieved key %s in transaction.", key);
+
       mark_for_rollback (tx, TRUE);
       return NULL;
     }
@@ -2685,7 +2689,8 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 {
   btree_node *node = NULL;
   btree_transaction *btx = tx->txn;
-
+  gboolean rollback = FALSE;
+  
   if (!check_tx (tx))
     return;
 
@@ -2707,11 +2712,17 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 		(unsigned char *) value, value_len))
 	{
 	  if (!maybe_split (btx, store->database, node))
-	    mark_for_rollback (tx, TRUE);
+	    rollback = TRUE;
 	}
-      else mark_for_rollback (tx, TRUE);
+      else rollback = TRUE;
     }
-  else mark_for_rollback (tx, TRUE);
+  else rollback = TRUE;
+
+  if (rollback)
+    {
+      g_warning ("Failed to store key %s in transaction.", key);
+      mark_for_rollback (tx, TRUE);
+    }
 }
 
 /* Deletes the value for the specified key. Returns ENOTFOUND if no such value
@@ -2758,7 +2769,10 @@ transaction_delete (gzochid_storage_transaction *tx,
   else ret = GZOCHID_STORAGE_ETXFAILURE;
 
   if (ret == GZOCHID_STORAGE_ETXFAILURE)
-    mark_for_rollback (tx, TRUE);
+    {
+      g_warning ("Failed to delete key %s in transaction.", key);
+      mark_for_rollback (tx, TRUE);
+    }
 
   return ret;
 }
@@ -2853,6 +2867,8 @@ transaction_first_key (gzochid_storage_transaction *tx,
 
   if (err != NULL)
     {
+      g_warning
+	("Failed to seek to first key in transaction: %s", err->message);
       g_error_free (err);
       mark_for_rollback (tx, TRUE);
     }
@@ -2882,6 +2898,7 @@ transaction_next_key (gzochid_storage_transaction *tx,
 
   if (err != NULL)
     {
+      g_warning ("Failed to advance cursor in transaction: %s", err->message);
       g_error_free (err);
       mark_for_rollback (tx, TRUE);
     }
