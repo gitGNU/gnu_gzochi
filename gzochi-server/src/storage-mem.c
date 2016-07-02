@@ -473,13 +473,16 @@ static gint
 competing_w_lock (gconstpointer a, gconstpointer b)
 {
   const btree_lock *lock = a;
-  const GList *ancestor_transaction_ptr = b;
+  const gpointer *args = b;
+
+  const btree_transaction *self = args[0];
+  const GList *ancestor_transaction_ptr = args[1];
 
   while (ancestor_transaction_ptr != NULL)
     {
       btree_transaction *ancestor_btx = ancestor_transaction_ptr->data;
 
-      if (ancestor_btx->waiting_to_write == lock)
+      if (ancestor_btx != self && ancestor_btx->waiting_to_write == lock)
 	return 0;
       else ancestor_transaction_ptr = ancestor_transaction_ptr->next;
     }
@@ -531,7 +534,8 @@ lock_detect (btree_environment *btree_env)
   GList *l = g_list_copy (btree_env->transactions);
   gboolean should_continue = TRUE;
   gboolean ret = FALSE;
-
+  gpointer args[2];
+  
   while (l != NULL && should_continue)
     {
       GList *l_ptr = l;
@@ -542,8 +546,11 @@ lock_detect (btree_environment *btree_env)
 	  btree_transaction *btx = l_ptr->data;
 	  GList *competing_transaction_ptr = NULL;	  
 
+	  args[0] = btx;
+	  args[1] = l;
+	  
 	  competing_transaction_ptr = g_list_find_custom
-	    (btx->read_locks, l, competing_w_lock);
+	    (btx->read_locks, args, competing_w_lock);
 
 	  if (competing_transaction_ptr == NULL)
 	    competing_transaction_ptr = g_list_find_custom
