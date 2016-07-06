@@ -61,6 +61,12 @@ void gzochid_durable_queue_offer (gzochid_durable_queue *,
 /* Deserializes and returns the object at the head of the specified queue, or 
    `NULL' if the queue is empty. */
 
+gpointer gzochid_durable_queue_peek (gzochid_durable_queue *,
+				     gzochid_io_serialization *, GError **);
+
+/* Deserializes and removes the object at the head of the specified queue, or 
+   `NULL' if the queue is empty. */
+
 gpointer gzochid_durable_queue_pop (gzochid_durable_queue *,
 				    gzochid_io_serialization *, GError **);
 

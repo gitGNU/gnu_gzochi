@@ -322,6 +322,33 @@ gzochid_durable_queue_offer (gzochid_durable_queue *queue,
 }
 
 gpointer
+gzochid_durable_queue_peek (gzochid_durable_queue *queue,
+			    gzochid_io_serialization *serialization,
+			    GError **err)
+{
+  gzochid_data_managed_reference *head_ref = queue->head;
+
+  if (head_ref != NULL)
+    {
+      GError *local_err = NULL;
+      gzochid_durable_queue_element *elt =
+	gzochid_data_dereference (head_ref, &local_err);
+
+      if (local_err == NULL)
+	{
+	  gzochid_data_managed_reference *data_ref =
+	    gzochid_data_create_reference_to_oid
+	    (queue->app_context, serialization, elt->oid);
+
+	  return gzochid_data_dereference (data_ref, err);
+	}
+      else g_propagate_error (err, local_err);
+    }
+
+  return NULL;
+}
+
+gpointer
 gzochid_durable_queue_pop (gzochid_durable_queue *queue,
 			   gzochid_io_serialization *serialization,
 			   GError **err)
@@ -331,16 +358,14 @@ gzochid_durable_queue_pop (gzochid_durable_queue *queue,
   if (head_ref != NULL)
     {
       GError *local_err = NULL;
-      gzochid_durable_queue_element *elt = NULL;
-      
-      gzochid_data_dereference (head_ref, &local_err);
+      gzochid_durable_queue_element *elt = gzochid_data_dereference_for_update
+	(head_ref, &local_err);
 
       if (local_err == NULL)
 	{
 	  gpointer data = NULL;
 	  gzochid_data_managed_reference *data_ref = NULL;
 	  
-	  elt = head_ref->obj;
 	  queue->head = elt->next;
 
 	  /* If the head of the queue is now `NULL', that must mean the queue is
@@ -351,12 +376,10 @@ gzochid_durable_queue_pop (gzochid_durable_queue *queue,
 
 	  data_ref = gzochid_data_create_reference_to_oid
 	    (queue->app_context, serialization, elt->oid);
-	  gzochid_data_dereference (data_ref, &local_err);
+	  data = gzochid_data_dereference (data_ref, &local_err);
 
 	  if (local_err == NULL)
 	    {
-	      data = data_ref->obj;
-
 	      /* Remove the old head link from the data store. */
 	      
 	      gzochid_data_remove_object (head_ref, &local_err);

@@ -76,6 +76,29 @@ test_queue_offer ()
 }
 
 static void
+test_queue_peek ()
+{
+  char *data = NULL;
+  GError *err = NULL;
+  gzochid_durable_queue *queue = gzochid_durable_queue_new (NULL);
+  
+  gzochid_durable_queue_offer
+    (queue, &string_serialization, strdup ("foo"), NULL);
+
+  data = gzochid_durable_queue_peek (queue, &string_serialization, NULL);
+  g_assert_cmpstr (data, ==, "foo");
+  
+  data = gzochid_durable_queue_pop (queue, &string_serialization, NULL);
+  g_assert_cmpstr (data, ==, "foo");
+
+  g_assert_null
+    (gzochid_durable_queue_peek (queue, &string_serialization, &err));
+  g_assert_no_error (err);
+  
+  gzochid_durable_queue_free (queue);
+}
+
+static void
 test_queue_pop ()
 {
   GError *err = NULL;
@@ -100,6 +123,7 @@ main (int argc, char *argv[])
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/queue/offer", test_queue_offer);
+  g_test_add_func ("/queue/peek", test_queue_peek);
   g_test_add_func ("/queue/pop", test_queue_pop);
 
   gzochid_test_mock_data_initialize ();
