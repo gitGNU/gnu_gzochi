@@ -47,6 +47,11 @@ struct _gzochid_durable_application_task_handle
 {
   gzochid_application_task_serialization *serialization;
 
+  /* The named binding for this durable task, or `NULL' if not durably 
+     persisted for resubmit on bootstrap. */
+
+  char *binding;
+
   gzochid_application_worker task_worker;
   gzochid_data_managed_reference *task_data_reference;
 
@@ -193,6 +198,7 @@ create_durable_task_handle
 
   durable_task_handle->task_data_reference = task_data_reference;
   durable_task_handle->serialization = serialization;
+  durable_task_handle->binding = NULL;
   durable_task_handle->identity = gzochid_auth_identity_ref (identity);
   durable_task_handle->repeats = FALSE;
   durable_task_handle->period = immediate;
@@ -243,6 +249,10 @@ deserialize_durable_task_handle
 
   assert (handle->serialization != NULL);
 
+  if (gzochid_util_deserialize_boolean (in))
+    handle->binding = gzochid_util_deserialize_string (in);
+  else handle->binding = NULL;
+  
   handle->task_worker = 
     handle->serialization->worker_serialization->deserializer (context, in);
   handle->task_data_reference = gzochid_data_create_reference_to_oid 
@@ -271,6 +281,11 @@ serialize_durable_task_handle
 
   gzochid_util_serialize_mpz (handle->task_data_reference->oid, out);
   gzochid_util_serialize_string (handle->serialization->name, out);
+
+  gzochid_util_serialize_boolean (handle->binding != NULL, out);
+  if (handle->binding != NULL)
+    gzochid_util_serialize_string (handle->binding, out);
+
   handle->serialization->worker_serialization->serializer 
     (context, handle->task_worker, out);
 
@@ -289,6 +304,9 @@ finalize_durable_task_handle (gzochid_application_context *context,
 {
   gzochid_durable_application_task_handle *handle = data;
 
+  if (handle->binding != NULL)
+    free (handle->binding);
+  
   gzochid_auth_identity_finalizer (context, handle->identity);
   free (handle);
 }
@@ -313,14 +331,21 @@ remove_durable_task (gzochid_application_context *context, mpz_t oid,
 		     GError **err)
 {
   GError *local_err = NULL;
-  char *oid_str = mpz_get_str (NULL, 16, oid);
-  GString *binding = g_string_new (PENDING_TASK_PREFIX);
   gzochid_data_managed_reference *reference =
     gzochid_data_create_reference_to_oid
     (context, &gzochid_durable_application_task_handle_serialization, oid);   
-  
-  g_string_append (binding, oid_str);      
-  gzochid_data_remove_binding (reference->context, binding->str, &local_err);
+  gzochid_durable_application_task_handle *task_handle =
+    gzochid_data_dereference (reference, &local_err);
+
+  if (task_handle == NULL)
+    {
+      g_propagate_error (err, local_err);
+      return;
+    }
+
+  if (task_handle->binding != NULL)
+    gzochid_data_remove_binding
+      (reference->context, task_handle->binding, &local_err);
   
   if (local_err == NULL)
     {
@@ -329,10 +354,30 @@ remove_durable_task (gzochid_application_context *context, mpz_t oid,
 	g_propagate_error (err, local_err);
     }
   else g_propagate_error (err, local_err);
+}
 
-  g_string_free (binding, TRUE);
+/*
+  Returns a newly-allocated string by concatenating "s.pendingTask." with the
+  base-16 representation of the specified object id. When written to the `names'
+  store, this binding will be used to resubmit the durable task that has the
+  specified oid.
+  
+  This string should be freed via `free' when no longer in use.
+*/
+
+static char *
+create_pending_task_binding (mpz_t oid)
+{
+  char *binding = calloc (mpz_sizeinbase (oid, 16) + 15, sizeof (char));
+  char *oid_str = mpz_get_str (NULL, 16, oid);
+
+  binding = strcat (binding, PENDING_TASK_PREFIX);
+  binding = strcat (binding, oid_str);
+
   free (oid_str);
- }
+
+  return binding;
+}
 
 void 
 gzochid_restart_tasks (gzochid_application_context *context)
@@ -340,7 +385,6 @@ gzochid_restart_tasks (gzochid_application_context *context)
   mpz_t oid;
   GError *err = NULL;
   char *next_binding = NULL;
-  int prefix_len = strlen (PENDING_TASK_PREFIX);
   int num_tasks = 0;
 
   mpz_init (oid);
@@ -351,7 +395,7 @@ gzochid_restart_tasks (gzochid_application_context *context)
   assert (err == NULL);
 
   while (next_binding != NULL 
-	 && strncmp (PENDING_TASK_PREFIX, next_binding, prefix_len) == 0)
+	 && strncmp (PENDING_TASK_PREFIX, next_binding, 14) == 0)
     {
       char *next_next_binding = NULL;
       gzochid_data_managed_reference *handle_reference = 
@@ -410,10 +454,6 @@ gzochid_create_durable_application_task_handle
   gzochid_durable_application_task_handle *durable_task_handle = NULL;
   gzochid_data_managed_reference *handle_reference = NULL;
 
-  char *oid_str = NULL;
-  int oid_strlen, prefix_len;
-  char *binding_name;
-
   gettimeofday (&target, NULL);
 
   target.tv_sec += delay.tv_sec;
@@ -433,6 +473,8 @@ gzochid_create_durable_application_task_handle
   if (period != NULL)
     durable_task_handle = create_durable_periodic_task_handle
       (task_data_reference, serialization, task->identity, target, *period);
+  durable_task_handle->binding = create_pending_task_binding
+    (handle_reference->oid);
   else durable_task_handle = create_durable_task_handle
 	 (task_data_reference, serialization, task->identity, target);
 
@@ -446,16 +488,6 @@ gzochid_create_durable_application_task_handle
       return NULL;
     }
   
-  oid_str = mpz_get_str (NULL, 16, handle_reference->oid);
-  oid_strlen = strlen (oid_str);
-  prefix_len = strlen (PENDING_TASK_PREFIX);
-  binding_name = calloc (oid_strlen + prefix_len + 1, sizeof (char));
-
-  binding_name = strncat (binding_name, PENDING_TASK_PREFIX, prefix_len);
-  binding_name = strncat (binding_name, oid_str, oid_strlen);
-  
-  free (oid_str);
-
   gzochid_data_set_binding_to_oid 
     (task->context, binding_name, handle_reference->oid, &local_err);
 
