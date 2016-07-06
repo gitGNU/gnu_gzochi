@@ -419,7 +419,15 @@ gzochid_restart_tasks (gzochid_application_context *context)
 	}
       else 
 	{
-	  gzochid_schedule_durable_task_handle (context, handle_reference->obj);
+	  gzochid_schedule_durable_task_handle
+	    (context, handle_reference->obj, &err);
+
+	  /* There's no reason this should fail: In this context it's being 
+	     scheduled with a single active thread with an infinite transaction
+	     timeout. */
+	  
+	  assert (err == NULL);
+	  
 	  num_tasks++;
 	}
 
@@ -451,8 +459,6 @@ gzochid_create_durable_application_task_handle
   struct timeval target;
 
   gzochid_data_managed_reference *task_data_reference = NULL;
-  gzochid_durable_application_task_handle *durable_task_handle = NULL;
-  gzochid_data_managed_reference *handle_reference = NULL;
 
   gettimeofday (&target, NULL);
 
@@ -471,37 +477,10 @@ gzochid_create_durable_application_task_handle
     }
   
   if (period != NULL)
-    durable_task_handle = create_durable_periodic_task_handle
+    return create_durable_periodic_task_handle
       (task_data_reference, serialization, task->identity, target, *period);
-  durable_task_handle->binding = create_pending_task_binding
-    (handle_reference->oid);
-  else durable_task_handle = create_durable_task_handle
-	 (task_data_reference, serialization, task->identity, target);
-
-  handle_reference = gzochid_data_create_reference 
-    (task->context, &gzochid_durable_application_task_handle_serialization, 
-     durable_task_handle, &local_err);
-  
-  if (local_err != NULL)
-    {
-      g_propagate_error (err, local_err);
-      return NULL;
-    }
-  
-  gzochid_data_set_binding_to_oid 
-    (task->context, binding_name, handle_reference->oid, &local_err);
-
-  if (local_err != NULL)
-    {
-      g_propagate_error (err, local_err);
-      free (binding_name);
-      return NULL;
-    }
-  else
-    {
-      free (binding_name);
-      return durable_task_handle;
-    }
+  return create_durable_task_handle
+    (task_data_reference, serialization, task->identity, target);
 }
  
 static void 
@@ -574,7 +553,7 @@ durable_task_application_worker (gzochid_application_context *context,
 	 handle, &err);
 
       if (err == NULL)
-	gzochid_schedule_durable_task_handle (context, handle);
+	gzochid_schedule_durable_task_handle (context, handle, NULL);
       else g_error_free (err);
     }
 }
@@ -623,7 +602,7 @@ gzochid_schedule_delayed_durable_task
     (task, serialization, delay, NULL, NULL);
 
   if (handle != NULL)
-    gzochid_schedule_durable_task_handle (context, handle);
+    gzochid_schedule_durable_task_handle (context, handle, NULL);
 }
 
 gzochid_periodic_task_handle *
@@ -639,17 +618,32 @@ gzochid_schedule_periodic_durable_task
 
   if (handle != NULL)
     {
-      gzochid_schedule_durable_task_handle (context, handle);
-      return handle;
+      GError *err = NULL;
+
+      gzochid_schedule_durable_task_handle (context, handle, &err);
+
+      if (err == NULL)
+	return handle;
+      else
+	{
+	  g_debug
+	    ("Failed to schedule durable task in transaction: %s",
+	     err->message);
+
+	  g_error_free (err);
+	  return NULL;
+	}
     }
   else return NULL;
 }
 
 void gzochid_schedule_durable_task_handle
 (gzochid_application_context *app_context,
- gzochid_durable_application_task_handle *task_handle)
+ gzochid_durable_application_task_handle *task_handle, GError **err)
 {
   char *oid_str = NULL;
+  GError *local_err = NULL;
+
   gzochid_game_context *game_context = (gzochid_game_context *) 
     ((gzochid_context *) app_context)->parent;
   gzochid_auth_identity *cloned_identity = NULL;
@@ -679,6 +673,28 @@ void gzochid_schedule_durable_task_handle
 
   durable_task = gzochid_durable_application_task_new
     (durable_task_handle_reference->oid);
+
+  /* The memory allocated for this string is freed by the cleanup task. */
+  
+  oid_str = mpz_get_str (NULL, 16, durable_task_handle_reference->oid);
+
+  task_handle->binding = create_pending_task_binding
+    (durable_task_handle_reference->oid);
+  
+  gzochid_data_set_binding_to_oid 
+    (app_context, task_handle->binding, durable_task_handle_reference->oid,
+     &local_err);
+
+  if (local_err != NULL)
+    {
+      free (oid_str);
+      gzochid_durable_application_task_free (durable_task);      
+
+      g_propagate_error (err, local_err);
+      
+      return;
+    }
+  
   tx_context = join_transaction (app_context);
   
   cloned_identity = gzochid_auth_identity_ref (task_handle->identity);
@@ -686,11 +702,6 @@ void gzochid_schedule_durable_task_handle
   transactional_task = gzochid_application_task_new
     (app_context, cloned_identity, durable_task_application_worker,
      durable_task);
-
-  /* The memory allocated for this string is freed by the cleanup task. */
-  
-  oid_str = mpz_get_str (NULL, 16, durable_task_handle_reference->oid);
-
   catch_task = gzochid_application_task_new
     (app_context, cloned_identity, durable_task_catch_worker, oid_str);
   cleanup_task = gzochid_application_task_new
