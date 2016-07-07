@@ -712,31 +712,491 @@ void gzochid_schedule_durable_task_handle
 		       application_task, task_handle->target_execution_time));
 }
 
+/*
+  The following data structures and functions can be used to manage the 
+  execution in serial of a sequence of tasks, as submitted via 
+  `gzochid_schedule_durable_task_chain'. The basic mechanism is this:
 
+  Each task in the sequence is "hosted" by a "coordinator," which deserializes
+  the task queue, pops the first task off of it, runs that task retryably, and,
+  if there are more tasks in the queue, reschedules itself. The coordinator task
+  is _not_ itself durable. Upon scheduling, a pending task binding for a task 
+  that schedules the coordinator is written to the names store to allow 
+  servicing of the queue to resume on container bootstrap. This binding is 
+  removed - along with the queue itself - when the queue is found to be empty.
+*/
+
+/* Contextual / state information for the sequence of tasks. */
+
+struct _task_chain_context
+{
+  /* A reference to the durable task that re-starts the processing of the task
+     chain on server start-up. */
+  
+  gzochid_data_managed_reference *bootstrap_ref;
+
+  /* A reference to the durable queue that holds the sequence of tasks. */
+  
+  gzochid_data_managed_reference *chain_ref;
+};
+
+typedef struct _task_chain_context task_chain_context;
+
+/* Serialization routines for the durable task chain context. */
+
+static void
+serialize_task_chain_context (gzochid_application_context *app_context,
+			      void *data, GString *out, GError **err)
+{
+  task_chain_context *chain_context = data;
+  
+  gzochid_util_serialize_mpz (chain_context->bootstrap_ref->oid, out);
+  gzochid_util_serialize_mpz (chain_context->chain_ref->oid, out);
+}
+
+static void *
+deserialize_task_chain_context (gzochid_application_context *app_context,
+				GString *in, GError **err)
+{
+  mpz_t oid;
+  task_chain_context *chain_context = malloc (sizeof (task_chain_context));
+
+  mpz_init (oid);
+  
+  gzochid_util_deserialize_mpz (in, oid);
+  chain_context->bootstrap_ref = gzochid_data_create_reference_to_oid
+    (app_context, &gzochid_durable_application_task_handle_serialization, oid);
+
+  gzochid_util_deserialize_mpz (in, oid);
+  chain_context->chain_ref = gzochid_data_create_reference_to_oid
+    (app_context, &gzochid_durable_queue_serialization, oid);
+  
+  return chain_context;
+}
+
+static void
+finalize_task_chain_context (gzochid_application_context *app_context,
+			     void *data)
+{
+  free (data);
+}
+
+static gzochid_io_serialization
+task_chain_context_serialization =
+  {
+    serialize_task_chain_context,
+    deserialize_task_chain_context,
+    finalize_task_chain_context
+  };
+
+/*
+  Clean up the artifacts associated with a durable task chain execution 
+  context. Specifically: 
+  
+  - Remove the bootstrap rescheduler task object and its binding.
+  - Remove any remaining durable task handles from the durable task queue.
+  - Remove the durable task queue object.
+  - Remove the task context object.
+*/
+
+static void
+cleanup_coordinator_task (gzochid_application_context *app_context,
+			  task_chain_context *task_chain_context)
+{
+  GError *err = NULL;
+  gzochid_durable_application_task_handle *task_handle = NULL;
+  
+  gzochid_data_remove_object (task_chain_context->bootstrap_ref, &err);
+  
   if (err == NULL)
     {
-      gzochid_data_managed_reference *handle_reference = 
-	gzochid_data_create_reference 
-	(context, &gzochid_durable_application_task_handle_serialization, 
-	 handle, &err);
-
-      /* Creating a new reference may fail if the transaction's in a bad 
-	 state. */
-
-      if (err == NULL)
-	schedule_durable_task 
-	  (context, wrap_durable_task (context, handle_reference->oid, NULL));
+      char *binding = create_pending_task_binding
+	(task_chain_context->bootstrap_ref->oid);
+      
+      gzochid_data_remove_binding (app_context, binding, &err);
+      free (binding);
     }
+
+  if (err == NULL)
+    while ((task_handle = gzochid_durable_queue_pop
+	    (queue, &gzochid_durable_application_task_handle_serialization,
+	     &err)) != NULL && err == NULL)
+      {
+	gzochid_data_managed_reference *handle_ref =
+	  gzochid_data_create_reference
+	  (app_context, &gzochid_durable_application_task_handle_serialization,
+	   task_handle, &err);
+	
+	/* Creating a new reference may fail if the transaction's in a bad 
+	   state. */
+	
+	if (err == NULL)
+	  gzochid_data_remove_object (handle_ref, &err);
+      }
+  
+  if (err == NULL)
+    gzochid_data_remove_object (task_chain_context->chain_ref, &err);
+  if (err == NULL)
+    gzochid_data_remove_object
+      (gzochid_data_create_reference
+       (app_context, &task_chain_context_serialization, task_chain_context,
+	NULL), &err);
 
   if (err != NULL)
     {
+      g_debug ("Failed to clean up coordinator task context: %s", err->message);
       g_error_free (err);
-      return NULL;
     }
-  else return handle;
-      
+}
+
+/* Forward declaration of `schedule_coordinator_task', to allow it to be 
+   referenced by `coordinator_worker'. */   
+
+static void
+schedule_coordinator_task (gzochid_application_context *,
+			   gzochid_auth_identity *, task_chain_context *);
+
+/* The coordinator worker task implementation. Deserializes the task chain
+   context, pops the next task, runs it, and then either reschedules itself (if
+   there's more work to do) or cleans up the queue (if there isn't). */
+
+static void
+coordinator_worker (gzochid_application_context *app_context,
+		    gzochid_auth_identity *identity, gpointer data)
+{
+  GError *err = NULL;
+
+  mpz_t oid;
+  char *oid_str = data;
+
+  gzochid_data_managed_reference *task_chain_context_ref = NULL;
+  task_chain_context *task_chain_context = NULL;
+  gzochid_durable_queue *queue = NULL;
+
+  gzochid_durable_application_task_handle *next_task_handle = NULL;
+  
+  mpz_init_set_str (oid, oid_str, 16);
+  task_chain_context_ref = gzochid_data_create_reference_to_oid
+    (app_context, &task_chain_context_serialization, oid);
+  mpz_clear (oid);
+  
+  task_chain_context = gzochid_data_dereference (task_chain_context_ref, &err);
+
+  if (err != NULL)
+    {
+      g_debug ("Failed to load task chain context: %s", err->message);
+      g_error_free (err);
+      return;
     }
 
+  /* Deference the queue for update - we're going to pop it immediately. */
+  
+  queue = gzochid_data_dereference_for_update
+    (task_chain_context->chain_ref, &err);
+
+  if (err != NULL)
+    {
+      g_debug ("Failed to load task chain: %s", err->message);
+      g_error_free (err);
+      return;
+    }
+
+  next_task_handle = gzochid_durable_queue_pop
+    (queue, &gzochid_durable_application_task_handle_serialization, &err);
+  
+  if (err != NULL)
+    {
+      g_debug ("Failed to pop the next chained task: %s", err->message);
+      g_error_free (err);
+      return;
+    }
+
+  if (next_task_handle != NULL)
+    {
+      gzochid_data_managed_reference *next_task_handle_ref =
+	gzochid_data_create_reference
+	(app_context, &gzochid_durable_application_task_handle_serialization,
+	 next_task_handle, NULL);
+      gzochid_durable_application_task *task = NULL;
+
+      /* Repeating tasks are not supported as members of a task chain. */
+  
+      assert (!next_task_handle->repeats);
+
+      /* The reference to the next task handle should already be cached in the 
+	 current transaction (as a result of popping it off the queue above) and
+	 so there's no reason that getting a reference to it should fail. */
+      
+      assert (next_task_handle_ref != NULL);
+      
+      gzochid_data_mark
+	(app_context, &gzochid_durable_application_task_handle_serialization,
+	 next_task_handle_ref->obj, &err);
+
+      if (err != NULL)
+	{
+	  g_debug ("Failed to mark chain task for update: %s", err->message);
+	  g_error_free (err);
+	  return;
+	}
+
+      /* Re-hydrate the inner task using the oid from the task handle. */
+      
+      task = gzochid_durable_application_task_new (next_task_handle_ref->oid);
+
+      /* Execute the inner task. This may cause the transaction to be rolled 
+	 back, but the worker interafce doesn't offer a way to signal that
+	 directly... */
+      
+      durable_task_application_worker
+	(app_context, next_task_handle->identity, task);
+
+      gzochid_durable_application_task_free (task);      
+
+      /* ...so check for it indirectly. If the transaction has been marked for
+	 rollback, that's (probably) okay; the outer transaction execution 
+	 system will handle retrying it or ultimately cleaning it up. */
+      
+      if (!gzochid_transaction_rollback_only ())
+	{
+	  gboolean has_next = FALSE;
+
+	  /* Remove the task. */
+	  
+	  gzochid_data_remove_object (next_task_handle_ref, &err);
+
+	  /* Before rescheduling the coordinator, check to see whether there are
+	     more tasks to process. There's no point in adding empty work to the
+	     scheduling queue. */
+	  
+	  if (err == NULL)
+	    has_next = gzochid_durable_queue_peek
+	      (queue, &gzochid_durable_application_task_handle_serialization,
+	       &err) != NULL;
+	  if (err == NULL)
+	    {
+	      if (has_next)
+		schedule_coordinator_task
+		  (app_context, identity, task_chain_context);
+
+	      /* If the queue has no next element, then run the clean up 
+		 process in the current transaction. */
+	      
+	      else cleanup_coordinator_task (app_context, task_chain_context);
+	    }
+	  else
+	    {
+	      g_debug ("Failed to retrieve next chain task: %s", err->message);
+	      g_error_free (err);
+	    }
+	}
+    }
+}
+
+/*
+  The coordinator "catch" task implementation, to be run when the coordinator
+  worker has failed and cannot be retried. 
+
+  Deserializes the task chain context, and then attempts to remove any remaining
+  durable tasks from the queue (without executing them), followed by the queue 
+  and the bootstrap task handle and the task chain context itself.
+*/
+
+static void
+coordinator_catch_worker (gzochid_application_context *app_context,
+			  gzochid_auth_identity *identity, gpointer data)
+{
+  mpz_t oid;
+  char *oid_str = data;
+  gzochid_data_managed_reference *task_chain_context_ref = NULL;
+  task_chain_context *task_chain_context = NULL;
+  GError *err = NULL;
+
+  gzochid_durable_queue *queue = NULL;
+  gzochid_durable_application_task_handle *task_handle = NULL;
+
+  mpz_init_set_str (oid, oid_str, 16);
+  task_chain_context_ref = gzochid_data_create_reference_to_oid
+    (app_context, &task_chain_context_serialization, oid);
+  mpz_clear (oid);
+  
+  task_chain_context = gzochid_data_dereference (task_chain_context_ref, &err);
+
+  if (err != NULL)
+    {      
+      g_debug
+	("Failed to load task chain context during cleanup: %s", err->message);
+      g_error_free (err);
+      return;
+    }
+
+  cleanup_coordinator_task (app_context, task_chain_context);
+}
+
+/*
+  The coordinator cleanup task implementation, to be run when the worker and/or
+  catch tasks are done executing. Frees the string representation of the 
+  durable task handle oid.
+*/
+
+static void
+coordinator_cleanup_worker (gzochid_application_context *app_context,
+			    gzochid_auth_identity *identity, gpointer data)
+{
+  free (data);
+}
+
+/* Enqueues a new instance of the coordinator task to be submitted to the
+   scheduler with the specified task chain context if/when the current 
+   transaction commits successfully. */
+
+static void
+schedule_coordinator_task (gzochid_application_context *app_context,
+			   gzochid_auth_identity *identity,
+			   task_chain_context *chain_context)
+{
+  GError *err = NULL;
+  char *oid_str = NULL;
+
+  gzochid_task_transaction_context *tx_context =
+    join_transaction (app_context);
+
+  gzochid_data_managed_reference *chain_context_ref =
+    gzochid_data_create_reference
+    (app_context, &task_chain_context_serialization, chain_context, &err);
+
+  gzochid_application_task *coordinator_main_task = NULL;
+  gzochid_application_task *coordinator_catch_task = NULL;
+  gzochid_application_task *coordinator_cleanup_task = NULL;
+
+  gzochid_transactional_application_task_execution *coordinator_execution;
+
+  gzochid_task *task = NULL;
+
+  if (err != NULL)
+    {
+      g_debug
+	("Failed to create reference to task chain context: %s", err->message);
+      g_error_free (err);
+      return;
+    }
+  
+  oid_str = mpz_get_str (NULL, 16, chain_context_ref->oid);
+
+  /* Create the worker, catch, and cleanup tasks for the coordinator... */
+  
+  coordinator_main_task = gzochid_application_task_new
+    (app_context, identity, coordinator_worker, oid_str);
+  coordinator_catch_task = gzochid_application_task_new
+    (app_context, identity, coordinator_catch_worker, oid_str);
+  coordinator_cleanup_task = gzochid_application_task_new
+    (app_context, identity, coordinator_cleanup_worker, oid_str);
+
+  /* ...and bundle them into an execution to facilitate retry. */
+  
+  coordinator_execution = gzochid_transactional_application_task_execution_new
+    (coordinator_main_task, coordinator_catch_task, coordinator_cleanup_task);
+
+  /* Note that the task as constructed below doesn't use the delay offset from
+     the task in the queue that it wraps. Possible avenue of enhancement for the
+     future, if desired. */
+  
+  task = gzochid_task_new
+    (gzochid_application_task_thread_worker, gzochid_application_task_new
+     (app_context, gzochid_auth_system_identity (),
+      gzochid_application_resubmitting_transactional_task_worker,
+      coordinator_execution),
+     (struct timeval) { 0, 0 });
+
+  tx_context->scheduled_tasks = g_list_append 
+    (tx_context->scheduled_tasks, task);
+}
+
+static void
+task_chain_bootstrap_worker (gzochid_application_context *app_context,
+			     gzochid_auth_identity *identity, gpointer data)
+{
+  schedule_coordinator_task (app_context, identity, data);
+}
+
+/* Task serialization routines for the durable task chain bootstrap task. */
+
+static void
+serialize_task_chain_bootstrap_worker (gzochid_application_context *app_context,
+				       gzochid_application_worker worker,
+				       GString *out)
+{
+}
+
+static gzochid_application_worker
+deserialize_task_chain_bootstrap_worker
+(gzochid_application_context *app_context, GString *in)
+{
+  return task_chain_bootstrap_worker;
+}
+
+static gzochid_application_worker_serialization
+task_chain_bootstrap_worker_serialization =
+  {
+    serialize_task_chain_bootstrap_worker,
+    deserialize_task_chain_bootstrap_worker
+  };
+
+gzochid_application_task_serialization
+gzochid_task_chain_bootstrap_task_serialization =
+  {
+    "task-chain",
+    &task_chain_bootstrap_worker_serialization,
+    &task_chain_context_serialization
+  };
+
+void
+gzochid_schedule_durable_task_chain (gzochid_application_context *app_context,
+				     gzochid_auth_identity *identity,
+				     gzochid_durable_queue *task_chain,
+				     GError **err)
+{
+  GError *local_err = NULL;
+  task_chain_context *chain_context = calloc (1, sizeof (task_chain_context));
+
+  /* Construct and assemble the primordial context components, checking for
+     transaction failure along the way. */
+  
+  gzochid_durable_application_task_handle *bootstrap_handle =
+    gzochid_create_durable_application_task_handle
+    (gzochid_application_task_new
+     (app_context, identity, task_chain_bootstrap_worker, chain_context),
+     &gzochid_task_chain_bootstrap_task_serialization,
+     (struct timeval) { 0, 0 }, NULL, &local_err);
+  
+  if (local_err == NULL)
+    chain_context->bootstrap_ref = gzochid_data_create_reference
+      (app_context, &gzochid_durable_application_task_handle_serialization,
+       bootstrap_handle, &local_err);
+
+  if (local_err == NULL)
+    {
+      char *binding = create_pending_task_binding
+	(chain_context->bootstrap_ref->oid);
+      
+      gzochid_data_set_binding_to_oid
+	(app_context, binding, chain_context->bootstrap_ref->oid, &local_err);
+      
+      free (binding);
+    }
+  
+  if (local_err == NULL)
+    chain_context->chain_ref = gzochid_data_create_reference
+      (app_context, &gzochid_durable_queue_serialization, task_chain,
+       &local_err);
+  
+  if (local_err != NULL)
+    {
+      g_propagate_error (err, local_err);
+      return;
+    }
+  
+  schedule_coordinator_task (app_context, identity, chain_context);
 }
 
 void 

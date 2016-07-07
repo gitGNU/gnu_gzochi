@@ -221,6 +221,8 @@ initialize_application_task_serializations (int from_state, int to_state,
   gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
   gzochid_task_register_serialization
     (&gzochid_client_received_message_task_serialization);
+  gzochid_task_register_serialization
+    (&gzochid_task_chain_bootstrap_task_serialization);
 }
 
 static void 

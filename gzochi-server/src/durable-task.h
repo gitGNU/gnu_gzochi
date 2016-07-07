@@ -25,6 +25,7 @@
 #include "app-task.h"
 #include "gzochid-auth.h"
 #include "io.h"
+#include "queue.h"
 
 struct _gzochid_application_worker_serialization
 {
@@ -52,6 +53,8 @@ gzochid_durable_application_task_handle;
 
 typedef gzochid_durable_application_task_handle gzochid_periodic_task_handle;
 
+/* Declaration for durable task handle object serialization. */
+
 extern gzochid_io_serialization 
 gzochid_durable_application_task_handle_serialization;
 
@@ -60,6 +63,8 @@ gzochid_durable_application_task_handle_serialization;
 extern gzochid_application_task_serialization
 gzochid_client_received_message_task_serialization;
 
+extern gzochid_application_task_serialization
+gzochid_task_chain_bootstrap_task_serialization;
 
 /* Creates and returns a new `gzochid_durable_task_handle' instance representing
    the specified durable application task, with the specified schedule delay and
@@ -93,15 +98,46 @@ gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task
   added to the pending task journal to allow it to be resubmitted upon container
   restart.
 
-  If the task and its binding cannot be created because the current transaction
-  is not in a healthy state, this function will return `NULL' and set the error
-  return argument appropriately.
+  If the task cannot be scheduled or its binding cannot be created because the 
+  current transaction is not in a healthy state, this function will set the 
+  error return argument appropriately.
 */
 
 void gzochid_schedule_durable_task_handle
 (gzochid_application_context *, gzochid_durable_application_task_handle *,
  GError **err);
 
+/*
+  Schedules the specified sequence of tasks, in the form of a 
+  `gzochid_durable_queue' for serial execution; each task in the queue will be 
+  executed (retryably) in its own transaction, and subsequent tasks will not be
+  scheduled for execution until the current task completes successfully.
+
+  When this function returns successfully, a wrapper around the serialized form
+  of the task queue has been persisted to the data store within the current 
+  transaction, and added to the pending task journal to allow task execution to
+  pick up where it left off upon container restart.
+
+  If the task chain cannot be scheduled or its binding cannot be created because
+  the current transaction is not in a healthy state, this function will set the 
+  error return argument appropriately.
+
+  Restrictions: 
+
+  - The elements in the queue must be uniformly of type 
+  `gzochid_durable_application_task_handle'.
+
+  - These task handles may not be repeating. (They may, however, specify a
+  pre-execution delay.)
+
+  - The durable queue passed to this function will be modified destructively as
+  tasks are removed from it for execution, and removed from the data store once
+  it is empty. It should not be re-used.
+*/
+
+void gzochid_schedule_durable_task_chain
+(gzochid_application_context *, gzochid_auth_identity *,
+ gzochid_durable_queue *, GError **);
 
 void gzochid_cancel_periodic_task 
 (gzochid_application_context *, gzochid_periodic_task_handle *);
