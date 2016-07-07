@@ -55,6 +55,10 @@ typedef gzochid_durable_application_task_handle gzochid_periodic_task_handle;
 extern gzochid_io_serialization 
 gzochid_durable_application_task_handle_serialization;
 
+/* Declarations for pre-defined durable task serializations. */
+
+extern gzochid_application_task_serialization
+gzochid_client_received_message_task_serialization;
 
 
 /* Creates and returns a new `gzochid_durable_task_handle' instance representing
@@ -106,8 +110,6 @@ void gzochid_task_initialize_serialization_registry (void);
 
 void gzochid_task_register_serialization 
 (gzochid_application_task_serialization *);
-
-void gzochid_register_client_received_message_task_serialization (void);
 
 void gzochid_restart_tasks (gzochid_application_context *);
 

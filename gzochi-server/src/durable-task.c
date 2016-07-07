@@ -167,13 +167,6 @@ gzochid_client_received_message_task_serialization =
     &received_message_data_serialization 
   };
 
-void 
-gzochid_register_client_received_message_task_serialization (void)
-{
-  gzochid_task_register_serialization 
-    (&gzochid_client_received_message_task_serialization);
-}
-
 gzochid_durable_application_task *
 gzochid_durable_application_task_new (mpz_t handle_oid)
 {

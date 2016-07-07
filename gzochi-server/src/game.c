@@ -213,25 +213,14 @@ initialize_scheme_api (int from_state, int to_state, gpointer user_data)
 }
 
 static void 
-initialize_serialization_registry (int from_state, int to_state, 
-				   gpointer user_data)
+initialize_application_task_serializations (int from_state, int to_state, 
+					    gpointer user_data)
 {
   gzochid_task_initialize_serialization_registry ();
-}
 
-static void 
-initialize_scheme_task_serialization (int from_state, int to_state,
-				      gpointer user_data)
-{
   gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
-}
-
-static void 
-initialize_client_received_message_task_serialization (int from_state, 
-						       int to_state, 
-						       gpointer user_data)
-{
-  gzochid_register_client_received_message_task_serialization ();
+  gzochid_task_register_serialization
+    (&gzochid_client_received_message_task_serialization);
 }
 
 static void 
@@ -391,16 +380,10 @@ gzochid_game_context_init (gzochid_game_context *context,
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_server, context);
   gzochid_fsm_on_enter 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_serialization_registry, 
-     context);
-  gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_scheme_api, context);
   gzochid_fsm_on_enter 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, 
-     initialize_client_received_message_task_serialization, context);
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, 
-     initialize_scheme_task_serialization, context);
+    (fsm, GZOCHID_GAME_STATE_INITIALIZING,
+     initialize_application_task_serializations, context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_auth, context);
   gzochid_fsm_on_enter 
