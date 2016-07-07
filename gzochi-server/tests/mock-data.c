@@ -133,6 +133,13 @@ gzochid_data_dereference
   return reference->obj;
 }
 
+void *
+gzochid_data_dereference_for_update
+(gzochid_data_managed_reference *reference, GError **error)
+{
+  return gzochid_data_dereference (reference, error);
+}
+
 void
 gzochid_test_mock_data_store
 (gzochid_application_context *context, gzochid_io_serialization *serialization,
