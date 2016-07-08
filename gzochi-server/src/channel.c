@@ -52,8 +52,6 @@ struct _gzochid_channel
 {
   char *name;
 
-  unsigned char *id;
-  short id_len;
 
   mpz_t oid;
   mpz_t scm_oid;
@@ -795,7 +793,6 @@ deserialize_channel (gzochid_application_context *context, GString *in,
   gzochid_channel *channel = calloc (1, sizeof (gzochid_channel));
 
   channel->name = gzochid_util_deserialize_string (in);
-  channel->id = gzochid_util_deserialize_bytes (in, (int *) &channel->id_len);
 
   gzochid_util_deserialize_mpz (in, channel->oid);
   gzochid_util_deserialize_mpz (in, channel->scm_oid);
@@ -810,8 +807,6 @@ serialize_channel (gzochid_application_context *context, gpointer obj,
   gzochid_channel *channel = obj;
   gzochid_util_serialize_string (channel->name, out);
 
-  gzochid_util_serialize_bytes (channel->id, channel->id_len, out);
-  
   gzochid_util_serialize_mpz (channel->oid, out);
   gzochid_util_serialize_mpz (channel->scm_oid, out);
 }
@@ -822,7 +817,6 @@ static void finalize_channel
   gzochid_channel *channel = obj;
   
   free (channel->name);
-  free (channel->id);
 
   mpz_clear (channel->oid);
   mpz_clear (channel->scm_oid);
@@ -925,9 +919,6 @@ gzochid_channel_create (gzochid_application_context *context, char *name)
   
   mpz_set (channel->scm_oid, scm_reference->oid);
   
-  channel->id = (unsigned char *) mpz_get_str (NULL, 16, channel->oid);
-  channel->id_len = strlen ((char *) channel->id);
-
   binding = make_channel_binding (name);
   gzochid_data_set_binding_to_oid (context, binding, reference->oid, &err);
 
