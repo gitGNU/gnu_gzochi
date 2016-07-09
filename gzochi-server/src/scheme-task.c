@@ -443,7 +443,10 @@ gzochid_scheme_application_disconnected_worker
     (context, &gzochid_scheme_data_serialization, 
      gzochid_client_session_get_handler (session)->disconnected->scm_oid);
 
-  gzochid_data_dereference (callback_reference, &err);
+  /* Mark the callback for update; if all goes well, it'll get removed later in
+     the transaction by `gzochid_client_session_disconnected_worker'. */
+  
+  gzochid_data_dereference_for_update (callback_reference, &err);
   
   if (err != NULL)
     {
