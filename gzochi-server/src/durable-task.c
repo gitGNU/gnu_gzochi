@@ -805,6 +805,7 @@ cleanup_coordinator_task (gzochid_application_context *app_context,
 {
   GError *err = NULL;
   gzochid_durable_application_task_handle *task_handle = NULL;
+  gzochid_durable_queue *queue = NULL;
   
   gzochid_data_remove_object (task_chain_context->bootstrap_ref, &err);
   
@@ -817,6 +818,10 @@ cleanup_coordinator_task (gzochid_application_context *app_context,
       free (binding);
     }
 
+  if (err == NULL)
+    queue = gzochid_data_dereference_for_update
+      (task_chain_context->chain_ref, &err);
+  
   if (err == NULL)
     while ((task_handle = gzochid_durable_queue_pop
 	    (queue, &gzochid_durable_application_task_handle_serialization,
@@ -1011,9 +1016,6 @@ coordinator_catch_worker (gzochid_application_context *app_context,
   gzochid_data_managed_reference *task_chain_context_ref = NULL;
   task_chain_context *task_chain_context = NULL;
   GError *err = NULL;
-
-  gzochid_durable_queue *queue = NULL;
-  gzochid_durable_application_task_handle *task_handle = NULL;
 
   mpz_init_set_str (oid, oid_str, 16);
   task_chain_context_ref = gzochid_data_create_reference_to_oid
