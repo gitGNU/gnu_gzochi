@@ -26,6 +26,7 @@
 
 #include "app.h"
 #include "auth_int.h"
+#include "channel.h"
 #include "config.h"
 #include "context.h"
 #include "descriptor.h"
@@ -221,6 +222,8 @@ initialize_application_task_serializations (int from_state, int to_state,
   gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
   gzochid_task_register_serialization
     (&gzochid_client_received_message_task_serialization);
+  gzochid_task_register_serialization
+    (&gzochid_channel_operation_task_serialization);
   gzochid_task_register_serialization
     (&gzochid_task_chain_bootstrap_task_serialization);
 }

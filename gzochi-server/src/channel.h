@@ -22,6 +22,7 @@
 #include <gmp.h>
 
 #include "app.h"
+#include "durable-task.h"
 #include "io.h"
 #include "session.h"
 #include "task.h"
@@ -29,6 +30,9 @@
 typedef struct _gzochid_channel gzochid_channel;
 
 extern gzochid_io_serialization gzochid_channel_serialization;
+
+extern gzochid_application_task_serialization
+gzochid_channel_operation_task_serialization;
 
 /*
   Create and return a new channel with the specified name in the specified game
@@ -40,7 +44,23 @@ extern gzochid_io_serialization gzochid_channel_serialization;
 
 gzochid_channel *gzochid_channel_create (gzochid_application_context *, char *);
 gzochid_channel *gzochid_channel_get (gzochid_application_context *, char *);
+
+/*
+  Initialize and return a new channel with the specified name. 
+  
+  Note that this function does not enqueue the channel for persistence nor bind
+  it to a Scheme object. Call `gzochid_channel_create' to do those things.
+*/
+
 gzochid_channel *gzochid_channel_new (char *);
+
+/*
+  Frees the memory associated with the specified channel.
+
+  Note that this function does not enqueue the channel for persistence nor bind
+  it to a Scheme object. Call `gzochid_channel_create' to do those things.
+*/
+
 void gzochid_channel_free (gzochid_channel *);
 
 void gzochid_channel_join 

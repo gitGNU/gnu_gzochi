@@ -38,177 +38,326 @@
 #include "tx.h"
 #include "util.h"
 
+/*
+  The following data structures and functions define the gzochid container's
+  channel service. As described in the manual, channels are named groups of
+  client sessions that can be addressed en masse for the purpose of broadcast.
+  
+  The channel service provides transactional semantics for message delivery and
+  membership management. There are two different "stages" of transaction 
+  executed by this service. The first stage is user-initiated and provides 
+  "all-or-nothing" guarantees for the scheduling of channel operations; if this
+  transaction commits, all requested operations will be durably scheduled for 
+  execution in serial. The second tier of transactions includes transactions
+  initiated to execute each of scheduled tasks; when a channel "side effect" 
+  transaction commits, the operation is executed against the current state of 
+  the channel - a message being sent to all member sessions, for example. The
+  initial transaction operates on the channel in the abstract, whereas the side
+  effect transaction operates on the concrete state of the channel.
+
+  Despite the transactional nature of channel interactions, channels themselves
+  are ephemeral with respect to a gzochid application server node. Channel
+  membership, for example, does not survive a container restart. ...Which stands
+  to reason, since all members would have been disconnected. 
+*/
+
 #define CHANNEL_PREFIX "s.channel."
+
+/* An enumeration of operation types. */
 
 enum gzochid_channel_operation
   {
-    GZOCHID_CHANNEL_OP_JOIN,
-    GZOCHID_CHANNEL_OP_LEAVE,
-    GZOCHID_CHANNEL_OP_SEND,
-    GZOCHID_CHANNEL_OP_CLOSE
+    GZOCHID_CHANNEL_OP_JOIN, /* Add a session to the channel. */
+    GZOCHID_CHANNEL_OP_LEAVE, /* Remove a session from the channel. */
+    GZOCHID_CHANNEL_OP_SEND, /* Send a message to all member sessions. */
+    GZOCHID_CHANNEL_OP_CLOSE /* Destroy the channel, removing all members. */
   };
+
+/* The channel structure. */
 
 struct _gzochid_channel
 {
-  char *name;
-
-
-  mpz_t oid;
-  mpz_t scm_oid;
+  char *name; /* The channel name. */
+  mpz_t oid; /* The object id of the channel in the object store. */
+  mpz_t scm_oid; /* The object id of the channel's Scheme representation. */
 };
+
+gzochid_channel *
+gzochid_channel_new (char *name)
+{
+  gzochid_channel *channel = calloc (1, sizeof (gzochid_channel));
+
+  channel->name = name;
+
+  mpz_init (channel->oid);
+  mpz_init (channel->scm_oid);
+
+  return channel;
+}
+
+void
+gzochid_channel_free (gzochid_channel *channel)
+{
+  mpz_clear (channel->oid);
+  mpz_clear (channel->scm_oid);
+
+  free (channel);
+}
+
+void
+gzochid_channel_scm_oid (gzochid_channel *channel, mpz_t scm_oid)
+{
+  mpz_set (scm_oid, channel->scm_oid);
+}
+
+const char *
+gzochid_channel_name (gzochid_channel *channel)
+{
+  return channel->name;
+}
+
+/* Serialization routines for channel objects. */
+
+static gpointer 
+deserialize_channel (gzochid_application_context *context, GString *in,
+		     GError **err)
+{
+  gzochid_channel *channel = calloc (1, sizeof (gzochid_channel));
+
+  channel->name = gzochid_util_deserialize_string (in);
+
+  gzochid_util_deserialize_mpz (in, channel->oid);
+  gzochid_util_deserialize_mpz (in, channel->scm_oid);
+
+  return channel;
+}
+
+static void 
+serialize_channel (gzochid_application_context *context, gpointer obj,
+		   GString *out, GError **err)
+{
+  gzochid_channel *channel = obj;
+  gzochid_util_serialize_string (channel->name, out);
+
+  gzochid_util_serialize_mpz (channel->oid, out);
+  gzochid_util_serialize_mpz (channel->scm_oid, out);
+}
+
+static void finalize_channel
+(gzochid_application_context *context, gpointer obj)
+{
+  gzochid_channel_free (obj);
+}
+
+gzochid_io_serialization gzochid_channel_serialization =
+  { serialize_channel, deserialize_channel, finalize_channel };
+
+/* The following data structures represent the logical set of channel operations
+   via a kind of "lite" polymorphism. */
+
+/* The base operation type. Also represents a channel `close' operation. */
 
 struct _gzochid_channel_pending_operation
 {
-  enum gzochid_channel_operation type;
-  mpz_t target_channel;
-  struct timeval timestamp;
+  enum gzochid_channel_operation type; /* The operation type. */
+  mpz_t target_channel; /* The target channel oid. */
+
+  /* The operation timestamp, for schedule ordering. */
+  
+  struct timeval timestamp; 
 };
 
 typedef struct _gzochid_channel_pending_operation
 gzochid_channel_pending_operation;
 
+/* Represents a channel `send' operation. */
+
 struct _gzochid_channel_pending_send_operation
 {
-  gzochid_channel_pending_operation base;
-  unsigned char *message;
-  short len;
+  gzochid_channel_pending_operation base; /* Base channel operation. */
+  unsigned char *message; /* The message payload. */
+  short len; /* The message payload size. */
 };
 
 typedef struct _gzochid_channel_pending_send_operation
 gzochid_channel_pending_send_operation;
 
+/* Represents an operation that changes channel membership, i.e., a `join' or
+   `leave' operation. */
+
 struct _gzochid_channel_pending_membership_operation
 {
-  gzochid_channel_pending_operation base;
-  mpz_t target_session;
+  gzochid_channel_pending_operation base; /* Base channel operation. */
+  mpz_t target_session; /* The target session oid. */
 };
 
 typedef struct _gzochid_channel_pending_membership_operation
 gzochid_channel_pending_membership_operation;
 
+/* Serialization routines for logical channel operations. */
+
+static gpointer 
+deserialize_channel_operation (gzochid_application_context *context,
+			       GString *in, GError **err)
+{
+  enum gzochid_channel_operation type = gzochid_util_deserialize_int (in);
+  gzochid_channel_pending_operation *op = NULL;
+
+  /* 
+     Figure out what kind of operation this is so we know how to deserialize 
+     the rest of the object. 
+  */
+  
+  if (type == GZOCHID_CHANNEL_OP_JOIN || type == GZOCHID_CHANNEL_OP_LEAVE)
+    op = malloc (sizeof (gzochid_channel_pending_membership_operation));
+  else if (type == GZOCHID_CHANNEL_OP_SEND)
+    op = malloc (sizeof (gzochid_channel_pending_send_operation));
+  else op = malloc (sizeof (gzochid_channel_pending_operation));
+
+  op->type = type;
+
+  mpz_init (op->target_channel);
+  gzochid_util_deserialize_mpz (in, op->target_channel);
+
+  if (type == GZOCHID_CHANNEL_OP_JOIN || type == GZOCHID_CHANNEL_OP_LEAVE)
+    {
+      gzochid_channel_pending_membership_operation *member_op =
+	(gzochid_channel_pending_membership_operation *) op;
+      
+      mpz_init (member_op->target_session);
+      gzochid_util_deserialize_mpz (in, member_op->target_session);
+    }
+  else if (type == GZOCHID_CHANNEL_OP_SEND)
+    {
+      gzochid_channel_pending_send_operation *send_op =
+	(gzochid_channel_pending_send_operation *) op;
+      
+      send_op->message = gzochid_util_deserialize_bytes
+	(in, (int *) &send_op->len);
+    }
+
+  return op;
+}
+
+static void 
+serialize_channel_operation (gzochid_application_context *context,
+			     gpointer data, GString *out, GError **err)
+{
+  gzochid_channel_pending_operation *op = data;
+
+  /* Important to serialize the operation type first, so that the deserializer
+     can read it before reading an operation type-specific fields. */
+  
+  gzochid_util_serialize_int (op->type, out);
+  gzochid_util_serialize_mpz (op->target_channel, out);
+  
+  if (op->type == GZOCHID_CHANNEL_OP_JOIN
+      || op->type == GZOCHID_CHANNEL_OP_LEAVE) {
+
+    gzochid_channel_pending_membership_operation *member_op =
+      (gzochid_channel_pending_membership_operation *) op;
+
+    gzochid_util_serialize_mpz (member_op->target_session, out);
+    
+  } else if (op->type == GZOCHID_CHANNEL_OP_SEND) {
+
+    gzochid_channel_pending_send_operation *send_op =
+      (gzochid_channel_pending_send_operation *) op;
+
+    gzochid_util_serialize_bytes (send_op->message, send_op->len, out);
+  } 
+}
+
+static void
+finalize_channel_operation (gzochid_application_context *context, gpointer data)
+{
+  gzochid_channel_pending_operation *op = data;
+
+  if (op->type == GZOCHID_CHANNEL_OP_SEND)
+    {
+      gzochid_channel_pending_send_operation *send_op =
+	(gzochid_channel_pending_send_operation *) op;
+
+      free (send_op->message);
+    }
+  else if (op->type == GZOCHID_CHANNEL_OP_JOIN
+	   || op->type == GZOCHID_CHANNEL_OP_LEAVE)
+    {
+      gzochid_channel_pending_membership_operation *membership_op =
+	(gzochid_channel_pending_membership_operation *) op;
+
+      mpz_clear (membership_op->target_session);
+    }
+  
+  mpz_clear (op->target_channel);  
+  free (op);
+}
+
+static gzochid_io_serialization gzochid_channel_operation_serialization =
+  {
+    serialize_channel_operation,
+    deserialize_channel_operation,
+    finalize_channel_operation
+  };
+
+/* The following data structures and functions make up the channel side effects
+   transaction system, using the same kind of polymorphism as logical channel
+   operations. */
+
+/* The base side effect type. Also represents a channel `close' side effect. */
+
 struct _gzochid_channel_side_effect
 {
-  enum gzochid_channel_operation op;
-  char *channel_oid_str;
+  enum gzochid_channel_operation op; /* The side effect type. */
+
+  /* The hexadecimal string form of the channel oid; used as a key into the 
+     application context's active channel map. */
+
+  char *channel_oid_str; 
 };
 
 typedef struct _gzochid_channel_side_effect gzochid_channel_side_effect;
 
+/* Represents a side effect that changes channel membership, i.e., a `join' or
+   `leave' side effect. */
+
 struct _gzochid_channel_membership_side_effect
 {
-  gzochid_channel_side_effect base;
+  gzochid_channel_side_effect base; /* Base channel side effect. */
   
+  /* The hexadecimal string form of the session oid; used as a key into the 
+     application context's active session map. */
+
   char *session_oid_str;
 };
 
 typedef struct _gzochid_channel_membership_side_effect
 gzochid_channel_membership_side_effect;
 
+/* Represents a channel `send' side effect. */
+
 struct _gzochid_channel_message_side_effect
 {
-  gzochid_channel_side_effect base;
+  gzochid_channel_side_effect base; /* Base channel side effect. */
   
+  /* A snapshot of the members of the channel, in the form of an array of hex 
+     string session oids, at the time the side effect transaction was 
+     executed. */
+
   GPtrArray *session_oid_strs;
-  unsigned char *msg;
-  short len;
+  
+  unsigned char *msg; /* The message to be sent. */
+  short len; /* The message payload length. */
 };
 
 typedef struct _gzochid_channel_message_side_effect
 gzochid_channel_message_side_effect;
 
-static gzochid_channel_side_effect *
-gzochid_channel_side_effect_new (enum gzochid_channel_operation op,
-				 char *channel_oid_str)
-{
-  gzochid_channel_side_effect *side_effect =
-    malloc (sizeof (gzochid_channel_side_effect));
-
-  assert (op == GZOCHID_CHANNEL_OP_CLOSE);
-  
-  side_effect->op = op;
-  side_effect->channel_oid_str = channel_oid_str;
-
-  return side_effect;
-}
-
-static gzochid_channel_side_effect *
-gzochid_channel_membership_side_effect_new (enum gzochid_channel_operation op,
-					    char *channel_oid_str,
-					    char *session_oid_str)
-{
-  gzochid_channel_membership_side_effect *membership_side_effect =
-    malloc (sizeof (gzochid_channel_membership_side_effect));
-  gzochid_channel_side_effect *side_effect = (gzochid_channel_side_effect *)
-    membership_side_effect;
-
-  assert (op == GZOCHID_CHANNEL_OP_JOIN || op == GZOCHID_CHANNEL_OP_LEAVE);
-  
-  side_effect->op = op;
-  side_effect->channel_oid_str = channel_oid_str;
-
-  membership_side_effect->session_oid_str = session_oid_str;
-  
-  return side_effect;
-}
-
-static gzochid_channel_side_effect *
-gzochid_channel_message_side_effect_new (enum gzochid_channel_operation op,
-					 char *channel_oid_str,
-					 GPtrArray *session_oid_strs,
-					 unsigned char *msg, short len)
-{
-  gzochid_channel_message_side_effect *message_side_effect =
-    malloc (sizeof (gzochid_channel_message_side_effect));
-  gzochid_channel_side_effect *side_effect = (gzochid_channel_side_effect *)
-    message_side_effect;
-
-  assert (op == GZOCHID_CHANNEL_OP_SEND);
-  
-  side_effect->op = op;
-  side_effect->channel_oid_str = channel_oid_str;
-
-  message_side_effect->session_oid_strs = g_ptr_array_ref (session_oid_strs);
-  message_side_effect->msg = malloc (sizeof (char) * len);
-  message_side_effect->len = len;
-  
-  memcpy (message_side_effect->msg, msg, len);
-  
-  return side_effect;
-}
-
-struct _gzochid_channel_side_effect_transaction_context 
-{
-  gzochid_application_context *app_context;
-  gzochid_channel_side_effect *side_effect;
-};
-
-typedef struct _gzochid_channel_side_effect_transaction_context 
-gzochid_channel_side_effect_transaction_context;
-
-static gzochid_channel_side_effect_transaction_context *
-create_side_effect_transaction_context
-(gzochid_application_context *app_context)
-{
-  gzochid_channel_side_effect_transaction_context *tx_context = malloc
-    (sizeof (gzochid_channel_side_effect_transaction_context));
-
-  tx_context->app_context = app_context;
-  tx_context->side_effect = NULL;
-  
-  return tx_context;
-}
-
-static int
-channel_side_effect_prepare (gpointer data)
-{
-  return TRUE;
-}
+/* Frees the memory used by the specified side effect. */
 
 static void
-free_side_effect (gpointer data)
+free_side_effect (gzochid_channel_side_effect *side_effect)
 {
-  gzochid_channel_side_effect *side_effect = data;
-
   if (side_effect->op == GZOCHID_CHANNEL_OP_SEND)
     {
       gzochid_channel_message_side_effect *message_side_effect =
@@ -230,6 +379,100 @@ free_side_effect (gpointer data)
   free (side_effect);
 }
 
+/*
+  Create and return a new channel `close' side effect. Memory should be freed
+  via `free_side_effect' when no longer in use.
+*/
+
+static gzochid_channel_side_effect *
+gzochid_channel_side_effect_new (enum gzochid_channel_operation op,
+				 char *channel_oid_str)
+{
+  gzochid_channel_side_effect *side_effect =
+    malloc (sizeof (gzochid_channel_side_effect));
+
+  assert (op == GZOCHID_CHANNEL_OP_CLOSE);
+  
+  side_effect->op = op;
+  side_effect->channel_oid_str = strdup (channel_oid_str);
+
+  return side_effect;
+}
+
+/*
+  Create and return a new channel `leave' or `join' side effect with the 
+  specified target session oid. Memory should be freed via `free_side_effect' 
+  when no longer in use.
+*/
+
+static gzochid_channel_side_effect *
+gzochid_channel_membership_side_effect_new (enum gzochid_channel_operation op,
+					    char *channel_oid_str,
+					    char *session_oid_str)
+{
+  gzochid_channel_membership_side_effect *membership_side_effect =
+    malloc (sizeof (gzochid_channel_membership_side_effect));
+  gzochid_channel_side_effect *side_effect = (gzochid_channel_side_effect *)
+    membership_side_effect;
+
+  assert (op == GZOCHID_CHANNEL_OP_JOIN || op == GZOCHID_CHANNEL_OP_LEAVE);
+  
+  side_effect->op = op;
+  side_effect->channel_oid_str = strdup (channel_oid_str);
+
+  membership_side_effect->session_oid_str = strdup (session_oid_str);
+  
+  return side_effect;
+}
+
+/*
+  Create and return a new channel `send' side effect with the 
+  specified session oid array and message. Memory should be freed via 
+  `free_side_effect' when no longer in use.
+*/
+
+static gzochid_channel_side_effect *
+gzochid_channel_message_side_effect_new (enum gzochid_channel_operation op,
+					 char *channel_oid_str,
+					 GPtrArray *session_oid_strs,
+					 unsigned char *msg, short len)
+{
+  gzochid_channel_message_side_effect *message_side_effect =
+    malloc (sizeof (gzochid_channel_message_side_effect));
+  gzochid_channel_side_effect *side_effect = (gzochid_channel_side_effect *)
+    message_side_effect;
+
+  assert (op == GZOCHID_CHANNEL_OP_SEND);
+  
+  side_effect->op = op;
+  side_effect->channel_oid_str = strdup (channel_oid_str);
+
+  message_side_effect->session_oid_strs = g_ptr_array_ref (session_oid_strs);
+  message_side_effect->msg = malloc (sizeof (char) * len);
+  message_side_effect->len = len;
+  
+  memcpy (message_side_effect->msg, msg, len);
+  
+  return side_effect;
+}
+
+/* The transaction participant context for channel side effect transactions. */
+
+struct _gzochid_channel_side_effect_transaction_context 
+{
+  /* The gzochi game application context to which the channel belongs. */
+  
+  gzochid_application_context *app_context;
+
+  /* The channel side effect to be executed on commit. There can only be one
+     side effect per side effect transaction. */
+  
+  gzochid_channel_side_effect *side_effect;
+};
+
+typedef struct _gzochid_channel_side_effect_transaction_context 
+gzochid_channel_side_effect_transaction_context;
+
 static void
 cleanup_side_effect_transaction
 (gzochid_channel_side_effect_transaction_context *tx_context)
@@ -238,6 +481,18 @@ cleanup_side_effect_transaction
     free_side_effect (tx_context->side_effect);
   free (tx_context);
 }
+
+/* The `prepare' function for a side effects transaction. Effectively a 
+   no-op. */
+
+static int
+channel_side_effect_prepare (gpointer data)
+{
+  return TRUE;
+}
+
+/* Makes the channel side effect permanent with respect to the current state of
+   the channel on this application server node. */
 
 static void
 channel_side_effect_commit (gpointer data)
@@ -248,14 +503,22 @@ channel_side_effect_commit (gpointer data)
     {
       GSequence *sessions = NULL;
 
+      /* Locking the channel map; no matter what kind of side effect is being
+	 processed, it'll require exclusive access to the channel. */
+      
       g_mutex_lock (&tx_context->app_context->channel_mapping_lock);
 
+      /* Does the channel have any member sessions on this node? */
+      
       sessions = g_hash_table_lookup
 	(tx_context->app_context->channel_oids_to_local_session_oids,
 	 tx_context->side_effect->channel_oid_str);
 
       if (sessions == NULL)
 	{
+	  /* If not, that's okay; it may not have been used on this node. Create
+	     an empty sequence to store new members. */
+	  
 	  sessions = g_sequence_new (free);
 
 	  g_hash_table_insert
@@ -272,12 +535,15 @@ channel_side_effect_commit (gpointer data)
 	  g_mutex_lock (&tx_context->app_context->client_mapping_lock);
 	  
 	  for (; i < message_side_effect->session_oid_strs->len; i++)
-	    {
+	    { 
 	      char *session_oid_str = g_ptr_array_index
 		(message_side_effect->session_oid_strs, i);
 	      gzochid_game_client *client = g_hash_table_lookup
 		(tx_context->app_context->oids_to_clients, session_oid_str);
 
+	      /* Grab the client connection to which the session oid 
+		 corresponds. */
+	      
 	      if (client != NULL)
 		{
 		  gzochid_application_event_dispatch
@@ -289,6 +555,11 @@ channel_side_effect_commit (gpointer data)
 		}
 	      else
 		{
+		  /* If no client was found for the specified session, remove it
+		     from the set of local session oids so we don't waste time 
+		     on it again; a conveniently lazy way of purging old 
+		     members. */
+		  
 		  GSequenceIter *iter = g_sequence_lookup
 		    (sessions, session_oid_str,
 		     gzochid_util_string_data_compare, NULL);
@@ -306,40 +577,43 @@ channel_side_effect_commit (gpointer data)
 	  
 	  g_mutex_unlock (&tx_context->app_context->client_mapping_lock);
 	}
-      else
+      else if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_JOIN
+	       || tx_context->side_effect->op == GZOCHID_CHANNEL_OP_LEAVE)
 	{
-	  if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_JOIN
-	      || tx_context->side_effect->op == GZOCHID_CHANNEL_OP_LEAVE)
-	    {
-	      gzochid_channel_membership_side_effect *membership_side_effect =
-		(gzochid_channel_membership_side_effect *)
-		tx_context->side_effect;
+	  gzochid_channel_membership_side_effect *membership_side_effect =
+	    (gzochid_channel_membership_side_effect *)
+	    tx_context->side_effect;
+	  
+	  GSequenceIter *iter = g_sequence_lookup
+	    (sessions, membership_side_effect->session_oid_str,
+	     gzochid_util_string_data_compare, NULL);
 
-	      GSequenceIter *iter = g_sequence_lookup
- 		(sessions, membership_side_effect->session_oid_str,
-		 gzochid_util_string_data_compare, NULL);
-	      
-	      if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_JOIN)
-		{
-		  if (iter == NULL)
-		    g_sequence_insert_sorted
-		      (sessions,
-		       strdup (membership_side_effect->session_oid_str),
-		       gzochid_util_string_data_compare, NULL);
-		}
-	      else if (iter != NULL)
-		g_sequence_remove (iter);
+	  /* Add or remove the session to or from the channel's session list. */
+	  
+	  if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_JOIN)
+	    {
+	      if (iter == NULL)
+		g_sequence_insert_sorted
+		  (sessions, strdup (membership_side_effect->session_oid_str),
+		   gzochid_util_string_data_compare, NULL);
 	    }
-	  else g_hash_table_remove
-		 (tx_context->app_context->channel_oids_to_local_session_oids,
-		  tx_context->side_effect->channel_oid_str);	  
+	  else if (iter != NULL)
+	    g_sequence_remove (iter);
 	}
+
+      /* Shut the channel down and free everything. */
+      
+      else g_hash_table_remove
+	     (tx_context->app_context->channel_oids_to_local_session_oids,
+	      tx_context->side_effect->channel_oid_str);	  
 
       g_mutex_unlock (&tx_context->app_context->channel_mapping_lock);
     }
 
   cleanup_side_effect_transaction (tx_context);
 }
+
+/* Abort the current transaction, discarding any pending side effect. */
 
 static void
 channel_side_effect_rollback (gpointer data)
@@ -355,8 +629,13 @@ static gzochid_transaction_participant channel_side_effect_participant =
     channel_side_effect_rollback 
   };
 
+/* Join the current general transaction, initiating one if there isn't one 
+   already active, and bind an empty side effect transactional state to it. (Or,
+   if we've already joined the transaction, just return the existing 
+   transactional state. */
+
 static gzochid_channel_side_effect_transaction_context *
-join_side_effect_transaction (gzochid_application_context *context)
+join_side_effect_transaction (gzochid_application_context *app_context)
 {
   gzochid_channel_side_effect_transaction_context *tx_context = NULL;
 
@@ -364,7 +643,12 @@ join_side_effect_transaction (gzochid_application_context *context)
       || (gzochid_transaction_context 
 	  (&channel_side_effect_participant) == NULL))
     {
-      tx_context = create_side_effect_transaction_context (context);
+      tx_context =
+	malloc (sizeof (gzochid_channel_side_effect_transaction_context));
+      
+      tx_context->app_context = app_context;
+      tx_context->side_effect = NULL;
+  
       gzochid_transaction_join (&channel_side_effect_participant, tx_context);
     }
   else tx_context = gzochid_transaction_context
@@ -373,40 +657,7 @@ join_side_effect_transaction (gzochid_application_context *context)
   return tx_context;
 }
 
-/* Frees the specified operation, potentially downcasting it to a more specific
-   type to allow operation-specific fields to be freed first. */
-
-static void
-free_operation (gzochid_channel_pending_operation *op)
-{
-  if (op->type == GZOCHID_CHANNEL_OP_SEND)
-    {
-      gzochid_channel_pending_send_operation *send_op =
-	(gzochid_channel_pending_send_operation *) op;
-
-      free (send_op->message);
-    }
-  else if (op->type == GZOCHID_CHANNEL_OP_JOIN
-	   || op->type == GZOCHID_CHANNEL_OP_LEAVE)
-    {
-      gzochid_channel_pending_membership_operation *membership_op =
-	(gzochid_channel_pending_membership_operation *) op;
-
-      mpz_clear (membership_op->target_session);
-    }
-  
-  mpz_clear (op->target_channel);  
-  free (op);
-}
-
-/* Exposes `free_operation' as a `gzochid_application_worker'. */
-
-static void
-free_operation_worker (gzochid_application_context *context,
-		       gzochid_auth_identity *identity, gpointer data)
-{
-  free_operation (data);
-}
+/* Close the target channel as a side effect of the current transaction. */
 
 static void
 close_channel (gzochid_application_context *context,
@@ -431,6 +682,9 @@ close_channel (gzochid_application_context *context,
   g_mutex_unlock (&context->channel_mapping_lock);
 }
 
+/* Send a message to the target channel's members as a side effect of the 
+   current transaction. */
+
 static void
 send_channel_message (gzochid_application_context *context,
 		      gzochid_auth_identity *identity, gpointer data)
@@ -450,7 +704,12 @@ send_channel_message (gzochid_application_context *context,
 	(context->channel_oids_to_local_session_oids, channel_oid_str);
       GSequenceIter *iter = g_sequence_get_begin_iter (sessions);
 
+      /* Take a snapshot of the current membership of the channel. */
+      
       if (g_sequence_iter_is_end (iter))
+
+	/* ...which might be empty. */
+	
 	free (channel_oid_str);
       else
 	{
@@ -475,6 +734,9 @@ send_channel_message (gzochid_application_context *context,
   
   g_mutex_unlock (&context->channel_mapping_lock);
 }
+
+/* Add the target session to the target channel as a side effect of the current
+   transaction. */
 
 static void
 join_channel (gzochid_application_context *context,
@@ -520,6 +782,9 @@ join_channel (gzochid_application_context *context,
     }
 }
 
+/* Remove the target session to the target channel as a side effect from the 
+   current transaction. */
+
 static void
 leave_channel (gzochid_application_context *context,
 	       gzochid_auth_identity *identity, gpointer data)
@@ -564,175 +829,23 @@ leave_channel (gzochid_application_context *context,
     }
 }
 
-/* Creates a retryable `gzochid_application_task' to execute the specified
-   worker, which represents some channel-related operation, and then finally 
-   free the operation as a cleanup step. (The result is then wrapped again as a
-   `gzochid_task' that may be submitted directly to the scheduler.) */
-
-static gzochid_task *
-create_transactional_channel_operation_task
-(gzochid_application_context *context, gzochid_auth_identity *identity,
- gzochid_application_worker worker, gpointer data, 
- struct timeval target_execution_time)
-{
-  gzochid_application_task *task = gzochid_application_task_new
-    (context, identity, worker, data);
-  gzochid_application_task *cleanup_task =
-    gzochid_application_task_new
-    (context, identity, free_operation_worker, data);
-  
-  gzochid_transactional_application_task_execution *execution = 
-    gzochid_transactional_application_task_execution_new
-    (task, NULL, cleanup_task);
-  
-  gzochid_application_task *application_task = 
-    gzochid_application_task_new
-    (context, identity, 
-     gzochid_application_resubmitting_transactional_task_worker, execution);
-
-  /* Not necessary to hold a ref to these, as we've transferred them to the
-     execution. */
-  
-  gzochid_application_task_unref (task);
-  gzochid_application_task_unref (cleanup_task);
-  
-  return gzochid_task_new
-    (gzochid_application_task_thread_worker, application_task, 
-     target_execution_time);
-}
-
-/* Returns a `gzochid_task' that executes the specified channel operation
-   transactionally. */
-
-static gzochid_task *
-create_channel_operation_task
-(gzochid_channel_pending_operation *op, gzochid_application_context *context)
-{
-  gzochid_task *task = NULL;
-
-  struct timeval now;
-
-  gzochid_auth_identity *identity = gzochid_auth_identity_from_name
-    (context->identity_cache, "[SYSTEM]");
-
-  gettimeofday (&now, NULL);
-
-  switch (op->type)
-    {
-    case GZOCHID_CHANNEL_OP_CLOSE: 
-      task = create_transactional_channel_operation_task	
-	(context, identity, close_channel, op, now);
-
-      break;
-
-    case GZOCHID_CHANNEL_OP_SEND:
-      task = create_transactional_channel_operation_task	
-	(context, identity, send_channel_message, op, now);
-
-      break;
-
-    case GZOCHID_CHANNEL_OP_LEAVE: 
-      task = create_transactional_channel_operation_task	
-	(context, identity, leave_channel, op, now);
-
-      break;
-
-    case GZOCHID_CHANNEL_OP_JOIN: 
-      task = create_transactional_channel_operation_task	
-	(context, identity, join_channel, op, now);
-
-      break;
-    }
-
-  return task;
-}
+/* The following data structures and functions make up the logical channel
+   operation transaction system. */
 
 struct _gzochid_channel_transaction_context 
 {
+  /* The gzochi game application context to which the channel belongs. */
+  
   gzochid_application_context *context;
-  GList *operations;
+
+  /* A managed reference to the queue of pending channel operations to be 
+     scheduled. */
+  
+  gzochid_data_managed_reference *queue_ref; 
 };
 
 typedef struct _gzochid_channel_transaction_context
 gzochid_channel_transaction_context;
-
-static gzochid_channel_pending_operation *
-create_close_operation (mpz_t channel_oid)
-{
-  gzochid_channel_pending_operation *operation = malloc 
-    (sizeof (gzochid_channel_pending_operation));
-
-  operation->type = GZOCHID_CHANNEL_OP_CLOSE;
-  mpz_init (operation->target_channel);
-  mpz_set (operation->target_channel, channel_oid);
-
-  return operation;
-}
-
-static gzochid_channel_pending_send_operation *
-create_send_operation (mpz_t channel_oid, unsigned char *message, short len)
-{
-  gzochid_channel_pending_send_operation *send_operation = malloc 
-    (sizeof (gzochid_channel_pending_send_operation));
-  gzochid_channel_pending_operation *operation = 
-    (gzochid_channel_pending_operation *) send_operation;
-
-  operation->type = GZOCHID_CHANNEL_OP_SEND;
-  send_operation->message = malloc (sizeof (unsigned char) * len);
-
-  memcpy (send_operation->message, message, len);
-  
-  send_operation->len = len;
-  mpz_init (operation->target_channel);
-  mpz_set (operation->target_channel, channel_oid);
-
-  return send_operation;
-}
-
-static gzochid_channel_pending_membership_operation *
-create_join_operation (mpz_t channel_oid, mpz_t session_oid)
-{
-  gzochid_channel_pending_membership_operation *join_operation = malloc 
-    (sizeof (gzochid_channel_pending_membership_operation));
-  gzochid_channel_pending_operation *operation = 
-    (gzochid_channel_pending_operation *) join_operation;
-
-  operation->type = GZOCHID_CHANNEL_OP_JOIN;
-  mpz_init (operation->target_channel);
-  mpz_init (join_operation->target_session);
-  mpz_set (operation->target_channel, channel_oid);
-  mpz_set (join_operation->target_session, session_oid);
-
-  return join_operation;
-}
-
-static gzochid_channel_pending_membership_operation *
-create_leave_operation (mpz_t channel_oid, mpz_t session_oid)
-{
-  gzochid_channel_pending_membership_operation *leave_operation = malloc 
-    (sizeof (gzochid_channel_pending_membership_operation));
-  gzochid_channel_pending_operation *operation = 
-    (gzochid_channel_pending_operation *) leave_operation;
-
-  operation->type = GZOCHID_CHANNEL_OP_LEAVE;
-  mpz_init (operation->target_channel);
-  mpz_init (leave_operation->target_session);
-  mpz_set (operation->target_channel, channel_oid);
-  mpz_set (leave_operation->target_session, session_oid);
-
-  return leave_operation;
-}
-
-static gzochid_channel_transaction_context *
-create_transaction_context (gzochid_application_context *context)
-{
-  gzochid_channel_transaction_context *tx_context = 
-    calloc (1, sizeof (gzochid_channel_transaction_context));
-
-  tx_context->context = context;
-
-  return tx_context;
-}
 
 static int
 channel_prepare (gpointer data)
@@ -740,126 +853,17 @@ channel_prepare (gpointer data)
   return TRUE;
 }
 
-static void
-cleanup_transaction (gzochid_channel_transaction_context *tx_context,
-		     gboolean free_operations)
-{
-  if (free_operations)
-    g_list_free_full (tx_context->operations, (GDestroyNotify) free_operation);
-  else g_list_free (tx_context->operations);
-
-  free (tx_context);
-}
-
-static void
-channel_commit (gpointer data)
-{
-  gzochid_channel_transaction_context *tx_context = data;
-  gzochid_application_context *app_context = tx_context->context;
-
-  gzochid_game_context *game_context =
-    (gzochid_game_context *) ((gzochid_context *) app_context)->parent;
-
-  GList *task_chain = NULL;
-  GList *operation_ptr = tx_context->operations;
-
-  while (operation_ptr != NULL)
-    {
-      task_chain = g_list_append 
-	(task_chain, 
-	 create_channel_operation_task (operation_ptr->data, app_context));
-      operation_ptr = operation_ptr->next;
-    }
-
-  gzochid_schedule_submit_task_chain (game_context->task_queue, task_chain);
-  g_list_free_full (task_chain, (GDestroyNotify) gzochid_task_free);
-
-  cleanup_transaction (tx_context, FALSE);
-}
-
-static void
-channel_rollback (gpointer tx_context)
-{
-  cleanup_transaction (tx_context, TRUE);
-}
+/* The logical channel operation transaction participant doesn't actually need
+   specialized commit and rollback processes; the queue of operations is 
+   scheduled and persisted at the beginning of the transaction and can be 
+   appended to for the duration of the transaction. If the general transaction
+   commits, the queue and its contents will be persisted and scheduled; if the
+   general transaction rolls back, it'll be cleaned up and forgotten. To put it
+   another way, this transactional service achieves its outcomes via other 
+   transational services. */
 
 static gzochid_transaction_participant channel_participant =
-  { "channel", channel_prepare, channel_commit, channel_rollback };
-
-static gpointer 
-deserialize_channel (gzochid_application_context *context, GString *in,
-		     GError **err)
-{
-  gzochid_channel *channel = calloc (1, sizeof (gzochid_channel));
-
-  channel->name = gzochid_util_deserialize_string (in);
-
-  gzochid_util_deserialize_mpz (in, channel->oid);
-  gzochid_util_deserialize_mpz (in, channel->scm_oid);
-
-  return channel;
-}
-
-static void 
-serialize_channel (gzochid_application_context *context, gpointer obj,
-		   GString *out, GError **err)
-{
-  gzochid_channel *channel = obj;
-  gzochid_util_serialize_string (channel->name, out);
-
-  gzochid_util_serialize_mpz (channel->oid, out);
-  gzochid_util_serialize_mpz (channel->scm_oid, out);
-}
-
-static void finalize_channel
-(gzochid_application_context *context, gpointer obj)
-{
-  gzochid_channel *channel = obj;
-  
-  free (channel->name);
-
-  mpz_clear (channel->oid);
-  mpz_clear (channel->scm_oid);
-
-  free (channel);
-}
-
-gzochid_io_serialization gzochid_channel_serialization =
-  { serialize_channel, deserialize_channel, finalize_channel };
-
-gzochid_channel *
-gzochid_channel_new (char *name)
-{
-  gzochid_channel *channel = calloc (1, sizeof (gzochid_channel));
-
-  channel->name = name;
-
-  mpz_init (channel->oid);
-  mpz_init (channel->scm_oid);
-
-  return channel;
-}
-
-void
-gzochid_channel_free (gzochid_channel *channel)
-{
-  mpz_clear (channel->oid);
-  mpz_clear (channel->scm_oid);
-
-  free (channel);
-}
-
-void
-gzochid_channel_scm_oid (gzochid_channel *channel, mpz_t scm_oid)
-{
-  mpz_set (scm_oid, channel->scm_oid);
-}
-
-const char *
-gzochid_channel_name (gzochid_channel *channel)
-{
-  return channel->name;
-}
+  { "channel", channel_prepare, free, free };
 
 static gzochid_channel_transaction_context *
 join_transaction (gzochid_application_context *context)
@@ -868,13 +872,42 @@ join_transaction (gzochid_application_context *context)
   if (!gzochid_transaction_active()
       || gzochid_transaction_context (&channel_participant) == NULL)
     {
-      tx_context = create_transaction_context (context);
-      gzochid_transaction_join (&channel_participant, tx_context);
+      gzochid_data_managed_reference *queue_ref = gzochid_data_create_reference
+	(context, &gzochid_durable_queue_serialization,
+	 gzochid_durable_queue_new (context), NULL);
+
+      /* The reference to the queue may be `NULL' if the data transaction 
+	 deadlocks or times out. If that happens, this function shouldn't join
+	 the general transaction will return `NULL' itself. */
+      
+      if (queue_ref != NULL)
+	{
+	  tx_context = malloc (sizeof (gzochid_channel_transaction_context));
+
+	  tx_context->context = context;
+	  tx_context->queue_ref = queue_ref;
+
+	  gzochid_transaction_join (&channel_participant, tx_context);
+
+	  /* Schedule the task chain even though it's currently empty; it'll
+	     probably have tasks added to it before the transaction commits. */
+	  
+	  gzochid_schedule_durable_task_chain
+	    (context, gzochid_auth_system_identity (),
+	     tx_context->queue_ref->obj, NULL);
+	}
     }
   else tx_context = gzochid_transaction_context (&channel_participant);
 
   return tx_context;
 }
+
+/*
+  Returns a newly-allocated string containing the binding name for the
+  specified channel name: s.channel.[name]
+  
+  Free this string with `free' when no longer in use.
+*/
 
 static char *
 make_channel_binding (char *name)
@@ -902,6 +935,11 @@ gzochid_channel_create (gzochid_application_context *context, char *name)
 
   if (reference == NULL)
     {
+      g_debug ("Failed to persist struct for new channel '%s'.", name);
+      
+      /* If the reference can't be created (because the transaction's in a bad
+	 state) free the memory used by the not-yet-persisted channel struct. */
+      
       gzochid_channel_free (channel);
       return NULL;
     }
@@ -913,7 +951,8 @@ gzochid_channel_create (gzochid_application_context *context, char *name)
 
   if (scm_reference == NULL)
     {
-      gzochid_channel_free (channel);
+      g_debug
+	("Failed to create Scheme representation of new channel '%s'.", name);
       return NULL;
     }
   
@@ -924,6 +963,9 @@ gzochid_channel_create (gzochid_application_context *context, char *name)
 
   if (err != NULL)
     {
+      g_debug ("Failed to create binding for channel: %s", err->message);
+      g_error_free (err);
+
       free (binding);
       return NULL;
     }
@@ -946,6 +988,67 @@ gzochid_channel_get (gzochid_application_context *context, char *name)
   return channel;
 }
 
+/* The logical channel operation task worker; a dispatcher for the individual
+   per-operation worker functions. */
+
+static void
+channel_operation_worker (gzochid_application_context *context,
+			  gzochid_auth_identity *identity, gpointer data)
+{
+  gzochid_channel_pending_operation *op = data;
+
+  switch (op->type)
+    {
+    case GZOCHID_CHANNEL_OP_JOIN: join_channel (context, identity, data); break;
+
+    case GZOCHID_CHANNEL_OP_LEAVE:
+      leave_channel (context, identity, data);
+      break;
+
+    case GZOCHID_CHANNEL_OP_SEND:
+      send_channel_message (context, identity, data);
+      break;
+      
+    case GZOCHID_CHANNEL_OP_CLOSE:
+      close_channel (context, identity, data);
+      break;
+      
+    default: assert (1 == 0);
+    }
+}
+
+/* Durable task serialization boilerplate for logical channel operation
+   transactional tasks. */
+			  
+static void
+serialize_channel_operation_worker (gzochid_application_context *context,
+				    gzochid_application_worker worker,
+				    GString *out)
+{
+}
+
+static gzochid_application_worker
+deserialize_channel_operation_worker (gzochid_application_context *context,
+				      GString *in)
+{
+  return channel_operation_worker;
+}
+
+static gzochid_application_worker_serialization
+gzochid_channel_operation_worker_serialization =
+  {
+    serialize_channel_operation_worker,
+    deserialize_channel_operation_worker
+  };
+
+gzochid_application_task_serialization
+gzochid_channel_operation_task_serialization =
+  {
+    "channel-operation",
+    &gzochid_channel_operation_worker_serialization,
+    &gzochid_channel_operation_serialization
+  };
+
 void
 gzochid_channel_join (gzochid_application_context *context,
 		      gzochid_channel *channel, 
@@ -954,7 +1057,16 @@ gzochid_channel_join (gzochid_application_context *context,
   gzochid_data_managed_reference *channel_reference = NULL;
   gzochid_data_managed_reference *session_reference = NULL;
   gzochid_channel_transaction_context *tx_context = join_transaction (context);
+  gzochid_durable_application_task_handle *task_handle = NULL;
 
+  gzochid_channel_pending_membership_operation *join_operation = malloc 
+    (sizeof (gzochid_channel_pending_membership_operation));
+  gzochid_channel_pending_operation *operation = 
+    (gzochid_channel_pending_operation *) join_operation;
+
+  if (tx_context == NULL)
+    return;
+  
   channel_reference = gzochid_data_create_reference 
     (context, &gzochid_channel_serialization, channel, NULL);
 
@@ -970,10 +1082,29 @@ gzochid_channel_join (gzochid_application_context *context,
      transaction context. */
 
   assert (session_reference != NULL);
+
+  operation->type = GZOCHID_CHANNEL_OP_JOIN;
+  mpz_init (operation->target_channel);
+  mpz_init (join_operation->target_session);
+  mpz_set (operation->target_channel, channel_reference->oid);
+  mpz_set (join_operation->target_session, session_reference->oid);
+
+  /* Create a task to execute the join... */
   
-  tx_context->operations = g_list_append 
-    (tx_context->operations, 
-     create_join_operation (channel_reference->oid, session_reference->oid));
+  task_handle = gzochid_create_durable_application_task_handle
+    (gzochid_application_task_new
+     (context, gzochid_auth_system_identity (), channel_operation_worker,
+      operation),
+     &gzochid_channel_operation_task_serialization, (struct timeval) { 0, 0 },
+     NULL, NULL);
+
+  /* ...and add it to the task queue. */
+
+  if (task_handle != NULL)
+    gzochid_durable_queue_offer
+      (tx_context->queue_ref->obj,
+       &gzochid_durable_application_task_handle_serialization,
+       task_handle, NULL);
 }
 
 void
@@ -984,6 +1115,12 @@ gzochid_channel_leave (gzochid_application_context *context,
   gzochid_data_managed_reference *channel_reference = NULL;
   gzochid_data_managed_reference *session_reference = NULL;
   gzochid_channel_transaction_context *tx_context = join_transaction (context);
+  gzochid_durable_application_task_handle *task_handle = NULL;
+
+  gzochid_channel_pending_membership_operation *leave_operation = malloc 
+    (sizeof (gzochid_channel_pending_membership_operation));
+  gzochid_channel_pending_operation *operation = 
+    (gzochid_channel_pending_operation *) leave_operation;
 
   channel_reference = gzochid_data_create_reference 
     (context, &gzochid_channel_serialization, channel, NULL);
@@ -1001,9 +1138,28 @@ gzochid_channel_leave (gzochid_application_context *context,
 
   assert (session_reference != NULL);
   
-  tx_context->operations = g_list_append 
-    (tx_context->operations, 
-     create_leave_operation (channel_reference->oid, session_reference->oid));
+  operation->type = GZOCHID_CHANNEL_OP_LEAVE;
+  mpz_init (operation->target_channel);
+  mpz_init (leave_operation->target_session);
+  mpz_set (operation->target_channel, channel_reference->oid);
+  mpz_set (leave_operation->target_session, session_reference->oid);
+
+  /* Create a task to execute the exit from the channel... */
+  
+  task_handle = gzochid_create_durable_application_task_handle
+    (gzochid_application_task_new
+     (context, gzochid_auth_system_identity (), channel_operation_worker,
+      operation),
+     &gzochid_channel_operation_task_serialization, (struct timeval) { 0, 0 },
+     NULL, NULL);
+
+  /* ...and add it to the task queue. */
+
+  if (task_handle != NULL)
+    gzochid_durable_queue_offer
+      (tx_context->queue_ref->obj,
+       &gzochid_durable_application_task_handle_serialization,
+       task_handle, NULL);
 }
 
 void
@@ -1013,6 +1169,12 @@ gzochid_channel_send (gzochid_application_context *context,
 {
   gzochid_data_managed_reference *channel_reference = NULL;
   gzochid_channel_transaction_context *tx_context = join_transaction (context);
+  gzochid_durable_application_task_handle *task_handle = NULL;
+
+  gzochid_channel_pending_send_operation *send_operation = malloc 
+    (sizeof (gzochid_channel_pending_send_operation));
+  gzochid_channel_pending_operation *operation = 
+    (gzochid_channel_pending_operation *) send_operation;
 
   channel_reference = gzochid_data_create_reference 
     (context, &gzochid_channel_serialization, channel, NULL);
@@ -1022,9 +1184,31 @@ gzochid_channel_send (gzochid_application_context *context,
 
   assert (channel_reference != NULL);
   
-  tx_context->operations = g_list_append 
-    (tx_context->operations,
-     create_send_operation (channel_reference->oid, message, len));
+  operation->type = GZOCHID_CHANNEL_OP_SEND;
+  send_operation->message = malloc (sizeof (unsigned char) * len);
+
+  memcpy (send_operation->message, message, len);
+  
+  send_operation->len = len;
+  mpz_init (operation->target_channel);
+  mpz_set (operation->target_channel, channel_reference->oid);
+
+  /* Create a task to execute the message broadcast... */
+
+  task_handle = gzochid_create_durable_application_task_handle
+    (gzochid_application_task_new
+     (context, gzochid_auth_system_identity (), channel_operation_worker,
+      operation),
+     &gzochid_channel_operation_task_serialization, (struct timeval) { 0, 0 },
+     NULL, NULL);
+
+  /* ...and add it to the task queue. */
+
+  if (task_handle != NULL)
+    gzochid_durable_queue_offer
+      (tx_context->queue_ref->obj,
+       &gzochid_durable_application_task_handle_serialization,
+       task_handle, NULL);
 }
 
 void
@@ -1033,6 +1217,10 @@ gzochid_channel_close (gzochid_application_context *context,
 {
   gzochid_data_managed_reference *channel_reference = NULL;
   gzochid_channel_transaction_context *tx_context = join_transaction (context);
+  gzochid_durable_application_task_handle *task_handle = NULL;
+
+  gzochid_channel_pending_operation *operation = malloc 
+    (sizeof (gzochid_channel_pending_operation));
 
   channel_reference = gzochid_data_create_reference 
     (context, &gzochid_channel_serialization, channel, NULL);
@@ -1041,7 +1229,25 @@ gzochid_channel_close (gzochid_application_context *context,
      transaction context. */
 
   assert (channel_reference != NULL);
-    
-  tx_context->operations = g_list_append 
-    (tx_context->operations, create_close_operation (channel_reference->oid));
+
+  operation->type = GZOCHID_CHANNEL_OP_CLOSE;
+  mpz_init (operation->target_channel);
+  mpz_set (operation->target_channel, channel_reference->oid);
+  
+  /* Create a task to execute the channel shutdown... */
+
+  task_handle = gzochid_create_durable_application_task_handle
+    (gzochid_application_task_new
+     (context, gzochid_auth_system_identity (), channel_operation_worker,
+      operation),
+     &gzochid_channel_operation_task_serialization, (struct timeval) { 0, 0 },
+     NULL, NULL);
+
+  /* ...and add it to the task queue. */
+
+  if (task_handle != NULL)
+    gzochid_durable_queue_offer
+      (tx_context->queue_ref->obj,
+       &gzochid_durable_application_task_handle_serialization,
+       task_handle, NULL);
 }
