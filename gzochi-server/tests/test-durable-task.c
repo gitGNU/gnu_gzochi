@@ -176,7 +176,6 @@ test_periodic_cancel ()
 {
   test_context context;
   gboolean submitted = FALSE, done = FALSE;
-  gzochid_periodic_task_handle handle;
 
   gzochid_game_context *game_context = NULL;
   gzochid_application_context *app_context = 
