@@ -17,6 +17,7 @@
 
 #include <assert.h>
 #include <glib.h>
+#include <gzochi-common.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +42,7 @@
 #define MAX_INTERNAL_CHILDREN BRANCHING_FACTOR
 #define MIN_LEAF_CHILDREN BRANCHING_FACTOR / 2
 #define MAX_LEAF_CHILDREN BRANCHING_FACTOR - 1
+#define MAX_PAGE_SIZE 4096
 
 /* A datum (key or value) to be stored within the B+tree. */
 
@@ -92,7 +94,8 @@ typedef struct _btree_environment btree_environment;
 enum _btree_tx_error
   {
     TXN_LOCK_TIMEOUT, /* Timed out waiting for the lock to become available. */
-    TXN_DEADLOCK /* Inconsistent lock access detected. */
+    TXN_DEADLOCK, /* Inconsistent lock access detected. */
+    TXN_FAILED /* General / unknown transaction failure. */
   };
 
 #define MEMORY_TRANSACTION_ERROR memory_transaction_error_quark ()
@@ -153,6 +156,16 @@ typedef struct _btree_node_header btree_node_header;
 #define FLAG_NEW       1 /* The node was created in an active transaction. */
 #define FLAG_TOMBSTONE 2 /* The node was deleted in an active transaction. */
 
+/* A block of key-value pairs in the B+tree. */
+
+struct _btree_page
+{
+  size_t page_size; /* The occupied portion of the block. */
+  unsigned char data[MAX_PAGE_SIZE]; /* The block data. */
+};
+
+typedef struct _btree_page btree_page;
+
 /* A structural element in the B+tree. */
 
 struct _btree_node
@@ -167,8 +180,8 @@ struct _btree_node
   btree_datum key; /* The key. */
   btree_datum new_key; /* Alternate key for temporary changes. */
 
-  btree_datum value; /* The value (if any). */
-  btree_datum new_value; /* Alternate value for temporary changes. */
+  btree_page *page; /* The page. `NULL' for internal nodes. */
+  btree_page *new_page; /* Alternate page for temporary changes. */
 };
 
 typedef struct _btree_node btree_node;
@@ -214,21 +227,6 @@ compare_datum (gconstpointer a, gconstpointer b)
   return (datum_a->data_len - i) - (datum_b->data_len - j);
 }
 
-/* Writes the specified buffer (with length) to the target datum structure, 
-   first freeing the target's buffer if it exists. */
-
-static void
-write_datum (btree_datum *target, unsigned char *data, size_t data_len)
-{
-  if (target->data != NULL)
-    free (target->data);
-
-  target->data = malloc (sizeof (char) *data_len);
-  memcpy (target->data, data, data_len);
-
-  target->data_len = data_len;
-}
-
 /* "Moves" the specified buffer from the source to the destination datum, first
    freeing the destination buffer if it exists. When this function returns, the
    buffer pointer of the source datum will be NULL. */
@@ -256,6 +254,116 @@ clear_datum (btree_datum *datum)
 
   datum->data = NULL;
   datum->data_len = 0;
+}
+
+/* Compares the datum at the specified page offset with the specified key.
+   Returns an integer less than, equal to, or greater than zero if the key is
+   found, respectively, to be less than, to match, or to be grater than the page
+   datum. */
+
+static gint
+compare_page_datum_to_key (btree_page *page, size_t offset, unsigned char *key,
+			   size_t key_len)
+{
+  unsigned short len = 0; 
+  int c = 0; 
+
+  if (offset >= page->page_size)
+    return -1;
+
+  len = gzochi_common_io_read_short (page->data, offset);
+  c = memcmp (page->data + offset + 2, key, MIN (len, key_len));
+  
+  if (c == 0)
+
+    /* If the key and the page datum are of different lengths, they can't be
+       equal. */
+    
+    return len == key_len ? 0 : len < key_len ? -1 : 1;
+  else return c;
+}
+
+/* Returns the offset within the specified page at which the specified key is
+   stored, or would be stored if it is not currently present in the page. */
+
+static size_t
+page_key_offset (btree_page *page, unsigned char *key, size_t key_len)
+{
+  size_t offset = 0;
+  
+  while (TRUE)
+    {
+      unsigned short page_key_len = gzochi_common_io_read_short
+	(page->data, offset);
+      unsigned short page_value_len = 0;
+      int c = compare_page_datum_to_key (page, offset, key, key_len);
+      
+      if (c >= 0)
+	return offset;
+      
+      page_value_len = gzochi_common_io_read_short
+	(page->data, offset + page_key_len + 2);
+
+      offset += page_key_len + page_value_len + 4;
+
+      if (offset == page->page_size)
+
+	/* If we've reached the end of the occupied region of the page, then
+	   that's where the key would have to go. */
+	
+	return offset;
+      else assert (offset < page->page_size);
+    }
+}
+
+/*
+  Returns a pointer into the specified page data block to the value 
+  associated with the specified key, or `NULL' if the key does not exist within
+  the specified page. If the key exists and the `value_len' argument is 
+  provided, its value will be set to the length of the value.
+  
+  The returned pointer is owned by the page and should not be freed or 
+  otherwise modified.
+*/ 
+
+static unsigned char *
+lookup_page_value (btree_page *page, unsigned char *key, size_t key_len,
+		   size_t *value_len)
+{
+  size_t offset = 0;
+  
+  while (offset < page->page_size)
+    {
+      unsigned short len = gzochi_common_io_read_short (page->data, offset);
+      int c = memcmp (key, page->data + offset + 2, MIN (len, key_len));
+
+      offset += len + 2;
+
+      if (c == 0 && len == key_len)
+	{
+	  unsigned char *ret = page->data + offset + 2;
+	  
+	  if (value_len != NULL)
+	    {
+	      len = gzochi_common_io_read_short (page->data, offset);
+	      *value_len = len;
+	    }
+	  
+	  return ret;
+	}
+      else if (c > 0)
+	{	  
+	  len = gzochi_common_io_read_short (page->data, offset);
+	  offset += len + 2;
+	}
+
+      /* Keys are stored in sorted order, so once we pass the key's insertion
+	 point, we might as well bail out. */
+      
+      else break;
+    }
+
+  return NULL;
 }
 
 /* Create and return a new B+tree environment. */
@@ -949,21 +1057,40 @@ effective_key (btree_node *node, gboolean write)
   else return node->new_key.data != NULL ? &node->new_key : &node->key;
 }
 
-/* Returns the "effective" B+tree value datum. The effective value datum for 
-   writers is the default value for newly created nodes; otherwise it is the 
-   "scratch" datum. For readers, it is the default value unless a scratch datum
-   is present.
-   
-   This function assumes its call originates within the scope of a transaction 
-   that holds at least a read lock on the specified node. 
+/*
+  Returns the "effective" B+tree page. The effective page for writers is the 
+  default page for newly created nodes; otherwise it is the "scratch" page. 
+  For readers, it is the default page unless a scratch datum is present.
+  
+  This function assumes its call originates within the scope of a transaction 
+  that holds at least a read lock on the specified node. 
 */
 
-static btree_datum *
-effective_value (btree_node *node, gboolean write)
+static btree_page *
+effective_page (btree_node *node, gboolean write)
 {
   if (write)
-    return is_new (node) ? &node->value : &node->new_value;
-  else return node->new_value.data != NULL ? &node->new_value : &node->value;
+    {
+      if (is_new (node))
+	return node->page;
+      else if (node->page != NULL && node->new_page == NULL)
+	{
+	  /*
+	    If the node doesn't have a default page, it's not a leaf. If it is
+	    a leaf and it's not new and it doesn't yet have a scratch page,
+	    allocate one now.
+	  */
+	  
+	  node->new_page = malloc (sizeof (btree_page));
+
+	  node->new_page->page_size = node->page->page_size;
+	  memcpy (node->new_page->data, node->page->data,
+		  node->page->page_size);
+	}
+
+      return node->new_page;
+    }
+  else return node->new_page != NULL ? node->new_page : node->page;
 }
 
 /* Returns the first child of the specified node, from the point of view of the
@@ -1307,6 +1434,14 @@ unlink_node (btree_node *node, btree_transaction *btx)
   else return TRUE;
 }
 
+/* Frees the resources associated with the specified page. */
+
+static void
+free_btree_page (btree_page *page)
+{
+  free (page);
+}
+
 /* Frees the resources associated with the specified node. */
 
 static void
@@ -1314,8 +1449,8 @@ free_btree_node (btree_node *node)
 {
   free (node->key.data);
 
-  if (node->value.data != NULL)
-    free (node->value.data);
+  if (node->page != NULL)
+    free_btree_page (node->page);
 
   free (node);
 }
@@ -1331,7 +1466,7 @@ static void
 delete_node (btree_node *node, btree_transaction *btx)
 {
   assert (node->new_key.data == NULL);
-  assert (node->new_value.data == NULL);
+  assert (node->new_page == NULL);
 
   lock_detach (node, btx);
   
@@ -1382,12 +1517,15 @@ mark_node_deleted (btree_transaction *btx, btree_node *node)
 	
 	clear_datum (&node->new_key);
       
-      if (node->new_value.data != NULL)
+      if (node->new_page != NULL)
+	{
+	
+	  /* We're deleting a leaf node that we modified earlier during this
+	     transaction. Clean up its scratch page. */
 
-	/* We're deleting a leaf node that we modified earlier during this
-	   transaction. Clean up its previous value. */
-
-	clear_datum (&node->new_value);
+	  free_btree_page (node->new_page);
+	  node->new_page = NULL;
+	}
     }
 
   return TRUE;
@@ -1415,11 +1553,14 @@ apply_modification (gpointer data, gpointer user_data)
     {
       if (node->new_key.data != NULL)
 	transfer_datum (&node->key, &node->new_key); /* Commit key change. */
-      if (node->new_value.data != NULL)
+      if (node->new_page != NULL)
+	{
+	  /* Commit page change. */
 
-	/* Commit value change. */
-
-	transfer_datum (&node->value, &node->new_value);
+	  free_btree_page (node->page);
+	  node->page = node->new_page;
+	  node->new_page = NULL;
+	}
 
       if (node->new_header != NULL)
 	{
@@ -1502,9 +1643,14 @@ rollback_modification (gpointer data, gpointer user_data)
     {
       if (node->new_key.data != NULL)
 	clear_datum (&node->new_key); /* Undo key changes. */
-      if (node->new_value.data != NULL)
-	clear_datum (&node->new_value); /* Undo value changes. */
+      if (node->new_page != NULL)
+	{
+	  /* Undo page changes. */
 
+	  free_btree_page (node->new_page);
+	  node->new_page = NULL;
+	}
+      
       if (node->new_header != NULL)
 	{
 	  /* Restore the original location of any node that got moved around. */
@@ -1678,14 +1824,15 @@ search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
 	  btree_datum *child_datum = effective_key (child, FALSE);
 	  gint compare_result = compare_datum (&search_datum, child_datum);
 
-	  if (child->value.data != NULL)
+	  if (child->page != NULL)
+	    node_is_leaf_parent = TRUE;
+
+	  if (compare_result < 0)
 	    {
-	      node_is_leaf_parent = TRUE;
-	      if (compare_result == 0)
+	      if (node_is_leaf_parent)
 		return child;
+	      else break;
 	    }
-	  else if (compare_result < 0)
-	    break;
 
 	  prev = child;
 	  child = tx_next_sibling (child, btx, &err);
@@ -1740,6 +1887,162 @@ set_node_key_to_key_after (btree_node *node, btree_datum *key)
   node_key->data_len = key->data_len + 1;
 }
 
+/*
+  Updates the key for a leaf or internal node based, respectively, on the first
+  record in its page or its first child, whose key might have changed as the
+  result of a change to the contents of a page; then do the same to the parent
+  and so on.
+
+  Call this function after making a change to a page that affects the first key.
+*/
+
+static void
+update_key (btree_node *node, btree_transaction *btx, size_t offset,
+	    GError **err)
+{
+  btree_page *page = effective_page (node, FALSE);
+
+  size_t key_len = gzochi_common_io_read_short (page->data, offset);
+  unsigned char *key = page->data + offset + 2;
+
+  btree_datum new_key = { key, key_len };
+  
+  while (node != NULL)
+    {
+      btree_node_header *header = effective_header (node, FALSE);
+      
+      if (tx_lock_node (node, btx, TRUE, err) == SUCCESS)
+	set_node_key_to_key_after (node, &new_key);
+      else return;
+
+      if (header->next == NULL)
+	{
+	  btree_node *parent = tx_parent (node, btx, err);
+
+	  if (parent != NULL)
+	    {
+	      header = effective_header (parent, FALSE);
+	      if (header->parent != NULL)
+		node = parent;
+	      else return;
+	    }
+	}
+      else return;
+    }
+}
+
+/*
+  Inserts the specified key and value into the page data for the specified leaf
+  node at the specified offset. Subsequent records will be pushed "right" to
+  make room for the new record. If the offset is zero (i.e., the record is being
+  inserted at the beginning of the block) the node's key (and potentially the
+  keys of its ancestors) will be updated. This function acquires a write lock on
+  the target node and on any ancestors as necessary. If any of these locks 
+  cannot be obtained, the provided `GError' will be set accordingly.
+
+  This function assumes that:
+
+  - The target node is a leaf node
+  - There is enough room for the new record in the target page
+  - The specified offset falls within or exactly at the end of the current page
+    data block.
+  - The key does not currently exist in the target page.
+*/
+
+static void
+insert_page_record (btree_transaction *btx, btree_node *leaf, size_t offset,
+		    unsigned char *key, size_t key_len,
+		    unsigned char *value, size_t value_len, GError **err)
+{
+  btree_page *page = NULL;
+  size_t total_len = key_len + value_len + 4;
+
+  if (tx_lock_node (leaf, btx, TRUE, err) != SUCCESS)
+    return;
+
+  page = effective_page (leaf, TRUE);
+
+  assert (page != NULL);
+  assert (page->page_size + total_len <= MAX_PAGE_SIZE);
+
+  /* Move subsequent data out of the way if necessary. */
+  
+  if (offset < page->page_size)
+    memmove (page->data + offset + total_len, page->data + offset,
+	     page->page_size - offset);
+
+  gzochi_common_io_write_short (key_len, page->data, offset);
+  memcpy (page->data + offset + 2, key, key_len);
+  gzochi_common_io_write_short (value_len, page->data, offset + key_len + 2);
+  memcpy (page->data + offset + key_len + 4, value, value_len);
+
+  page->page_size += total_len;
+
+  /* Add the leaf to the modification list for commit / rollback. */
+  
+  mark_modification (leaf, btx);
+  
+  if (offset + total_len == page->page_size)
+
+    /* Update the leaf's key if necessary. */
+
+    update_key (leaf, btx, offset, err);
+}
+
+/*
+  Removes the record at the specified offset within the page of the specified
+  leaf node, shifting any subsequent records "left" to fill in the gap.
+  
+  If the record being removed is the first record in the page (offset zero),
+  the leaf node's key and potentially its ancestor's keys will be updated.
+  
+  If the record being removed is the only record in the page, the leaf node
+  will be removed from its parent. (This may trigger a merge on the parent 
+  internal node.)
+  
+  If the locks required to complete any of these operations cannnot be 
+  acquired, this function sets the supplied `GError' argument accordingly.
+*/
+
+static void
+remove_page_record (btree_transaction *btx, btree_node *leaf, size_t offset,
+		    GError **err)
+{
+  btree_page *page = NULL;
+  unsigned short key_len = 0;
+  unsigned short value_len = 0;
+  size_t record_len = 0;
+  size_t next_record_offset = 0;
+
+  if (tx_lock_node (leaf, btx, TRUE, err) != SUCCESS)
+    return;
+
+  page = effective_page (leaf, TRUE);
+
+  key_len = gzochi_common_io_read_short (page->data, offset);
+  value_len = gzochi_common_io_read_short (page->data, offset + key_len + 2);
+  record_len = key_len + value_len + 4;
+  next_record_offset = offset + record_len;
+  
+  /* Move subsequent data to fill the gap if necessary. */
+
+  if (next_record_offset < page->page_size)  
+    memmove (page->data + offset, page->data + next_record_offset,
+	     page->page_size - next_record_offset);
+  
+  page->page_size -= record_len;
+
+  /* Add the leaf to the modification list for commit / rollback. */
+
+  mark_modification (leaf, btx);
+  
+  if (offset == page->page_size && page->page_size > 0)
+
+    /* Update the leaf's key if necessary. */
+
+    update_key (leaf, btx, offset, err);
+}
+
 /* Performs a merge on the specified node by "borrowing" enough children from 
    its next and previous siblings (who must have the specified number of "spare"
    children) that the node meets its minimum child threshold. 
@@ -1788,7 +2091,8 @@ merge_borrow (btree_node *prev, btree_node *node, btree_node *next,
   if (spare_prev > 0)
     {
       if (!tx_set_next_sibling (last_prev_child, btx, first_child)
-	  || !tx_set_prev_sibling (first_child, btx, last_prev_child))
+	  || (first_child != NULL
+	      && !tx_set_prev_sibling (first_child, btx, last_prev_child)))
 	return FALSE;
       else borrowed_prev = TRUE;
     }
@@ -2141,150 +2445,6 @@ maybe_merge (btree_transaction *btx, btree_node *node)
   return TRUE;
 }
 
-/* Creates and inserts a new leaf node with the specified key and value datums
-   as a child of the specified parent node. Read and write locks are established
-   as necessary on the parent and its existing children; this functiion returns
-   `TRUE' if all necessary locks can be obtained, `FALSE' otherwise.
-*/
-
-static gboolean
-insert_value (btree_transaction *btx, btree_node *parent, unsigned char *key, 
-	      size_t key_len, unsigned char *value, size_t value_len)
-{
-  GError *err = NULL;
-  btree_node *new_node = NULL;
-  btree_node *first_child = tx_first_child (parent, btx, &err);
-  btree_node *next = first_child;
-
-  if (err != NULL)
-    {
-      g_error_free (err);
-      return FALSE;
-    }
-
-  new_node = create_lockable_btree_node (parent, 0, 0, key, key_len, btx);
-  if (tx_lock_node (new_node, btx, TRUE, NULL) != SUCCESS)
-    return FALSE;
-
-  write_datum (&new_node->value, value, value_len);
-  mark_modification (new_node, btx);
-
-  while (next != NULL)
-    {
-      if (compare_datum (&new_node->key, effective_key (next, FALSE)) < 0)
-	break;
-
-      next = tx_next_sibling (next, btx, &err);
-
-      if (err != NULL)
-	{
-	  g_error_free (err);
-	  return FALSE;
-	}
-    }
-
-  if (next == NULL)
-    {
-      /* The new node belongs at the end of the parent's list of children. */
-
-      if (first_child == NULL)
-
-	/* The parent has no children. Lock the parent, but don't mark it
-	   modified. Modification / rollback will be handled when processing
-	   the new child. */
-
-	return tx_set_first_child (parent, btx, new_node);
-
-      else
-	{
-	  /* Find the end of the list of children and get a write lock on it. */
-
-	  gboolean needs_merge = FALSE;
-	  btree_node *last_child = tx_last_child (parent, btx, &err);
-
-	  if (err != NULL)
-	    {
-	      g_error_free (err);
-	      return FALSE;
-	    }
-
-	  /* The node may have leaf or internal children, but all its children
-	     must be of the same type. If the final child doesn't have a value,
-	     create an internal node to house the new value... */
-
-	  if (last_child->value.data == NULL)
-	    {
-	      unsigned char *interstitial_key = key_after (key, key_len);
-	      btree_node *interstitial = create_lockable_btree_node 
-		(parent, MIN_INTERNAL_CHILDREN, MAX_INTERNAL_CHILDREN, 
-		 interstitial_key, key_len + 1, btx);
-
-	      free (interstitial_key);
-	      if (tx_lock_node (interstitial, btx, TRUE, NULL) != SUCCESS)
-		return FALSE;
-
-	      tx_set_first_child (interstitial, btx, new_node);
-	      tx_set_parent (new_node, btx, interstitial);
-
-	      new_node = interstitial;
-	      
-	      if (1 < MIN_INTERNAL_CHILDREN)
-		needs_merge = TRUE;
-	    }
-
-	  if (!tx_set_next_sibling (last_child, btx, new_node)
-	      || !tx_set_prev_sibling (new_node, btx, last_child))
-	    return FALSE;
-
-	  if (needs_merge && !merge (new_node, 1, btx))
-	    return FALSE;
-
-	  /* ...and then force a merge. */
-
-	  if (last_child->value.data == NULL && !maybe_merge (btx, parent))
-	    return FALSE;
-	}
-    }
-  else
-    {
-      if (tx_lock_node (next, btx, TRUE, &err) != SUCCESS)
-	{
-	  g_clear_error (&err);
-	  return FALSE;
-	}
-
-      if (next == first_child)
-	{
-	  /* The new node belongs at the front of the parent's list of
-	     children. Lock the parent and the previous first child. No need to
-	     mark them as modified. */
-
-	  if (!tx_set_first_child (parent, btx, new_node)
-	      || !tx_set_next_sibling (new_node, btx, next)
-	      || !tx_set_prev_sibling (next, btx, new_node))
-	    return FALSE;
-	}
-      else
-	{
-	  btree_node *prev = tx_prev_sibling (next, btx, &err);
-
-	  if (err != NULL)
-	    {
-	      g_error_free (err);
-	      return FALSE;
-	    }
-	  else if
-	    (!tx_set_next_sibling (prev, btx, new_node)
-	     || !tx_set_prev_sibling (next, btx, new_node)
-	     || !tx_set_next_sibling (new_node, btx, next)
-	     || !tx_set_prev_sibling (new_node, btx, prev))
-	    return FALSE;
-	}
-    }
-
-  return TRUE;
-}
-
 /* Split the specified B+tree node by creating a new next sibling for it and 
    moving half of its children to the new sibling. Returns the newly created 
    sibling node, which is locked for write.
@@ -2440,6 +2600,136 @@ maybe_split (btree_transaction *btx, btree *btree, btree_node *node)
     }
 
   return TRUE;
+}
+
+/*
+  Creates and returns a new leaf node whose page contains the specified key and
+  value as its only record.
+   
+  The new key is inserted as a child of the specified internal parent node 
+  after the specified sibling, or as the first child if the `after' argument is
+  `NULL'.
+
+  This function returns `NULL' if the necessary structural updates to the parent
+  and the adjacent children could not be performed.
+*/
+
+static btree_node *
+insert_leaf_with_record (btree_transaction *btx, btree *btree,
+			 btree_node *parent, btree_node *after,
+			 unsigned char *key, size_t key_len,
+			 unsigned char *value, size_t value_len)
+{
+  GError *err = NULL;
+  btree_node *new_child = create_lockable_btree_node
+    (parent, 0, 0, NULL, 0, btx);
+  
+  if (tx_lock_node (new_child, btx, TRUE, NULL) != SUCCESS)
+    return NULL;
+  else
+    {
+      /* If a relative position in the child list was specified, use it.
+	 Otherwise, attempt to find the parent's last child. */
+      
+      btree_node *prev = after != NULL
+	? after : tx_last_child (parent, btx, &err);
+
+      if (prev == NULL)
+	{
+	  /* If that results in `NULL' was it because there was an error
+	     traversing the list? Or because the parent has no children 
+	     (unlikely). */
+	  
+	  if (err != NULL)
+	    {
+	      g_error_free (err);
+	      return NULL;
+	    }
+	  else
+	    {
+	      btree_node *first_child = tx_first_child (parent, btx, &err);
+
+	      if (first_child != NULL)
+		{
+		  if (!tx_set_next_sibling (new_child, btx, prev)
+		      || !tx_set_prev_sibling (prev, btx, new_child))
+		    return NULL;
+		}
+	      else if (err != NULL)
+		{
+		  g_error_free (err);
+		  return NULL;
+		}	      
+
+	      if (!tx_set_first_child (parent, btx, new_child))
+		return NULL;
+	    }
+	}
+      else
+	{
+	  /* If there is a previous sibling for the new leaf, there might be a
+	     next sibling for it as well. */
+	  
+	  btree_node *next = tx_next_sibling (prev, btx, &err);
+	  btree_node *new_sibling = new_child;
+	  gboolean needs_merge = FALSE;
+	  
+	  if (effective_page (prev, FALSE) == NULL)
+	    {
+	      btree_node *interstitial = create_lockable_btree_node
+		(parent, MIN_INTERNAL_CHILDREN, MAX_INTERNAL_CHILDREN, NULL, 0,
+		 btx);
+
+	      if (tx_lock_node (interstitial, btx, TRUE, NULL) != SUCCESS)
+		return FALSE;
+
+	      tx_set_first_child (interstitial, btx, new_child);
+	      tx_set_parent (new_child, btx, interstitial);
+
+	      new_sibling = interstitial;
+
+	      if (1 < MIN_INTERNAL_CHILDREN)
+		needs_merge = TRUE;
+	    }
+	  
+	  if (next != NULL)
+	    {
+	      if (!tx_set_next_sibling (new_sibling, btx, next)
+		  || !tx_set_prev_sibling (next, btx, new_sibling))
+		return NULL;
+	    }
+	  else if (err != NULL)
+	    {
+	      g_error_free (err);
+	      return NULL;
+	    }
+
+	  if (!tx_set_next_sibling (prev, btx, new_sibling)
+	       || !tx_set_prev_sibling (new_sibling, btx, prev))
+	    return NULL;
+
+	  if (needs_merge
+	      && (!merge (new_sibling, 1, btx) || !maybe_merge (btx, parent)))
+	    return NULL;
+	}
+    }
+
+  mark_modification (new_child, btx);
+  new_child->page = calloc (1, sizeof (btree_page));
+
+  /* Write the value to the new leaf's page. */
+
+  insert_page_record (btx, new_child, 0, key, key_len, value, value_len, &err);
+
+  if (err != NULL)
+    {
+      g_error_free (err);
+      return NULL;
+    }
+  
+  if (!maybe_split (btx, btree, parent))
+    return NULL;
+  else return new_child;
 }
 
 /* Create and return a new B+tree wrapper structure. */
@@ -2614,10 +2904,11 @@ static char *
 get_internal (gzochid_storage_transaction *tx, gzochid_storage_store *store, 
 	      char *key, size_t key_len, size_t *value_len, gboolean update)
 {
-  char *ret = NULL;
   btree_transaction *btx = tx->txn;
   btree_node *node = search (btx, store->database, key, key_len);
 
+  btree_page *page = NULL;
+  
   if (node == NULL)
     {
       /* `search' never returns NULL unless there was a problem with the
@@ -2636,16 +2927,28 @@ get_internal (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       return NULL;
     }
 
-  if (node->value.data == NULL)
+  page = effective_page (node, FALSE);
+
+  if (page == NULL)
     return NULL;
+  else
+    {
+      size_t tmp_value_len = 0;
+      unsigned char *value = lookup_page_value
+	(page, (unsigned char *) key, key_len, &tmp_value_len);
 
-  ret = malloc (sizeof (unsigned char) *node->value.data_len);
-  memcpy (ret, node->value.data, node->value.data_len);
+      if (value != NULL)
+	{
+	  char *ret = malloc (sizeof (char) * tmp_value_len);
+	  memcpy (ret, value, tmp_value_len);
+	  
+	  if (value_len != NULL)
+	    *value_len = tmp_value_len;
 
-  if (value_len != NULL)
-    *value_len = node->value.data_len;
-
-  return ret;
+	  return ret;
+	}
+      else return NULL;
+    }
 }
 
 /* Returns the value for the specified key or NULL if none exists. */
@@ -2688,6 +2991,186 @@ transaction_prepare (gzochid_storage_transaction *tx)
 {
 }
 
+/*
+  Inserts the specified key and value into the page of the target leaf node. The
+  process works as follows:
+
+  If the key already exists in the target page, it is first removed.
+
+  If there is not enough room for the new record in the target page, the 
+  contents of the page following the offset of the new record are moved to a new
+  leaf node and page.
+  
+  If there is still not enough room for the new record in the target page, it is
+  inserted as a new leaf node and page following the target leaf node (and
+  preceding the new leaf node potentially created earlier). Otherwise the new
+  record is inserted as the new last record in the target page.
+
+  If any of the operations above cannot be completed (inserting new leaf nodes
+  may trigger splitting of internal nodes) the provided `GError' argument is set
+  accordingly.
+*/
+
+static void
+put_internal (btree_transaction *btx, btree *database, btree_node *node,
+	      unsigned char *key, size_t key_len, unsigned char *value,
+	      size_t value_len, GError **err)
+{
+  GError *local_err = NULL;
+  btree_page *page = NULL;
+  size_t offset = 0;
+  size_t required_size = key_len + value_len + 4;
+
+  page = effective_page (node, TRUE);
+  offset = page_key_offset (page, key, key_len);
+
+  /* Does the key already exist in the target page? */
+  
+  if (offset + 2 < page->page_size
+      && compare_page_datum_to_key (page, offset, key, key_len) == 0)
+    {
+      /* If so, remove it. */
+      
+      remove_page_record (btx, node, offset, &local_err);
+      
+      if (local_err != NULL)
+	{
+	  g_propagate_error (err, local_err);
+	  return;
+	}
+    }
+
+  /* Is there room for the new record in the target page? */
+  
+  if (page->page_size + required_size <= MAX_PAGE_SIZE)
+    {
+      /* If so, write it. */
+      
+      insert_page_record
+	(btx, node, offset, key, key_len, value, value_len, &local_err);
+
+      if (local_err != NULL)
+	g_propagate_error (err, local_err);
+    }
+  else
+    {
+      /* Otherwise, find some way to make room for the new record. */
+      
+      btree_node *new_leaf = NULL;
+      btree_page *new_page = NULL;
+      btree_node *new_parent = tx_parent (node, btx, &local_err);
+
+      if (local_err != NULL)
+	{
+	  g_propagate_error (err, local_err);
+	  return;	  
+	}
+
+      /* First, if there's stuff on the page that comes after the target offset,
+	 try moving that to its own leaf / page. */
+      
+      if (offset < page->page_size)
+	{      
+	  size_t next_key_len =
+	    gzochi_common_io_read_short (page->data, offset);
+	  size_t next_value_len = gzochi_common_io_read_short
+	    (page->data, offset + next_key_len + 2);
+	  size_t target_offset = 0;
+	  
+	  /* Create a leaf with the first subsequent record. */
+	  
+	  new_leaf = insert_leaf_with_record
+	    (btx, database, new_parent, node,
+	     page->data + offset + 2, next_key_len,
+	     page->data + offset + next_key_len + 4, next_value_len);
+
+	  if (new_leaf == NULL)
+	    {
+	      g_set_error
+		(err, MEMORY_TRANSACTION_ERROR, TXN_FAILED,
+		 "Transaction failure while splitting page.");
+
+	      return;
+	    }
+
+	  /* Remove that record from the source page. */
+	  
+	  remove_page_record (btx, node, offset, &local_err);
+	      
+	  if (local_err != NULL)
+	    {
+	      g_propagate_error (err, local_err);
+	      return;
+	    }
+	  
+	  new_page = effective_page (new_leaf, TRUE);
+
+	  /* Then, if there's more stuff after it, transfer it directly via
+	     `memcpy'. */
+
+	  target_offset = next_key_len + next_value_len + 4;
+	  
+	  while (offset < page->page_size)
+	    {
+	      size_t total_len = 0;
+	      
+	      next_key_len = gzochi_common_io_read_short (page->data, offset);
+	      next_value_len = gzochi_common_io_read_short
+		(page->data, offset + next_key_len + 2);
+
+	      total_len = next_key_len + next_value_len + 4;
+	      
+	      memcpy (new_page->data + target_offset, page->data + offset,
+		      total_len);
+
+	      offset += total_len;
+	      
+	      if (offset == page->page_size)
+		{
+		  update_key (new_leaf, btx, target_offset, &local_err);
+
+		  if (local_err != NULL)
+		    {
+		      g_propagate_error (err, local_err);
+		      return;
+		    }
+		  
+		  break;
+		}
+	      else target_offset += total_len;
+	    }
+
+	  /* Did that free up enough space on the target page? */
+	  
+	  if (page->page_size + required_size <= MAX_PAGE_SIZE)
+	    {
+	      /* If so, write the new record. */
+	      
+	      insert_page_record
+		(btx, node, offset, key, key_len, value, value_len, err);
+	      return;
+	    }
+	}
+
+      /* Get the parent again; it may have changed as the result of a split. */
+      
+      new_parent = tx_parent (node, btx, &local_err);
+
+      if (local_err != NULL)
+	g_propagate_error (err, local_err);
+
+      /* Just give the record its own dedicated page. */
+      
+      else if (insert_leaf_with_record
+	       (btx, database, new_parent, node, key, key_len, value,
+		value_len) == NULL)
+	
+	g_set_error
+	  (err, MEMORY_TRANSACTION_ERROR, TXN_FAILED,
+	   "Transaction failure while inserting singleton record.");
+    }
+}
+
 /* Inserts or updates the value for the specified key. */
 
 static void
@@ -2705,23 +3188,28 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 
   if (node != NULL && tx_lock_node (node, btx, TRUE, NULL) == SUCCESS)
     {
-      btree_datum *read_value = effective_value (node, FALSE);
+      btree_page *page = effective_page (node, FALSE);
+      
+      if (page != NULL)
+	{
+	  GError *err = NULL;
 
-      if (read_value->data != NULL)
-	{
-	  write_datum
-	    (effective_value (node, TRUE), (unsigned char *) value,
-	     value_len);
-	  mark_modification (node, btx);
-	}
-      else if (insert_value
-	       (btx, node, (unsigned char *) key, key_len,
-		(unsigned char *) value, value_len))
-	{
-	  if (!maybe_split (btx, store->database, node))
+	  put_internal
+	    (btx, store->database, node, (unsigned char *) key, key_len,
+	     (unsigned char *) value, value_len, &err);
+
+	  if (err != NULL)
 	    rollback = TRUE;
 	}
-      else rollback = TRUE;
+      else
+	{
+	  btree_node *new_leaf = insert_leaf_with_record
+	    (btx, store->database, node, NULL, (unsigned char *) key, key_len,
+	     (unsigned char *) value, value_len);
+
+	  if (new_leaf == NULL)
+	    rollback = TRUE;
+	}
     }
   else rollback = TRUE;
 
@@ -2751,26 +3239,46 @@ transaction_delete (gzochid_storage_transaction *tx,
 
   if (node != NULL)
     {
-      btree_datum *value = effective_value (node, FALSE);
+      btree_page *page = effective_page (node, TRUE);
 
-      if (value->data == NULL)
+      if (page == NULL)
 	ret = GZOCHID_STORAGE_ENOTFOUND;
       else
 	{
 	  GError *err = NULL;
-	  btree_node *parent = tx_parent (node, btx, &err);
+	  btree_node *parent = NULL;	  
+	  size_t offset = page_key_offset
+	    (page, (unsigned char *) key, key_len);
 
-	  if (err != NULL)
+	  if (compare_page_datum_to_key
+	      (page, offset, (unsigned char *) key, key_len) != 0)
+	    ret = GZOCHID_STORAGE_ENOTFOUND;
+	  else
 	    {
-	      g_error_free (err);
-	      ret = GZOCHID_STORAGE_ETXFAILURE;
+	      remove_page_record (btx, node, offset, &err);
+
+	      if (err != NULL)
+		{
+		  g_error_free (err);
+		  ret = GZOCHID_STORAGE_ETXFAILURE;
+		}
+	      else if (page->page_size == 0)
+		{	  
+		  parent = tx_parent (node, btx, &err);
+		  
+		  if (err != NULL)
+		    {
+		      g_error_free (err);
+		      ret = GZOCHID_STORAGE_ETXFAILURE;
+		    }
+		  else if (mark_node_deleted (btx, node))
+		    {
+		      if (!maybe_merge (btx, parent))
+			ret = GZOCHID_STORAGE_ETXFAILURE;
+		    }
+		  else ret = GZOCHID_STORAGE_ETXFAILURE;
+		}
 	    }
-	  else if (mark_node_deleted (btx, node))
-	    {
-	      if (!maybe_merge (btx, parent))
-		ret = GZOCHID_STORAGE_ETXFAILURE;
-	    }
-	  else ret = GZOCHID_STORAGE_ETXFAILURE;
 	}
     }
   else ret = GZOCHID_STORAGE_ETXFAILURE;
@@ -2799,59 +3307,45 @@ static char *
 find_key_gte (btree_transaction *btx, btree *bt, char *key, size_t key_len, 
 	      size_t *found_key_len, GError **err)
 {
-  GError *tmp_err = NULL;
-
-  btree_datum search_datum;
   btree_node *node = search (btx, bt, key, key_len);
-
-  search_datum.data = (unsigned char *) key;
-  search_datum.data_len = key_len;
 
   if (node != NULL)
     {
-      char *ret = NULL;
-      btree_datum *value = effective_value (node, FALSE);
+      btree_page *page = effective_page (node, FALSE);
 
-      if (value->data == NULL)
+      if (page != NULL)
 	{
-	  btree_node *first_child = tx_first_child (node, btx, &tmp_err);
+	  int i = 0;
+	  size_t offset = 0;
 
-	  if (first_child == NULL)
+	  while (offset < page->page_size)
 	    {
-	      if (tmp_err != NULL)
-		g_propagate_error (err, tmp_err);
+	      unsigned short len = gzochi_common_io_read_short
+		(page->data, offset);
+	      int c = memcmp (key, page->data + offset + 2, MIN (len, key_len));
 
-	      /* The tree could be empty. */
+	      if (c < 0 || (c == 0 && len >= key_len))
+		{
+		  char *ret = malloc (sizeof (char) * len);
+		  memcpy (ret, page->data + offset + 2, len);
+		  
+		  if (found_key_len != NULL)
+		    *found_key_len = len;
 
-	      return NULL;
+		  return ret;
+		}
+	      else
+		{
+		  offset += len + 2;
+		  len = gzochi_common_io_read_short (page->data, offset);
+		  offset += len + 2;
+		  
+		  i++;
+		}
 	    }
-
-	  node = first_child;
-
-	  value = effective_value (node, FALSE);
-	  assert (value->data != NULL);
+	  return NULL;
 	}
-
-      while (node != NULL && compare_datum (&search_datum, &node->key) > 0)
-	{
-	  node = tx_next_sibling (node, btx, &tmp_err);
-	  if (tmp_err != NULL)
-	    {
-	      g_propagate_error (err, tmp_err);
-	      return NULL;
-	    }
-	}
-
-      if (node != NULL)
-	{
-	  ret = malloc (sizeof (char) *node->key.data_len);
-	  memcpy (ret, node->key.data, node->key.data_len);
-
-	  if (found_key_len != NULL)
-	    *found_key_len = node->key.data_len;
-	}
-
-      return ret;
+      else return NULL;
     }
   else return NULL; /* The transaction is in a bad state. */
 }

@@ -207,11 +207,11 @@ test_lrucache_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lrucache_SOURCES = test-lrucache.c
 test_lrucache_LDADD = $(top_builddir)/src/libgzochid_la-lrucache.o @GLIB_LIBS@
 
-test_oids_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_oids_CFLAGS = -I$(top_srcdir)/src @GZOCHI_COMMON_CFLAGS@ @GLIB_CFLAGS@
 test_oids_SOURCES = test-oids.c
 test_oids_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-storage-mem.o \
-	@GLIB_LIBS@
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 
 test_oids_dataclient_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_oids_dataclient_SOURCES = test-oids-dataclient.c
@@ -219,12 +219,13 @@ test_oids_dataclient_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-oids-dataclient.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@
 
-test_oids_storage_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_oids_storage_CFLAGS = -I$(top_srcdir)/src @GZOCHI_COMMON_CFLAGS@ \
+	@GLIB_CFLAGS@
 test_oids_storage_SOURCES = test-oids-storage.c
 test_oids_storage_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-oids-storage.o \
 	$(top_builddir)/src/libgzochid_la-storage-mem.o \
-	@GLIB_LIBS@
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 
 test_queue_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_queue_SOURCES = test-queue.c mock-data.c
@@ -296,10 +297,11 @@ test_storage_dataclient_LDADD = \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@
 
-test_storage_mem_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_storage_mem_CFLAGS = -I$(top_srcdir)/src @GZOCHI_COMMON_CFLAGS@ \
+	@GLIB_CFLAGS@
 test_storage_mem_SOURCES = test-storage-mem.c
 test_storage_mem_LDADD = $(top_builddir)/src/libgzochid_la-storage-mem.o \
-	@GLIB_LIBS@
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 
 test_task_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_task_SOURCES = test-task.c 
