@@ -996,7 +996,13 @@ channel_operation_worker (gzochid_application_context *context,
 			  gzochid_auth_identity *identity, gpointer data)
 {
   gzochid_channel_pending_operation *op = data;
+  gzochid_data_managed_reference *op_reference =
+    gzochid_data_create_reference
+    (context, &gzochid_channel_operation_serialization, op, NULL);
 
+  if (op_reference == NULL)
+    return;
+  
   switch (op->type)
     {
     case GZOCHID_CHANNEL_OP_JOIN: join_channel (context, identity, data); break;
@@ -1015,6 +1021,8 @@ channel_operation_worker (gzochid_application_context *context,
       
     default: assert (1 == 0);
     }
+
+  gzochid_data_remove_object (op_reference, NULL);
 }
 
 /* Durable task serialization boilerplate for logical channel operation
