@@ -1821,17 +1821,28 @@ search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
 
       while (child != NULL)
 	{
-	  btree_datum *child_datum = effective_key (child, FALSE);
-	  gint compare_result = compare_datum (&search_datum, child_datum);
+	  btree_page *page = effective_page (child, FALSE);
 
-	  if (child->page != NULL)
-	    node_is_leaf_parent = TRUE;
-
-	  if (compare_result < 0)
+	  if (page != NULL)
 	    {
-	      if (node_is_leaf_parent)
-		return child;
-	      else break;
+	      /* If we're examining leaf nodes, choose the greatest whose first
+		 key is smaller than the search key. */
+	      
+	      node_is_leaf_parent = TRUE;
+
+	      if (compare_page_datum_to_key
+		  (page, 0, search_datum.data, search_datum.data_len) > 0)
+		return prev != NULL ? prev : child;
+	    }
+	  else
+	    {
+	      /* If we're examining internal nodes, choose the first whose 
+		 greatest key is greater than the search key. */
+	      
+	      btree_datum *child_datum = effective_key (child, FALSE);
+
+	      if (compare_datum (&search_datum, child_datum) < 0)
+		break;
 	    }
 
 	  prev = child;
@@ -1846,7 +1857,9 @@ search (btree_transaction *btx, btree *bt, char *key, size_t key_len)
 
       if (child == NULL)
 	{
-	  if (node_is_leaf_parent || is_root)
+	  if (node_is_leaf_parent)
+	    return prev;
+	  if (is_root)
 	    return node;
 	  else node = prev;
 	}
