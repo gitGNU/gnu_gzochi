@@ -16,9 +16,11 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
 #include <glib.h>
 #include <gzochi-common.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -1721,12 +1723,13 @@ walk_btree (btree_node *root, GFunc func, gpointer user_data)
     {
       GList *to_visit_ptr = to_visit;
       btree_node *node = to_visit_ptr->data;
+      btree_node_header *header = effective_header (node,  FALSE);
+      
+      if (header->next != NULL)
+	to_visit = g_list_prepend (to_visit, header->next);
 
-      if (node->header.first_child != NULL)
-	to_visit = g_list_prepend (to_visit, node->header.first_child);
-
-      if (node->header.next != NULL)
-	to_visit = g_list_prepend (to_visit, node->header.next);
+      if (header->first_child != NULL)
+	to_visit = g_list_prepend (to_visit, header->first_child);
 
       to_visit = g_list_delete_link (to_visit, to_visit_ptr);
       func (node, user_data);
@@ -3447,3 +3450,123 @@ gzochid_storage_engine_interface gzochid_storage_engine_interface_mem =
     transaction_first_key,
     transaction_next_key
   };
+
+/* A `GFunc' implementation to support `gzochid_data_print_btree_structure' 
+   below. */
+
+static void
+print_btree_structure_visitor (gpointer data, gpointer user_data)
+{
+  btree_node *node = data;
+  GList *lines = NULL, *lines_ptr = NULL;
+  int i = 0;
+
+  while (node != NULL)
+    {
+      btree_node_header *header = effective_header (node, FALSE);
+
+      if (node == data)
+	lines = g_list_append (lines, "|- ");
+      else if (header->next != NULL)
+	lines = g_list_append (lines, "|  ");
+      else lines = g_list_append (lines, "   ");
+
+      node = header->parent;
+    }
+
+  lines = g_list_reverse (lines);
+  lines_ptr = lines;
+
+  while (lines_ptr != NULL)
+    {
+      printf ("%s", (char *) lines_ptr->data);
+      lines_ptr = lines_ptr->next;
+    }
+
+  g_list_free (lines);
+  
+  node = data;
+  
+  if (node->key.data == NULL)
+    printf ("[ROOT]\n");
+  else
+    {
+      for (i = 0; i < node->key.data_len; i++)
+	if (isalnum (node->key.data[i]))
+	  printf ("%c", node->key.data[i]);
+	else printf ("\\x%.2x", node->key.data[i]);
+
+      printf ("\n");
+    }
+}
+
+/*
+  Print to standard output the structure of the specified `btree', as determined
+  via an "inorder" traversal, including a representation of the keys of internal
+  and leaf nodes.
+
+  Use this function within GDB to inspect the distribution of keys in the memory
+  storage engine.
+*/
+
+void
+gzochid_storage_mem_print_btree_structure (btree *btree)
+{
+  walk_btree (btree->root, print_btree_structure_visitor, NULL);
+}
+
+/*
+  Print to standard output the state of the specified btree transaction in terms
+  of its (pending) read and write locks against leaf and internal nodes.
+
+  Use this function within GDB to examine deadlocks and other lock contention 
+  issues.
+*/
+
+void
+gzochid_storage_mem_print_transaction_state (btree_transaction *btx)
+{
+  GHashTableIter iter;
+  gpointer key, value;
+  
+  g_hash_table_iter_init (&iter, btx->environment->lock_table);
+
+  while (g_hash_table_iter_next (&iter, &key, &value))
+    {
+      btree_node *node = key;
+      btree_lock *lock = value;
+
+      btree_datum *key_data = effective_key (node, FALSE);
+	  
+      if (lock->writer == btx)
+	{
+	  if (node->page != NULL)
+	    printf ("WRITE: %p key %s [leaf]\n", node, key_data->data);
+	  else printf ("WRITE: %p key %s [interstitial]\n", node,
+		       key_data->data);
+	}
+      if (g_list_find (lock->readers, btx))
+	{
+	  if (node->page != NULL)
+	    printf ("READ: %p key %s [leaf]\n", node, key_data->data);
+	  else printf ("READ: %p key %s [interstitial]\n", node,
+		       key_data->data);
+	}
+      if (btx->waiting_to_write == lock)
+	{
+	  if (node->page != NULL)
+	    printf ("WAITING TO WRITE: %p key %s [leaf]\n", node,
+		    key_data->data);
+	  else printf ("WAITING TO WRITE: %p key %s [interstitial]\n", node,
+		       key_data->data);
+	}
+      else if (btx->waiting_to_read == lock)
+	{
+	  if (node->page != NULL)
+	    printf ("WAITING TO READ: %p key %s [leaf]\n", node,
+		    key_data->data);
+	  else printf ("WAITING TO READ: %p key %s [interstitial]\n", node,
+		       key_data->data);
+	}
+    }
+}

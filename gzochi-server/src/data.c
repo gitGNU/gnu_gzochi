@@ -19,6 +19,7 @@
 #include <glib.h>
 #include <gmp.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -986,4 +987,53 @@ gzochid_data_mark (gzochid_application_context *context,
 
       free (oid_str);
     }
+}
+
+/*
+  Print to standard output the list of managed references accessed by the
+  specified transaction context, along with their state - `MODIFIED', `NEW', 
+  etc.
+
+  Use this function within GDB to inspect the behavior of transactions against
+  the data service.
+*/
+
+void
+gzochid_data_print_references (gzochid_data_transaction_context *context)
+{
+  GList *values = g_hash_table_get_values (context->ptrs_to_references);
+  GList *values_ptr = values;
+
+  while (values_ptr != NULL)
+    {
+      const char *state;
+      gzochid_data_managed_reference *ref = values_ptr->data;
+      char *oid_str = mpz_get_str (NULL, 16, ref->oid);
+      
+      switch (ref->state)
+	{
+	case GZOCHID_MANAGED_REFERENCE_STATE_NEW: state = "NEW"; break;
+	case GZOCHID_MANAGED_REFERENCE_STATE_EMPTY: state = "EMPTY"; break;
+	case GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED:
+	  state = "NOT MODIFIED"; break;
+	case GZOCHID_MANAGED_REFERENCE_STATE_MAYBE_MODIFIED:
+	  state = "MAYBE MODIFIED"; break;
+	case GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED: state =
+	    "MODIFIED"; break;
+	case GZOCHID_MANAGED_REFERENCE_STATE_FLUSHED: state = "FLUSHED"; break;
+	case GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY:
+	  state = "REMOVED EMPTY"; break;
+	case GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED:
+	  state = "REMOVED FETCHED"; break;
+	}
+      
+      printf ("%s (serialization: %p) -> %s\n", oid_str, ref->serialization,
+	      state);
+
+      free (oid_str);
+	
+      values_ptr = values_ptr->next;
+    }
+  
+  g_list_free (values);
 }
