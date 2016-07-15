@@ -3088,7 +3088,6 @@ put_internal (btree_transaction *btx, btree *database, btree_node *node,
 	    gzochi_common_io_read_short (page->data, offset);
 	  size_t next_value_len = gzochi_common_io_read_short
 	    (page->data, offset + next_key_len + 2);
-	  size_t target_offset = 0;
 	  
 	  /* Create a leaf with the first subsequent record. */
 	  
@@ -3118,39 +3117,28 @@ put_internal (btree_transaction *btx, btree *database, btree_node *node,
 	  
 	  new_page = effective_page (new_leaf, TRUE);
 
-	  /* Then, if there's more stuff after it, transfer it directly via
-	     `memcpy'. */
+	  /* Then, if there's more stuff after it, transfer it. */
 
-	  target_offset = next_key_len + next_value_len + 4;
-	  
 	  while (offset < page->page_size)
 	    {
-	      size_t total_len = 0;
-	      
 	      next_key_len = gzochi_common_io_read_short (page->data, offset);
 	      next_value_len = gzochi_common_io_read_short
 		(page->data, offset + next_key_len + 2);
+	      	      
+	      insert_page_record
+		(btx, new_leaf, new_page->page_size,
+		 page->data + offset + 2, next_key_len,
+		 page->data + offset + next_key_len + 4, next_value_len,
+		 &local_err);
 
-	      total_len = next_key_len + next_value_len + 4;
+	      if (local_err == NULL)
+		remove_page_record (btx, node, offset, &local_err);
 	      
-	      memcpy (new_page->data + target_offset, page->data + offset,
-		      total_len);
-
-	      offset += total_len;
-	      
-	      if (offset == page->page_size)
+	      if (local_err != NULL)
 		{
-		  update_key (new_leaf, btx, target_offset, &local_err);
-
-		  if (local_err != NULL)
-		    {
-		      g_propagate_error (err, local_err);
-		      return;
-		    }
-		  
-		  break;
+		  g_propagate_error (err, local_err);
+		  return;
 		}
-	      else target_offset += total_len;
 	    }
 
 	  /* Did that free up enough space on the target page? */
