@@ -1,15 +1,10 @@
 # Build scripts for GitLab CI. 
 
 debian:
-  image: samueldebruyn/debian-git
+  image: juliangraham/gzochi-build
   script:
     - "export GUILE_CFLAGS=\"-pthread -I/usr/include/guile/2.0 -I/usr/include\""
     - "export GUILE_LIBS=\"-L/usr/lib -lguile-2.0 -lgc\""
-    - "apt-get update"
-    - "apt-get -y install autoconf automake libtool pkg-config make texinfo"
-    - "apt-get -y install guile-2.0-dev libglib2.0-dev libmicrohttpd-dev zlib1g-dev libdb-dev libgmp-dev"
-    - "apt-get -y install libglib2.0-dev libncurses5-dev"
-    - "apt-get -y install libglib2.0-dev libsdl1.2-dev"
     - "./autogen.sh"
     - "./configure"
     - "make"
