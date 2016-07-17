@@ -54,7 +54,17 @@ struct _gzochid_client_session
   gzochid_client_session_handler *handler;
   gboolean connected;
 
-  mpz_t scm_oid;
+  mpz_t scm_oid; /* Object id of the Scheme representation of the session. */
+
+  /* Object id of the Scheme representation of the client session listener. This
+     field is tracked purely to keep track of session listener, which is a
+     managed record and thus winds up in the database. Although from the point
+     of you of the container, the only thing the listener is used for is its two
+     lifecycle callbacks, it's not easy to predict what else application code 
+     will do with it. For that reason, it has to stick around at least as long
+     as the session does. */
+ 
+  mpz_t handler_scm_oid;
 };
 
 struct _gzochid_client_session_pending_operation
@@ -302,8 +312,11 @@ deserialize_client_session (gzochid_application_context *context, GString *in,
   gzochid_util_deserialize_mpz (in, session->scm_oid);
 
   if (gzochid_util_deserialize_boolean (in))
-    session->handler = deserialize_handler (context, in, NULL);
-
+    {
+      session->handler = deserialize_handler (context, in, NULL);
+      gzochid_util_deserialize_mpz (in, session->handler_scm_oid);
+    }
+  
   gzochid_auth_identity_unref (identity);
   
   return session;
@@ -328,10 +341,12 @@ serialize_client_session (gzochid_application_context *context, gpointer obj,
 
   gzochid_auth_identity_serializer (context, session->identity, out, NULL);
   gzochid_util_serialize_mpz (session->scm_oid, out);
+
   if (session->handler != NULL)
     {
       gzochid_util_serialize_boolean (TRUE, out);
       serialize_handler (context, session->handler, out, NULL);
+      gzochid_util_serialize_mpz (session->handler_scm_oid, out);
     }
   else gzochid_util_serialize_boolean (FALSE, out);
 }
@@ -451,8 +466,10 @@ gzochid_client_session_new (gzochid_auth_identity *identity)
     calloc (1, sizeof (gzochid_client_session));
 
   session->identity = gzochid_auth_identity_ref (identity);
-  mpz_init (session->scm_oid);
 
+  mpz_init (session->scm_oid);
+  mpz_init (session->handler_scm_oid);
+  
   return session;
 }
 
@@ -460,7 +477,9 @@ void
 gzochid_client_session_free (gzochid_client_session *session)
 {
   gzochid_auth_identity_unref (session->identity);
+
   mpz_clear (session->scm_oid);
+  mpz_clear (session->handler_scm_oid);
   
   free (session);
 }
@@ -526,6 +545,20 @@ gzochid_client_session_set_scm_oid (gzochid_client_session *session,
 				    mpz_t scm_oid)
 {
   mpz_set (session->scm_oid, scm_oid);
+}
+
+void
+gzochid_client_session_handler_scm_oid (gzochid_client_session *session,
+					mpz_t handler_scm_oid)
+{
+  mpz_set (handler_scm_oid, session->handler_scm_oid);
+}
+
+void
+gzochid_client_session_set_handler_scm_oid (gzochid_client_session *session,
+					    mpz_t handler_scm_oid)
+{
+  mpz_set (session->handler_scm_oid, handler_scm_oid);
 }
 
 gzochid_client_session_handler *

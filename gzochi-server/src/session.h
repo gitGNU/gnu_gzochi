@@ -78,9 +78,21 @@ gzochid_auth_identity *gzochid_client_session_identity
 
 void gzochid_client_session_scm_oid (gzochid_client_session *, mpz_t);
 
-/* Returns the oid of the specified channel's Scheme representation. */
+/* Sets the oid of the specified session's Scheme representation to the 
+   specified `mpz_t'. */
 
 void gzochid_client_session_set_scm_oid (gzochid_client_session *, mpz_t);
+
+/* Sets the specified `mpz_t' to the oid of the Scheme representation of the 
+   specified session's session listener. */
+
+void gzochid_client_session_handler_scm_oid (gzochid_client_session *, mpz_t);
+
+/* Sets the specified `mpz_t' to the oid of the Scheme representation of the 
+   specified session's session listener. */
+
+void gzochid_client_session_set_handler_scm_oid
+(gzochid_client_session *, mpz_t);
 
 /* Returns the lifecycle handler of the specified channel. */
 
