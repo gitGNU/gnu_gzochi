@@ -223,7 +223,6 @@ gzochid_scheme_application_logged_in_worker
   SCM scm_session = SCM_BOOL_F;
 
   SCM cb = SCM_BOOL_F;
-  gzochid_data_managed_reference *callback_reference = NULL;
 
   SCM handler = SCM_BOOL_F;
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
@@ -233,7 +232,7 @@ gzochid_scheme_application_logged_in_worker
   session_reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, session_oid);
   mpz_clear (session_oid);
-
+  
   gzochid_data_dereference (session_reference, &err);
 
   if (err != NULL)
@@ -248,20 +247,13 @@ gzochid_scheme_application_logged_in_worker
     (session, session_reference->oid);
 
   cb = gzochid_scheme_create_callback (context->descriptor->logged_in, NULL);
-  callback_reference = gzochid_data_create_reference 
-    (context, &gzochid_scheme_data_serialization, cb, NULL);
-
-  /* If the transaction fails here (or has already failed) just return. */
-  
-  if (callback_reference == NULL)
-    return;
   
   gzochid_transaction_join (&scheme_participant, NULL);
 
   handler = gzochid_scheme_invoke_callback 
     (context, identity, "gzochi:execute-logged-in", gzochi_private_app,
-     scm_list_2 (callback_reference->obj, scm_session), exception_var);
-
+     scm_list_2 (cb, scm_session), exception_var);
+  
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
       if (! gzochid_scheme_triggered_by_rollback 
