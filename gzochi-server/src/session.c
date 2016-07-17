@@ -414,6 +414,10 @@ remove_session (gzochid_application_context *context, const char *oid_str,
 	    gzochid_data_create_reference_to_oid 
 	    (context, &gzochid_scm_location_aware_serialization, 
 	     session->scm_oid);
+	  gzochid_data_managed_reference *scm_handler_reference =
+	    gzochid_data_create_reference_to_oid 
+	    (context, &gzochid_scm_location_aware_serialization, 
+	     session->handler_scm_oid);
 	  
 	  gzochid_data_remove_object (scm_session_reference, &local_err);
 
@@ -430,17 +434,30 @@ remove_session (gzochid_application_context *context, const char *oid_str,
 		   oid_str, local_err->message);
 	    }
 
-	  /* Don't attempt to remove the object if the transaction is in a
-	     failed state - it's a waste of time and tends to irritate the 
-	     storage engine. */
+	  if (local_err == NULL ||
+	      !g_error_matches (local_err, GZOCHID_DATA_ERROR,
+				GZOCHID_DATA_ERROR_TRANSACTION))
+	    g_clear_error (&local_err);
+
+	  /* Now do the same thing for the Scheme representation of the
+	     client lifecycle handler. */
 	  
-	  if (!g_error_matches
-	      (local_err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION))
-	    {
-	      g_clear_error (&local_err);
-	      gzochid_data_remove_object (session_reference, &local_err);
-	    }
+	  gzochid_data_remove_object (scm_handler_reference, &local_err);
+
+	  if (local_err == NULL ||
+	      !g_error_matches (local_err, GZOCHID_DATA_ERROR,
+				GZOCHID_DATA_ERROR_TRANSACTION))
+	    g_clear_error (&local_err);
+	  
+	  if (local_err == NULL)
+
+	    /* Don't attempt to remove the object if the transaction is in a
+	       failed state - it's a waste of time and tends to irritate the 
+	       storage engine. */
+	    
+	    gzochid_data_remove_object (session_reference, &local_err);
 	}
+      
       if (local_err != NULL)
 	g_propagate_error (err, local_err);	  
 	

@@ -285,10 +285,21 @@ gzochid_scheme_application_logged_in_worker
     }
   else
     {
+      gzochid_scm_location_info *scm_handler_reloc = 
+	gzochid_scm_location_get (context, handler);
+      gzochid_data_managed_reference *handler_reference = 
+	gzochid_data_create_reference 
+	(context, &gzochid_scm_location_aware_serialization, scm_handler_reloc,
+	 NULL);
+
+      scm_gc_protect_object (handler);
+      
       gzochid_client_session_set_handler
 	(session, gzochid_with_application_context 
 	 (context, identity, unpack_handler, handler));
-
+      gzochid_client_session_set_handler_scm_oid
+	(session, handler_reference->oid);
+      
       gzochid_data_mark 
 	(context, &gzochid_client_session_serialization, session, &err);
 
