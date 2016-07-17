@@ -168,9 +168,12 @@ scm_to_callback (gzochid_application_context *context, SCM scm_callback)
 {
   GList *module = gzochid_scheme_callback_module (scm_callback);
   char *procedure = gzochid_scheme_callback_procedure (scm_callback);
-  gzochid_data_managed_reference *reference = 
-    gzochid_data_create_reference
-    (context, &gzochid_scheme_data_serialization, scm_callback, NULL);
+  gzochid_scm_location_info *scm_callback_reloc = gzochid_scm_location_get
+    (context, scm_callback);
+  
+  gzochid_data_managed_reference *reference = gzochid_data_create_reference
+    (context, &gzochid_scm_location_aware_serialization, scm_callback_reloc,
+     NULL);
 
   if (reference == NULL) /* Can happen on transaction timeout. */
     return NULL;
@@ -391,7 +394,8 @@ gzochid_scheme_application_disconnected_worker
   gzochid_client_session *session = NULL;
   gzochid_data_managed_reference *session_reference = NULL;
   gzochid_data_managed_reference *callback_reference = NULL;
-
+  gzochid_client_session_handler *handler = NULL;
+  
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
   char *oid_str = ptr;
   mpz_t session_oid;
@@ -422,11 +426,12 @@ gzochid_scheme_application_disconnected_worker
     }
 
   session = session_reference->obj;
-
+  handler = gzochid_client_session_get_handler (session);
+  
   /* A client may disconnect before the login process has completed or after
      it has failed enough times to stop being retried. */
 
-  if (gzochid_client_session_get_handler (session) == NULL)
+  if (handler == NULL)
     {
       /* In that case, don't bother trying to dredge up its disconnect handler.
 	 Just jump straight to removing the session from the data store. */
@@ -438,13 +443,11 @@ gzochid_scheme_application_disconnected_worker
       return;
     }
 
-  callback_reference =
-    gzochid_data_create_reference_to_oid
-    (context, &gzochid_scheme_data_serialization, 
-     gzochid_client_session_get_handler (session)->disconnected->scm_oid);
+  callback_reference = gzochid_data_create_reference_to_oid
+    (context, &gzochid_scheme_data_serialization,
+     handler->disconnected->scm_oid);
 
-  /* Mark the callback for update; if all goes well, it'll get removed later in
-     the transaction by `gzochid_client_session_disconnected_worker'. */
+  /* Mark the callback for update; if all goes well, it'll get removed below. */
   
   gzochid_data_dereference_for_update (callback_reference, &err);
   
@@ -478,7 +481,28 @@ gzochid_scheme_application_disconnected_worker
 	     (scm_variable_ref (exception_var)));
 	}
     }
-  else gzochid_client_session_disconnected_worker (context, identity, ptr);
+  else
+    {
+      gzochid_data_remove_object (callback_reference, &err);
+
+      if (err == NULL)
+	{
+	  callback_reference = gzochid_data_create_reference_to_oid
+	    (context, &gzochid_scheme_data_serialization, 
+	     handler->received_message->scm_oid);
+
+	  gzochid_data_remove_object (callback_reference, &err);
+	}
+      
+      if (err != NULL)
+	{
+	  g_warning
+	    ("Failed to remove lifecycle handler for session '%s': %s", oid_str,
+	     err->message);
+	  g_error_free (err);
+	}
+      else gzochid_client_session_disconnected_worker (context, identity, ptr);
+    }
 }
 
 void 
