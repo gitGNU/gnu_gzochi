@@ -1025,6 +1025,7 @@ gzochid_data_print_references (gzochid_data_transaction_context *context)
 	  state = "REMOVED EMPTY"; break;
 	case GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_FETCHED:
 	  state = "REMOVED FETCHED"; break;
+	default: state = "UNKNOWN";
 	}
       
       printf ("%s (serialization: %p) -> %s\n", oid_str, ref->serialization,
