@@ -2463,22 +2463,29 @@ maybe_merge (btree_transaction *btx, btree_node *node)
 
 /* Split the specified B+tree node by creating a new next sibling for it and 
    moving half of its children to the new sibling. Returns the newly created 
-   sibling node, which is locked for write.
-*/ 
+   sibling node, which is locked for write. The new sibling node's min and max
+   child count is determined by the `leaf_parent' argument - internal nodes that
+   are the parents of only leaf nodes may have different min / max child 
+   thresholds. */ 
 
 static btree_node *
-split (btree_node *node, btree_transaction *btx)
+split (btree_node *node, btree_transaction *btx, gboolean leaf_parent)
 {
   GError *err = NULL;
   unsigned int split_position = 1;
-  btree_node *new_node = create_lockable_btree_node
-    (NULL, MIN_INTERNAL_CHILDREN, MAX_INTERNAL_CHILDREN, NULL, 0, btx);
-
+  btree_node *new_node = NULL;
+  
   btree_node *next = NULL;
   btree_node *parent = NULL;
   btree_node *split_point = NULL;
   btree_node *pre_split_point = NULL;
 
+  if (leaf_parent)
+    new_node = create_lockable_btree_node
+      (NULL, MIN_LEAF_CHILDREN, MAX_LEAF_CHILDREN, NULL, 0, btx);
+  else new_node = create_lockable_btree_node
+	 (NULL, MIN_INTERNAL_CHILDREN, MAX_INTERNAL_CHILDREN, NULL, 0, btx);
+  
   if (tx_lock_node (new_node, btx, TRUE, NULL) != SUCCESS)
     return NULL;
 
@@ -2561,7 +2568,8 @@ maybe_split (btree_transaction *btx, btree *btree, btree_node *node)
 {
   GError *err = NULL;
   int num_children = count_children (btx, node, &err);
-
+  gboolean leaf_parent = TRUE;
+  
   if (err != NULL)
     {
       g_error_free (err);
@@ -2579,8 +2587,9 @@ maybe_split (btree_transaction *btx, btree *btree, btree_node *node)
 	  return FALSE;
 	}
 
-      new_node = split (node, btx);
-
+      new_node = split (node, btx, leaf_parent);
+      leaf_parent = FALSE;
+      
       if (new_node == NULL)
 	return FALSE;
       else if (parent == NULL)
