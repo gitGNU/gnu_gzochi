@@ -2157,7 +2157,11 @@ merge_borrow (btree_node *prev, btree_node *node, btree_node *next,
 
   if (spare_next > 0 && num_children < node->min_children)
     {
-      if (!tx_set_next_sibling (last_child, btx, first_next_child)
+      /* It's possible that the last child is `NULL' if the node has no
+	 children. */
+      
+      if ((last_child != NULL
+	   && !tx_set_next_sibling (last_child, btx, first_next_child))
 	  || !tx_set_prev_sibling (first_next_child, btx, last_child))
 	return FALSE;
       else borrowed_next = TRUE;
