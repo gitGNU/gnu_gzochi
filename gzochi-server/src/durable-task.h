@@ -30,9 +30,9 @@
 struct _gzochid_application_worker_serialization
 {
   void (*serializer) 
-  (gzochid_application_context *, gzochid_application_worker, GString *);
+  (gzochid_application_context *, gzochid_application_worker, GByteArray *);
   gzochid_application_worker (*deserializer) 
-  (gzochid_application_context *, GString *);
+  (gzochid_application_context *, GByteArray *);
 };
 
 typedef struct _gzochid_application_worker_serialization

@@ -113,7 +113,7 @@ void *
 gzochid_data_dereference 
 (gzochid_data_managed_reference *reference, GError **error)
 {
-  GString *in = NULL;
+  GByteArray *in = NULL;
   GString *data = NULL;
   char *oid_str = NULL;
 
@@ -125,10 +125,12 @@ gzochid_data_dereference
   data = g_hash_table_lookup (oids, oid_str); 
   free (oid_str);
 
-  in = g_string_new_len (data->str, data->len);
+  in = g_byte_array_sized_new (data->len);
+  g_byte_array_append (in, data->str, data->len);
+  
   reference->obj = reference->serialization->deserializer 
     (reference->context, in, NULL);
-  g_string_free (in, TRUE);
+  g_byte_array_unref (in);
 
   return reference->obj;
 }
@@ -145,7 +147,7 @@ gzochid_test_mock_data_store
 (gzochid_application_context *context, gzochid_io_serialization *serialization,
  gpointer data, mpz_t oid)
 {
-  GString *out = g_string_new (NULL);
+  GByteArray *out = g_byte_array_new ();
   
   mpz_set (oid, next_oid);
   mpz_add_ui (next_oid, next_oid, 1);

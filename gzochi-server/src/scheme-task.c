@@ -547,12 +547,13 @@ gzochid_scheme_application_ready (gzochid_application_context *context,
 
 static void 
 scheme_worker_serializer (gzochid_application_context *context, 
-			  gzochid_application_worker worker, GString *out)
+			  gzochid_application_worker worker, GByteArray *out)
 {
 }
 
 static gzochid_application_worker 
-scheme_worker_deserializer (gzochid_application_context *context, GString *in)
+scheme_worker_deserializer (gzochid_application_context *context,
+			    GByteArray *in)
 {
   return gzochid_scheme_application_task_worker;
 }

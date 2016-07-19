@@ -22,37 +22,38 @@
 #include <gmp.h>
 #include <sys/time.h>
 
-void gzochid_util_serialize_boolean (gboolean, GString *);
-void gzochid_util_serialize_int (int, GString *);
-void gzochid_util_serialize_mpz (mpz_t, GString *);
-void gzochid_util_serialize_bytes (unsigned char *, int, GString *);
-void gzochid_util_serialize_string (char *, GString *);
+void gzochid_util_serialize_boolean (gboolean, GByteArray *);
+void gzochid_util_serialize_int (int, GByteArray *);
+void gzochid_util_serialize_mpz (mpz_t, GByteArray *);
+void gzochid_util_serialize_bytes (unsigned char *, int, GByteArray *);
+void gzochid_util_serialize_string (char *, GByteArray *);
 void gzochid_util_serialize_list 
-(GList *, void (*) (gpointer, GString *), GString *);
+(GList *, void (*) (gpointer, GByteArray *), GByteArray *);
 void gzochid_util_serialize_sequence
-(GSequence *, void (*) (gpointer, GString *), GString *);
+(GSequence *, void (*) (gpointer, GByteArray *), GByteArray *);
 void gzochid_util_serialize_hash_table
 (GHashTable *, 
- void (*) (gpointer, GString *), 
- void (*) (gpointer, GString *), 
- GString *);
-void gzochid_util_serialize_timeval (struct timeval, GString *);
+ void (*) (gpointer, GByteArray *), 
+ void (*) (gpointer, GByteArray *), 
+ GByteArray *);
+void gzochid_util_serialize_timeval (struct timeval, GByteArray *);
 
-gboolean gzochid_util_deserialize_boolean (GString *);
-int gzochid_util_deserialize_int (GString *);
-void gzochid_util_deserialize_mpz (GString *, mpz_t);
-unsigned char *gzochid_util_deserialize_bytes (GString *, int *);
-char *gzochid_util_deserialize_string (GString *);
-GList *gzochid_util_deserialize_list (GString *, gpointer (*) (GString *));
+gboolean gzochid_util_deserialize_boolean (GByteArray *);
+int gzochid_util_deserialize_int (GByteArray *);
+void gzochid_util_deserialize_mpz (GByteArray *, mpz_t);
+unsigned char *gzochid_util_deserialize_bytes (GByteArray *, int *);
+char *gzochid_util_deserialize_string (GByteArray *);
+GList *gzochid_util_deserialize_list
+(GByteArray *, gpointer (*) (GByteArray *));
 GSequence *gzochid_util_deserialize_sequence 
-(GString *, gpointer (*) (GString *), GDestroyNotify);
+(GByteArray *, gpointer (*) (GByteArray *), GDestroyNotify);
 GHashTable *gzochid_util_deserialize_hash_table
-(GString *, 
+(GByteArray *, 
  GHashFunc, 
  GEqualFunc, 
- gpointer (*) (GString *), 
- gpointer (*) (GString *));
-struct timeval gzochid_util_deserialize_timeval (GString *);
+ gpointer (*) (GByteArray *), 
+ gpointer (*) (GByteArray *));
+struct timeval gzochid_util_deserialize_timeval (GByteArray *);
 
 gint gzochid_util_string_data_compare (gconstpointer, gconstpointer, gpointer);
 

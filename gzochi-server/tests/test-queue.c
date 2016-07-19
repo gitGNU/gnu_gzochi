@@ -32,13 +32,13 @@
 
 static void
 serialize_string (gzochid_application_context *app_context, gpointer data,
-		  GString *out, GError **err)
+		  GByteArray *out, GError **err)
 {
   gzochid_util_serialize_string (data, out);
 }
 
 static gpointer
-deserialize_string (gzochid_application_context *app_context, GString *in,
+deserialize_string (gzochid_application_context *app_context, GByteArray *in,
 		    GError **err)
 {
   return gzochid_util_deserialize_string (in);

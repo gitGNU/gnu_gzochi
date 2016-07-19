@@ -119,7 +119,7 @@ gzochid_channel_name (gzochid_channel *channel)
 /* Serialization routines for channel objects. */
 
 static gpointer 
-deserialize_channel (gzochid_application_context *context, GString *in,
+deserialize_channel (gzochid_application_context *context, GByteArray *in,
 		     GError **err)
 {
   gzochid_channel *channel = calloc (1, sizeof (gzochid_channel));
@@ -134,7 +134,7 @@ deserialize_channel (gzochid_application_context *context, GString *in,
 
 static void 
 serialize_channel (gzochid_application_context *context, gpointer obj,
-		   GString *out, GError **err)
+		   GByteArray *out, GError **err)
 {
   gzochid_channel *channel = obj;
   gzochid_util_serialize_string (channel->name, out);
@@ -198,7 +198,7 @@ gzochid_channel_pending_membership_operation;
 
 static gpointer 
 deserialize_channel_operation (gzochid_application_context *context,
-			       GString *in, GError **err)
+			       GByteArray *in, GError **err)
 {
   enum gzochid_channel_operation type = gzochid_util_deserialize_int (in);
   gzochid_channel_pending_operation *op = NULL;
@@ -241,7 +241,7 @@ deserialize_channel_operation (gzochid_application_context *context,
 
 static void 
 serialize_channel_operation (gzochid_application_context *context,
-			     gpointer data, GString *out, GError **err)
+			     gpointer data, GByteArray *out, GError **err)
 {
   gzochid_channel_pending_operation *op = data;
 
@@ -1031,13 +1031,13 @@ channel_operation_worker (gzochid_application_context *context,
 static void
 serialize_channel_operation_worker (gzochid_application_context *context,
 				    gzochid_application_worker worker,
-				    GString *out)
+				    GByteArray *out)
 {
 }
 
 static gzochid_application_worker
 deserialize_channel_operation_worker (gzochid_application_context *context,
-				      GString *in)
+				      GByteArray *in)
 {
   return channel_operation_worker;
 }

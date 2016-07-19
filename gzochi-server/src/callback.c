@@ -1,5 +1,5 @@
 /* callback.c: Constructors and serialization routines for application callbacks
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -26,19 +26,19 @@
 
 static void 
 serialize_callback (gzochid_application_context *context, gpointer data, 
-		    GString *out, GError **err)
+		    GByteArray *out, GError **err)
 {
   gzochid_application_callback *callback = data;
 
   gzochid_util_serialize_string (callback->procedure, out);
   gzochid_util_serialize_list 
     (callback->module, 
-     (void (*) (gpointer, GString *)) gzochid_util_serialize_string, out);
+     (void (*) (gpointer, GByteArray *)) gzochid_util_serialize_string, out);
   gzochid_util_serialize_mpz (callback->scm_oid, out);
 }
 
 static gpointer 
-deserialize_callback (gzochid_application_context *context, GString *in, 
+deserialize_callback (gzochid_application_context *context, GByteArray *in, 
 		      GError **err)
 {
   gzochid_application_callback *callback = 
@@ -46,7 +46,7 @@ deserialize_callback (gzochid_application_context *context, GString *in,
 
   callback->procedure = gzochid_util_deserialize_string (in);
   callback->module = gzochid_util_deserialize_list 
-    (in, (gpointer (*) (GString *)) gzochid_util_deserialize_string);
+    (in, (gpointer (*) (GByteArray *)) gzochid_util_deserialize_string);
 
   mpz_init (callback->scm_oid);
   gzochid_util_deserialize_mpz (in, callback->scm_oid);

@@ -91,7 +91,7 @@ gzochid_durable_queue_element_free (gzochid_durable_queue_element *elt)
 
 static void
 serialize_element (gzochid_application_context *app_context, gpointer data,
-		   GString *out, GError **err)
+		   GByteArray *out, GError **err)
 {
   gzochid_durable_queue_element *elt = data;
   
@@ -119,7 +119,7 @@ static gzochid_io_serialization gzochid_durable_queue_element_serialization;
    the next link in the queue. */
 
 static gpointer
-deserialize_element (gzochid_application_context *app_context, GString *in,
+deserialize_element (gzochid_application_context *app_context, GByteArray *in,
 		     GError **err)
 {
   gzochid_durable_queue_element *elt = gzochid_durable_queue_element_new ();
@@ -164,7 +164,7 @@ static gzochid_io_serialization gzochid_durable_queue_element_serialization =
 
 static void
 serialize_queue (gzochid_application_context *app_context, gpointer data,
-		 GString *out, GError **err)
+		 GByteArray *out, GError **err)
 {
   gzochid_durable_queue *queue = data;
 
@@ -185,7 +185,7 @@ serialize_queue (gzochid_application_context *app_context, gpointer data,
    oids of the head and tail pointers, if they exist. */
 
 static gpointer
-deserialize_queue (gzochid_application_context *app_context, GString *in,
+deserialize_queue (gzochid_application_context *app_context, GByteArray *in,
 		   GError **err)
 {
   gzochid_durable_queue *queue = gzochid_durable_queue_new (app_context);

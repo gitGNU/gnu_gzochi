@@ -287,7 +287,7 @@ session_rollback (gpointer data)
 }
 
 static gzochid_client_session_handler *
-deserialize_handler (gzochid_application_context *context, GString *in, 
+deserialize_handler (gzochid_application_context *context, GByteArray *in, 
 		     GError **err)
 {
   gzochid_client_session_handler *handler = malloc 
@@ -302,8 +302,8 @@ deserialize_handler (gzochid_application_context *context, GString *in,
 }
 
 static gpointer 
-deserialize_client_session (gzochid_application_context *context, GString *in, 
-			    GError **err)
+deserialize_client_session (gzochid_application_context *context,
+			    GByteArray *in, GError **err)
 {
   gzochid_auth_identity *identity = 
     gzochid_auth_identity_deserializer (context, in, NULL);
@@ -324,7 +324,7 @@ deserialize_client_session (gzochid_application_context *context, GString *in,
 
 static void 
 serialize_handler (gzochid_application_context *context, 
-		   gzochid_client_session_handler *handler, GString *out, 
+		   gzochid_client_session_handler *handler, GByteArray *out, 
 		   GError **err)
 {
   gzochid_application_callback_serialization.serializer 
@@ -335,7 +335,7 @@ serialize_handler (gzochid_application_context *context,
 
 static void 
 serialize_client_session (gzochid_application_context *context, gpointer obj, 
-			  GString *out, GError **err)
+			  GByteArray *out, GError **err)
 {
   gzochid_client_session *session = obj;
 

@@ -118,7 +118,7 @@ static void
 persist_client_session (struct test_scheme_task_fixture *fixture,
 			gzochid_client_session *session)
 {
-  GString *out = g_string_new (NULL);
+  GByteArray *out = g_byte_array_new ();
 
   gzochid_storage_transaction *tx = fixture->storage_interface
     ->transaction_begin (fixture->context->storage_context);
@@ -127,14 +127,14 @@ persist_client_session (struct test_scheme_task_fixture *fixture,
     (fixture->context, session, out, NULL);
   
   fixture->storage_interface->transaction_put
-    (tx, fixture->context->oids, "1", 2, out->str, out->len);
+    (tx, fixture->context->oids, "1", 2, out->data, out->len);
   fixture->storage_interface->transaction_put
     (tx, fixture->context->names, "s.session.1", 12, "1", 2);
 
   fixture->storage_interface->transaction_prepare (tx);
   fixture->storage_interface->transaction_commit (tx);
-  
-  g_string_free (out, TRUE);
+
+  g_byte_array_unref (out);
 }
 
 static void 

@@ -48,12 +48,12 @@ test_worker (gzochid_application_context *context,
 
 static void 
 test_worker_serializer (gzochid_application_context *context, 
-			gzochid_application_worker worker, GString *out)
+			gzochid_application_worker worker, GByteArray *out)
 {
 }
 
 static gzochid_application_worker 
-test_worker_deserializer (gzochid_application_context *context, GString *in)
+test_worker_deserializer (gzochid_application_context *context, GByteArray *in)
 {
   return test_worker;
 }
@@ -63,13 +63,13 @@ static gzochid_application_worker_serialization worker_serialization =
 
 static void 
 serialize_test_worker_counter (gzochid_application_context *context,
-			       gpointer data, GString *out, GError **error)
+			       gpointer data, GByteArray *out, GError **error)
 {
 }
 
 static gpointer 
 deserialize_test_worker_counter (gzochid_application_context *context,
-				 GString *in, GError **error)
+				 GByteArray *in, GError **error)
 {
   return "";
 }

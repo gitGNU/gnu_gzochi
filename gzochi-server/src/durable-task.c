@@ -225,7 +225,7 @@ gzochid_durable_application_task_free (gzochid_durable_application_task *task)
 
 gpointer 
 deserialize_durable_task_handle
-(gzochid_application_context *context, GString *in, GError **err)
+(gzochid_application_context *context, GByteArray *in, GError **err)
 {
   gzochid_durable_application_task_handle *handle = 
     malloc (sizeof (gzochid_durable_application_task_handle));
@@ -267,7 +267,7 @@ deserialize_durable_task_handle
 
 void 
 serialize_durable_task_handle
-(gzochid_application_context *context, gpointer data, GString *out, 
+(gzochid_application_context *context, gpointer data, GByteArray *out, 
  GError **err)
 {
   gzochid_durable_application_task_handle *handle = data;
@@ -746,7 +746,7 @@ typedef struct _task_chain_context task_chain_context;
 
 static void
 serialize_task_chain_context (gzochid_application_context *app_context,
-			      void *data, GString *out, GError **err)
+			      void *data, GByteArray *out, GError **err)
 {
   task_chain_context *chain_context = data;
   
@@ -756,7 +756,7 @@ serialize_task_chain_context (gzochid_application_context *app_context,
 
 static void *
 deserialize_task_chain_context (gzochid_application_context *app_context,
-				GString *in, GError **err)
+				GByteArray *in, GError **err)
 {
   mpz_t oid;
   task_chain_context *chain_context = malloc (sizeof (task_chain_context));
@@ -1126,13 +1126,13 @@ task_chain_bootstrap_worker (gzochid_application_context *app_context,
 static void
 serialize_task_chain_bootstrap_worker (gzochid_application_context *app_context,
 				       gzochid_application_worker worker,
-				       GString *out)
+				       GByteArray *out)
 {
 }
 
 static gzochid_application_worker
 deserialize_task_chain_bootstrap_worker
-(gzochid_application_context *app_context, GString *in)
+(gzochid_application_context *app_context, GByteArray *in)
 {
   return task_chain_bootstrap_worker;
 }

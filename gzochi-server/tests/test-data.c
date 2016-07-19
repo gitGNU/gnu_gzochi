@@ -35,24 +35,24 @@ static gboolean finalized = FALSE;
 
 static void 
 test_serializer 
-(gzochid_application_context *context, void *ptr, GString *out, GError **err)
+(gzochid_application_context *context, void *ptr, GByteArray *out, GError **err)
 {
   serialized = TRUE;
 }
 
 static void 
 test_failure_serializer
-(gzochid_application_context *context, void *ptr, GString *out, GError **err)
+(gzochid_application_context *context, void *ptr, GByteArray *out, GError **err)
 {
   g_set_error (err, GZOCHID_IO_ERROR, GZOCHID_IO_ERROR_SERIALIZATION,
 	       "Failed to serialize record.");
 }
 
 static void *test_deserializer 
-(gzochid_application_context *context, GString *in, GError **err)
+(gzochid_application_context *context, GByteArray *in, GError **err)
 {
   deserialized = TRUE;
-  return g_string_new_len (in->str, in->len);
+  return g_string_new_len (in->data, in->len);
 }
 
 static void test_finalizer (gzochid_application_context *context, void *ptr)

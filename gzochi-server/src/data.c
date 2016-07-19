@@ -158,7 +158,7 @@ flush_reference (gzochid_data_managed_reference *reference,
 		 gzochid_data_transaction_context *context)
 {
   char *oid_str = NULL;
-  GString *out = NULL;
+  GByteArray *out = NULL;
   GError *err = NULL;
 
   switch (reference->state)
@@ -170,7 +170,7 @@ flush_reference (gzochid_data_managed_reference *reference,
     case GZOCHID_MANAGED_REFERENCE_STATE_NEW:
     case GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED:
       
-      out = g_string_new (NULL);
+      out = g_byte_array_new ();
       assert (reference->obj != NULL);
 
       oid_str = mpz_get_str (NULL, 16, reference->oid);
@@ -183,20 +183,20 @@ flush_reference (gzochid_data_managed_reference *reference,
 	{
 	  free (oid_str);
 	  g_clear_error (&err);
-	  g_string_free (out, TRUE);
+	  g_byte_array_unref (out);
 	  return FALSE;
 	}
 
       APP_STORAGE_INTERFACE (context->context)->transaction_put
 	(context->transaction, context->context->oids, oid_str, 
-	 strlen (oid_str) + 1, out->str, out->len);
+	 strlen (oid_str) + 1, (char *) out->data, out->len);
       free (oid_str);
 
       gzochid_application_event_dispatch
 	(context->context->event_source,
 	 gzochid_application_data_event_new (BYTES_WRITTEN, out->len));
 
-      g_string_free (out, TRUE);
+      g_byte_array_unref (out);
       
       if (context->transaction->rollback)
 	return FALSE;
@@ -529,7 +529,7 @@ dereference (gzochid_data_transaction_context *context,
   size_t data_len = 0;
   char *oid_str = NULL; 
   char *data = NULL; 
-  GString *in = NULL;
+  GByteArray *in = NULL;
   
   if (reference->obj != NULL
       || reference->state == GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY)
@@ -580,7 +580,8 @@ dereference (gzochid_data_transaction_context *context,
 	(context->context->event_source,
 	 gzochid_application_data_event_new (BYTES_READ, data_len));
 
-      in = g_string_new_len (data, data_len);
+      in = g_byte_array_sized_new (data_len);
+      g_byte_array_append (in, (unsigned char *) data, data_len);
       free (data);
 
       reference->obj = reference->serialization->deserializer 
@@ -596,7 +597,7 @@ dereference (gzochid_data_transaction_context *context,
       g_hash_table_insert 
 	(context->ptrs_to_references, reference->obj, reference);
 
-      g_string_free (in, TRUE);
+      g_byte_array_unref (in);
     }
 
   return;

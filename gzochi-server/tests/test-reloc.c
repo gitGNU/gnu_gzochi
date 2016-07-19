@@ -53,12 +53,13 @@ gzochid_transaction_participant test_participant =
 
 static void
 serializer 
-(gzochid_application_context *context, void *obj, GString *str, GError **err)
+(gzochid_application_context *context, void *obj, GByteArray *str, GError **err)
 {
 }
 
 static void *
-deserializer (gzochid_application_context *context, GString *str, GError **err)
+deserializer (gzochid_application_context *context, GByteArray *str,
+	      GError **err)
 {
   gzochid_transaction_join (&test_participant, NULL);
   gzochid_transaction_mark_for_rollback (&test_participant, TRUE);
@@ -76,7 +77,7 @@ static void
 test_deserializer_error_inner (gpointer data)
 {
   gzochid_application_context *context = gzochid_application_context_new ();
-  GString *str = g_string_new ("");
+  GByteArray *str = g_byte_array_new ();
 
   gzochid_scm_location_aware_serialization.deserializer (context, str, NULL);
   g_assert (gzochid_transaction_rollback_only ());

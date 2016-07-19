@@ -114,25 +114,26 @@ persist_callback (gzochid_application_context *context,
 		  gzochid_application_callback *callback, char *key,
 		  size_t key_len)
 {
-  GString *callback_str = g_string_new ("");
+  GByteArray *callback_str = g_byte_array_new ();
   SCM scm_callback = gzochid_scheme_create_callback
     (callback, SCM_BOOL_F, NULL);
   GError *err = NULL;
   gzochid_storage_transaction *tx = NULL;
-  
+
   gzochid_scheme_data_serialization.serializer
     (context, scm_callback, callback_str, &err);
 
   tx = gzochid_storage_engine_interface_mem.transaction_begin
     (context->storage_context);
   gzochid_storage_engine_interface_mem.transaction_put
-    (tx, context->oids, key, key_len, callback_str->str, callback_str->len);
+    (tx, context->oids, key, key_len, (char *) callback_str->data,
+     callback_str->len);
   gzochid_storage_engine_interface_mem.transaction_prepare (tx);
   gzochid_storage_engine_interface_mem.transaction_commit (tx);
   
   mpz_set_str (callback->scm_oid, key, 16);
   
-  g_string_free (callback_str, TRUE);
+  g_byte_array_unref (callback_str);
   
 }
 
@@ -163,8 +164,8 @@ test_sweep_client_session_rollback_nonretryable ()
   
   gzochid_client_session_handler handler; 
   
-  GString *serialized_session = g_string_new ("");
-  
+  GByteArray *serialized_session = g_byte_array_new ();
+
   /* Context and test setup. */
   
   mpz_init (received_message_callback_arg_oid);
@@ -191,7 +192,7 @@ test_sweep_client_session_rollback_nonretryable ()
     (context->storage_context);
   
   gzochid_storage_engine_interface_mem.transaction_put
-    (tx, context->oids, "2", 2, serialized_session->str,
+    (tx, context->oids, "2", 2, (char *) serialized_session->data,
      serialized_session->len);
   gzochid_storage_engine_interface_mem.transaction_put
     (tx, context->names, "s.session.0", 12, "2", 2);
@@ -206,7 +207,7 @@ test_sweep_client_session_rollback_nonretryable ()
 
   /* Tear everything down. */
 
-  g_string_free (serialized_session, TRUE);
+  g_byte_array_unref (serialized_session);
   
   mpz_clear (received_message_callback_arg_oid);
   mpz_clear (disconnected_callback_arg_oid);

@@ -35,9 +35,9 @@ struct _gzochid_application_context;
 typedef struct _gzochid_io_serialization
 {
   void (*serializer) 
-    (struct _gzochid_application_context *, void *, GString *, GError **);
+    (struct _gzochid_application_context *, void *, GByteArray *, GError **);
   void *(*deserializer) 
-    (struct _gzochid_application_context *, GString *, GError **);
+    (struct _gzochid_application_context *, GByteArray *, GError **);
   void (*finalizer) (struct _gzochid_application_context *, void *);
 } gzochid_io_serialization;
 

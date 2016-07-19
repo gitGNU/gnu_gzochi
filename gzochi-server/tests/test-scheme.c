@@ -48,7 +48,7 @@ static void
 test_serialization_exception ()
 {
   gzochid_application_context *context = gzochid_application_context_new ();
-  GString *str = g_string_new ("");
+  GByteArray *str = g_byte_array_new ();
   GError *err = NULL;
 
   context->descriptor = calloc (1, sizeof (gzochid_application_descriptor));
@@ -65,16 +65,16 @@ test_serialization_exception ()
 
   free (context->descriptor);
   gzochid_application_context_free (context);
-  g_string_free (str, TRUE);
+  g_byte_array_unref (str);
 }
 
 static void
 test_serialization_corrupt ()
 {
   gzochid_application_context *context = gzochid_application_context_new ();
-  GString *str = g_string_new ("");
+  GByteArray *str = g_byte_array_new ();
   GError *err = NULL;
-  
+
   gzochid_util_serialize_int (16, str);  
 
   g_assert
@@ -86,7 +86,7 @@ test_serialization_corrupt ()
 
   free (context->descriptor);
   gzochid_application_context_free (context);
-  g_string_free (str, TRUE);
+  g_byte_array_unref (str);
 }
 
 static void

@@ -24,38 +24,38 @@
 #include "util.h"
 
 void
-gzochid_util_serialize_boolean (gboolean bool, GString *out)
+gzochid_util_serialize_boolean (gboolean bool, GByteArray *out)
 {
-  char bool_str[1];
+  unsigned char bool_str[1];
   
   bool_str[0] = bool ? 0x1 : 0x0;
-  g_string_append_len (out, bool_str, 1);
+  g_byte_array_append (out, bool_str, 1);
 }
 
 void
-gzochid_util_serialize_int (int n, GString *out)
+gzochid_util_serialize_int (int n, GByteArray *out)
 {
   unsigned char n_str[4];
 
   gzochi_common_io_write_int (n, n_str, 0);
-  g_string_append_len (out, (char *) n_str, 4);
+  g_byte_array_append (out, n_str, 4);
 }
 
 void
-gzochid_util_serialize_bytes (unsigned char *str, int len, GString *out)
+gzochid_util_serialize_bytes (unsigned char *str, int len, GByteArray *out)
 {
   gzochid_util_serialize_int (len, out);
-  g_string_append_len (out, (char *) str, len);
+  g_byte_array_append (out, str, len);
 }
 
 void
-gzochid_util_serialize_string (char *str, GString *out)
+gzochid_util_serialize_string (char *str, GByteArray *out)
 {
   gzochid_util_serialize_bytes ((unsigned char *) str, strlen (str) + 1, out);
 }
 
 void
-gzochid_util_serialize_mpz (mpz_t i, GString *out)
+gzochid_util_serialize_mpz (mpz_t i, GByteArray *out)
 {
   char *i_str = mpz_get_str (NULL, 16, i);
   gzochid_util_serialize_string (i_str, out);
@@ -64,15 +64,15 @@ gzochid_util_serialize_mpz (mpz_t i, GString *out)
 
 void
 gzochid_util_serialize_list (GList *list,
-			     void (*serializer) (gpointer, GString *),
-			     GString *out)
+			     void (*serializer) (gpointer, GByteArray *),
+			     GByteArray *out)
 {
   unsigned char len_str[4];
   int len = g_list_length (list);
   GList *list_ptr = list;
 
   gzochi_common_io_write_int (len, len_str, 0);
-  g_string_append_len (out, (char *) len_str, 4);
+  g_byte_array_append (out, len_str, 4);
   
   while (list_ptr != NULL)
     {
@@ -83,15 +83,15 @@ gzochid_util_serialize_list (GList *list,
 
 void
 gzochid_util_serialize_sequence (GSequence *sequence,
-				 void (*serializer) (gpointer, GString *),
-				 GString *out)
+				 void (*serializer) (gpointer, GByteArray *),
+				 GByteArray *out)
 {
   unsigned char len_str[4];
   int len = g_sequence_get_length (sequence);
   GSequenceIter *iter = g_sequence_get_begin_iter (sequence);
   
   gzochi_common_io_write_int (len, len_str, 0);
-  g_string_append_len (out, (char *) len_str, 4);
+  g_byte_array_append (out, len_str, 4);
 
   while (!g_sequence_iter_is_end (iter))
     {
@@ -102,8 +102,8 @@ gzochid_util_serialize_sequence (GSequence *sequence,
 
 void
 gzochid_util_serialize_hash_table
-(GHashTable *hashtable, void (*key_serializer) (gpointer, GString *),
- void (*value_serializer) (gpointer, GString *), GString *out)
+(GHashTable *hashtable, void (*key_serializer) (gpointer, GByteArray *),
+ void (*value_serializer) (gpointer, GByteArray *), GByteArray *out)
 {
   unsigned char len_str[4];
   int len = g_hash_table_size (hashtable);
@@ -111,7 +111,7 @@ gzochid_util_serialize_hash_table
   gpointer key, value;
 
   gzochi_common_io_write_int (len, len_str, 0);
-  g_string_append_len (out, (char *) len_str, 4);
+  g_byte_array_append (out, len_str, 4);
 
   g_hash_table_iter_init (&iter, hashtable);
   while (g_hash_table_iter_next (&iter, &key, &value))
@@ -121,41 +121,41 @@ gzochid_util_serialize_hash_table
     }
 }
 
-void gzochid_util_serialize_timeval (struct timeval tv, GString *out)
+void gzochid_util_serialize_timeval (struct timeval tv, GByteArray *out)
 {
   unsigned char str[4];
 
   gzochi_common_io_write_int (tv.tv_sec, str, 0);
-  g_string_append_len (out, (char *) str, 4);
+  g_byte_array_append (out, str, 4);
 
   gzochi_common_io_write_int (tv.tv_usec, str, 0);
-  g_string_append_len (out, (char *) str, 4);
+  g_byte_array_append (out, str, 4);
 }
 
 gboolean
-gzochid_util_deserialize_boolean (GString *in)
+gzochid_util_deserialize_boolean (GByteArray *in)
 {
-  gboolean ret = in->str[0] == 0x1 ? TRUE : FALSE;
-  g_string_erase (in, 0, 1);
+  gboolean ret = in->data[0] == 0x1 ? TRUE : FALSE;
+  g_byte_array_remove_index (in, 0);
   return ret;
 }
 
 int
-gzochid_util_deserialize_int (GString *in)
+gzochid_util_deserialize_int (GByteArray *in)
 {
-  int ret = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
-  g_string_erase (in, 0, 4);
+  int ret = gzochi_common_io_read_int (in->data, 0);
+  g_byte_array_remove_range (in, 0, 4);
   return ret;
 }
 
 unsigned char *
-gzochid_util_deserialize_bytes (GString *in, int *len)
+gzochid_util_deserialize_bytes (GByteArray *in, int *len)
 {
-  int str_len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
+  int str_len = gzochi_common_io_read_int (in->data, 0);
   unsigned char *i_str = malloc (sizeof (unsigned char) * str_len);
 
-  memcpy (i_str, in->str + 4, str_len);
-  g_string_erase (in, 0, 4 + str_len);
+  memcpy (i_str, in->data + 4, str_len);
+  g_byte_array_remove_range (in, 0, 4 + str_len);
 
   if (len != NULL)
     *len = str_len;
@@ -164,13 +164,13 @@ gzochid_util_deserialize_bytes (GString *in, int *len)
 }
 
 char *
-gzochid_util_deserialize_string (GString *in)
+gzochid_util_deserialize_string (GByteArray *in)
 {
   return (char *) gzochid_util_deserialize_bytes (in, NULL);
 }
 
 void
-gzochid_util_deserialize_mpz (GString *in, mpz_t o)
+gzochid_util_deserialize_mpz (GByteArray *in, mpz_t o)
 {
   char *o_str = gzochid_util_deserialize_string (in);
   mpz_set_str (o, o_str, 16);
@@ -178,12 +178,12 @@ gzochid_util_deserialize_mpz (GString *in, mpz_t o)
 }
 
 GList *
-gzochid_util_deserialize_list (GString *in,
-			       gpointer (*deserializer) (GString *))
+gzochid_util_deserialize_list (GByteArray *in,
+			       gpointer (*deserializer) (GByteArray *))
 {
   GList *ret = NULL;
-  int len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
-  g_string_erase (in, 0, 4);
+  int len = gzochi_common_io_read_int (in->data, 0);
+  g_byte_array_remove_range (in, 0, 4);
 
   while (len > 0)
     {
@@ -195,13 +195,13 @@ gzochid_util_deserialize_list (GString *in,
 }
 
 GSequence *
-gzochid_util_deserialize_sequence (GString *in,
-				   gpointer (*deserializer) (GString *),
+gzochid_util_deserialize_sequence (GByteArray *in,
+				   gpointer (*deserializer) (GByteArray *),
 				   GDestroyNotify destroy_fn)
 {
   GSequence *ret = g_sequence_new (destroy_fn);
-  int len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
-  g_string_erase (in, 0, 4);
+  int len = gzochi_common_io_read_int (in->data, 0);
+  g_byte_array_remove_range (in, 0, 4);
 
   while (len > 0)
     {
@@ -213,19 +213,20 @@ gzochid_util_deserialize_sequence (GString *in,
 }
 
 GHashTable *
-gzochid_util_deserialize_hash_table (GString *in, GHashFunc hash_func,
+gzochid_util_deserialize_hash_table (GByteArray *in, GHashFunc hash_func,
 				     GEqualFunc key_equal_func, 
-				     gpointer (*key_deserializer) (GString *), 
-				     gpointer (*value_deserializer) (GString *))
+				     gpointer (*kd) (GByteArray *), 
+				     gpointer (*vd) (GByteArray *))
 {
   GHashTable *ret = g_hash_table_new (hash_func, key_equal_func);
-  int len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
-  g_string_erase (in, 0, 4);
+  int len = gzochi_common_io_read_int (in->data, 0);
+  g_byte_array_remove_range (in, 0, 4);
 
   while (len > 0)
     {
-      gpointer key = key_deserializer (in);
-      gpointer value = value_deserializer (in);
+      gpointer key = kd (in);
+      gpointer value = vd (in);
+
       g_hash_table_insert (ret, key, value);
       len--;
     }
@@ -234,14 +235,14 @@ gzochid_util_deserialize_hash_table (GString *in, GHashFunc hash_func,
 }
 
 struct timeval
-gzochid_util_deserialize_timeval (GString *in)
+gzochid_util_deserialize_timeval (GByteArray *in)
 {
   struct timeval tv;
 
-  tv.tv_sec = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
-  g_string_erase (in, 0, 4);
-  tv.tv_usec = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
-  g_string_erase (in, 0, 4);
+  tv.tv_sec = gzochi_common_io_read_int (in->data, 0);
+  g_byte_array_remove_range (in, 0, 4);
+  tv.tv_usec = gzochi_common_io_read_int (in->data, 0);
+  g_byte_array_remove_range (in, 0, 4);
 
   return tv;
 }

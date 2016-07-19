@@ -140,7 +140,7 @@ gzochid_scheme_invoke_callback (gzochid_application_context *context,
 
 static void 
 scheme_managed_record_serializer (gzochid_application_context *context, SCM arg,
-				  GString *out, GError **err)
+				  GByteArray *out, GError **err)
 {
   unsigned char vec_len_str[4];
   GList *gpd = g_list_append 
@@ -180,23 +180,24 @@ scheme_managed_record_serializer (gzochid_application_context *context, SCM arg,
 
   gzochi_common_io_write_int (vec_len, vec_len_str, 0);
 
-  g_string_append_len (out, (char *) vec_len_str, 4);
-  g_string_append_len (out, (char *) SCM_BYTEVECTOR_CONTENTS (vec), vec_len);
+  g_byte_array_append (out, vec_len_str, 4);
+  g_byte_array_append
+    (out, (unsigned char *) SCM_BYTEVECTOR_CONTENTS (vec), vec_len);
 
   g_list_free (gpd);
 }
 
 static void *
 scheme_managed_record_deserializer (gzochid_application_context *context, 
-				    GString *in, GError **err)
+				    GByteArray *in, GError **err)
 {
-  int vec_len = gzochi_common_io_read_int ((unsigned char *) in->str, 0);
+  int vec_len = gzochi_common_io_read_int (in->data, 0);
   SCM vec = SCM_EOL, port = SCM_EOL, record = SCM_EOL;
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
   GList *args = g_list_append 
     (g_list_append (g_list_append (NULL, "gzochi"), "private"), "data");
 
-  g_string_erase (in, 0, 4);
+  g_byte_array_remove_range (in, 0, 4);
 
   if (vec_len > in->len)
     {
@@ -206,7 +207,7 @@ scheme_managed_record_deserializer (gzochid_application_context *context,
       return SCM_BOOL_F;
     }
   
-  vec = scm_take_u8vector ((unsigned char *) in->str, vec_len);
+  vec = scm_take_u8vector (in->data, vec_len);
   port = scm_open_bytevector_input_port (vec, SCM_BOOL_F);
 
   record = gzochid_scheme_invoke_callback
@@ -218,7 +219,7 @@ scheme_managed_record_deserializer (gzochid_application_context *context,
      exception_var);
 
   g_list_free (args);
-  g_string_erase (in, 0, vec_len);
+  g_byte_array_remove_range (in, 0, vec_len);
   
   if (scm_variable_ref (exception_var) != SCM_UNSPECIFIED)
     {
@@ -249,7 +250,7 @@ scheme_serializer_inner (void *data)
   void **ptr = data;
   gzochid_application_context *context = ptr[0];
   SCM task = ptr[1];
-  GString *out = ptr[2];
+  GByteArray *out = ptr[2];
   GError **err = ptr[3];
 
   scheme_managed_record_serializer (context, task, out, err);
@@ -259,7 +260,7 @@ scheme_serializer_inner (void *data)
 
 static void 
 scheme_serializer (gzochid_application_context *context, void *ptr, 
-		   GString *out, GError **err)
+		   GByteArray *out, GError **err)
 {
   void *args[4];
 
@@ -276,14 +277,14 @@ scheme_deserializer_inner (void *data)
 {
   void **ptr = data;
   gzochid_application_context *context = ptr[0];
-  GString *in = ptr[1];
+  GByteArray *in = ptr[1];
   GError **err = ptr[2];
 
   return scheme_managed_record_deserializer (context, in, err);
 }
 
 static void *
-scheme_deserializer (gzochid_application_context *context, GString *in, 
+scheme_deserializer (gzochid_application_context *context, GByteArray *in, 
 		     GError **err)
 {
   void *args[3];
