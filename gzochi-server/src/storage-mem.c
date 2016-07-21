@@ -292,8 +292,8 @@ static size_t
 page_key_offset (btree_page *page, unsigned char *key, size_t key_len)
 {
   size_t offset = 0;
-  
-  while (TRUE)
+
+  while (offset < page->page_size)
     {
       unsigned short page_key_len = gzochi_common_io_read_short
 	(page->data, offset);
@@ -307,15 +307,14 @@ page_key_offset (btree_page *page, unsigned char *key, size_t key_len)
 	(page->data, offset + page_key_len + 2);
 
       offset += page_key_len + page_value_len + 4;
-
-      if (offset == page->page_size)
-
-	/* If we've reached the end of the occupied region of the page, then
-	   that's where the key would have to go. */
-	
-	return offset;
-      else assert (offset < page->page_size);
     }
+
+  assert (offset == page->page_size);
+
+  /* If we've reached the end of the occupied region of the page, then
+     that's where the key would have to go. */
+	
+  return offset;
 }
 
 /*
