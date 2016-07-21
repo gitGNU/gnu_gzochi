@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <libguile.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -34,6 +33,7 @@
 #include "storage-mem.h"
 #include "session.h"
 #include "tx.h"
+#include "util.h"
 
 struct test_scheme_task_fixture
 {
@@ -152,10 +152,11 @@ static void
 test_disconnected_worker_no_handler (struct test_scheme_task_fixture *fixture,
 				     gconstpointer user_data)
 {
+  guint64 one = gzochid_util_encode_oid (1);
   gzochid_storage_transaction *tx = NULL;
   gzochid_client_session *session =
     gzochid_client_session_new (fixture->identity);
-
+  
   persist_client_session (fixture, session);
 
   gzochid_transaction_execute
@@ -166,7 +167,7 @@ test_disconnected_worker_no_handler (struct test_scheme_task_fixture *fixture,
 
   g_assert_null
     (fixture->storage_interface->transaction_get
-     (tx, fixture->context->oids, "1", 2, NULL));
+     (tx, fixture->context->oids, (char *) &one, sizeof (guint64), NULL));
 
   fixture->storage_interface->transaction_rollback (tx);
 
@@ -189,16 +190,7 @@ return_unspecified (SCM session)
 static gzochid_application_callback *
 make_callback (char *name, GList *module)
 {
-  mpz_t scm_oid;
-  gzochid_application_callback *callback = NULL;
-  
-  mpz_init (scm_oid);
-  mpz_set_si (scm_oid, -1);
-
-  callback = gzochid_application_callback_new (name, module, scm_oid);
-  mpz_clear (scm_oid);
-
-  return callback;
+  return gzochid_application_callback_new (name, module, -1);
 }
 
 static void 

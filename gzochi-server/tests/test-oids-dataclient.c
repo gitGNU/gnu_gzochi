@@ -17,7 +17,6 @@
 
 #include <glib.h>
 #include <glib-object.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -49,12 +48,11 @@ reserve_oids_inner (gpointer data)
   gzochid_dataclient_oids_callback callback = args[0];
   gpointer callback_data = args[1];
   
-  mpz_init_set_ui (block.block_start, 1);
+  block.block_start = 1;
   block.block_size = 100;
   
   callback (block, callback_data);
 
-  mpz_clear (block.block_start);
   free (args);
 }
 
@@ -82,11 +80,9 @@ test_oids_dataclient_reserve ()
   
   g_assert_true (gzochid_oids_reserve_block (strategy, &block, &err));
   g_assert_no_error (err);
-  g_assert_true (mpz_cmp_ui (block.block_start, 1) == 0);
+  g_assert_cmpint (block.block_start, ==, 1);
   g_assert_cmpint (block.block_size, ==, 100);
 
-  mpz_clear (block.block_start);
-  
   gzochid_oid_allocation_strategy_free (strategy);  
   g_object_unref (dataclient);
 }

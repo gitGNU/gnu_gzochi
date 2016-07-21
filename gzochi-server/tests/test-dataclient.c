@@ -117,7 +117,7 @@ oids_callback (gzochid_data_oids_block block, gpointer user_data)
 {
   dataclient_oids_callback_data *callback_data = user_data;
 
-  mpz_init_set (callback_data->block.block_start, block.block_start);
+  callback_data->block.block_start = block.block_start;
   callback_data->block.block_size = block.block_size;
 }
 
@@ -245,7 +245,7 @@ test_received_oids_simple (dataclient_fixture *fixture, gconstpointer user_data)
   gzochid_data_oids_block block;
   gzochid_data_reserve_oids_response *response = NULL;
 
-  mpz_init_set_ui (block.block_start, 1);
+  block.block_start = 1;
   block.block_size = 100;
   
   response = gzochid_data_reserve_oids_response_new ("test", &block);
@@ -254,13 +254,10 @@ test_received_oids_simple (dataclient_fixture *fixture, gconstpointer user_data)
     (fixture->dataclient, "test", oids_callback, &callback_data);
   gzochid_dataclient_received_oids (fixture->dataclient, response);
 
-  g_assert_true (mpz_cmp_ui (callback_data.block.block_start, 1) == 0);
+  g_assert_cmpint (callback_data.block.block_start, ==, 1);
   g_assert_cmpint (callback_data.block.block_size, ==, 100);
   
   gzochid_data_reserve_oids_response_free (response);
-
-  mpz_clear (block.block_start);
-  mpz_clear (callback_data.block.block_start);
 }
 
 static void

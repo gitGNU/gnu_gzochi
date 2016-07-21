@@ -28,6 +28,7 @@
 #include "session.h"
 #include "storage-mem.h"
 #include "tx.h"
+#include "util.h"
 
 static int
 prepare (gpointer data)
@@ -111,27 +112,27 @@ application_context_clear (gzochid_application_context *context)
 
 static void
 persist_callback (gzochid_application_context *context,
-		  gzochid_application_callback *callback, char *key,
-		  size_t key_len)
+		  gzochid_application_callback *callback, guint64 key)
 {
   GByteArray *callback_str = g_byte_array_new ();
   SCM scm_callback = gzochid_scheme_create_callback
     (callback, SCM_BOOL_F, NULL);
   GError *err = NULL;
   gzochid_storage_transaction *tx = NULL;
-
+  guint64 encoded_oid = gzochid_util_encode_oid (key);
+  
   gzochid_scheme_data_serialization.serializer
     (context, scm_callback, callback_str, &err);
 
   tx = gzochid_storage_engine_interface_mem.transaction_begin
     (context->storage_context);
   gzochid_storage_engine_interface_mem.transaction_put
-    (tx, context->oids, key, key_len, (char *) callback_str->data,
-     callback_str->len);
+    (tx, context->oids, (char *) &encoded_oid, sizeof (guint64),
+     (char *) callback_str->data, callback_str->len);
   gzochid_storage_engine_interface_mem.transaction_prepare (tx);
   gzochid_storage_engine_interface_mem.transaction_commit (tx);
-  
-  mpz_set_str (callback->scm_oid, key, 16);
+
+  callback->scm_oid = key;
   
   g_byte_array_unref (callback_str);
   
@@ -159,7 +160,10 @@ test_sweep_client_session_rollback_nonretryable ()
   GList *test_module = g_list_append (NULL, "test");
   gzochid_application_callback *disconnected_callback = NULL;
   gzochid_application_callback *received_message_callback = NULL;
-  mpz_t received_message_callback_arg_oid, disconnected_callback_arg_oid;
+
+  guint64 received_message_callback_arg_oid, disconnected_callback_arg_oid;
+  guint64 two = gzochid_util_encode_oid (2);
+  
   gzochid_storage_transaction *tx = NULL;
   
   gzochid_client_session_handler handler; 
@@ -168,9 +172,6 @@ test_sweep_client_session_rollback_nonretryable ()
 
   /* Context and test setup. */
   
-  mpz_init (received_message_callback_arg_oid);
-  mpz_init (disconnected_callback_arg_oid);
-  
   application_context_init (context);
 
   received_message_callback = gzochid_application_callback_new
@@ -178,8 +179,8 @@ test_sweep_client_session_rollback_nonretryable ()
   disconnected_callback = gzochid_application_callback_new
     ("disconnected", test_module, disconnected_callback_arg_oid);
 
-  persist_callback (context, received_message_callback, "0", 2);
-  persist_callback (context, disconnected_callback, "1", 2);
+  persist_callback (context, received_message_callback, 0);
+  persist_callback (context, disconnected_callback, 1);
   
   handler = (gzochid_client_session_handler)
     { received_message_callback, disconnected_callback };
@@ -190,12 +191,12 @@ test_sweep_client_session_rollback_nonretryable ()
 
   tx = gzochid_storage_engine_interface_mem.transaction_begin
     (context->storage_context);
-  
+
   gzochid_storage_engine_interface_mem.transaction_put
-    (tx, context->oids, "2", 2, (char *) serialized_session->data,
-     serialized_session->len);
+    (tx, context->oids, (char *) &two, sizeof (guint64),
+     (char *) serialized_session->data, serialized_session->len);
   gzochid_storage_engine_interface_mem.transaction_put
-    (tx, context->names, "s.session.0", 12, "2", 2);
+    (tx, context->names, "s.session.0", 12, (char *) &two, sizeof (guint64));
 
   gzochid_storage_engine_interface_mem.transaction_prepare (tx);
   gzochid_storage_engine_interface_mem.transaction_commit (tx);
@@ -209,9 +210,6 @@ test_sweep_client_session_rollback_nonretryable ()
 
   g_byte_array_unref (serialized_session);
   
-  mpz_clear (received_message_callback_arg_oid);
-  mpz_clear (disconnected_callback_arg_oid);
-
   gzochid_application_callback_free (received_message_callback);
   gzochid_application_callback_free (disconnected_callback);
   

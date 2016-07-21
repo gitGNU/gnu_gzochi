@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <stdlib.h>
 
 #include "app.h"
@@ -34,7 +33,7 @@ serialize_callback (gzochid_application_context *context, gpointer data,
   gzochid_util_serialize_list 
     (callback->module, 
      (void (*) (gpointer, GByteArray *)) gzochid_util_serialize_string, out);
-  gzochid_util_serialize_mpz (callback->scm_oid, out);
+  gzochid_util_serialize_oid (callback->scm_oid, out);
 }
 
 static gpointer 
@@ -48,8 +47,7 @@ deserialize_callback (gzochid_application_context *context, GByteArray *in,
   callback->module = gzochid_util_deserialize_list 
     (in, (gpointer (*) (GByteArray *)) gzochid_util_deserialize_string);
 
-  mpz_init (callback->scm_oid);
-  gzochid_util_deserialize_mpz (in, callback->scm_oid);
+  callback->scm_oid = gzochid_util_deserialize_oid (in);
   
   return callback;
 }
@@ -61,7 +59,6 @@ finalize_callback (gzochid_application_context *context, gpointer data)
 
   free (callback->procedure);
   g_list_free_full (callback->module, free);
-  mpz_clear (callback->scm_oid);
 
   free (callback);
 }
@@ -71,16 +68,15 @@ gzochid_application_callback_serialization =
   { serialize_callback, deserialize_callback, finalize_callback };
 
 gzochid_application_callback *
-gzochid_application_callback_new (char *procedure, GList *module, mpz_t scm_oid)
+gzochid_application_callback_new (char *procedure, GList *module,
+				  guint64 scm_oid)
 {
   gzochid_application_callback *callback = calloc
     (1, sizeof (gzochid_application_callback));
 
   callback->module = module;
   callback->procedure = procedure;
-
-  mpz_init (callback->scm_oid);
-  mpz_set (callback->scm_oid, scm_oid);
+  callback->scm_oid = scm_oid;
 
   return callback;
 }
@@ -88,7 +84,6 @@ gzochid_application_callback_new (char *procedure, GList *module, mpz_t scm_oid)
 void 
 gzochid_application_callback_free (gzochid_application_callback *callback)
 {
-  mpz_clear (callback->scm_oid);
   free (callback);
 }
 

@@ -18,10 +18,12 @@
 #include <glib.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "oids.h"
 #include "oids-storage.h"
 #include "storage-mem.h"
+#include "util.h"
 
 struct _test_oids_storage
 {
@@ -54,19 +56,23 @@ teardown_storage (test_oids_storage *fixture, gconstpointer user_data)
   gzochid_oid_allocation_strategy_free (fixture->strategy);
 }
 
-static char *
+static guint64
 get_oid_block_counter (test_oids_storage *fixture)
 {
   char key[] = { 0 };
-  char *value = NULL;
+  guint64 value = 0;
   gzochid_storage_transaction *transaction =
     fixture->interface->transaction_begin (fixture->context);
-
-  value = fixture->interface->transaction_get
+  
+  char *value_bytes = fixture->interface->transaction_get
     (transaction, fixture->meta, key, 1, NULL);
+
+  memcpy (&value, value_bytes, sizeof (guint64));
+  free (value_bytes);
   
   fixture->interface->transaction_rollback (transaction);
-  return value;
+
+  return gzochid_util_decode_oid (value);
 }
 
 static void
@@ -75,17 +81,14 @@ test_oids_storage_reserve_first (test_oids_storage *fixture,
 {
   GError *err = NULL;
   gzochid_data_oids_block oids_block;
-  char *new_counter_value = NULL;
+  guint64 new_counter_value = 0;
   
   g_assert_true
     (gzochid_oids_reserve_block (fixture->strategy, &oids_block, &err));
   g_assert_no_error (err);
 
   new_counter_value = get_oid_block_counter (fixture);
-  g_assert_cmpstr (new_counter_value, ==, "64");
-  free (new_counter_value);
-
-  mpz_clear (oids_block.block_start);
+  g_assert_cmpint (new_counter_value, ==, 100);
 }
 
 static void
@@ -94,15 +97,15 @@ test_oids_storage_reserve_next (test_oids_storage *fixture,
 {
   GError *err = NULL;
   gzochid_data_oids_block oids_block;
-  char *new_counter_value = NULL;
+  guint64 new_counter_value = 0;
 
   char key[] = { 0 };
-  char value[] = { '1' };
+  guint64 value = gzochid_util_encode_oid (1);
   gzochid_storage_transaction *transaction =
     fixture->interface->transaction_begin (fixture->context);
 
   fixture->interface->transaction_put
-    (transaction, fixture->meta, key, 1, value, 2);
+    (transaction, fixture->meta, key, 1, (char *) &value, sizeof (guint64));
 
   fixture->interface->transaction_prepare (transaction);
   fixture->interface->transaction_commit (transaction);
@@ -112,10 +115,7 @@ test_oids_storage_reserve_next (test_oids_storage *fixture,
   g_assert_no_error (err);
 
   new_counter_value = get_oid_block_counter (fixture);
-  g_assert_cmpstr (new_counter_value, ==, "65");
-  free (new_counter_value);
-
-  mpz_clear (oids_block.block_start);
+  g_assert_cmpint (new_counter_value, ==, 101);
 }
 
 int

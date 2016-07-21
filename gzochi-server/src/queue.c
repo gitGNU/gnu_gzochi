@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -32,7 +31,7 @@
 
 struct _gzochid_durable_queue_element
 {
-  mpz_t oid; /* The id of the object stored at this node. */
+  guint64 oid; /* The id of the object stored at this node. */
 
   /* A pointer to the next node, or `NULL' if this is the end of the queue. */
   
@@ -67,12 +66,7 @@ struct _gzochid_durable_queue
 static gzochid_durable_queue_element *
 gzochid_durable_queue_element_new ()
 {
-  gzochid_durable_queue_element *elt = calloc
-    (1, sizeof (gzochid_durable_queue_element));
-
-  mpz_init (elt->oid);
-  
-  return elt;
+  return calloc (1, sizeof (gzochid_durable_queue_element));
 }
 
 /* Frees the memory associated with the specified 
@@ -81,7 +75,6 @@ gzochid_durable_queue_element_new ()
 static void
 gzochid_durable_queue_element_free (gzochid_durable_queue_element *elt)
 {
-  mpz_clear (elt->oid);
   free (elt);
 }
 
@@ -95,7 +88,7 @@ serialize_element (gzochid_application_context *app_context, gpointer data,
 {
   gzochid_durable_queue_element *elt = data;
   
-  gzochid_util_serialize_mpz (elt->oid, out);
+  gzochid_util_serialize_oid (elt->oid, out);
 
   /* Is there a next link? */
   
@@ -104,7 +97,7 @@ serialize_element (gzochid_application_context *app_context, gpointer data,
       /* If so, write its oid. */
       
       gzochid_util_serialize_boolean (TRUE, out);
-      gzochid_util_serialize_mpz (elt->next->oid, out);
+      gzochid_util_serialize_oid (elt->next->oid, out);
     }
   else gzochid_util_serialize_boolean (FALSE, out);  
 }
@@ -123,24 +116,19 @@ deserialize_element (gzochid_application_context *app_context, GByteArray *in,
 		     GError **err)
 {
   gzochid_durable_queue_element *elt = gzochid_durable_queue_element_new ();
-  
-  gzochid_util_deserialize_mpz (in, elt->oid);
+
+  elt->oid = gzochid_util_deserialize_oid (in);
 
   /* Is there a next link? */
   
   if (gzochid_util_deserialize_boolean (in))
     {
-      mpz_t next_oid;
-
       /* If so, deserialize it. */
 
-      mpz_init (next_oid);
-      gzochid_util_deserialize_mpz (in, next_oid);
+      guint64 next_oid = gzochid_util_deserialize_oid (in);
 
       elt->next = gzochid_data_create_reference_to_oid
 	(app_context, &gzochid_durable_queue_element_serialization, next_oid);
-
-      mpz_clear (next_oid);
     }
   
   return elt;
@@ -175,8 +163,8 @@ serialize_queue (gzochid_application_context *app_context, gpointer data,
       /* If so, write the head and tail oids. */
       
       gzochid_util_serialize_boolean (TRUE, out);
-      gzochid_util_serialize_mpz (queue->head->oid, out);
-      gzochid_util_serialize_mpz (queue->tail->oid, out);
+      gzochid_util_serialize_oid (queue->head->oid, out);
+      gzochid_util_serialize_oid (queue->tail->oid, out);
     }
   else gzochid_util_serialize_boolean (FALSE, out);
 }
@@ -194,20 +182,17 @@ deserialize_queue (gzochid_application_context *app_context, GByteArray *in,
 
   if (gzochid_util_deserialize_boolean (in))
     {
-      mpz_t oid;
-
-      mpz_init (oid);
-
       /* If so, read the head and tail oids. */
+
+      guint64 oid = gzochid_util_deserialize_oid (in);
       
-      gzochid_util_deserialize_mpz (in, oid);
       queue->head = gzochid_data_create_reference_to_oid
 	(app_context, &gzochid_durable_queue_element_serialization, oid);
-      gzochid_util_deserialize_mpz (in, oid);
+
+      oid = gzochid_util_deserialize_oid (in);
+
       queue->tail = gzochid_data_create_reference_to_oid
 	(app_context, &gzochid_durable_queue_element_serialization, oid);
-
-      mpz_clear (oid);
     }
   
   return queue;
@@ -270,8 +255,8 @@ gzochid_durable_queue_offer (gzochid_durable_queue *queue,
       g_propagate_error (err, local_err);
       return;
     }
-  
-  mpz_set (elt->oid, data_ref->oid);
+
+  elt->oid = data_ref->oid;
   elt->next = NULL;
 
   if (queue->head == NULL)

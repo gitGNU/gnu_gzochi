@@ -17,7 +17,6 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <libguile.h>
 #include <stddef.h>
 #include <sys/time.h>
@@ -126,15 +125,10 @@ SCM_DEFINE (primitive_cancel_task, "primitive-cancel-task", 1, 0, 0,
     gzochid_api_ensure_current_application_context ();   
   gzochid_data_managed_reference *handle_reference = NULL;
   gzochid_periodic_task_handle *task_handle = NULL;
-  mpz_t oid;
+  guint64 oid = gzochid_scheme_task_handle_oid (scm_handle);
   
-  mpz_init (oid);
-  
-  gzochid_scheme_task_handle_oid (scm_handle, oid);
   handle_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_durable_application_task_handle_serialization, oid);
-
-  mpz_clear (oid);
 
   gzochid_data_dereference (handle_reference, &err);
 

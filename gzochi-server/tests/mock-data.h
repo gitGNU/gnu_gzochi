@@ -1,5 +1,5 @@
 /* mock-data.h: Prototypes and declarations for mock-data.c
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,14 +19,13 @@
 #define GZOCHID_TEST_MOCK_DATA_H
 
 #include <glib.h>
-#include <gmp.h>
 
 #include "app.h"
 #include "io.h"
 
 void 
 gzochid_test_mock_data_store 
-(gzochid_application_context *, gzochid_io_serialization *, gpointer, mpz_t);
+(gzochid_application_context *, gzochid_io_serialization *, gpointer, guint64);
 
 void 
 gzochid_test_mock_data_initialize (void);

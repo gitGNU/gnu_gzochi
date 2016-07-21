@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 
@@ -43,7 +42,7 @@ cleanup (gpointer user_data)
 static gboolean
 allocate (gpointer user_data, gzochid_data_oids_block *block, GError **err)
 {
-  mpz_init_set_ui (block->block_start, block_start);
+  block->block_start = block_start;
   block->block_size = BLOCK_SIZE;
 
   block_start += BLOCK_SIZE;
@@ -60,17 +59,13 @@ test_oid_strategy_allocation ()
 
   g_assert_true (gzochid_oids_reserve_block (strategy, &block, NULL));
 
-  g_assert_true (mpz_cmp_ui (block.block_start, 1) == 0);
+  g_assert_cmpint (block.block_start, ==, 1);
   g_assert_cmpint (block.block_size, ==, BLOCK_SIZE);
 
-  mpz_clear (block.block_start);
-  
   g_assert_true (gzochid_oids_reserve_block (strategy, &block, NULL));
   
-  g_assert_true (mpz_cmp_ui (block.block_start, 124) == 0);
+  g_assert_cmpint (block.block_start, ==, 124);
   g_assert_cmpint (block.block_size, ==, BLOCK_SIZE);
-
-  mpz_clear (block.block_start);
 
   gzochid_oid_allocation_strategy_free (strategy);
 }

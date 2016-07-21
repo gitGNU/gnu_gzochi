@@ -17,7 +17,6 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,7 +36,7 @@ GHashTable *serialization_registry = NULL;
 
 struct _gzochid_durable_application_task
 {
-  mpz_t handle_oid;
+  guint64 handle_oid;
 };
 
 typedef struct _gzochid_durable_application_task
@@ -168,13 +167,12 @@ gzochid_client_received_message_task_serialization =
   };
 
 gzochid_durable_application_task *
-gzochid_durable_application_task_new (mpz_t handle_oid)
+gzochid_durable_application_task_new (guint64 handle_oid)
 {
   gzochid_durable_application_task *task = 
     malloc (sizeof (gzochid_durable_application_task));
 
-  mpz_init (task->handle_oid);
-  mpz_set (task->handle_oid, handle_oid);
+  task->handle_oid = handle_oid;
 
   return task;
 }
@@ -231,10 +229,7 @@ deserialize_durable_task_handle
     malloc (sizeof (gzochid_durable_application_task_handle));
   char *serialization_name = NULL;
 
-  mpz_t oid;
-
-  mpz_init (oid);
-  gzochid_util_deserialize_mpz (in, oid);
+  guint64 oid = gzochid_util_deserialize_oid (in);
   
   serialization_name = gzochid_util_deserialize_string (in);
   handle->serialization = gzochid_lookup_task_serialization 
@@ -250,8 +245,6 @@ deserialize_durable_task_handle
     handle->serialization->worker_serialization->deserializer (context, in);
   handle->task_data_reference = gzochid_data_create_reference_to_oid 
     (context, handle->serialization->data_serialization, oid);
-
-  mpz_clear (oid);
  
   handle->identity = gzochid_auth_identity_deserializer (context, in, NULL);
   handle->repeats = gzochid_util_deserialize_boolean (in);
@@ -272,7 +265,7 @@ serialize_durable_task_handle
 {
   gzochid_durable_application_task_handle *handle = data;
 
-  gzochid_util_serialize_mpz (handle->task_data_reference->oid, out);
+  gzochid_util_serialize_oid (handle->task_data_reference->oid, out);
   gzochid_util_serialize_string (handle->serialization->name, out);
 
   gzochid_util_serialize_boolean (handle->binding != NULL, out);
@@ -320,7 +313,7 @@ static void durable_task_cleanup_worker
 (gzochid_application_context *, gzochid_auth_identity *, gpointer);
 
 static void 
-remove_durable_task (gzochid_application_context *context, mpz_t oid, 
+remove_durable_task (gzochid_application_context *context, guint64 oid, 
 		     GError **err)
 {
   GError *local_err = NULL;
@@ -359,31 +352,24 @@ remove_durable_task (gzochid_application_context *context, mpz_t oid,
 */
 
 static char *
-create_pending_task_binding (mpz_t oid)
+create_pending_task_binding (guint64 oid)
 {
-  char *binding = calloc (mpz_sizeinbase (oid, 16) + 15, sizeof (char));
-  char *oid_str = mpz_get_str (NULL, 16, oid);
-
-  binding = strcat (binding, PENDING_TASK_PREFIX);
-  binding = strcat (binding, oid_str);
-
-  free (oid_str);
-
-  return binding;
+  GString *str = g_string_new (PENDING_TASK_PREFIX);
+  g_string_printf (str, "%lx", oid);
+  return g_string_free (str, FALSE);
 }
 
 void 
 gzochid_restart_tasks (gzochid_application_context *context)
 {
-  mpz_t oid;
+  guint64 oid;
   GError *err = NULL;
   char *next_binding = NULL;
   int num_tasks = 0;
 
-  mpz_init (oid);
   gzochid_tx_info (context, "Resubmitting durable tasks.");
   next_binding = gzochid_data_next_binding_oid 
-    (context, PENDING_TASK_PREFIX, oid, &err);
+    (context, PENDING_TASK_PREFIX, &oid, &err);
 
   assert (err == NULL);
 
@@ -425,7 +411,7 @@ gzochid_restart_tasks (gzochid_application_context *context)
 	}
 
       next_next_binding = 
-	gzochid_data_next_binding_oid (context, next_binding, oid, &err);
+	gzochid_data_next_binding_oid (context, next_binding, &oid, &err);
 
       assert (err == NULL);
 
@@ -438,8 +424,6 @@ gzochid_restart_tasks (gzochid_application_context *context)
   else if (num_tasks > 1)
     gzochid_tx_info (context, "Resubmitted %d tasks.", num_tasks);
   else gzochid_tx_info (context, "No tasks found to resubmit.");
-
-  mpz_clear (oid);  
 }
 
 gzochid_durable_application_task_handle *
@@ -555,14 +539,8 @@ static void
 durable_task_catch_worker (gzochid_application_context *context, 
 			   gzochid_auth_identity *identity, gpointer data)
 {
-  mpz_t oid;
-
-  mpz_init (oid);
-  mpz_set_str (oid, data, 16);
-  
-  remove_durable_task (context, oid, NULL);
-
-  mpz_clear (oid);
+  guint64 *oid = data;
+  remove_durable_task (context, *oid, NULL);
 }
 
 static void
@@ -634,7 +612,7 @@ void gzochid_schedule_durable_task_handle
 (gzochid_application_context *app_context,
  gzochid_durable_application_task_handle *task_handle, GError **err)
 {
-  char *oid_str = NULL;
+  guint64 *oid = NULL;
   GError *local_err = NULL;
 
   gzochid_game_context *game_context = (gzochid_game_context *) 
@@ -667,9 +645,10 @@ void gzochid_schedule_durable_task_handle
   durable_task = gzochid_durable_application_task_new
     (durable_task_handle_reference->oid);
 
-  /* The memory allocated for this string is freed by the cleanup task. */
-  
-  oid_str = mpz_get_str (NULL, 16, durable_task_handle_reference->oid);
+  /* The memory allocated for this oid is freed by the cleanup task. */
+
+  oid = malloc (sizeof (guint64));
+  *oid = durable_task_handle_reference->oid;
 
   task_handle->binding = create_pending_task_binding
     (durable_task_handle_reference->oid);
@@ -680,7 +659,7 @@ void gzochid_schedule_durable_task_handle
 
   if (local_err != NULL)
     {
-      free (oid_str);
+      free (oid);
       gzochid_durable_application_task_free (durable_task);      
 
       g_propagate_error (err, local_err);
@@ -696,9 +675,9 @@ void gzochid_schedule_durable_task_handle
     (app_context, cloned_identity, durable_task_application_worker,
      durable_task);
   catch_task = gzochid_application_task_new
-    (app_context, cloned_identity, durable_task_catch_worker, oid_str);
+    (app_context, cloned_identity, durable_task_catch_worker, oid);
   cleanup_task = gzochid_application_task_new
-    (app_context, cloned_identity, durable_task_cleanup_worker, oid_str);
+    (app_context, cloned_identity, durable_task_cleanup_worker, oid);
   execution = gzochid_transactional_application_task_timed_execution_new 
     (transactional_task, catch_task, cleanup_task, game_context->tx_timeout);
 
@@ -750,24 +729,22 @@ serialize_task_chain_context (gzochid_application_context *app_context,
 {
   task_chain_context *chain_context = data;
   
-  gzochid_util_serialize_mpz (chain_context->bootstrap_ref->oid, out);
-  gzochid_util_serialize_mpz (chain_context->chain_ref->oid, out);
+  gzochid_util_serialize_oid (chain_context->bootstrap_ref->oid, out);
+  gzochid_util_serialize_oid (chain_context->chain_ref->oid, out);
 }
 
 static void *
 deserialize_task_chain_context (gzochid_application_context *app_context,
 				GByteArray *in, GError **err)
 {
-  mpz_t oid;
   task_chain_context *chain_context = malloc (sizeof (task_chain_context));
-
-  mpz_init (oid);
+  guint64 oid = gzochid_util_deserialize_oid (in);
   
-  gzochid_util_deserialize_mpz (in, oid);
   chain_context->bootstrap_ref = gzochid_data_create_reference_to_oid
     (app_context, &gzochid_durable_application_task_handle_serialization, oid);
 
-  gzochid_util_deserialize_mpz (in, oid);
+  oid = gzochid_util_deserialize_oid (in);
+  
   chain_context->chain_ref = gzochid_data_create_reference_to_oid
     (app_context, &gzochid_durable_queue_serialization, oid);
   
@@ -870,20 +847,16 @@ coordinator_worker (gzochid_application_context *app_context,
 		    gzochid_auth_identity *identity, gpointer data)
 {
   GError *err = NULL;
-
-  mpz_t oid;
-  char *oid_str = data;
-
+  guint64 *oid = data;
+  
   gzochid_data_managed_reference *task_chain_context_ref = NULL;
   task_chain_context *task_chain_context = NULL;
   gzochid_durable_queue *queue = NULL;
 
   gzochid_durable_application_task_handle *next_task_handle = NULL;
   
-  mpz_init_set_str (oid, oid_str, 16);
   task_chain_context_ref = gzochid_data_create_reference_to_oid
-    (app_context, &task_chain_context_serialization, oid);
-  mpz_clear (oid);
+    (app_context, &task_chain_context_serialization, *oid);
   
   task_chain_context = gzochid_data_dereference (task_chain_context_ref, &err);
 
@@ -1011,16 +984,13 @@ static void
 coordinator_catch_worker (gzochid_application_context *app_context,
 			  gzochid_auth_identity *identity, gpointer data)
 {
-  mpz_t oid;
-  char *oid_str = data;
+  guint64 *oid = data;
   gzochid_data_managed_reference *task_chain_context_ref = NULL;
   task_chain_context *task_chain_context = NULL;
   GError *err = NULL;
 
-  mpz_init_set_str (oid, oid_str, 16);
   task_chain_context_ref = gzochid_data_create_reference_to_oid
-    (app_context, &task_chain_context_serialization, oid);
-  mpz_clear (oid);
+    (app_context, &task_chain_context_serialization, *oid);
   
   task_chain_context = gzochid_data_dereference (task_chain_context_ref, &err);
 
@@ -1057,8 +1027,8 @@ schedule_coordinator_task (gzochid_application_context *app_context,
 			   gzochid_auth_identity *identity,
 			   task_chain_context *chain_context)
 {
+  guint64 *oid = NULL;
   GError *err = NULL;
-  char *oid_str = NULL;
 
   gzochid_task_transaction_context *tx_context =
     join_transaction (app_context);
@@ -1082,17 +1052,18 @@ schedule_coordinator_task (gzochid_application_context *app_context,
       g_error_free (err);
       return;
     }
-  
-  oid_str = mpz_get_str (NULL, 16, chain_context_ref->oid);
+
+  oid = malloc (sizeof (guint64));
+  *oid = chain_context_ref->oid;
 
   /* Create the worker, catch, and cleanup tasks for the coordinator... */
   
   coordinator_main_task = gzochid_application_task_new
-    (app_context, identity, coordinator_worker, oid_str);
+    (app_context, identity, coordinator_worker, oid);
   coordinator_catch_task = gzochid_application_task_new
-    (app_context, identity, coordinator_catch_worker, oid_str);
+    (app_context, identity, coordinator_catch_worker, oid);
   coordinator_cleanup_task = gzochid_application_task_new
-    (app_context, identity, coordinator_cleanup_worker, oid_str);
+    (app_context, identity, coordinator_cleanup_worker, oid);
 
   /* ...and bundle them into an execution to facilitate retry. */
   

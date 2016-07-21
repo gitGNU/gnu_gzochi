@@ -1,5 +1,5 @@
 /* scheme.h: Prototypes and declarations for scheme.c
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@
 #define GZOCHID_SCHEME_H
 
 #include <glib.h>
-#include <gmp.h>
 #include <libguile.h>
 
 #include "app.h"
@@ -65,16 +64,16 @@ SCM gzochid_scheme_handler_received_message (SCM);
 SCM gzochid_scheme_handler_disconnected (SCM);
 
 SCM gzochid_scheme_create_bytevector (unsigned char *, size_t);
-SCM gzochid_scheme_create_client_session (gzochid_client_session *, mpz_t);
+SCM gzochid_scheme_create_client_session (gzochid_client_session *, guint64);
 SCM gzochid_scheme_create_managed_hashtable (GHashTable *);
 SCM gzochid_scheme_create_managed_reference (gzochid_data_managed_reference *);
-SCM gzochid_scheme_create_channel (gzochid_channel *, mpz_t);
-SCM gzochid_scheme_create_periodic_task_handle (mpz_t);
+SCM gzochid_scheme_create_channel (gzochid_channel *, guint64);
+SCM gzochid_scheme_create_periodic_task_handle (guint64);
 
-void gzochid_scheme_managed_reference_oid (SCM, mpz_t);
-void gzochid_scheme_client_session_oid (SCM, mpz_t);
-void gzochid_scheme_channel_oid (SCM, mpz_t);
-void gzochid_scheme_task_handle_oid (SCM, mpz_t);
+guint64 gzochid_scheme_managed_reference_oid (SCM);
+guint64 gzochid_scheme_client_session_oid (SCM);
+guint64 gzochid_scheme_channel_oid (SCM);
+guint64 gzochid_scheme_task_handle_oid (SCM);
 
 SCM gzochid_scheme_invoke 
 (gzochid_application_context *, gzochid_auth_identity *, SCM, SCM, SCM);

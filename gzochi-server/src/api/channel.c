@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <libguile.h>
 #include <stddef.h>
 
@@ -32,7 +31,6 @@
 SCM_DEFINE (primitive_create_channel, "primitive-create-channel", 1, 0, 0,
 	    (SCM name), "Create a new channel with the specified name.")
 {
-  mpz_t scm_oid;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
   char *cname = scm_to_locale_string (name);
@@ -44,14 +42,11 @@ SCM_DEFINE (primitive_create_channel, "primitive-create-channel", 1, 0, 0,
      into a bad state. */
   
   if (channel != NULL)
-    {  
-      mpz_init (scm_oid);
-      gzochid_channel_scm_oid (channel, scm_oid);
+    {
+      guint64 scm_oid = gzochid_channel_scm_oid (channel);
   
       scm_reference = gzochid_data_create_reference_to_oid 
 	(context, &gzochid_scheme_data_serialization, scm_oid);
-
-      mpz_clear (scm_oid);
   
       gzochid_data_dereference (scm_reference, NULL);      
       ret = scm_reference->obj;
@@ -74,17 +69,11 @@ SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
   free (cname);
   if (channel != NULL)
     {
-      mpz_t scm_oid;
-      gzochid_data_managed_reference *scm_reference = NULL;
-
-      mpz_init (scm_oid);
-      gzochid_channel_scm_oid (channel, scm_oid);
-      
-      scm_reference = gzochid_data_create_reference_to_oid 
+      guint64 scm_oid = gzochid_channel_scm_oid (channel);
+      gzochid_data_managed_reference *scm_reference =
+	gzochid_data_create_reference_to_oid 
 	(context, &gzochid_scheme_data_serialization, scm_oid);
 
-      mpz_clear (scm_oid);
-      
       gzochid_data_dereference (scm_reference, &err);
 
       if (err == NULL)
@@ -100,26 +89,17 @@ SCM_DEFINE (primitive_get_channel, "primitive-get-channel", 1, 0, 0,
 SCM_DEFINE (primitive_join_channel, "primitive-join-channel", 2, 0, 0,
 	    (SCM channel, SCM session), "Add client session to a channel.")
 {
+  GError *err = NULL;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
-  gzochid_data_managed_reference *channel_reference = NULL;
-  gzochid_data_managed_reference *session_reference = NULL;
-  mpz_t channel_oid, session_oid;
-  GError *err = NULL;
-
-  mpz_init (channel_oid);
-  mpz_init (session_oid);
-  
-  gzochid_scheme_channel_oid (channel, channel_oid);
-  gzochid_scheme_client_session_oid (session, session_oid);
-  
-  channel_reference = gzochid_data_create_reference_to_oid 
+  guint64 channel_oid = gzochid_scheme_channel_oid (channel);
+  guint64 session_oid = gzochid_scheme_client_session_oid (session);
+  gzochid_data_managed_reference *channel_reference =
+    gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, channel_oid);
-  session_reference = gzochid_data_create_reference_to_oid
+  gzochid_data_managed_reference *session_reference =
+    gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, session_oid);
-
-  mpz_clear (channel_oid);
-  mpz_clear (session_oid);
 
   gzochid_data_dereference (channel_reference, &err);
   if (err == NULL)
@@ -145,25 +125,16 @@ SCM_DEFINE (primitive_leave_channel, "primitive-leave-channel", 2, 0, 0,
   GError *err = NULL;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
-  gzochid_data_managed_reference *channel_reference = NULL;
-  gzochid_data_managed_reference *session_reference = NULL;
-  mpz_t channel_oid, session_oid;
-
-  mpz_init (channel_oid);
-  mpz_init (session_oid);
-  
-  gzochid_scheme_channel_oid (channel, channel_oid);
-  gzochid_scheme_client_session_oid (session, session_oid);
-  
-  channel_reference = gzochid_data_create_reference_to_oid 
+  guint64 channel_oid = gzochid_scheme_channel_oid (channel);
+  guint64 session_oid = gzochid_scheme_client_session_oid (session);  
+  gzochid_data_managed_reference *channel_reference =
+    gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, channel_oid);
-  session_reference = gzochid_data_create_reference_to_oid
+  gzochid_data_managed_reference *session_reference =
+    gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, session_oid);
   
   gzochid_data_dereference (channel_reference, &err);
-
-  mpz_clear (session_oid);
-  mpz_clear (channel_oid);
   
   if (err == NULL)
     {
@@ -191,16 +162,10 @@ SCM_DEFINE (primitive_send_channel_message, "primitive-send-channel-message",
   short len = (short) SCM_BYTEVECTOR_LENGTH (bv);
   unsigned char *msg = (unsigned char *) SCM_BYTEVECTOR_CONTENTS (bv);
 
-  gzochid_data_managed_reference *channel_reference = NULL;
-  mpz_t channel_oid;
-
-  mpz_init (channel_oid);
-  
-  gzochid_scheme_channel_oid (channel, channel_oid);
-  
-  channel_reference = gzochid_data_create_reference_to_oid 
+  guint64 channel_oid = gzochid_scheme_channel_oid (channel);
+  gzochid_data_managed_reference *channel_reference =
+    gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, channel_oid);
-  mpz_clear (channel_oid);
 
   gzochid_data_dereference (channel_reference, &err);
 
@@ -219,12 +184,9 @@ SCM_DEFINE (primitive_close_channel, "primitive-close-channel", 1, 0, 0,
   GError *err = NULL;
   gzochid_application_context *context = 
     gzochid_api_ensure_current_application_context ();
-  gzochid_data_managed_reference *channel_reference = NULL;
-  mpz_t channel_oid;
-
-  mpz_init (channel_oid);
-  gzochid_scheme_channel_oid (channel, channel_oid);  
-  channel_reference = gzochid_data_create_reference_to_oid 
+  guint64 channel_oid = gzochid_scheme_channel_oid (channel);  
+  gzochid_data_managed_reference *channel_reference =
+    gzochid_data_create_reference_to_oid 
     (context, &gzochid_channel_serialization, channel_oid);
 
   gzochid_data_dereference (channel_reference, &err);

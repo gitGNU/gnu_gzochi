@@ -67,8 +67,7 @@ gzochid_dataclient_received_oids (GzochidDataClient *client,
   client->activity_log = g_list_append
     (client->activity_log,
      g_strdup_printf ("RECEIVED OID BLOCK %s/%lu:%lu", response->app,
-		      mpz_get_ui (response->block.block_start),
-		      response->block.block_size));
+		      response->block.block_start, response->block.block_size));
 }
 
 void
@@ -129,10 +128,12 @@ test_client_dispatch_one_oids_response ()
   GzochidDataClient *client = g_object_new (GZOCHID_TYPE_DATA_CLIENT, NULL);
   GByteArray *bytes = g_byte_array_new ();
 
-  g_byte_array_append (bytes, "\x00\x09\x50test\x00""1\x00\x00\x64", 12);
+  g_byte_array_append
+    (bytes, "\x00\x0f\x50test\x00""\x00\x00\x00\x00\x00\x00\x00\x01\x00\x64",
+     18);
   
   g_assert_cmpint
-    (gzochid_dataclient_client_protocol.dispatch (bytes, client), ==, 12);
+    (gzochid_dataclient_client_protocol.dispatch (bytes, client), ==, 18);
   
   g_assert_cmpint (g_list_length (client->activity_log), ==, 1);
   g_assert_cmpstr

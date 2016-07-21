@@ -19,7 +19,6 @@
 #define GZOCHID_OIDS_H
 
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 
 /* The following data structures and prototypes provide a framework for 
@@ -50,7 +49,7 @@ enum GzochidOidError
 
 struct _gzochid_data_oids_block
 {
-  mpz_t block_start; /* The first object id in the block. */
+  guint64 block_start; /* The first object id in the block. */
   size_t block_size; /* The size of the block. */
 };
 

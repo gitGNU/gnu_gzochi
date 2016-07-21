@@ -19,7 +19,6 @@
 #define GZOCHID_DATA_H
 
 #include <glib.h>
-#include <gmp.h>
 
 #include "app.h"
 #include "gzochid-auth.h"
@@ -45,7 +44,7 @@ enum GzochidDataError
 
 struct _gzochid_oid_holder
 {
-  mpz_t oid;
+  guint64 oid;
   GError *err;
 };
 
@@ -69,7 +68,7 @@ struct _gzochid_data_managed_reference
   enum gzochid_data_managed_reference_state state;
   gzochid_io_serialization *serialization;
 
-  mpz_t oid;
+  guint64 oid;
   void *obj;
 };
 
@@ -97,7 +96,7 @@ void gzochid_data_set_binding
  GError **);
 
 void gzochid_data_set_binding_to_oid
-(gzochid_application_context *, char *, mpz_t, GError **);
+(gzochid_application_context *, char *, guint64, GError **);
 
 void gzochid_data_remove_binding 
 (gzochid_application_context *, char *, GError **);
@@ -106,7 +105,7 @@ gboolean gzochid_data_binding_exists
 (gzochid_application_context *, char *, GError **);
 
 char *gzochid_data_next_binding_oid 
-(gzochid_application_context *, char *, mpz_t, GError **);
+(gzochid_application_context *, char *, guint64 *, GError **);
 
 /*
   Return a managed reference for the specified pointer within the target gzochi
@@ -129,7 +128,7 @@ gzochid_data_managed_reference *gzochid_data_create_reference
 (gzochid_application_context *, gzochid_io_serialization *, void *, GError **);
 
 gzochid_data_managed_reference *gzochid_data_create_reference_to_oid
-(gzochid_application_context *, gzochid_io_serialization *, mpz_t);
+(gzochid_application_context *, gzochid_io_serialization *, guint64);
 
 /*
   Returns the object referenced by the specified managed reference, retrieving 

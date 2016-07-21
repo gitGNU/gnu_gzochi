@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,16 +77,11 @@ reset_serialization_state ()
 static void 
 fetch_reference (gpointer data)
 {
-  mpz_t z;
   gzochid_application_context *context = data;
   gzochid_data_managed_reference *ref = NULL;
 
-  mpz_init (z);
-
-  ref = gzochid_data_create_reference_to_oid (context, &test_serialization, z);
+  ref = gzochid_data_create_reference_to_oid (context, &test_serialization, 0);
   gzochid_data_dereference (ref, NULL);
-
-  mpz_clear (z);
 }
 
 static void 
@@ -134,29 +128,22 @@ application_context_shutdown (gzochid_application_context *context)
 
 static void test_data_reference_finalize ()
 {
-  mpz_t z;
-  char *key = NULL;
   gzochid_application_context *context = gzochid_application_context_new ();
   gzochid_storage_transaction *tx = NULL;
+  guint64 zero = 0;
   
   application_context_init (context);
   reset_serialization_state ();
-
-  mpz_init (z);
-  key = mpz_get_str (NULL, 16, z);
 
   tx = gzochid_storage_engine_interface_mem.transaction_begin
     (context->storage_context);
 
   gzochid_storage_engine_interface_mem.transaction_put 
-    (tx, context->oids, key, strlen (key) + 1, "foo", 4);
+    (tx, context->oids, (char *) &zero, sizeof (guint64), "foo", 4);
 
   gzochid_storage_engine_interface_mem.transaction_prepare (tx);  
   gzochid_storage_engine_interface_mem.transaction_commit (tx);  
   
-  free (key);
-  mpz_clear (z);
-
   gzochid_transaction_execute (fetch_reference, context);
 
   g_assert (!serialized);

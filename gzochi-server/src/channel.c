@@ -17,7 +17,6 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,8 +77,8 @@ enum gzochid_channel_operation
 struct _gzochid_channel
 {
   char *name; /* The channel name. */
-  mpz_t oid; /* The object id of the channel in the object store. */
-  mpz_t scm_oid; /* The object id of the channel's Scheme representation. */
+  guint64 oid; /* The object id of the channel in the object store. */
+  guint64 scm_oid; /* The object id of the channel's Scheme representation. */
 };
 
 gzochid_channel *
@@ -89,25 +88,19 @@ gzochid_channel_new (char *name)
 
   channel->name = name;
 
-  mpz_init (channel->oid);
-  mpz_init (channel->scm_oid);
-
   return channel;
 }
 
 void
 gzochid_channel_free (gzochid_channel *channel)
 {
-  mpz_clear (channel->oid);
-  mpz_clear (channel->scm_oid);
-
   free (channel);
 }
 
-void
-gzochid_channel_scm_oid (gzochid_channel *channel, mpz_t scm_oid)
+guint64
+gzochid_channel_scm_oid (gzochid_channel *channel)
 {
-  mpz_set (scm_oid, channel->scm_oid);
+  return channel->scm_oid;
 }
 
 const char *
@@ -126,8 +119,8 @@ deserialize_channel (gzochid_application_context *context, GByteArray *in,
 
   channel->name = gzochid_util_deserialize_string (in);
 
-  gzochid_util_deserialize_mpz (in, channel->oid);
-  gzochid_util_deserialize_mpz (in, channel->scm_oid);
+  channel->oid = gzochid_util_deserialize_oid (in);
+  channel->scm_oid = gzochid_util_deserialize_oid (in);
 
   return channel;
 }
@@ -139,8 +132,8 @@ serialize_channel (gzochid_application_context *context, gpointer obj,
   gzochid_channel *channel = obj;
   gzochid_util_serialize_string (channel->name, out);
 
-  gzochid_util_serialize_mpz (channel->oid, out);
-  gzochid_util_serialize_mpz (channel->scm_oid, out);
+  gzochid_util_serialize_oid (channel->oid, out);
+  gzochid_util_serialize_oid (channel->scm_oid, out);
 }
 
 static void finalize_channel
@@ -160,7 +153,7 @@ gzochid_io_serialization gzochid_channel_serialization =
 struct _gzochid_channel_pending_operation
 {
   enum gzochid_channel_operation type; /* The operation type. */
-  mpz_t target_channel; /* The target channel oid. */
+  guint64 target_channel; /* The target channel oid. */
 
   /* The operation timestamp, for schedule ordering. */
   
@@ -188,7 +181,7 @@ gzochid_channel_pending_send_operation;
 struct _gzochid_channel_pending_membership_operation
 {
   gzochid_channel_pending_operation base; /* Base channel operation. */
-  mpz_t target_session; /* The target session oid. */
+  guint64 target_session; /* The target session oid. */
 };
 
 typedef struct _gzochid_channel_pending_membership_operation
@@ -215,17 +208,14 @@ deserialize_channel_operation (gzochid_application_context *context,
   else op = malloc (sizeof (gzochid_channel_pending_operation));
 
   op->type = type;
-
-  mpz_init (op->target_channel);
-  gzochid_util_deserialize_mpz (in, op->target_channel);
+  op->target_channel = gzochid_util_deserialize_oid (in);
 
   if (type == GZOCHID_CHANNEL_OP_JOIN || type == GZOCHID_CHANNEL_OP_LEAVE)
     {
       gzochid_channel_pending_membership_operation *member_op =
 	(gzochid_channel_pending_membership_operation *) op;
       
-      mpz_init (member_op->target_session);
-      gzochid_util_deserialize_mpz (in, member_op->target_session);
+      member_op->target_session = gzochid_util_deserialize_oid (in);
     }
   else if (type == GZOCHID_CHANNEL_OP_SEND)
     {
@@ -249,7 +239,7 @@ serialize_channel_operation (gzochid_application_context *context,
      can read it before reading an operation type-specific fields. */
   
   gzochid_util_serialize_int (op->type, out);
-  gzochid_util_serialize_mpz (op->target_channel, out);
+  gzochid_util_serialize_oid (op->target_channel, out);
   
   if (op->type == GZOCHID_CHANNEL_OP_JOIN
       || op->type == GZOCHID_CHANNEL_OP_LEAVE) {
@@ -257,7 +247,7 @@ serialize_channel_operation (gzochid_application_context *context,
     gzochid_channel_pending_membership_operation *member_op =
       (gzochid_channel_pending_membership_operation *) op;
 
-    gzochid_util_serialize_mpz (member_op->target_session, out);
+    gzochid_util_serialize_oid (member_op->target_session, out);
     
   } else if (op->type == GZOCHID_CHANNEL_OP_SEND) {
 
@@ -280,16 +270,7 @@ finalize_channel_operation (gzochid_application_context *context, gpointer data)
 
       free (send_op->message);
     }
-  else if (op->type == GZOCHID_CHANNEL_OP_JOIN
-	   || op->type == GZOCHID_CHANNEL_OP_LEAVE)
-    {
-      gzochid_channel_pending_membership_operation *membership_op =
-	(gzochid_channel_pending_membership_operation *) op;
-
-      mpz_clear (membership_op->target_session);
-    }
   
-  mpz_clear (op->target_channel);  
   free (op);
 }
 
@@ -313,7 +294,7 @@ struct _gzochid_channel_side_effect
   /* The hexadecimal string form of the channel oid; used as a key into the 
      application context's active channel map. */
 
-  char *channel_oid_str; 
+  guint64 channel_oid;
 };
 
 typedef struct _gzochid_channel_side_effect gzochid_channel_side_effect;
@@ -328,7 +309,7 @@ struct _gzochid_channel_membership_side_effect
   /* The hexadecimal string form of the session oid; used as a key into the 
      application context's active session map. */
 
-  char *session_oid_str;
+  guint64 session_oid;
 };
 
 typedef struct _gzochid_channel_membership_side_effect
@@ -340,11 +321,11 @@ struct _gzochid_channel_message_side_effect
 {
   gzochid_channel_side_effect base; /* Base channel side effect. */
   
-  /* A snapshot of the members of the channel, in the form of an array of hex 
-     string session oids, at the time the side effect transaction was 
+  /* A snapshot of the members of the channel, in the form of an array of 
+     session oids, at the time the side effect transaction was 
      executed. */
 
-  GPtrArray *session_oid_strs;
+  GArray *session_oids;
   
   unsigned char *msg; /* The message to be sent. */
   short len; /* The message payload length. */
@@ -363,19 +344,10 @@ free_side_effect (gzochid_channel_side_effect *side_effect)
       gzochid_channel_message_side_effect *message_side_effect =
 	(gzochid_channel_message_side_effect *) side_effect;
 
-      g_ptr_array_unref (message_side_effect->session_oid_strs);
+      g_array_unref (message_side_effect->session_oids);
       free (message_side_effect->msg);
     }
-  else if (side_effect->op == GZOCHID_CHANNEL_OP_JOIN
-      || side_effect->op == GZOCHID_CHANNEL_OP_LEAVE)
-    {
-      gzochid_channel_membership_side_effect *membership_side_effect =
-	(gzochid_channel_membership_side_effect *) side_effect;
 
-      free (membership_side_effect->session_oid_str);
-    }
-  
-  free (side_effect->channel_oid_str);
   free (side_effect);
 }
 
@@ -386,7 +358,7 @@ free_side_effect (gzochid_channel_side_effect *side_effect)
 
 static gzochid_channel_side_effect *
 gzochid_channel_side_effect_new (enum gzochid_channel_operation op,
-				 char *channel_oid_str)
+				 guint64 channel_oid)
 {
   gzochid_channel_side_effect *side_effect =
     malloc (sizeof (gzochid_channel_side_effect));
@@ -394,7 +366,7 @@ gzochid_channel_side_effect_new (enum gzochid_channel_operation op,
   assert (op == GZOCHID_CHANNEL_OP_CLOSE);
   
   side_effect->op = op;
-  side_effect->channel_oid_str = strdup (channel_oid_str);
+  side_effect->channel_oid = channel_oid;
 
   return side_effect;
 }
@@ -407,8 +379,8 @@ gzochid_channel_side_effect_new (enum gzochid_channel_operation op,
 
 static gzochid_channel_side_effect *
 gzochid_channel_membership_side_effect_new (enum gzochid_channel_operation op,
-					    char *channel_oid_str,
-					    char *session_oid_str)
+					    guint64 channel_oid,
+					    guint64 session_oid)
 {
   gzochid_channel_membership_side_effect *membership_side_effect =
     malloc (sizeof (gzochid_channel_membership_side_effect));
@@ -418,9 +390,9 @@ gzochid_channel_membership_side_effect_new (enum gzochid_channel_operation op,
   assert (op == GZOCHID_CHANNEL_OP_JOIN || op == GZOCHID_CHANNEL_OP_LEAVE);
   
   side_effect->op = op;
-  side_effect->channel_oid_str = strdup (channel_oid_str);
+  side_effect->channel_oid = channel_oid;
 
-  membership_side_effect->session_oid_str = strdup (session_oid_str);
+  membership_side_effect->session_oid = session_oid;
   
   return side_effect;
 }
@@ -433,8 +405,8 @@ gzochid_channel_membership_side_effect_new (enum gzochid_channel_operation op,
 
 static gzochid_channel_side_effect *
 gzochid_channel_message_side_effect_new (enum gzochid_channel_operation op,
-					 char *channel_oid_str,
-					 GPtrArray *session_oid_strs,
+					 guint64 channel_oid,
+					 GArray *session_oids,
 					 unsigned char *msg, short len)
 {
   gzochid_channel_message_side_effect *message_side_effect =
@@ -445,9 +417,9 @@ gzochid_channel_message_side_effect_new (enum gzochid_channel_operation op,
   assert (op == GZOCHID_CHANNEL_OP_SEND);
   
   side_effect->op = op;
-  side_effect->channel_oid_str = strdup (channel_oid_str);
+  side_effect->channel_oid = channel_oid;
 
-  message_side_effect->session_oid_strs = g_ptr_array_ref (session_oid_strs);
+  message_side_effect->session_oids = g_array_ref (session_oids);
   message_side_effect->msg = malloc (sizeof (char) * len);
   message_side_effect->len = len;
   
@@ -512,10 +484,14 @@ channel_side_effect_commit (gpointer data)
       
       sessions = g_hash_table_lookup
 	(tx_context->app_context->channel_oids_to_local_session_oids,
-	 tx_context->side_effect->channel_oid_str);
+	 &tx_context->side_effect->channel_oid);
 
       if (sessions == NULL)
 	{
+	  guint64 *channel_oid_ptr = malloc (sizeof (guint64));
+
+	  *channel_oid_ptr = tx_context->side_effect->channel_oid;
+	  
 	  /* If not, that's okay; it may not have been used on this node. Create
 	     an empty sequence to store new members. */
 	  
@@ -523,7 +499,7 @@ channel_side_effect_commit (gpointer data)
 
 	  g_hash_table_insert
 	    (tx_context->app_context->channel_oids_to_local_session_oids,
-	     strdup (tx_context->side_effect->channel_oid_str), sessions);
+	     channel_oid_ptr, sessions);
 	}
       
       if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_SEND)
@@ -534,12 +510,12 @@ channel_side_effect_commit (gpointer data)
 
 	  g_mutex_lock (&tx_context->app_context->client_mapping_lock);
 	  
-	  for (; i < message_side_effect->session_oid_strs->len; i++)
+	  for (; i < message_side_effect->session_oids->len; i++)
 	    { 
-	      char *session_oid_str = g_ptr_array_index
-		(message_side_effect->session_oid_strs, i);
+	      guint64 session_oid = g_array_index
+		(message_side_effect->session_oids, guint64, i);
 	      gzochid_game_client *client = g_hash_table_lookup
-		(tx_context->app_context->oids_to_clients, session_oid_str);
+		(tx_context->app_context->oids_to_clients, &session_oid);
 
 	      /* Grab the client connection to which the session oid 
 		 corresponds. */
@@ -561,14 +537,14 @@ channel_side_effect_commit (gpointer data)
 		     members. */
 		  
 		  GSequenceIter *iter = g_sequence_lookup
-		    (sessions, session_oid_str,
-		     gzochid_util_string_data_compare, NULL);
+		    (sessions, &session_oid,
+		     gzochid_util_guint64_data_compare, NULL);
 		  
 		  if (iter != NULL)
 		    {
 		      g_debug 
-			("Client not found for messaged channel session '%s'; "
-			 "removing.", session_oid_str);
+			("Client not found for messaged channel session '%lx'; "
+			 "removing.", session_oid);
 
 		      g_sequence_remove (iter);
 		    }
@@ -585,17 +561,23 @@ channel_side_effect_commit (gpointer data)
 	    tx_context->side_effect;
 	  
 	  GSequenceIter *iter = g_sequence_lookup
-	    (sessions, membership_side_effect->session_oid_str,
-	     gzochid_util_string_data_compare, NULL);
+	    (sessions, &membership_side_effect->session_oid,
+	     gzochid_util_guint64_data_compare, NULL);
 
 	  /* Add or remove the session to or from the channel's session list. */
 	  
 	  if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_JOIN)
 	    {
 	      if (iter == NULL)
-		g_sequence_insert_sorted
-		  (sessions, strdup (membership_side_effect->session_oid_str),
-		   gzochid_util_string_data_compare, NULL);
+		{
+		  guint64 *session_oid_ptr = malloc (sizeof (guint64));
+
+		  *session_oid_ptr = membership_side_effect->session_oid;
+		  
+		  g_sequence_insert_sorted
+		    (sessions, session_oid_ptr,
+		     gzochid_util_guint64_data_compare, NULL);
+		}
 	    }
 	  else if (iter != NULL)
 	    g_sequence_remove (iter);
@@ -605,7 +587,7 @@ channel_side_effect_commit (gpointer data)
       
       else g_hash_table_remove
 	     (tx_context->app_context->channel_oids_to_local_session_oids,
-	      tx_context->side_effect->channel_oid_str);	  
+	      &tx_context->side_effect->channel_oid);	  
 
       g_mutex_unlock (&tx_context->app_context->channel_mapping_lock);
     }
@@ -664,20 +646,18 @@ close_channel (gzochid_application_context *context,
 	       gzochid_auth_identity *identity, gpointer data)
 {
   gzochid_channel_pending_operation *op = data;
-  char *channel_oid_str = mpz_get_str (NULL, 16, op->target_channel);
 
   g_mutex_lock (&context->channel_mapping_lock);
 
   if (g_hash_table_contains
-      (context->channel_oids_to_local_session_oids, channel_oid_str))
+      (context->channel_oids_to_local_session_oids, &op->target_channel))
     {
       gzochid_channel_side_effect_transaction_context *tx_context =
 	join_side_effect_transaction (context);
 
       tx_context->side_effect = gzochid_channel_side_effect_new
-	(GZOCHID_CHANNEL_OP_CLOSE, channel_oid_str);
+	(GZOCHID_CHANNEL_OP_CLOSE, op->target_channel);
     }
-  else free (channel_oid_str);
   
   g_mutex_unlock (&context->channel_mapping_lock);
 }
@@ -693,44 +673,38 @@ send_channel_message (gzochid_application_context *context,
   gzochid_channel_pending_operation *op =
     (gzochid_channel_pending_operation *) send_op;
 
-  char *channel_oid_str = mpz_get_str (NULL, 16, op->target_channel);
-
   g_mutex_lock (&context->channel_mapping_lock);
 
   if (g_hash_table_contains
-      (context->channel_oids_to_local_session_oids, channel_oid_str))
+      (context->channel_oids_to_local_session_oids, &op->target_channel))
     {
       GSequence *sessions = g_hash_table_lookup
-	(context->channel_oids_to_local_session_oids, channel_oid_str);
+	(context->channel_oids_to_local_session_oids, &op->target_channel);
       GSequenceIter *iter = g_sequence_get_begin_iter (sessions);
 
       /* Take a snapshot of the current membership of the channel. */
       
-      if (g_sequence_iter_is_end (iter))
-
-	/* ...which might be empty. */
-	
-	free (channel_oid_str);
-      else
+      if (!g_sequence_iter_is_end (iter))
 	{
-	  GPtrArray *session_oid_strs = g_ptr_array_new ();
+	  GArray *session_oids = g_array_new (FALSE, FALSE, sizeof (guint64));
 	  gzochid_channel_side_effect_transaction_context *tx_context =
 	    join_side_effect_transaction (context);
 
 	  while (!g_sequence_iter_is_end (iter))
 	    {
-	      g_ptr_array_add (session_oid_strs, g_sequence_get (iter));
+	      guint64 *session_oid = g_sequence_get (iter);
+	      
+	      g_array_append_val (session_oids, *session_oid);
 	      iter = g_sequence_iter_next (iter);
 	    }
 
 	  tx_context->side_effect = gzochid_channel_message_side_effect_new
-	    (GZOCHID_CHANNEL_OP_SEND, channel_oid_str, session_oid_strs,
+	    (GZOCHID_CHANNEL_OP_SEND, op->target_channel, session_oids,
 	     send_op->message, send_op->len);
 	  
-	  g_ptr_array_unref (session_oid_strs);
+	  g_array_unref (session_oids);
 	}
     }
-  else free (channel_oid_str);
   
   g_mutex_unlock (&context->channel_mapping_lock);
 }
@@ -748,18 +722,16 @@ join_channel (gzochid_application_context *context,
 
   gboolean do_join = TRUE;
 
-  char *channel_oid_str = mpz_get_str (NULL, 16, op->target_channel);
-  char *session_oid_str = mpz_get_str (NULL, 16, member_op->target_session);
-  
   g_mutex_lock (&context->channel_mapping_lock);
 
   if (g_hash_table_contains
-      (context->channel_oids_to_local_session_oids, channel_oid_str))
+      (context->channel_oids_to_local_session_oids, &op->target_channel))
     {
       GSequence *sessions = g_hash_table_lookup
-	(context->channel_oids_to_local_session_oids, channel_oid_str);
+	(context->channel_oids_to_local_session_oids, &op->target_channel);
       GSequenceIter *iter = g_sequence_lookup
-	(sessions, session_oid_str, gzochid_util_string_data_compare, NULL);
+	(sessions, &member_op->target_session,
+	 gzochid_util_guint64_data_compare, NULL);
 
       do_join = iter == NULL;
     }
@@ -772,13 +744,8 @@ join_channel (gzochid_application_context *context,
 	join_side_effect_transaction (context);
 
       tx_context->side_effect = gzochid_channel_membership_side_effect_new
-	(GZOCHID_CHANNEL_OP_JOIN, channel_oid_str,
-	 mpz_get_str (NULL, 16, member_op->target_session));
-    }
-  else
-    {
-      free (channel_oid_str);
-      free (session_oid_str);
+	(GZOCHID_CHANNEL_OP_JOIN, op->target_channel,
+	 member_op->target_session);
     }
 }
 
@@ -795,18 +762,16 @@ leave_channel (gzochid_application_context *context,
 
   gboolean do_leave = FALSE;
 
-  char *channel_oid_str = mpz_get_str (NULL, 16, op->target_channel);
-  char *session_oid_str = mpz_get_str (NULL, 16, member_op->target_session);
-  
   g_mutex_lock (&context->channel_mapping_lock);
 
   if (g_hash_table_contains
-      (context->channel_oids_to_local_session_oids, channel_oid_str))
+      (context->channel_oids_to_local_session_oids, &op->target_channel))
     {
       GSequence *sessions = g_hash_table_lookup
-	(context->channel_oids_to_local_session_oids, channel_oid_str);
+	(context->channel_oids_to_local_session_oids, &op->target_channel);
       GSequenceIter *iter = g_sequence_lookup
-	(sessions, session_oid_str, gzochid_util_string_data_compare, NULL);
+	(sessions, &member_op->target_session,
+	 gzochid_util_guint64_data_compare, NULL);
 
       do_leave = iter != NULL;
     }
@@ -819,13 +784,8 @@ leave_channel (gzochid_application_context *context,
 	join_side_effect_transaction (context);
 
       tx_context->side_effect = gzochid_channel_membership_side_effect_new
-	(GZOCHID_CHANNEL_OP_LEAVE, channel_oid_str,
-	 mpz_get_str (NULL, 16, member_op->target_session));
-    }
-  else
-    {
-      free (channel_oid_str);
-      free (session_oid_str);
+	(GZOCHID_CHANNEL_OP_LEAVE, op->target_channel,
+	 member_op->target_session);
     }
 }
 
@@ -943,8 +903,9 @@ gzochid_channel_create (gzochid_application_context *context, char *name)
       gzochid_channel_free (channel);
       return NULL;
     }
-  
-  mpz_set (channel->oid, reference->oid);
+
+  channel->oid = reference->oid;
+
   scm_channel = gzochid_scheme_create_channel (channel, reference->oid);
   scm_reference = gzochid_data_create_reference
     (context, &gzochid_scheme_data_serialization, scm_channel, NULL);
@@ -955,8 +916,8 @@ gzochid_channel_create (gzochid_application_context *context, char *name)
 	("Failed to create Scheme representation of new channel '%s'.", name);
       return NULL;
     }
-  
-  mpz_set (channel->scm_oid, scm_reference->oid);
+
+  channel->scm_oid = scm_reference->oid;
   
   binding = make_channel_binding (name);
   gzochid_data_set_binding_to_oid (context, binding, reference->oid, &err);
@@ -1092,10 +1053,9 @@ gzochid_channel_join (gzochid_application_context *context,
   assert (session_reference != NULL);
 
   operation->type = GZOCHID_CHANNEL_OP_JOIN;
-  mpz_init (operation->target_channel);
-  mpz_init (join_operation->target_session);
-  mpz_set (operation->target_channel, channel_reference->oid);
-  mpz_set (join_operation->target_session, session_reference->oid);
+  
+  operation->target_channel = channel_reference->oid;
+  join_operation->target_session = session_reference->oid;
 
   /* Create a task to execute the join... */
   
@@ -1147,10 +1107,9 @@ gzochid_channel_leave (gzochid_application_context *context,
   assert (session_reference != NULL);
   
   operation->type = GZOCHID_CHANNEL_OP_LEAVE;
-  mpz_init (operation->target_channel);
-  mpz_init (leave_operation->target_session);
-  mpz_set (operation->target_channel, channel_reference->oid);
-  mpz_set (leave_operation->target_session, session_reference->oid);
+  operation->target_channel = channel_reference->oid;
+
+  leave_operation->target_session = session_reference->oid;
 
   /* Create a task to execute the exit from the channel... */
   
@@ -1198,8 +1157,8 @@ gzochid_channel_send (gzochid_application_context *context,
   memcpy (send_operation->message, message, len);
   
   send_operation->len = len;
-  mpz_init (operation->target_channel);
-  mpz_set (operation->target_channel, channel_reference->oid);
+
+  operation->target_channel = channel_reference->oid;
 
   /* Create a task to execute the message broadcast... */
 
@@ -1239,8 +1198,7 @@ gzochid_channel_close (gzochid_application_context *context,
   assert (channel_reference != NULL);
 
   operation->type = GZOCHID_CHANNEL_OP_CLOSE;
-  mpz_init (operation->target_channel);
-  mpz_set (operation->target_channel, channel_reference->oid);
+  operation->target_channel = channel_reference->oid;
   
   /* Create a task to execute the channel shutdown... */
 

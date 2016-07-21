@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,13 +32,10 @@ test_reserve_oids_response ()
   gzochid_data_reserve_oids_response *response1 = NULL;
   gzochid_data_reserve_oids_response *response2 = NULL;
 
-  mpz_init (oids_block.block_start);
-  mpz_set_ui (oids_block.block_start, 123);
-
+  oids_block.block_start = 123;
   oids_block.block_size = 100;
   
   response1 = gzochid_data_reserve_oids_response_new ("test", &oids_block);
-  mpz_clear (oids_block.block_start);
   
   gzochid_data_protocol_reserve_oids_response_write (response1, arr);
 
@@ -48,7 +44,7 @@ test_reserve_oids_response ()
 
   g_assert_nonnull (response2);
   g_assert_cmpstr (response2->app, ==, "test");
-  g_assert (mpz_cmp_ui (response2->block.block_start, 123) == 0);
+  g_assert_cmpint (response2->block.block_start, ==, 123);
   g_assert_cmpint (response2->block.block_size, ==, 100);
   
   gzochid_data_reserve_oids_response_free (response1);

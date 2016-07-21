@@ -17,7 +17,6 @@
 
 #include <glib.h>
 #include <glib-object.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,14 +45,12 @@ gzochi_metad_dataserver_reserve_oids (GzochiMetadDataServer *dataserver,
 {
   gzochid_data_oids_block block;
   gzochid_data_reserve_oids_response *response = NULL;
-  
-  mpz_init_set_str (block.block_start, "1", 16);
+
+  block.block_start = 1;
   block.block_size = 100;
 
   response = gzochid_data_reserve_oids_response_new (app, &block);
 
-  mpz_clear (block.block_start);
-  
   return response;
 }
 
@@ -284,10 +281,12 @@ test_client_dispatch_one_reserve_oids (dataserver_protocol_fixture *fixture,
   g_main_context_iteration (fixture->socket_server->main_context, FALSE);
   
   g_assert_cmpint
-    (g_io_channel_read_chars (fixture->socket_channel, buf, 12, NULL, NULL), ==,
+    (g_io_channel_read_chars (fixture->socket_channel, buf, 18, NULL, NULL), ==,
      G_IO_STATUS_NORMAL);
 
-  g_assert (memcmp (buf, "\x00\x09\x50test\x00""1\x00\x00\x64", 12) == 0);
+  g_assert(memcmp (buf,
+		   "\x00\x0f\x50test\x00"
+		   "\x00\x00\x00\x00\x00\x00\x00\x01\x00\x64", 18) == 0);
 }
 
 static void

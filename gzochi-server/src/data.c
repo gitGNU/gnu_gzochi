@@ -17,7 +17,6 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,12 +29,13 @@
 #include "io.h"
 #include "oids.h"
 #include "tx.h"
+#include "util.h"
 
 struct _gzochid_data_oid_block_state
 {
-  mpz_t first;
-  mpz_t next;
-  mpz_t last;  
+  guint64 first;
+  guint64 next;
+  guint64 last;  
 };
 
 typedef struct _gzochid_data_oid_block_state gzochid_data_oid_block_state;
@@ -67,19 +67,12 @@ gzochid_data_error_quark (void)
 gzochid_oid_holder *
 gzochid_oid_holder_new (void)
 {
-  gzochid_oid_holder *holder = malloc (sizeof (gzochid_oid_holder));
-
-  mpz_init (holder->oid);
-  holder->err = NULL;
-  
-  return holder;
+  return calloc (1, sizeof (gzochid_oid_holder));
 }
 
 void 
 gzochid_oid_holder_free (gzochid_oid_holder *holder)
 {
-  mpz_clear (holder->oid);
-
   if (holder->err != NULL)
     g_error_free (holder->err);
   
@@ -102,7 +95,7 @@ create_transaction_context (gzochid_application_context *app_context,
 	 ->transaction_begin (app_context->storage_context);
 
   tx_context->oids_to_references = g_hash_table_new_full 
-    (g_str_hash, g_str_equal, free, NULL);
+    (g_int64_hash, g_int64_equal, free, NULL);
   tx_context->ptrs_to_references = g_hash_table_new 
     (g_direct_hash, g_direct_equal);
 
@@ -115,37 +108,20 @@ create_oid_block_state (gzochid_data_oids_block *block)
   gzochid_data_oid_block_state *block_state =
     malloc (sizeof (gzochid_data_oid_block_state));
 
-  mpz_init (block_state->first);
-  mpz_init (block_state->next);
-  mpz_init (block_state->last);
-
-  mpz_set (block_state->first, block->block_start);
-  mpz_set (block_state->next, block->block_start);
-  mpz_add_ui (block_state->last, block_state->first, block->block_size);
-  mpz_sub_ui (block_state->last, block_state->last, 1);
+  block_state->first = block->block_start;
+  block_state->next = block->block_start;
+  block_state->last = block_state->first + block->block_size - 1;
   
   return block_state;
 }
 
 static void 
-free_oid_block_state (void *ptr)
-{
-  gzochid_data_oid_block_state *block_state = ptr;
-
-  mpz_clear (block_state->first);
-  mpz_clear (block_state->next);
-  mpz_clear (block_state->last);
-
-  free (block_state);
-} 
-
-static void 
 transaction_context_free (gzochid_data_transaction_context *context)
 {  
   if (context->free_oids != NULL)
-    free_oid_block_state (context->free_oids);
+    free (context->free_oids);
 
-  g_list_free_full (context->used_oid_blocks, free_oid_block_state);
+  g_list_free_full (context->used_oid_blocks, free);
 
   g_hash_table_destroy (context->oids_to_references);
   g_hash_table_destroy (context->ptrs_to_references);
@@ -157,9 +133,10 @@ static gboolean
 flush_reference (gzochid_data_managed_reference *reference,
 		 gzochid_data_transaction_context *context)
 {
-  char *oid_str = NULL;
   GByteArray *out = NULL;
   GError *err = NULL;
+
+  guint64 encoded_oid = gzochid_util_encode_oid (reference->oid);
 
   switch (reference->state)
     {
@@ -173,24 +150,22 @@ flush_reference (gzochid_data_managed_reference *reference,
       out = g_byte_array_new ();
       assert (reference->obj != NULL);
 
-      oid_str = mpz_get_str (NULL, 16, reference->oid);
-      g_debug ("Flushing new/modified reference '%s'.", oid_str);
+      g_debug ("Flushing new/modified reference '%lx'.", reference->oid);
 
       reference->serialization->serializer
 	(context->context, reference->obj, out, &err);
 
       if (err != NULL || gzochid_transaction_rollback_only ())
 	{
-	  free (oid_str);
 	  g_clear_error (&err);
 	  g_byte_array_unref (out);
 	  return FALSE;
 	}
 
       APP_STORAGE_INTERFACE (context->context)->transaction_put
-	(context->transaction, context->context->oids, oid_str, 
-	 strlen (oid_str) + 1, (char *) out->data, out->len);
-      free (oid_str);
+	(context->transaction, context->context->oids,
+	 (char *) &encoded_oid, sizeof (guint64),
+	 (char *) out->data, out->len);
 
       gzochid_application_event_dispatch
 	(context->context->event_source,
@@ -244,15 +219,6 @@ data_prepare (gpointer data)
 }
 
 static void 
-free_reference (gpointer data)
-{
-  gzochid_data_managed_reference *reference = data;
-
-  mpz_clear (reference->oid);
-  free (data);
-}
-
-static void 
 finalize_references (gzochid_data_transaction_context *context)
 {
   GList *references = g_hash_table_get_values (context->oids_to_references);
@@ -270,7 +236,8 @@ finalize_references (gzochid_data_transaction_context *context)
 	}
       reference_ptr = reference_ptr->next;
     }
-  g_list_free_full (references, free_reference);
+  
+  g_list_free_full (references, free);
 }
 
 static void 
@@ -329,50 +296,62 @@ reserve_oids (gzochid_application_context *context)
 	      (context->oid_strategy, &new_block, NULL));
 
       block_state = create_oid_block_state (&new_block);
-      mpz_clear (new_block.block_start);
     }
 
   g_mutex_unlock (&context->free_oids_lock);
   return block_state;
 }
 
-static void 
-get_binding (gzochid_data_transaction_context *context, char *name, mpz_t oid, 
+static guint64
+get_binding (gzochid_data_transaction_context *context, char *name,
 	     GError **err)
 {
-  char *oid_str = APP_STORAGE_INTERFACE (context->context)->transaction_get 
+  size_t oid_bytes_len = 0;
+  char *oid_bytes = APP_STORAGE_INTERFACE (context->context)->transaction_get 
     (context->transaction, context->context->names, name, strlen (name) + 1, 
-     NULL);
+     &oid_bytes_len);
 
+  assert (oid_bytes == NULL || oid_bytes_len == sizeof (guint64));
+  
   if (context->transaction->rollback)
     {
       gzochid_transaction_mark_for_rollback 
 	(&data_participant, context->transaction->should_retry);
+
       g_set_error
 	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
 	 "Transaction rolled back while retrieving binding.");
+
+      return 0;
     }
-  else if (oid_str != NULL)
+  else if (oid_bytes != NULL)
     {
-      mpz_set_str (oid, oid_str, 16);
-      free (oid_str);
+      guint64 oid;
+      
+      memcpy (&oid, oid_bytes, sizeof (guint64));
+      free (oid_bytes);
+
+      return gzochid_util_decode_oid (oid);
     }
-  else g_set_error
+ else
+   {
+     g_set_error
 	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
 	 "No data found for binding '%s'.", name);
+     
+     return 0;
+   }
 }
 
 static void 
-set_binding (gzochid_data_transaction_context *context, char *name, mpz_t oid, 
+set_binding (gzochid_data_transaction_context *context, char *name, guint64 oid,
 	     GError **err)
 {
-  char *oid_str = mpz_get_str (NULL, 16, oid);
-
+  guint64 encoded_oid = gzochid_util_encode_oid (oid);
+  
   APP_STORAGE_INTERFACE (context->context)->transaction_put 
     (context->transaction, context->context->names, name, strlen (name) + 1, 
-     oid_str, strlen (oid_str) + 1);
-
-  free (oid_str);
+     (char *) &encoded_oid, sizeof (guint64));
 
   if (context->transaction->rollback)
     {
@@ -385,17 +364,14 @@ set_binding (gzochid_data_transaction_context *context, char *name, mpz_t oid,
 }
 
 static gzochid_data_managed_reference *
-create_empty_reference (gzochid_application_context *context, mpz_t oid, 
+create_empty_reference (gzochid_application_context *context, guint64 oid, 
 			gzochid_io_serialization *serialization)
 {
   gzochid_data_managed_reference *reference = 
     calloc (1, sizeof (gzochid_data_managed_reference));
 
   reference->context = context;
-
-  mpz_init (reference->oid);
-  mpz_set (reference->oid, oid);
- 
+  reference->oid = oid;
   reference->state = GZOCHID_MANAGED_REFERENCE_STATE_EMPTY;
   reference->serialization = serialization;
   
@@ -403,15 +379,15 @@ create_empty_reference (gzochid_application_context *context, mpz_t oid,
 }
 
 static int 
-next_object_id (gzochid_data_transaction_context *context, mpz_t oid)
+next_object_id (gzochid_data_transaction_context *context, guint64 *oid)
 {
   if (context->free_oids == NULL)
     context->free_oids = reserve_oids (context->context);
 
-  mpz_set (oid, context->free_oids->next);
-  mpz_add_ui (context->free_oids->next, context->free_oids->next, 1);
+  *oid = context->free_oids->next;
+  context->free_oids->next += 1;
 
-  if (mpz_cmp (context->free_oids->next, context->free_oids->last) > 0)
+  if (context->free_oids->next > context->free_oids->last)
     {
       context->used_oid_blocks = g_list_append 
 	(context->used_oid_blocks, context->free_oids);
@@ -429,13 +405,10 @@ create_new_reference (gzochid_application_context *context, void *ptr,
     gzochid_transaction_context (&data_participant);
   gzochid_data_managed_reference *reference = 
     calloc (1, sizeof (gzochid_data_managed_reference));
-  char *oid_str = NULL;
   
   reference->context = context;
   
-  mpz_init (reference->oid);
-  
-  next_object_id (tx_context, reference->oid);
+  next_object_id (tx_context, &reference->oid);
   reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NEW;
   reference->serialization = serialization;
   reference->obj = ptr;
@@ -450,34 +423,34 @@ create_new_reference (gzochid_application_context *context, void *ptr,
   
   if (!tx_context->transaction->rollback)
     {
-      oid_str = mpz_get_str (NULL, 16, reference->oid);
-  
-      APP_STORAGE_INTERFACE (context)->transaction_get_for_update
-	(tx_context->transaction, tx_context->context->oids, oid_str, 
-	 strlen (oid_str) + 1, NULL);
+      guint64 encoded_oid = gzochid_util_encode_oid (reference->oid);
       
-      free (oid_str);
+      APP_STORAGE_INTERFACE (context)->transaction_get_for_update
+	(tx_context->transaction, tx_context->context->oids,
+	 (char *) &encoded_oid, sizeof (guint64), NULL);
     }
   
   return reference;
 }
 
 static gzochid_data_managed_reference *
-get_reference_by_oid (gzochid_application_context *context, mpz_t oid, 
+get_reference_by_oid (gzochid_application_context *context, guint64 oid, 
 		      gzochid_io_serialization *serialization)
 {
   gzochid_data_transaction_context *tx_context = 
     gzochid_transaction_context (&data_participant);
-  char *key = mpz_get_str (NULL, 16, oid);
   gzochid_data_managed_reference *reference = g_hash_table_lookup 
-    (tx_context->oids_to_references, key);
+    (tx_context->oids_to_references, &oid);
 
   if (reference == NULL)
     {
+      guint64 *key = malloc (sizeof (guint64));
+
+      *key = oid;
+      
       reference = create_empty_reference (context, oid, serialization);
       g_hash_table_insert (tx_context->oids_to_references, key, reference);
     }
-  else free (key);
 
   return reference;
 }
@@ -493,8 +466,8 @@ get_reference_by_ptr (gzochid_application_context *context, void *ptr,
 
   if (reference == NULL)
     {
-      char *key = NULL;
-
+      guint64 *key = NULL;
+      
       reference = create_new_reference (context, ptr, serialization);
 
       if (tx_context->transaction->rollback)
@@ -507,12 +480,13 @@ get_reference_by_ptr (gzochid_application_context *context, void *ptr,
 	  return NULL;
 	}
       
-      key = mpz_get_str (NULL, 16, reference->oid);
-
       assert (g_hash_table_lookup 
-	      (tx_context->oids_to_references, key) == NULL);
+	      (tx_context->oids_to_references, &reference->oid) == NULL);
       assert (g_hash_table_lookup 
 	      (tx_context->ptrs_to_references, ptr) == NULL);
+
+      key = malloc (sizeof (guint64));
+      *key = reference->oid;
       
       g_hash_table_insert (tx_context->oids_to_references, key, reference);
       g_hash_table_insert (tx_context->ptrs_to_references, ptr, reference);
@@ -527,9 +501,9 @@ dereference (gzochid_data_transaction_context *context,
 	     GError **err)
 {
   size_t data_len = 0;
-  char *oid_str = NULL; 
   char *data = NULL; 
   GByteArray *in = NULL;
+  guint64 encoded_oid;
   
   if (reference->obj != NULL
       || reference->state == GZOCHID_MANAGED_REFERENCE_STATE_REMOVED_EMPTY)
@@ -544,16 +518,17 @@ dereference (gzochid_data_transaction_context *context,
       return;
     }
 
-  oid_str = mpz_get_str (NULL, 16, reference->oid);
-  g_debug ("Retrieving data for reference '%s'.", oid_str);
+  g_debug ("Retrieving data for reference '%lx'.", reference->oid);
 
+  encoded_oid = gzochid_util_encode_oid (reference->oid);
+  
   if (for_update)
     data = APP_STORAGE_INTERFACE (context->context)->transaction_get_for_update
-      (context->transaction, context->context->oids, oid_str, 
-       strlen (oid_str) + 1, &data_len);
+      (context->transaction, context->context->oids, (char *) &encoded_oid,
+       sizeof (guint64), &data_len);
   else data = APP_STORAGE_INTERFACE (context->context)->transaction_get
-	 (context->transaction, context->context->oids, oid_str, 
-	  strlen (oid_str) + 1, &data_len);
+	 (context->transaction, context->context->oids, (char *) &encoded_oid, 
+	  sizeof (guint64), &data_len);
 
   if (context->transaction->rollback)
     {
@@ -561,21 +536,18 @@ dereference (gzochid_data_transaction_context *context,
 	(&data_participant, context->transaction->should_retry);
       g_set_error 
 	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
-	 "Transaction rolled back while retrieving reference '%s'.", oid_str);
-      free (oid_str);
+	 "Transaction rolled back while retrieving reference '%lx'.",
+	 reference->oid);
     }
   else if (data == NULL)
-    {
-      g_set_error 
-	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
-	 "No data found for reference '%s'.", oid_str);
-
-      free (oid_str);
-    }
+    g_set_error 
+      (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
+       "No data found for reference '%lx'.", reference->oid);
   else 
     {
       GError *local_err = NULL;
-
+      guint64 *key = malloc (sizeof (guint64));
+      
       gzochid_application_event_dispatch
 	(context->context->event_source,
 	 gzochid_application_data_event_new (BYTES_READ, data_len));
@@ -592,8 +564,10 @@ dereference (gzochid_data_transaction_context *context,
       else if (for_update)
 	reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
       else reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED;
+
+      *key = reference->oid;
       
-      g_hash_table_insert (context->oids_to_references, oid_str, reference);
+      g_hash_table_insert (context->oids_to_references, key, reference);
       g_hash_table_insert 
 	(context->ptrs_to_references, reference->obj, reference);
 
@@ -604,35 +578,35 @@ dereference (gzochid_data_transaction_context *context,
 }
 
 static void 
-remove_object (gzochid_data_transaction_context *context, mpz_t oid, 
+remove_object (gzochid_data_transaction_context *context, guint64 oid, 
 	       GError **err)
 {
   int ret = 0;
-  char *oid_str = mpz_get_str (NULL, 16, oid);
 
   /* The transaction is presumed to have already been joined at this point. */
   
   gzochid_data_transaction_context *tx_context =
     gzochid_transaction_context (&data_participant);
 
-  g_debug ("Removing reference '%s'.", oid_str);      
+  guint64 encoded_oid = gzochid_util_encode_oid (oid);
+  
+  g_debug ("Removing reference '%lx'.", oid);
   ret = APP_STORAGE_INTERFACE (context->context)->transaction_delete 
-    (context->transaction, context->context->oids, oid_str, 
-     strlen (oid_str) + 1);
+    (context->transaction, context->context->oids, (char *) &encoded_oid, 
+     sizeof (guint64));
 
   if (ret == GZOCHID_STORAGE_ENOTFOUND)
     g_set_error (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
-		 "No data found for reference '%s'.", oid_str);
+		 "No data found for reference '%lx'.", oid);
   else if (ret == GZOCHID_STORAGE_ETXFAILURE)
     {
       gzochid_transaction_mark_for_rollback 
 	(&data_participant, tx_context->transaction->should_retry);
       g_set_error 
 	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
-	 "Transaction rolled back while removing reference '%s'.", oid_str);
+	 "Transaction rolled back while removing reference '%lx'.", oid);
     }
 
-  free (oid_str);
   return;
 }
 
@@ -695,9 +669,9 @@ void *
 gzochid_data_get_binding (gzochid_application_context *context, char *name, 
 			  gzochid_io_serialization *serialization, GError **err)
 {
-  mpz_t oid;
-  gzochid_data_managed_reference *reference = NULL;
+  guint64 oid;
   GError *local_err = NULL;
+  gzochid_data_managed_reference *reference = NULL;
   gzochid_data_transaction_context *tx_context = 
     join_transaction (context, &local_err);
   
@@ -707,18 +681,15 @@ gzochid_data_get_binding (gzochid_application_context *context, char *name,
       return NULL;
     }
 
-  mpz_init (oid);
-  get_binding (tx_context, name, oid, &local_err);
+  oid = get_binding (tx_context, name, &local_err);
 
   if (local_err != NULL)
     {
       g_propagate_error (err, local_err);
-      mpz_clear (oid);
       return NULL;
     }
 
   reference = get_reference_by_oid (context, oid, serialization);  
-  mpz_clear (oid);
 
   dereference (tx_context, reference, FALSE, err);
   return reference->obj;
@@ -726,7 +697,7 @@ gzochid_data_get_binding (gzochid_application_context *context, char *name,
 
 void 
 gzochid_data_set_binding_to_oid (gzochid_application_context *context, 
-				 char *name, mpz_t oid, GError **err)
+				 char *name, guint64 oid, GError **err)
 {
   GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
@@ -739,7 +710,7 @@ gzochid_data_set_binding_to_oid (gzochid_application_context *context,
 
 char *
 gzochid_data_next_binding_oid (gzochid_application_context *context, char *key,
-			       mpz_t oid, GError **err)
+			       guint64 *oid, GError **err)
 {
   char *next_key = NULL;
   GError *local_err = NULL;
@@ -762,20 +733,17 @@ gzochid_data_next_binding_oid (gzochid_application_context *context, char *key,
 
   if (next_key != NULL)
     {
-      char *next_value = iface->transaction_get 
-	(tx_context->transaction, tx_context->context->names, next_key, 
-	 strlen (next_key) + 1, NULL);
-      if (tx_context->transaction->rollback)
-	gzochid_transaction_mark_for_rollback 
-	  (&data_participant, tx_context->transaction->should_retry);
+      GError *local_err = NULL;
+      guint64 local_oid = get_binding (tx_context, next_key, &local_err);
 
-      if (next_value != NULL)
+      if (local_err != NULL)
 	{
-	  mpz_set_str (oid, next_value, 16);
-	  free (next_value);
-	  return next_key;
+	  g_propagate_error (err, local_err);
+	  return NULL;
 	}
-      else return NULL;
+
+      *oid = local_oid;
+      return next_key;
     }
   else return NULL;
 }
@@ -839,7 +807,6 @@ gboolean
 gzochid_data_binding_exists (gzochid_application_context *context, char *name, 
 			     GError **err)
 {
-  mpz_t oid;
   gboolean ret = TRUE;
   GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
@@ -851,10 +818,8 @@ gzochid_data_binding_exists (gzochid_application_context *context, char *name,
       return FALSE;
     }
 
-  mpz_init (oid);
-
-  get_binding (tx_context, name, oid, &local_err);
-
+  get_binding (tx_context, name, &local_err);
+  
   if (local_err != NULL)
     {
       if (local_err->code != GZOCHID_DATA_ERROR_NOT_FOUND)       
@@ -864,7 +829,6 @@ gzochid_data_binding_exists (gzochid_application_context *context, char *name,
       ret = FALSE;
     }
 
-  mpz_clear (oid);
   return ret;
 }
 
@@ -886,7 +850,7 @@ gzochid_data_managed_reference *gzochid_data_create_reference
 gzochid_data_managed_reference *
 gzochid_data_create_reference_to_oid (gzochid_application_context *context, 
 				      gzochid_io_serialization *serialization, 
-				      mpz_t oid)
+				      guint64 oid)
 {
   GError *err = NULL;
 
@@ -966,14 +930,14 @@ gzochid_data_mark (gzochid_application_context *context,
       && reference->state != GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED)
     {
       char *data = NULL;
-      char *oid_str = mpz_get_str (NULL, 16, reference->oid); 
-
+      guint64 encoded_oid = gzochid_util_encode_oid (reference->oid);
+      
       reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
-      g_debug ("Marking reference '%s' for update.", oid_str);
+      g_debug ("Marking reference '%lx' for update.", reference->oid);
 
       data = APP_STORAGE_INTERFACE (context)->transaction_get_for_update
-	(tx_context->transaction, tx_context->context->oids, oid_str, 
-	 strlen (oid_str) + 1, NULL);
+	(tx_context->transaction, tx_context->context->oids,
+	 (char *) &encoded_oid, sizeof (guint64), NULL);
    
       if (tx_context->transaction->rollback)
 	{
@@ -981,12 +945,10 @@ gzochid_data_mark (gzochid_application_context *context,
 	    (&data_participant, tx_context->transaction->should_retry);
 	  g_set_error 
 	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
-	     "Transaction rolled back while removing reference '%s'.", 
-	     oid_str);
+	     "Transaction rolled back while removing reference '%lx'.",
+	     reference->oid);
 	}
       else free (data);
-
-      free (oid_str);
     }
 }
 
@@ -1009,7 +971,6 @@ gzochid_data_print_references (gzochid_data_transaction_context *context)
     {
       const char *state;
       gzochid_data_managed_reference *ref = values_ptr->data;
-      char *oid_str = mpz_get_str (NULL, 16, ref->oid);
       
       switch (ref->state)
 	{
@@ -1029,11 +990,9 @@ gzochid_data_print_references (gzochid_data_transaction_context *context)
 	default: state = "UNKNOWN";
 	}
       
-      printf ("%s (serialization: %p) -> %s\n", oid_str, ref->serialization,
+      printf ("%lx (serialization: %p) -> %s\n", ref->oid, ref->serialization,
 	      state);
 
-      free (oid_str);
-	
       values_ptr = values_ptr->next;
     }
   

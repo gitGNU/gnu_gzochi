@@ -19,7 +19,6 @@
 #include <errno.h>
 #include <getopt.h>
 #include <glib.h>
-#include <gmp.h>
 #include <libguile.h>
 #include <libintl.h>
 #include <locale.h>
@@ -41,6 +40,7 @@
 #include "scheme-task.h"
 #include "toollib.h"
 #include "tx.h"
+#include "util.h"
 
 #define _(String) gettext (String)
 
@@ -55,13 +55,6 @@
 
 #define SERVER_FS_APPS_DEFAULT "/var/gzochid/deploy"
 #define SERVER_FS_DATA_DEFAULT "/var/gzochid/data"
-
-/*
-  Redundant prototype for gmp_fprintf, which does not seem to be consistently
-  defined by the preprocessor magic in gmp.h.
-*/
-int 
-gmp_fprintf (FILE *, const char *, ...);
 
 static SCM 
 scm_gzochi_visit_object = SCM_BOOL_F;
@@ -89,9 +82,9 @@ struct migration
 
   struct timeval start_time;
   struct timeval end_time;
-  mpz_t num_visited;
-  mpz_t num_transformed;
-  mpz_t num_removed;
+  guint64 num_visited;
+  guint64 num_transformed;
+  guint64 num_removed;
 };
 
 struct migration_descriptor
@@ -308,19 +301,17 @@ parse_descriptor (FILE *descriptor)
 static SCM
 enqueue_oids (SCM migration_ptr, SCM oids)
 {
-  mpz_t oid;
   struct migration *m = scm_to_pointer (migration_ptr);
-
-  mpz_init (oid);
 
   while (oids != SCM_EOL)
     {
-      scm_to_mpz (SCM_CAR (oids), oid);
-      g_queue_push_tail (m->pending_oids, mpz_get_str (NULL, 16, oid));
+      guint64 *oid_ptr = malloc (sizeof (guint64));
+
+      *oid_ptr = scm_to_uint64 (SCM_CAR (oids));
+      g_queue_push_tail (m->pending_oids, oid_ptr);
       oids = SCM_CDR (oids);
     }
 
-  mpz_clear (oid);
   return SCM_UNSPECIFIED;
 }
 
@@ -470,10 +461,6 @@ create_migration (gzochid_application_context *context,
   scm_gc_protect_object (m->output_registry);
   scm_gc_protect_object (m->callback);
 
-  mpz_init (m->num_visited);
-  mpz_init (m->num_transformed);
-  mpz_init (m->num_removed);
-
   return m;
 }
 
@@ -506,10 +493,6 @@ cleanup_migration (struct migration *m)
     scm_gc_unprotect_object (m->output_registry);
   scm_gc_unprotect_object (m->callback);
 
-  mpz_clear (m->num_visited);
-  mpz_clear (m->num_transformed);
-  mpz_clear (m->num_removed);
-  
   free (m);
 }
 
@@ -675,15 +658,10 @@ migrate_object_tx (gpointer data)
 {
   gpointer *args = data;
   struct migration *m = args[0];
-  char *oid_str = args[1];
-
-  mpz_t oid;
+  guint64 *oid = args[1];
 
   GError *err = NULL;
   gzochid_data_managed_reference *obj_ref = NULL;
-
-  mpz_init (oid);
-  mpz_set_str (oid, oid_str, 16);
 
   m->explicit_rollback = FALSE;
   if (m->pushed_registry)
@@ -698,21 +676,20 @@ migrate_object_tx (gpointer data)
     }
 
   obj_ref = gzochid_data_create_reference_to_oid 
-    (m->context, &gzochid_scm_location_aware_serialization, oid);
+    (m->context, &gzochid_scm_location_aware_serialization, *oid);
   gzochid_data_dereference (obj_ref, &err);
 
-  mpz_add_ui (m->num_visited, m->num_visited, 1);
+  m->num_visited++;
 
   if (err != NULL)
     {
       if (g_error_matches 
 	  (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND))
-	g_warning ("No data found for oid %s.", oid_str);
+	g_warning ("No data found for oid %lx.", *oid);
       else 
 	{
 	  g_critical 
-	    ("Failed to deserialize data for oid %s: %s", 
-	     oid_str, err->message);
+	    ("Failed to deserialize data for oid %lx: %s", *oid, err->message);
 	  exit (EXIT_FAILURE);
 	}
     }
@@ -725,11 +702,11 @@ migrate_object_tx (gpointer data)
 	  gzochid_data_remove_object (obj_ref, &err);
 	  if (err != NULL)
 	    {
-	      g_critical ("Failed to remove data for oid %s", oid_str);
+	      g_critical ("Failed to remove data for oid %lx", *oid);
 	      exit (EXIT_FAILURE);
 	    }
 	  
-	  mpz_add_ui (m->num_removed, m->num_removed, 1);
+	  m->num_removed++;
 	}
       else if (ret != SCM_UNSPECIFIED)
 	{
@@ -741,7 +718,7 @@ migrate_object_tx (gpointer data)
 	  obj_ref->obj = gzochid_scm_location_get (m->context, ret);
 	  obj_ref->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
 
-	  mpz_add_ui (m->num_transformed, m->num_transformed, 1);
+	  m->num_transformed++;
 	}
     }
 
@@ -756,8 +733,6 @@ migrate_object_tx (gpointer data)
       m->pushed_registry = TRUE;
     }
 
-  mpz_clear (oid);
-
   if (m->dry_run && !m->explicit_rollback)
     {
       gzochid_transaction_join (&migration_participant, NULL);
@@ -767,30 +742,30 @@ migrate_object_tx (gpointer data)
 }
 
 static void 
-migrate_object (struct migration *m, char *oid_str)
+migrate_object (struct migration *m, guint64 oid)
 {
   gpointer args[2];
 
   args[0] = m;
-  args[1] = oid_str;
+  args[1] = &oid;
 
-  size_t oid_len = strlen (oid_str);
   gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (m->context);
   gzochid_storage_transaction *tx = iface->transaction_begin
     (m->context->storage_context);
+  guint64 encoded_oid = gzochid_util_encode_oid (oid);
   char *val = iface->transaction_get
-    (tx, m->visited_oids, oid_str, oid_len, NULL);
+    (tx, m->visited_oids, (char *) &encoded_oid, sizeof (guint64), NULL);
       
   if (val == NULL)
     {
-      iface->transaction_put (tx, m->visited_oids, oid_str, oid_len, "", 1);
+      iface->transaction_put
+	(tx, m->visited_oids, (char *) &encoded_oid, sizeof (guint64), "", 1);
       if (gzochid_transaction_execute (migrate_object_tx, args) 
 	  != GZOCHID_TRANSACTION_SUCCESS && !m->explicit_rollback)
 	{
 	  g_critical ("Migration transaction failed.");
 	  exit (EXIT_FAILURE);
 	}
-      else free (oid_str);
     }
   else free (val);
 
@@ -837,10 +812,10 @@ run_migration (struct migration *m)
 
   while (TRUE)
     {
-      char *oid_str = NULL;
+      guint64 *oid = NULL;
 
       if (! g_queue_is_empty (m->pending_oids))
-	oid_str = g_queue_pop_head (m->pending_oids);
+	oid = g_queue_pop_head (m->pending_oids);
       else
 	{
 	  last_key = key;
@@ -857,13 +832,26 @@ run_migration (struct migration *m)
 	      gzochid_storage_transaction *tx = iface->transaction_begin
 		(m->context->storage_context);
 
-	      oid_str = iface->transaction_get 
-		(tx, m->context->names, key.data, key.data_len, NULL);
+	      size_t oid_len = 0;
+	      char *oid_bytes = NULL;
+	      guint64 encoded_oid = 0;
+	      
+	      oid_bytes = iface->transaction_get 
+		(tx, m->context->names, key.data, key.data_len, &oid_len);
+
+	      assert (oid_len == sizeof (guint64));
+
+	      memcpy (&encoded_oid, oid_bytes, sizeof (guint64));
+
+	      oid = malloc (sizeof (guint64));
+	      *oid = gzochid_util_decode_oid (encoded_oid);
+	      
 	      iface->transaction_rollback (tx);
 	    }
 	}
       
-      migrate_object (m, oid_str);
+      migrate_object (m, *oid);
+      free (oid);
     }
 }
 
@@ -876,9 +864,9 @@ report_stats (struct migration *m)
   fprintf (stderr, "Migration complete in %lu ms.\n", 
 	   ret.tv_sec * 1000 + ret.tv_usec / 1000);
 
-  gmp_fprintf (stderr, "Objects visited: %Zu\n", m->num_visited);
-  gmp_fprintf (stderr, "Objects transformed: %Zu\n", m->num_transformed);
-  gmp_fprintf (stderr, "Objects removed: %Zu\n", m->num_removed);
+  fprintf (stderr, "Objects visited: %lu\n", m->num_visited);
+  fprintf (stderr, "Objects transformed: %lu\n", m->num_transformed);
+  fprintf (stderr, "Objects removed: %lu\n", m->num_removed);
 }
 
 static struct migration_descriptor *

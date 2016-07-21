@@ -94,7 +94,7 @@ struct _test_context
 {
   gzochid_application_context *app_context;
   gzochid_auth_identity *identity;
-  mpz_t handle_oid;
+  guint64 handle_oid;
 };
 
 typedef struct _test_context test_context;
@@ -114,7 +114,7 @@ test_periodic_cancel_inner0 (gpointer data)
     (context->app_context, 
      &gzochid_durable_application_task_handle_serialization, handle, NULL);
 
-  mpz_set (context->handle_oid, handle_ref->oid);
+  context->handle_oid = handle_ref->oid;
 }
 
 static void 
@@ -196,7 +196,6 @@ test_periodic_cancel ()
 
   context.app_context = app_context;
   context.identity = identity;
-  mpz_init (context.handle_oid);
 
   while (TRUE)
     {

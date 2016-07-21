@@ -153,25 +153,18 @@ descriptor_start_element (GMarkupParseContext *context,
 	    ("module", attribute_names, attribute_values);
 	  GList *module_name = to_module_name (module_name_str);
 
-	  mpz_t scm_oid;
-	  
-	  mpz_init (scm_oid);
-	  mpz_set_si (scm_oid, -1);
-
 	  if (strcmp (parent, "initialized") == 0)
 	    descriptor->initialized = gzochid_application_callback_new 
-	      (strdup (procedure), module_name, scm_oid);
+	      (strdup (procedure), module_name, 0);
 	  else if (strcmp (parent, "logged-in") == 0)
 	    descriptor->logged_in = gzochid_application_callback_new 
-	      (strdup (procedure), module_name, scm_oid);
+	      (strdup (procedure), module_name, 0);
 	  else if (strcmp (parent, "ready") == 0)
 	    descriptor->ready = gzochid_application_callback_new
-	      (strdup (procedure), module_name, scm_oid);
+	      (strdup (procedure), module_name, 0);
 	  else *error = g_error_new 
 		 (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
 		  "Invalid position for 'callback' element.");
-
-	  mpz_clear (scm_oid);
 	}
       else;
     }

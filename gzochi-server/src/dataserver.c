@@ -350,7 +350,6 @@ gzochi_metad_dataserver_reserve_oids (GzochiMetadDataServer *server,
 	  (app_store->oid_strategy, &oids_block, NULL));
 
   response = gzochid_data_reserve_oids_response_new (app, &oids_block);
-  mpz_clear (oids_block.block_start);
   return response;
 }
 

@@ -45,7 +45,7 @@ DATA=END
 EOF`
 
 # Includes bindings:
-#   o.foo\000 -> 0\000
+#   o.foo\x00 -> \x00\x00\x00\x00\x00\x00\x00\x00
 
 NAMES=`cat <<EOF
 VERSION=3
@@ -53,19 +53,19 @@ format=bytevalue
 type=btree
 HEADER=END
  6f2e666f6f00
- 3000
+ 0000000000000000
 DATA=END
 EOF`
 
 # Includes serialized records:
-#   0\x00 -> \x00\x00\x00\x10\x0einteger-holder\x00
+#   \x00\x00\x00\x00\x00\x00\x00\x00 -> \x00\x00\x00\x10\x0einteger-holder\x00
 
 OIDS=`cat <<EOF
 VERSION=3
 format=bytevalue
 type=btree
 HEADER=END
- 3000
+ 0000000000000000
  000000100e696e74656765722d686f6c64657200
 DATA=END
 EOF`
@@ -93,14 +93,15 @@ REFERENCE_META="$META"
 REFERENCE_NAMES="$NAMES"
 
 # Includes serialized records:
-#   0\x00 -> \x00\x00\x00\x10\x0einteger-holder\x00\x03foo
+#   \x00\x00\x00\x00\x00\x00\x00\x00 ->
+#       \x00\x00\x00\x10\x0einteger-holder\x00\x03foo
 
 REFERENCE_OIDS=`cat <<EOF
 VERSION=3
 format=bytevalue
 type=btree
 HEADER=END
- 3000
+ 0000000000000000
  000000140e696e74656765722d686f6c6465720003666f6f
 DATA=END
 EOF`

@@ -19,7 +19,6 @@
 #define GZOCHID_CHANNEL_H
 
 #include <glib.h>
-#include <gmp.h>
 
 #include "app.h"
 #include "durable-task.h"
@@ -71,10 +70,9 @@ void gzochid_channel_send
 (gzochid_application_context *, gzochid_channel *,  unsigned char *, short);
 void gzochid_channel_close (gzochid_application_context *, gzochid_channel *);
 
-/* Sets the specified `mpz' to the oid of the specified channel's Scheme
-   representation. */
+/* Returns the oid of the specified channel's Scheme representation. */
 
-void gzochid_channel_scm_oid (gzochid_channel *, mpz_t);
+guint64 gzochid_channel_scm_oid (gzochid_channel *);
 
 /*
   Returns the specified channel's name.

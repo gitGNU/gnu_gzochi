@@ -1,5 +1,5 @@
 /* session.c: Primitive functions for user-facing gzochid client session API
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2015 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <libguile.h>
 #include <stddef.h>
 
@@ -38,14 +37,10 @@ SCM_DEFINE (primitive_send_message, "primitive-send-message", 2, 0, 0,
   
   short len = (short) SCM_BYTEVECTOR_LENGTH (msg);
   unsigned char *payload = (unsigned char *) SCM_BYTEVECTOR_CONTENTS (msg);
-  mpz_t c_oid;
-
-  mpz_init (c_oid);
-  gzochid_scheme_client_session_oid (session, c_oid);
+  guint64 c_oid = gzochid_scheme_client_session_oid (session);
+  
   reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, c_oid);
-
-  mpz_clear (c_oid);
 
   gzochid_data_dereference (reference, &err);
 
@@ -65,15 +60,11 @@ SCM_DEFINE (primitive_disconnect, "primitive-disconnect", 1, 0, 0,
   GError *err = NULL;
   gzochid_application_context *context =
     gzochid_api_ensure_current_application_context ();
-  gzochid_data_managed_reference *reference = NULL;  
-  mpz_t c_oid;
-
-  mpz_init (c_oid);
-  gzochid_scheme_client_session_oid (session, c_oid);
+  gzochid_data_managed_reference *reference = NULL;
+  guint64 c_oid = gzochid_scheme_client_session_oid (session);
+  
   reference = gzochid_data_create_reference_to_oid
     (context, &gzochid_client_session_serialization, c_oid);
-
-  mpz_clear (c_oid);
 
   gzochid_data_dereference (reference, &err);
 

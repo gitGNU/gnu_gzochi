@@ -17,7 +17,6 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <libguile.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -65,16 +64,12 @@ SCM_DEFINE (primitive_dereference, "primitive-dereference", 1, 0, 0, (SCM ref),
     gzochid_api_ensure_current_application_context ();
   gzochid_data_managed_reference *reference = NULL;
   SCM ret = SCM_BOOL_F;
-  mpz_t oid;
-  
-  mpz_init (oid);
 
-  gzochid_scheme_managed_reference_oid (ref, oid);
+  guint64 oid = gzochid_scheme_managed_reference_oid (ref);
 
   reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_scm_location_aware_serialization, oid);
 
-  mpz_clear (oid);
   gzochid_data_dereference (reference, &err);
 
   if (err == NULL)

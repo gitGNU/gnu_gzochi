@@ -77,8 +77,8 @@ oids_callback (gzochid_data_oids_block block, gpointer user_data)
   response->complete = TRUE;
   
   /* Copy the block metadata to the callback object. */
-  
-  mpz_init_set (response->dest->block_start, block.block_start);
+
+  response->dest->block_start = block.block_start;
   response->dest->block_size = block.block_size;
 
   /* Let the caller know the response is complete. */

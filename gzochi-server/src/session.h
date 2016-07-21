@@ -19,7 +19,6 @@
 #define GZOCHID_SESSION_H
 
 #include <glib.h>
-#include <gmp.h>
 
 #include "app.h"
 #include "data.h"
@@ -73,26 +72,25 @@ void gzochid_client_session_send_message
 gzochid_auth_identity *gzochid_client_session_identity
 (gzochid_client_session *);
 
-/* Sets the specified `mpz_t' to the oid of the specified session's Scheme
-   representation. */
+/* Returns the oid of the specified session's Scheme representation. */
 
-void gzochid_client_session_scm_oid (gzochid_client_session *, mpz_t);
+guint64 gzochid_client_session_scm_oid (gzochid_client_session *);
 
 /* Sets the oid of the specified session's Scheme representation to the 
-   specified `mpz_t'. */
+   specified oid. */
 
-void gzochid_client_session_set_scm_oid (gzochid_client_session *, mpz_t);
+void gzochid_client_session_set_scm_oid (gzochid_client_session *, guint64);
 
-/* Sets the specified `mpz_t' to the oid of the Scheme representation of the 
-   specified session's session listener. */
+/* Returns the oid of the Scheme representation of the specified session's 
+   session listener. */
 
-void gzochid_client_session_handler_scm_oid (gzochid_client_session *, mpz_t);
+guint64 gzochid_client_session_handler_scm_oid (gzochid_client_session *);
 
-/* Sets the specified `mpz_t' to the oid of the Scheme representation of the 
-   specified session's session listener. */
+/* Sets the oid of the Scheme representation of the specified session's session
+   listener to the specified oid. */
 
 void gzochid_client_session_set_handler_scm_oid
-(gzochid_client_session *, mpz_t);
+(gzochid_client_session *, guint64);
 
 /* Returns the lifecycle handler of the specified channel. */
 
@@ -105,7 +103,7 @@ void gzochid_client_session_set_handler
 (gzochid_client_session *, gzochid_client_session_handler *);
 
 void gzochid_client_session_persist 
-(gzochid_application_context *, gzochid_client_session *, mpz_t, GError **);
+(gzochid_application_context *, gzochid_client_session *, guint64 *, GError **);
 void gzochid_sweep_client_sessions (gzochid_application_context *, GError **);
 
 #endif /* GZOCHID_SESSION_H */

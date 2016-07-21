@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +24,7 @@
 #include "gzochid-storage.h"
 #include "oids.h"
 #include "oids-storage.h"
+#include "util.h"
 
 #define ALLOCATION_BLOCK_SIZE 100
 #define NEXT_OID_KEY 0x00
@@ -44,14 +45,9 @@ allocate (gpointer user_data, gzochid_data_oids_block *ret, GError **err)
   
   char next_oid_key[] = { NEXT_OID_KEY };
   char *next_oid_value = NULL;
-
-  /* Because initializing an `mpz_t' requires modifying an opaque structure 
-     "in place," all of the intermediate computation is done on local variables
-     that are only transferred to the target `gzochid_data_oids_block' if the
-     reservation transaction is successful. */
+  size_t next_oid_value_len = 0;
+  guint64 encoded_oid = 0, block_start = 0, next_block = 0;
   
-  mpz_t block_start, next_block;
-
   gzochid_storage_transaction *transaction = context->engine->transaction_begin
     (context->storage_context);
 
@@ -67,7 +63,7 @@ allocate (gpointer user_data, gzochid_data_oids_block *ret, GError **err)
      (though still not very likely) to fail. */
   
   next_oid_value = context->engine->transaction_get_for_update
-    (transaction, context->store, next_oid_key, 1, NULL);
+    (transaction, context->store, next_oid_key, 1, &next_oid_value_len);
 
   if (transaction->rollback)
     {
@@ -80,32 +76,30 @@ allocate (gpointer user_data, gzochid_data_oids_block *ret, GError **err)
       return FALSE;
     }
   
-  mpz_init (block_start);
-  
   if (next_oid_value != NULL)
     {
-      mpz_set_str (block_start, next_oid_value, 16);
+      assert (next_oid_value_len == sizeof (guint64));
+
+      memcpy (&encoded_oid, next_oid_value, sizeof (guint64));
+      block_start = gzochid_util_decode_oid (encoded_oid);
+      
       free (next_oid_value);
     }
+  else block_start = 0;
 
-  mpz_init (next_block);
-  mpz_add_ui (next_block, block_start, ALLOCATION_BLOCK_SIZE);
-  next_oid_value = mpz_get_str (NULL, 16, next_block);
+  next_block = block_start + ALLOCATION_BLOCK_SIZE;
+  encoded_oid = gzochid_util_encode_oid (next_block);
   
   context->engine->transaction_put
-    (transaction, context->store, next_oid_key, 1, next_oid_value,
-     strlen (next_oid_value) + 1);
-
-  free (next_oid_value);  
-  mpz_clear (next_block);
+    (transaction, context->store, next_oid_key, 1, (char *) &encoded_oid,
+     sizeof (guint64));
   
   if (!transaction->rollback)
     context->engine->transaction_prepare (transaction);
   if (transaction->rollback)
     {
       context->engine->transaction_rollback (transaction);
-      mpz_clear (block_start);
-
+  
       g_set_error
 	(err, GZOCHID_OIDS_ERROR, GZOCHID_OIDS_ERROR_TRANSACTION,
 	 "Transaction rollback while allocating object ids.");
@@ -116,12 +110,10 @@ allocate (gpointer user_data, gzochid_data_oids_block *ret, GError **err)
   context->engine->transaction_commit (transaction);  
 
   /* Transfer the block information to the target variable. */
-  
-  mpz_init (ret->block_start);
-  mpz_set (ret->block_start, block_start);
+
+  ret->block_start = block_start;
   ret->block_size = ALLOCATION_BLOCK_SIZE;
 
-  mpz_clear (block_start);
   return TRUE;
 }
 

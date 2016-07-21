@@ -408,10 +408,8 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
 
   gzochid_task task;
 
-  char *session_oid_str = NULL;
-  mpz_t session_oid;
+  guint64 *session_oid = malloc (sizeof (guint64));
   
-  mpz_init (session_oid);
   gzochid_client_session_persist (context, session, session_oid, &err);
 
   if (err != NULL)
@@ -420,22 +418,19 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
 	("Failed to bind session oid for identity '%s'; disconnecting: %s",
 	 gzochid_auth_identity_name (identity), err->message);
 
-      mpz_clear (session_oid);
       g_error_free (err);
+      free (session_oid);
       
       gzochid_game_client_disconnect (client);
       return;
     }
 
-  session_oid_str = mpz_get_str (NULL, 16, session_oid);
-  mpz_clear (session_oid);
-
   login_task = gzochid_application_task_new
     (context, identity, gzochid_scheme_application_logged_in_worker,
-     session_oid_str);
+     session_oid);
 
   login_catch_task = gzochid_application_task_new
-    (context, identity, login_catch_worker, session_oid_str);
+    (context, identity, login_catch_worker, session_oid);
 
   execution = gzochid_transactional_application_task_timed_execution_new 
     (login_task, login_catch_task, NULL, game_context->tx_timeout);
@@ -447,8 +442,8 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   gzochid_application_task_unref (login_catch_task);
 
   g_mutex_lock (&context->client_mapping_lock);
-  g_hash_table_insert (context->oids_to_clients, session_oid_str, client);
-  g_hash_table_insert (context->clients_to_oids, client, session_oid_str);
+  g_hash_table_insert (context->oids_to_clients, session_oid, client);
+  g_hash_table_insert (context->clients_to_oids, client, session_oid);
   g_mutex_unlock (&context->client_mapping_lock);
 
   application_task = gzochid_application_task_new
@@ -468,11 +463,11 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
 {
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
-  char *session_oid_str = NULL;
+  guint64 *session_oid = NULL;
 
   g_mutex_lock (&context->client_mapping_lock);
-  session_oid_str = g_hash_table_lookup (context->clients_to_oids, client);
-  if (session_oid_str == NULL)
+  session_oid = g_hash_table_lookup (context->clients_to_oids, client);
+  if (session_oid == NULL)
     {
       g_mutex_unlock (&context->client_mapping_lock);
       return;
@@ -482,16 +477,16 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
       gzochid_application_task *callback_task = 
 	gzochid_application_task_new
 	(context, gzochid_game_client_get_identity (client),
-	 gzochid_scheme_application_disconnected_worker, session_oid_str);
+	 gzochid_scheme_application_disconnected_worker, session_oid);
       gzochid_application_task *catch_task =
 	gzochid_application_task_new
 	(context, gzochid_game_client_get_identity (client),
-	 gzochid_client_session_disconnected_worker, session_oid_str);
+	 gzochid_client_session_disconnected_worker, session_oid);
       gzochid_application_task *cleanup_task = 
 	gzochid_application_task_new
 	(context, gzochid_game_client_get_identity (client), 
 	 gzochid_scheme_application_disconnected_cleanup_worker,
-	 session_oid_str);
+	 session_oid);
       gzochid_transactional_application_task_execution *execution = 
 	gzochid_transactional_application_task_execution_new 
 	(callback_task, catch_task, cleanup_task);
@@ -513,7 +508,7 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
       gettimeofday (&task.target_execution_time, NULL);
 
       g_hash_table_remove (context->clients_to_oids, client);
-      g_hash_table_remove (context->oids_to_clients, session_oid_str);
+      g_hash_table_remove (context->oids_to_clients, session_oid);
       
       gzochid_schedule_submit_task (game_context->task_queue, &task);
 
@@ -529,14 +524,14 @@ gzochid_application_session_received_message
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
 
-  char *session_oid_str = NULL;
+  guint64 *session_oid = NULL;
   void *data[3];
 
   g_mutex_lock (&context->client_mapping_lock);
-  session_oid_str = g_hash_table_lookup (context->clients_to_oids, client);
+  session_oid = g_hash_table_lookup (context->clients_to_oids, client);
   g_mutex_unlock (&context->client_mapping_lock);
 
-  if (session_oid_str == NULL)
+  if (session_oid == NULL)
     return;
   else 
     {
@@ -545,7 +540,7 @@ gzochid_application_session_received_message
       gzochid_transactional_application_task_execution *execution = NULL;
       gzochid_task task;
 
-      data[0] = session_oid_str;
+      data[0] = session_oid;
       data[1] = msg;
       data[2] = &len;
       

@@ -17,7 +17,6 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <gzochi-common.h>
 #include <libguile.h>
 #include <stddef.h>
@@ -215,8 +214,7 @@ gzochid_scheme_application_logged_in_worker
  gpointer data)
 {
   GError *err = NULL;
-  mpz_t session_oid;
-  char *session_oid_str = data;
+  guint64 *session_oid = data;
   gzochid_client_session *session = NULL;
   gzochid_data_managed_reference *session_reference = NULL;
 
@@ -227,11 +225,8 @@ gzochid_scheme_application_logged_in_worker
   SCM handler = SCM_BOOL_F;
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
     
-  mpz_init (session_oid);
-  mpz_set_str (session_oid, session_oid_str, 16);
   session_reference = gzochid_data_create_reference_to_oid
-    (context, &gzochid_client_session_serialization, session_oid);
-  mpz_clear (session_oid);
+    (context, &gzochid_client_session_serialization, *session_oid);
   
   gzochid_data_dereference (session_reference, &err);
 
@@ -330,21 +325,14 @@ gzochid_scheme_application_received_message_worker
   SCM bv = SCM_BOOL_F;
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
 
-  unsigned char *message = NULL;
-  short *message_len_ptr = NULL;
   void **data = ptr;
 
-  mpz_t session_oid;
-  mpz_init (session_oid);
-  mpz_set_str (session_oid, data[0], 16);
-
-  message = data[1];
-  message_len_ptr = data[2];
+  guint64 *session_oid = data[0];
+  unsigned char *message = data[1];
+  short *message_len_ptr = data[2];
 
   session_reference = gzochid_data_create_reference_to_oid 
-    (context, &gzochid_client_session_serialization, session_oid);
-
-  mpz_clear (session_oid);
+    (context, &gzochid_client_session_serialization, *session_oid);
 
   gzochid_data_dereference (session_reference, &err);
 
@@ -400,15 +388,10 @@ gzochid_scheme_application_disconnected_worker
   gzochid_client_session_handler *handler = NULL;
   
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  char *oid_str = ptr;
-  mpz_t session_oid;
-
-  mpz_init (session_oid);
-  mpz_set_str (session_oid, oid_str, 16);
+  guint64 *session_oid = ptr;
 
   session_reference = gzochid_data_create_reference_to_oid 
-    (context, &gzochid_client_session_serialization, session_oid);
-  mpz_clear (session_oid);
+    (context, &gzochid_client_session_serialization, *session_oid);
 
   /* Obtain a preemptive write lock on the session object, as it's most likely 
      going to be removed later in the same transaction. */
@@ -419,10 +402,11 @@ gzochid_scheme_application_disconnected_worker
     {
       if (err->message != NULL)
 	g_warning
-	  ("Failed to dereference disconnecting session '%s': %s", 
-	   oid_str, err->message);
+	  ("Failed to dereference disconnecting session '%lx': %s", 
+	   *session_oid, err->message);
       else g_warning 
-	     ("Failed to dereference disconnecting session '%s'.", oid_str);
+	     ("Failed to dereference disconnecting session '%lx'.",
+	      *session_oid);
 
       g_error_free (err);
       return;
@@ -440,7 +424,8 @@ gzochid_scheme_application_disconnected_worker
 	 Just jump straight to removing the session from the data store. */
       
       gzochid_tx_warning 
-	(context, "Session '%s' disconnected after incomplete login.", ptr);
+	(context, "Session '%lx' disconnected after incomplete login.",
+	 *session_oid);
       gzochid_client_session_disconnected_worker (context, identity, ptr);
       
       return;
@@ -458,11 +443,11 @@ gzochid_scheme_application_disconnected_worker
     {
       if (err->message != NULL)
 	g_warning
-	  ("Failed to retrieve disconnect callback for session '%s': %s", 
-	   oid_str, err->message);
+	  ("Failed to retrieve disconnect callback for session '%lx': %s", 
+	   *session_oid, err->message);
       else g_warning 
-	     ("Failed to retrieve disconnect callback for session '%s'.", 
-	      oid_str);
+	     ("Failed to retrieve disconnect callback for session '%lx'.", 
+	      *session_oid);
 
       g_error_free (err);      
       return;
@@ -500,8 +485,9 @@ gzochid_scheme_application_disconnected_worker
       if (err != NULL)
 	{
 	  g_warning
-	    ("Failed to remove lifecycle handler for session '%s': %s", oid_str,
-	     err->message);
+	    ("Failed to remove lifecycle handler for session '%lx': %s",
+	     *session_oid,  err->message);
+	  
 	  g_error_free (err);
 	}
       else gzochid_client_session_disconnected_worker (context, identity, ptr);

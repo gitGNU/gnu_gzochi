@@ -114,8 +114,7 @@
   Describes a block of oids reserved for the client. Format:
 
   `NULL'-terminated string: Name of the requesting game application
-  `NULL'-terminated string: Hexadecimal string representation of the first oid
-    in the reserved block
+  8 bytes: The big-endian encoding of the first oid
   2 bytes: The big-endian encoding of the length of the block in oids
 */
 

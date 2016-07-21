@@ -17,7 +17,6 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <gzochi-common.h>
 #include <libguile.h>
 #include <stdarg.h>
@@ -501,40 +500,31 @@ gzochid_scheme_handler_disconnected (SCM handler)
 
 SCM 
 gzochid_scheme_create_client_session (gzochid_client_session *session, 
-				      mpz_t oid)
+				      guint64 oid)
 {
-  char *oid_str = mpz_get_str (NULL, 16, oid);
   SCM name = scm_from_locale_string
     (gzochid_auth_identity_name (gzochid_client_session_identity (session)));
   
-  SCM scm_oid = scm_c_locale_stringn_to_number (oid_str, strlen (oid_str), 16);
+  SCM scm_oid = scm_from_unsigned_integer (oid);
   SCM ret = scm_call_2 (scm_make_client_session, name, scm_oid);
 
   scm_gc_protect_object (ret);
-  free (oid_str);
 
   return ret;
 }
 
-void 
-gzochid_scheme_client_session_oid (SCM session, mpz_t oid)
+guint64
+gzochid_scheme_client_session_oid (SCM session)
 {
   SCM scm_oid = scm_call_1 (scm_client_session_oid, session);
-  char *oid_str = scm_to_locale_string 
-    (scm_number_to_string (scm_oid, scm_from_short (16)));
-
-  mpz_set_str (oid, oid_str, 16);
-  free (oid_str);
+  return scm_to_uint64 (scm_oid);
 }
 
 SCM 
 gzochid_scheme_create_managed_reference 
 (gzochid_data_managed_reference *reference)
 {
-  char *oid_str = mpz_get_str (NULL, 16, reference->oid);
-
-  SCM scm_oid = scm_string_to_number 
-    (scm_from_locale_string (oid_str), scm_from_short (16));
+  SCM scm_oid = scm_from_unsigned_integer (reference->oid);
   SCM data = SCM_BOOL_F;
   SCM ret = SCM_BOOL_F;
 
@@ -543,39 +533,30 @@ gzochid_scheme_create_managed_reference
   
   ret = scm_call_2 (scm_make_managed_reference, scm_oid, data);
 
-  free (oid_str);
   scm_gc_protect_object (ret);
 
   return ret;
 }
 
 SCM 
-gzochid_scheme_create_channel (gzochid_channel *channel, mpz_t oid)
+gzochid_scheme_create_channel (gzochid_channel *channel, guint64 oid)
 {
-  char *oid_str = mpz_get_str (NULL, 16, oid);
-  
-  SCM scm_oid = scm_string_to_number
-    (scm_from_locale_string (oid_str), scm_from_short (16));
+  SCM scm_oid = scm_from_unsigned_integer (oid);
   SCM ret = scm_call_2 
     (scm_make_channel, scm_oid, scm_from_locale_string
      (gzochid_channel_name (channel)));
 
-  free (oid_str);
   scm_gc_protect_object (ret);
 
   return ret;
 }
 
 SCM 
-gzochid_scheme_create_periodic_task_handle (mpz_t oid)
+gzochid_scheme_create_periodic_task_handle (guint64 oid)
 {
-  char *oid_str = mpz_get_str (NULL, 16, oid);
-  
-  SCM scm_oid = scm_string_to_number
-    (scm_from_locale_string (oid_str), scm_from_short (16));
+  SCM scm_oid = scm_from_unsigned_integer (oid);
   SCM ret = scm_call_1 (scm_make_task_handle, scm_oid);
 
-  free (oid_str);
   scm_gc_protect_object (ret);
 
   return ret;
@@ -655,40 +636,25 @@ initialize_bindings (void *ptr)
   return NULL;
 }
 
-void 
-gzochid_scheme_managed_reference_oid (SCM reference, mpz_t oid)
+guint64
+gzochid_scheme_managed_reference_oid (SCM reference)
 {
   SCM num = scm_call_1 (scm_managed_reference_oid, reference);
-  char *oid_str = scm_to_locale_string 
-    (scm_number_to_string (num, scm_from_short (16)));
-  
-  mpz_set_str (oid, oid_str, 16);
-
-  free (oid_str);
+  return scm_to_uint64 (num);
 }
 
-void 
-gzochid_scheme_channel_oid (SCM channel, mpz_t oid)
+guint64
+gzochid_scheme_channel_oid (SCM channel)
 {
   SCM num = scm_call_1 (scm_channel_oid, channel);
-  char *oid_str = scm_to_locale_string
-    (scm_number_to_string (num, scm_from_short (16)));
-  
-  mpz_set_str (oid, oid_str, 16);
-
-  free (oid_str);
+  return scm_to_uint64 (num);
 }
 
-void 
-gzochid_scheme_task_handle_oid (SCM handle, mpz_t oid)
+guint64
+gzochid_scheme_task_handle_oid (SCM handle)
 {
   SCM num = scm_call_1 (scm_task_handle_oid, handle);
-  char *oid_str = scm_to_locale_string
-    (scm_number_to_string (num, scm_from_short (16)));
-  
-  mpz_set_str (oid, oid_str, 16);
-
-  free (oid_str);
+  return scm_to_uint64 (num);
 }
 
 void 

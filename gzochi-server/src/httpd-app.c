@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <ctype.h>
 #include <glib.h>
 #include <stddef.h>
@@ -26,6 +27,7 @@
 #include "game.h"
 #include "httpd.h"
 #include "httpd-app.h"
+#include "util.h"
 
 /* The following declaraitons support rendering the contents of an object in the
    object store. */
@@ -382,7 +384,9 @@ list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   char *k = iface->transaction_first_key (tx, app_context->oids, &klen);
 
   iface->transaction_rollback (tx);
-  
+
+  assert (klen == sizeof (guint64));  
+
   g_string_append (response_str, "<html>\n");
   g_string_append (response_str, "  <body>\n");
   g_string_append_printf 
@@ -391,12 +395,17 @@ list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   
   while (k != NULL)
     {
+      guint64 encoded_oid = 0;
       char *next_k = NULL;
-      
+
+      memcpy (&encoded_oid, k, sizeof (guint64));
+            
       g_string_append (response_str, "      <li><a href=\"");
-      g_string_append_len (response_str, k, klen - 1);
+      g_string_append_printf
+	(response_str, "%lx", gzochid_util_decode_oid (encoded_oid));
       g_string_append (response_str, "\">");
-      g_string_append_len (response_str, k, klen - 1);
+      g_string_append_printf
+	(response_str, "%lx", gzochid_util_decode_oid (encoded_oid));
       g_string_append (response_str, "</a></li>\n");
 
       tx = iface->transaction_begin (app_context->storage_context);      
@@ -425,13 +434,13 @@ render_oid (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   size_t data_length = 0;
   char *oid_str = g_match_info_fetch (match_info, 1);
   gzochid_application_context *app_context = request_context;
-
   gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
   gzochid_storage_transaction *tx = iface->transaction_begin
     (app_context->storage_context);
+  guint64 oid = gzochid_util_encode_oid (g_ascii_strtoull (oid_str, NULL, 16)); 
   char *data = iface->transaction_get
-    (tx, app_context->oids, oid_str, strlen (oid_str) + 1, &data_length);
-
+    (tx, app_context->oids, (char *) &oid, sizeof (guint64), &data_length);
+  
   iface->transaction_rollback (tx);
   
   free (oid_str);

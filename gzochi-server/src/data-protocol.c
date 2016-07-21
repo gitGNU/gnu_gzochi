@@ -17,13 +17,13 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <gzochi-common.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "data-protocol.h"
 #include "oids.h"
+#include "util.h"
 
 /* Finds the bounds of the `NULL'-terminated string that begins at `bytes', 
    returning a pointer to that string and setting `str_len' appropriately.
@@ -122,20 +122,6 @@ write_timeval (const struct timeval *tv, GByteArray *arr)
   gzochi_common_io_write_int (tv->tv_usec, arr->data, len + 4);
 }
 
-/* Serializes the specified oid to the specified byte array by converting the
-   oid to its `NULL'-terminated, hexadecimal string representation. */
-
-static void
-write_oid (mpz_t oid, GByteArray *arr)
-{
-  size_t len = arr->len;
-
-  /* Grow the array by the expected size of the string. */
-  
-  g_byte_array_set_size (arr, arr->len + mpz_sizeinbase (oid, 16) + 1);
-  mpz_get_str ((char *) arr->data + len, 16, oid);
-}
-
 gzochid_data_reserve_oids_response *
 gzochid_data_reserve_oids_response_new (char *app,
 					gzochid_data_oids_block *block)
@@ -144,8 +130,7 @@ gzochid_data_reserve_oids_response_new (char *app,
     g_slice_alloc (sizeof (gzochid_data_reserve_oids_response));
 
   response->app = strdup (app);
-  
-  mpz_init_set (response->block.block_start, block->block_start);
+  response->block.block_start = block->block_start;
   response->block.block_size = block->block_size;
   
   return response;
@@ -156,7 +141,6 @@ gzochid_data_reserve_oids_response_free
 (gzochid_data_reserve_oids_response *response)
 {
   free (response->app);
-  mpz_clear (response->block.block_start);
   g_slice_free (gzochid_data_reserve_oids_response, response);
 }
 
@@ -167,7 +151,15 @@ gzochid_data_protocol_reserve_oids_response_write
   size_t len = 0;
   g_byte_array_append
     (arr, (unsigned char *) response->app, strlen (response->app) + 1);
-  write_oid (response->block.block_start, arr);
+
+  len = arr->len;
+
+  /* Grow the array by eight bytes. */
+
+  g_byte_array_set_size (arr, len + sizeof (guint64));
+
+  gzochi_common_io_write_long
+    (response->block.block_start, arr->data, len);
 
   len = arr->len;
 
@@ -180,23 +172,39 @@ gzochid_data_protocol_reserve_oids_response_write
   gzochi_common_io_write_short (response->block.block_size, arr->data, len);
 }
 
+static guint64
+read_oid (const unsigned char *bytes, size_t len, size_t *str_len)
+{
+  if (len < sizeof (guint64))
+    return 0;
+  else
+    {      
+      guint64 ret = gzochi_common_io_read_long (bytes, 0);
+
+      if (str_len != NULL)
+	*str_len = sizeof (guint64);
+
+      return ret;
+    }
+}
+
 gzochid_data_reserve_oids_response *
 gzochid_data_protocol_reserve_oids_response_read (GBytes *data)
 {
-  size_t len = 0, str_len = 0;
+  size_t len = 0, str_len = 0, oid_len = 0;
   const unsigned char *bytes = g_bytes_get_data (data, &len);
   char *app = read_str (bytes, len, &str_len);
-  char *oid_str = NULL;
-
+  guint64 oid = 0;
+  
   if (app == NULL || str_len == 0)
     return NULL;
 
   len -= str_len;
 
-  oid_str = read_str (bytes + str_len, len, &str_len);
+  oid = read_oid (bytes + str_len, len, &oid_len);
 
-  if (oid_str == NULL)
-    return NULL;  
+  if (oid_len == 0)
+    return NULL;
   else
     {
       len -= str_len;
@@ -206,13 +214,10 @@ gzochid_data_protocol_reserve_oids_response_read (GBytes *data)
 	  gzochid_data_oids_block oids_block;	  
 	  gzochid_data_reserve_oids_response *response = NULL;
 
-	  if (mpz_init_set_str (oids_block.block_start, oid_str, 16) < 0)
-	    return NULL;
-	  
+	  oids_block.block_start = oid;	  
 	  oids_block.block_size = gzochi_common_io_read_short
-	    ((unsigned char *) oid_str + str_len, 0);
+	    (bytes + str_len + oid_len, 0);
 	  response = gzochid_data_reserve_oids_response_new (app, &oids_block);
-	  mpz_clear (oids_block.block_start);
 
 	  return response;
 	}
