@@ -23,16 +23,11 @@ found below.
 gzochid depends on the following external libraries.
 - libdb
 - libg
-- libgmp
 - libgobject
 - libguile
 - libgzochi-common
 - libmicrohttpd
 - libz
-
-There is a corresponding `--with-XXX-prefix' option for libgdbm and libgmp that
-you can use when invoking ./configure, if you have these libraries installed in
-a location other than the standard places (/usr and /usr/local).
 
 The dependencies on libg, libguile, libmicrohttpd, and libz are configured 
 using `pkg-config'.
@@ -63,11 +58,6 @@ gzochid requires the following external packages:
     GLib is used throughout gzochid for its general-purpose utility functions
     and data structures. The GObject library is used for component modeling and
     wiring. Both are available from http://www.gtk.org/ .
-
-  - GNU MP, at least version 4.1
-
-    GNU MP is used for bignum arithmetic. It is available from 
-    http://gmplib.org/ .
 
   - GNU Guile, at least version 2.0.4
  

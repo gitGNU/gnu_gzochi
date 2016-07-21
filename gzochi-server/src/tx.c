@@ -17,7 +17,6 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -28,8 +27,7 @@
 static GMutex transaction_mutex;
 static GPrivate thread_transaction_key;
 static GPrivate thread_transaction_timing_key;
-static mpz_t transaction_counter;
-static gboolean transactions_initialized;
+static guint64 transaction_counter;
 
 enum gzochid_transaction_state
   {
@@ -43,7 +41,7 @@ enum gzochid_transaction_state
 
 struct _gzochid_transaction 
 {
-  mpz_t id;
+  guint64 id;
   char *name;
   GHashTable *participants;
   enum gzochid_transaction_state state;
@@ -53,24 +51,18 @@ struct _gzochid_transaction
 
 typedef struct _gzochid_transaction gzochid_transaction;
 
-static 
-gzochid_transaction *transaction_new (void)
+static gzochid_transaction *
+transaction_new (void)
 {
   gzochid_transaction *transaction = calloc (1, sizeof (gzochid_transaction));
   transaction->participants = g_hash_table_new_full 
     (g_str_hash, g_str_equal, NULL, free);
 
   g_mutex_lock (&transaction_mutex);
-  if (!transactions_initialized)
-    {
-      mpz_init (transaction_counter);
-      transactions_initialized = TRUE;
-    }
-  mpz_set (transaction->id, transaction_counter);
-  mpz_add_ui (transaction_counter, transaction_counter, 1);
+  transaction->id = transaction_counter++;
   g_mutex_unlock (&transaction_mutex);
 
-  transaction->name = mpz_get_str (NULL, 16, transaction->id);
+  transaction->name = g_strdup_printf ("%lx", transaction->id);
   transaction->state = GZOCHID_TRANSACTION_STATE_ACTIVE;
 
   return transaction;
@@ -79,8 +71,7 @@ gzochid_transaction *transaction_new (void)
 static void 
 transaction_free (gzochid_transaction *transaction)
 {
-  mpz_clear (transaction->id);
-  free (transaction->name);
+  g_free (transaction->name);
   g_hash_table_destroy (transaction->participants);
   free (transaction);
 }

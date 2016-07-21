@@ -20,7 +20,6 @@
 
 #include <glib.h>
 #include <glib-object.h>
-#include <gmp.h>
 
 #include "data-protocol.h"
 #include "oids.h"

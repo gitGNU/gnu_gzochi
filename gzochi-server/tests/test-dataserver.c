@@ -18,7 +18,6 @@
 #include <assert.h>
 #include <glib.h>
 #include <glib-object.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>

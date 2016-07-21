@@ -20,7 +20,6 @@
 
 #include <glib.h>
 #include <gmodule.h>
-#include <gmp.h>
 #include <sys/time.h>
 
 #define GZOCHID_STORAGE_EFAILURE -1

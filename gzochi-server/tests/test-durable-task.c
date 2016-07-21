@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <stdlib.h>
 
 #include "app.h"

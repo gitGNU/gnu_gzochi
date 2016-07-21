@@ -19,7 +19,6 @@
 #define GZOCHID_UTIL_H
 
 #include <glib.h>
-#include <gmp.h>
 #include <sys/time.h>
 
 void gzochid_util_serialize_boolean (gboolean, GByteArray *);
@@ -34,7 +33,6 @@ void gzochid_util_serialize_uint64 (guint64, GByteArray *);
 
 void gzochid_util_serialize_oid (guint64, GByteArray *);
 
-void gzochid_util_serialize_mpz (mpz_t, GByteArray *);
 void gzochid_util_serialize_bytes (unsigned char *, int, GByteArray *);
 void gzochid_util_serialize_string (char *, GByteArray *);
 void gzochid_util_serialize_list 
@@ -61,7 +59,6 @@ guint64 gzochid_util_deserialize_uint64 (GByteArray *);
 
 guint64 gzochid_util_deserialize_oid (GByteArray *);
 
-void gzochid_util_deserialize_mpz (GByteArray *, mpz_t);
 unsigned char *gzochid_util_deserialize_bytes (GByteArray *, int *);
 char *gzochid_util_deserialize_string (GByteArray *);
 GList *gzochid_util_deserialize_list

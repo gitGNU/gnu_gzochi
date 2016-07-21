@@ -76,9 +76,6 @@ AS_IF([test "x$with_bdb" != xno],
 
 AM_CONDITIONAL([HAVE_BDB], [test x$have_bdb = xtrue])
 
-AC_SEARCH_LIBS([__gmpz_init], [gmp], [], [AC_MSG_ERROR([libgmp is required.])])
-AC_CHECK_HEADER([gmp.h], [], [AC_MSG_ERROR([gmp.h is required.])])
-
 AC_CHECK_FUNCS([fmemopen])
 
 ac_gzochi_common_cflags='-I$(abs_top_srcdir)/../gzochi-common/src'

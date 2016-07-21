@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <gzochi-common.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,14 +51,6 @@ void
 gzochid_util_serialize_string (char *str, GByteArray *out)
 {
   gzochid_util_serialize_bytes ((unsigned char *) str, strlen (str) + 1, out);
-}
-
-void
-gzochid_util_serialize_mpz (mpz_t i, GByteArray *out)
-{
-  char *i_str = mpz_get_str (NULL, 16, i);
-  gzochid_util_serialize_string (i_str, out);
-  free (i_str);
 }
 
 void
@@ -182,14 +173,6 @@ char *
 gzochid_util_deserialize_string (GByteArray *in)
 {
   return (char *) gzochid_util_deserialize_bytes (in, NULL);
-}
-
-void
-gzochid_util_deserialize_mpz (GByteArray *in, mpz_t o)
-{
-  char *o_str = gzochid_util_deserialize_string (in);
-  mpz_set_str (o, o_str, 16);
-  free (o_str);
 }
 
 guint64

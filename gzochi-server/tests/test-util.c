@@ -16,7 +16,6 @@
  */
  
 #include <glib.h>
-#include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,29 +51,6 @@ test_util_serialize_int ()
   g_assert_cmpint (out->data[2], ==, 0x04);
   g_assert_cmpint (out->data[3], ==, 0xd2);
   g_byte_array_unref (out);
-}
-
-static void
-test_util_serialize_mpz ()
-{
-  GByteArray *out = g_byte_array_new ();
-  char *str = NULL;
-  mpz_t i;
-
-  mpz_init (i);
-  mpz_set_si (i, -100);
-  str = mpz_get_str (NULL, 16, i);
-  gzochid_util_serialize_mpz (i, out);
-
-  g_assert_cmpint (out->len, ==, 8);
-  g_assert_cmpint (out->data[0], ==, 0x00);
-  g_assert_cmpint (out->data[1], ==, 0x00);
-  g_assert_cmpint (out->data[2], ==, 0x00);
-  g_assert_cmpint (out->data[3], ==, 0x04);
-  g_assert_cmpstr (str, ==, out->data + 4);
-
-  free (str);
-  mpz_clear (i);
 }
 
 static void
@@ -294,21 +270,6 @@ test_util_deserialize_int ()
   g_byte_array_append (in, "\001\002\003\004", 4);
   g_assert_cmpint (gzochid_util_deserialize_int (in), ==, 16909060);
   g_byte_array_unref (in);
-}
-
-static void
-test_util_deserialize_mpz ()
-{
-  GByteArray *in = g_byte_array_new ();
-  mpz_t i;
-
-  g_byte_array_append (in, "\000\000\000\003\066\064\000", 7);
-  
-  mpz_init (i);
-  gzochid_util_deserialize_mpz (in, i);
-  g_assert (mpz_cmp_ui (i, 100) == 0);
-
-  mpz_clear (i);
 }
 
 static void
@@ -552,7 +513,6 @@ main (int argc, char *argv[])
   g_test_add_func ("/util/serialize/boolean", test_util_serialize_boolean);
   g_test_add_func ("/util/serialize/int", test_util_serialize_int);
   g_test_add_func ("/util/serialize/uint64", test_util_serialize_uint64);
-  g_test_add_func ("/util/serialize/mpz", test_util_serialize_mpz);
   g_test_add_func ("/util/serialize/bytes", test_util_serialize_bytes);
   g_test_add_func ("/util/serialize/string", test_util_serialize_string);
   g_test_add_func ("/util/serialize/list", test_util_serialize_list);
@@ -564,7 +524,6 @@ main (int argc, char *argv[])
   g_test_add_func ("/util/deserialize/boolean", test_util_deserialize_boolean);
   g_test_add_func ("/util/deserialize/int", test_util_deserialize_int);
   g_test_add_func ("/util/deserialize/uint64", test_util_deserialize_uint64);
-  g_test_add_func ("/util/deserialize/mpz", test_util_deserialize_mpz);
   g_test_add_func ("/util/deserialize/bytes", test_util_deserialize_bytes);
   g_test_add_func ("/util/deserialize/string", test_util_deserialize_string);
   g_test_add_func ("/util/deserialize/list", test_util_deserialize_list);
