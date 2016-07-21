@@ -17,6 +17,19 @@
 
 #include "io.h"
 
+long long
+gzochi_common_io_read_long (const unsigned char *bytes, int offset)
+{
+  return ((long long) bytes[offset] << 56)
+    + ((long long) bytes[offset + 1] << 48)
+    + ((long long) bytes[offset + 2] << 40)
+    + ((long long) bytes[offset + 3] << 32)
+    + ((long long) bytes[offset + 4] << 24)
+    + ((long long) bytes[offset + 5] << 16)
+    + ((long long) bytes[offset + 6] << 8)
+    + ((long long) bytes[offset + 7]);
+}
+
 int
 gzochi_common_io_read_int (const unsigned char *bytes, int offset)
 {
@@ -30,6 +43,19 @@ short
 gzochi_common_io_read_short (const unsigned char *bytes, int offset)
 {
   return (bytes[offset] << 8) + bytes[offset + 1];
+}
+
+void
+gzochi_common_io_write_long (long long val, unsigned char *bytes, int offset)
+{
+  bytes[offset] = val >> 56;
+  bytes[offset + 1] = val >> 48 & 0xff;
+  bytes[offset + 2] = val >> 40 & 0xff;
+  bytes[offset + 3] = val >> 32 & 0xff;
+  bytes[offset + 4] = val >> 24 & 0xff;
+  bytes[offset + 5] = val >> 16 & 0xff;
+  bytes[offset + 6] = val >> 8 & 0xff;
+  bytes[offset + 7] = val & 0xff;
 }
 
 void

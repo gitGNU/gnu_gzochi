@@ -1,5 +1,5 @@
 /* test-io.c: Test routines for io.c in libgzochicommon.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,6 +20,17 @@
 
 #include "io.h"
 
+static void test_read_long (void)
+{
+  unsigned char i[8] = { 0x00, 0x2e, 0x9d, 0x94, 0xb7, 0x7a, 0x44, 0xb1 };
+
+  fprintf (stderr, "/io/read-long: ");
+
+  assert (gzochi_common_io_read_long (i, 0) == 13121110987654321);
+
+  fprintf (stderr, "OK\n");
+}
+
 static void test_read_int (void)
 {
   unsigned char i[4] = { 0x3a, 0xde, 0x68, 0xb1 };
@@ -38,6 +49,26 @@ static void test_read_short (void)
   fprintf (stderr, "/io/read-short: ");
 
   assert (gzochi_common_io_read_short (i, 0) == 4321);
+
+  fprintf (stderr, "OK\n");
+}
+
+static void test_write_long (void)
+{
+  unsigned char i[8] = { 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0 };
+
+  fprintf (stderr, "/io/write-long: "); 
+
+  gzochi_common_io_write_long (12345678910111213, i, 0);
+
+  assert (i[0] == 0x00);
+  assert (i[1] == 0x2b);
+  assert (i[2] == 0xdc);
+  assert (i[3] == 0x54);
+  assert (i[4] == 0x5d);
+  assert (i[5] == 0xf2);  
+  assert (i[6] == 0xbd);
+  assert (i[7] == 0xed);
 
   fprintf (stderr, "OK\n");
 }
@@ -74,8 +105,10 @@ static void test_write_short (void)
 
 int main (int argc, char *argv[])
 {
+  test_read_long ();
   test_read_int ();
   test_read_short ();
+  test_write_long ();
   test_write_int ();
   test_write_short ();
 
