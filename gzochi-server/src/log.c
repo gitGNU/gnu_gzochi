@@ -19,6 +19,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 #include <time.h>
 
@@ -40,8 +41,16 @@ log_handler (const gchar *log_domain, GLogLevelFlags log_level,
   struct tm ltm;
 
   priority_mask_holder *holder = user_data;
+
+  /* Replicate behavior of default logger with respect to printing debug 
+     messages. */
   
-  if (!(log_level & G_LOG_LEVEL_MASK & holder->priority_mask))
+  const gchar *domains = g_getenv ("G_MESSAGES_DEBUG");
+  
+  if (!(log_level & G_LOG_LEVEL_MASK & holder->priority_mask)
+      && (domains == NULL
+	  || ((!log_domain || !strstr (domains, log_domain))
+	      && strcmp (domains, "all") != 0)))
     return;
 
   gettimeofday (&tv, NULL);
