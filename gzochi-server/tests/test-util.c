@@ -75,6 +75,22 @@ test_util_serialize_mpz ()
 
   free (str);
   mpz_clear (i);
+}
+
+static void
+test_util_serialize_uint64 ()
+{
+  GByteArray *out = g_byte_array_new ();
+  gzochid_util_serialize_uint64 (12345678910111213, out);
+  g_assert_cmpint (out->len, ==, 8);
+  g_assert_cmpint (out->data[0], ==, 0x00);
+  g_assert_cmpint (out->data[1], ==, 0x2b);
+  g_assert_cmpint (out->data[2], ==, 0xdc);
+  g_assert_cmpint (out->data[3], ==, 0x54);
+  g_assert_cmpint (out->data[4], ==, 0x5d);
+  g_assert_cmpint (out->data[5], ==, 0xf2);
+  g_assert_cmpint (out->data[6], ==, 0xbd);
+  g_assert_cmpint (out->data[7], ==, 0xed);
   g_byte_array_unref (out);
 }
 
@@ -293,6 +309,15 @@ test_util_deserialize_mpz ()
   g_assert (mpz_cmp_ui (i, 100) == 0);
 
   mpz_clear (i);
+}
+
+static void
+test_util_deserialize_uint64 ()
+{
+  GByteArray *in = g_byte_array_new ();
+
+  g_byte_array_append (in, "\001\002\003\004\005\006\007\008", 8);
+  g_assert_cmpint (gzochid_util_deserialize_uint64 (in), ==, 72623859790382848);
   g_byte_array_unref (in);
 }
 
@@ -476,6 +501,7 @@ main (int argc, char *argv[])
 
   g_test_add_func ("/util/serialize/boolean", test_util_serialize_boolean);
   g_test_add_func ("/util/serialize/int", test_util_serialize_int);
+  g_test_add_func ("/util/serialize/uint64", test_util_serialize_uint64);
   g_test_add_func ("/util/serialize/mpz", test_util_serialize_mpz);
   g_test_add_func ("/util/serialize/bytes", test_util_serialize_bytes);
   g_test_add_func ("/util/serialize/string", test_util_serialize_string);
@@ -487,6 +513,7 @@ main (int argc, char *argv[])
 
   g_test_add_func ("/util/deserialize/boolean", test_util_deserialize_boolean);
   g_test_add_func ("/util/deserialize/int", test_util_deserialize_int);
+  g_test_add_func ("/util/deserialize/uint64", test_util_deserialize_uint64);
   g_test_add_func ("/util/deserialize/mpz", test_util_deserialize_mpz);
   g_test_add_func ("/util/deserialize/bytes", test_util_deserialize_bytes);
   g_test_add_func ("/util/deserialize/string", test_util_deserialize_string);

@@ -63,6 +63,21 @@ gzochid_util_serialize_mpz (mpz_t i, GByteArray *out)
 }
 
 void
+gzochid_util_serialize_uint64 (guint64 oid, GByteArray *out)
+{
+  unsigned char n_str[8];
+
+  gzochi_common_io_write_long (oid, n_str, 0);
+  g_byte_array_append (out, n_str, 8);
+}
+
+void
+gzochid_util_serialize_oid (guint64 oid, GByteArray *out)
+{
+  gzochid_util_serialize_uint64 (oid, out);
+}
+
+void
 gzochid_util_serialize_list (GList *list,
 			     void (*serializer) (gpointer, GByteArray *),
 			     GByteArray *out)
@@ -175,6 +190,20 @@ gzochid_util_deserialize_mpz (GByteArray *in, mpz_t o)
   char *o_str = gzochid_util_deserialize_string (in);
   mpz_set_str (o, o_str, 16);
   free (o_str);
+}
+
+guint64
+gzochid_util_deserialize_uint64 (GByteArray *in)
+{
+  guint64 ret = gzochi_common_io_read_long (in->data, 0);
+  g_byte_array_remove_range (in, 0, sizeof (guint64));
+  return ret;
+}
+
+guint64
+gzochid_util_deserialize_oid (GByteArray *in)
+{
+  return gzochid_util_deserialize_uint64 (in);
 }
 
 GList *

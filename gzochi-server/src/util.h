@@ -24,6 +24,16 @@
 
 void gzochid_util_serialize_boolean (gboolean, GByteArray *);
 void gzochid_util_serialize_int (int, GByteArray *);
+
+/* Writes the big-endian representation of the specified 64-bit unsigned long to
+   the specified byte array. */
+
+void gzochid_util_serialize_uint64 (guint64, GByteArray *);
+
+/* A more intentional alias for `gzochid_util_serialize_uint64'. */
+
+void gzochid_util_serialize_oid (guint64, GByteArray *);
+
 void gzochid_util_serialize_mpz (mpz_t, GByteArray *);
 void gzochid_util_serialize_bytes (unsigned char *, int, GByteArray *);
 void gzochid_util_serialize_string (char *, GByteArray *);
@@ -40,6 +50,17 @@ void gzochid_util_serialize_timeval (struct timeval, GByteArray *);
 
 gboolean gzochid_util_deserialize_boolean (GByteArray *);
 int gzochid_util_deserialize_int (GByteArray *);
+
+/* Reads the big-endian representation of a 64-bit unsigned long from the 
+   specified byte array, erasing eight bytes from the array (which is assumed to
+   have at least eight bytes to spare. */
+
+guint64 gzochid_util_deserialize_uint64 (GByteArray *);
+
+/* A more intentional alias for `gzochid_util_deserialize_uint64'. */
+
+guint64 gzochid_util_deserialize_oid (GByteArray *);
+
 void gzochid_util_deserialize_mpz (GByteArray *, mpz_t);
 unsigned char *gzochid_util_deserialize_bytes (GByteArray *, int *);
 char *gzochid_util_deserialize_string (GByteArray *);
