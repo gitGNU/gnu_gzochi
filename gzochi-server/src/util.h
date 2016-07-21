@@ -93,4 +93,14 @@ gint gzochid_util_bytes_compare_null_first (gconstpointer, gconstpointer);
 
 gint gzochid_util_bytes_compare_null_last (gconstpointer, gconstpointer);
 
+/* Return the big-endian encoding of the specified 64-bit unsigned integer. (On
+   big-endian platforms, this is a no-op.) */
+
+guint64 gzochid_util_encode_oid (guint64);
+
+/* Return the native encoding of the specified big endian-encoded 64-bit 
+   unsigned integer. (On big-endian platforms, this is a no-op.) */
+
+guint64 gzochid_util_decode_oid (guint64);
+
 #endif /* GZOCHID_UTIL_H */

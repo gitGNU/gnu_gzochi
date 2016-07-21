@@ -308,3 +308,23 @@ gzochid_util_bytes_compare_null_last (gconstpointer o1, gconstpointer o2)
     return o2 == NULL ? 0 : 1;
   else return o2 == NULL ? -1 : g_bytes_compare (o1, o2);
 }
+
+guint64
+gzochid_util_encode_oid (guint64 oid)
+{
+#if G_BYTE_ORDER == G_BIG_ENDIAN
+  return oid;
+#else
+  return GUINT64_TO_BE (oid);
+#endif
+}
+
+guint64
+gzochid_util_decode_oid (guint64 oid)
+{
+#if G_BYTE_ORDER == G_BIG_ENDIAN
+  return oid;
+#else
+  return GUINT64_FROM_BE (oid);
+#endif
+}

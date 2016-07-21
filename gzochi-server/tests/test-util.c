@@ -505,6 +505,45 @@ test_util_bytes_compare_null_last_null ()
   g_bytes_unref (b1);
 }
 
+static void
+test_util_encode_oid_simple ()
+{
+  guint64 encoded_one_zero_zero = gzochid_util_encode_oid (256);
+  guint64 encoded_two = gzochid_util_encode_oid (2);
+
+  GBytes *one_zero_zero_bytes = g_bytes_new_static
+    (&encoded_one_zero_zero, sizeof (guint64));
+  GBytes *two_bytes = g_bytes_new_static (&encoded_two, sizeof (guint64));
+
+  g_assert_cmpint (g_bytes_compare (two_bytes, one_zero_zero_bytes), <, 0);
+  
+  g_bytes_unref (one_zero_zero_bytes);
+  g_bytes_unref (two_bytes);
+}
+
+static void
+test_util_decode_oid_simple ()
+{
+  GBytes *one_zero_zero_bytes = g_bytes_new_static
+    ("\x00\x00\x00\x00\x00\x01\x00\x00", sizeof (guint64));
+  GBytes *two_bytes = g_bytes_new_static
+    ("\x00\x00\x00\x00\x00\x00\x00\x02", sizeof (guint64));
+
+  guint64 one_zero_zero = 0;
+  guint64 two = 0;
+
+  memcpy
+    (&one_zero_zero, g_bytes_get_data (one_zero_zero_bytes, NULL),
+     sizeof (guint64));
+  memcpy (&two, g_bytes_get_data (two_bytes, NULL), sizeof (guint64));
+
+  g_assert_cmpint
+    (gzochid_util_decode_oid (two), <, gzochid_util_decode_oid (one_zero_zero));
+  
+  g_bytes_unref (one_zero_zero_bytes);
+  g_bytes_unref (two_bytes);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -549,6 +588,9 @@ main (int argc, char *argv[])
   g_test_add_func
     ("/util/bytes_compare_null_last/null",
      test_util_bytes_compare_null_last_simple);
+
+  g_test_add_func ("/util/encode_oid/simple", test_util_encode_oid_simple);
+  g_test_add_func ("/util/decode_oid/simple", test_util_decode_oid_simple);
   
   return g_test_run ();
 }
