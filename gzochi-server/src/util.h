@@ -78,6 +78,11 @@ struct timeval gzochid_util_deserialize_timeval (GByteArray *);
 
 gint gzochid_util_string_data_compare (gconstpointer, gconstpointer, gpointer);
 
+/* A `GCompareDataFunc' implementation that operates on pointers to 
+   `guint64's. */
+
+gint gzochid_util_guint64_data_compare (gconstpointer, gconstpointer, gpointer);
+
 /* Comparison function that sorts `NULL' before all non-`NULL' values. Use for
    comparing the lower bounds of range locks. */
 

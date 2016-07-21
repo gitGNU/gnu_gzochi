@@ -451,6 +451,17 @@ test_util_deserialize_timeval ()
 }
 
 static void
+test_util_guint64_data_compare ()
+{
+  guint64 zero = 0;
+  guint64 one = 1;
+
+  g_assert_cmpint (gzochid_util_guint64_data_compare (&zero, &one, NULL), <, 0);
+  g_assert_cmpint (gzochid_util_guint64_data_compare (&one, &one, NULL), ==, 0);
+  g_assert_cmpint (gzochid_util_guint64_data_compare (&one, &zero, NULL), >, 0);
+}
+
+static void
 test_util_bytes_compare_null_first_simple ()
 {
   GBytes *b1 = g_bytes_new_static ("foo1", 5);
@@ -524,6 +535,8 @@ main (int argc, char *argv[])
     ("/util/deserialize/hash_table", test_util_deserialize_hash_table);
   g_test_add_func ("/util/deserialize/timeval", test_util_deserialize_timeval);
 
+  g_test_add_func
+    ("/util/guint64_data_compare/simple", test_util_guint64_data_compare);
   g_test_add_func
     ("/util/bytes_compare_null_first/simple",
      test_util_bytes_compare_null_first_simple);

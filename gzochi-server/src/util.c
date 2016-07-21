@@ -284,6 +284,16 @@ gzochid_util_string_data_compare (gconstpointer a, gconstpointer b,
 }
 
 gint
+gzochid_util_guint64_data_compare (gconstpointer a, gconstpointer b,
+				   gpointer user_data)
+{
+  const guint64 an = *(const guint64 *) a;
+  const guint64 bn = *(const guint64 *) b;
+
+  return an < bn ? -1 : an > bn ? 1 : 0;
+}
+
+gint
 gzochid_util_bytes_compare_null_first (gconstpointer o1, gconstpointer o2)
 {
   if (o1 == NULL)
