@@ -629,7 +629,7 @@ callback_data_free (dataclient_callback_data *callback_data)
  */
 
 static inline void
-notify_waiters (GHashTable *lock_table, dataclient_qualified_key *key)
+notify_waiters (GHashTable *lock_table, GBytes *key)
 {
   dataclient_lock_request *lock_request = g_hash_table_lookup (lock_table, key);
       
@@ -650,13 +650,15 @@ lock_success_callback (GBytes *data, gpointer user_data)
 {
   dataclient_callback_data *callback_data = user_data;
   dataclient_database *database = callback_data->store->database;
-  dataclient_qualified_key key = (dataclient_qualified_key)
-    { database->name, callback_data->key };
-  dataclient_lock *lock = NULL;
   
-  g_mutex_lock (&database->mutex);
+  dataclient_qualified_key qualified_key = (dataclient_qualified_key)
+    { database->name, callback_data->key };
+  
+  dataclient_lock *lock = NULL;
 
-  lock = g_hash_table_lookup (database->locks, &key);  
+  g_mutex_lock (&database->mutex);
+    
+  lock = g_hash_table_lookup (database->locks, callback_data->key);  
   
   if (lock != NULL)
     {
@@ -671,12 +673,12 @@ lock_success_callback (GBytes *data, gpointer user_data)
       
       lock = malloc (sizeof (dataclient_lock));
       
-      lock->key = dataclient_qualified_key_copy (&key);
+      lock->key = dataclient_qualified_key_copy (&qualified_key);
       lock->for_write = callback_data->for_write;
       g_rw_lock_init (&lock->lock);
 
       g_hash_table_insert
-	(database->locks, dataclient_qualified_key_copy (&key), lock);
+	(database->locks, g_bytes_ref (callback_data->key), lock);
 
       if (data != NULL)
 	{
@@ -709,17 +711,15 @@ lock_success_callback (GBytes *data, gpointer user_data)
   
   if (callback_data->for_write)
     {
-      notify_waiters (database->write_lock_requests, &key);
-      g_hash_table_remove (database->write_lock_requests, &key);
+      notify_waiters (database->write_lock_requests, callback_data->key);
+      g_hash_table_remove (database->write_lock_requests, callback_data->key);
     }
 
   /* Always notify threads waiting for read locks - they'll be happy with a
      write lock as well. */
   
-  notify_waiters (database->read_lock_requests, &key);
-  g_hash_table_remove (database->read_lock_requests, &key);
-  
-  callback_data_free (callback_data);
+  notify_waiters (database->read_lock_requests, callback_data->key);
+  g_hash_table_remove (database->read_lock_requests, callback_data->key);
   
   g_mutex_unlock (&database->mutex);
 }
@@ -736,17 +736,12 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
   dataclient_database *database = callback_data->store->database;
   dataclient_lock_request *lock_request = NULL;
 
-  dataclient_qualified_key tmp_key;
-  
   g_mutex_lock (&database->mutex);
-
-  tmp_key.store = database->name;
-  tmp_key.key = callback_data->key;
   
   if (callback_data->for_write)
     {
       lock_request = g_hash_table_lookup
-	(database->write_lock_requests, &tmp_key);
+	(database->write_lock_requests, callback_data->key);
 
       /* There may be no lock request if there are no longer any threads waiting
 	 for the lock. */
@@ -758,14 +753,15 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
 	    + wait_time.tv_sec * 1000
 	    + wait_time.tv_usec / 1000;
 	  
-	  notify_waiters (database->write_lock_requests, &tmp_key);
+	  notify_waiters (database->write_lock_requests, callback_data->key);
 	}
     }
 
   /* There may be no lock request if there are no longer any threads waiting
      for the lock. */
 
-  lock_request = g_hash_table_lookup (database->read_lock_requests, &tmp_key);
+  lock_request = g_hash_table_lookup
+    (database->read_lock_requests, callback_data->key);
 
   if (lock_request != NULL)
     {      
@@ -774,7 +770,7 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
 	+ wait_time.tv_sec * 1000
 	+ wait_time.tv_usec / 1000;
 
-      notify_waiters (database->read_lock_requests, &tmp_key);
+      notify_waiters (database->read_lock_requests, callback_data->key);
     }
 
   callback_data_free (callback_data);
@@ -864,7 +860,7 @@ check_and_set_lock (dataclient_transaction *tx, dataclient_database *database,
 {
   dataclient_qualified_key qualified_key = (dataclient_qualified_key)
     { database->name, key };
-  dataclient_lock *lock = g_hash_table_lookup (database->locks, &qualified_key);
+  dataclient_lock *lock = g_hash_table_lookup (database->locks, key);
       
   if (lock != NULL)
     {
@@ -942,7 +938,7 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
   
   lock_request = g_hash_table_lookup
     (for_write ? database->write_lock_requests : database->read_lock_requests,
-     &qualified_key);
+     key_bytes);
   
   if (lock_request != NULL)
     {
@@ -960,7 +956,7 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	(for_write
 	 ? database->write_lock_requests
 	 : database->read_lock_requests,
-	 dataclient_qualified_key_copy (&qualified_key), lock_request);
+	 key_bytes, lock_request);
       
       g_mutex_lock (&lock_request->mutex);
       g_mutex_unlock (&database->mutex);
@@ -1054,7 +1050,7 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 		? database->write_lock_requests
 		: database->read_lock_requests;
 
-	      g_hash_table_remove (table, &qualified_key);
+	      g_hash_table_remove (table, key_bytes);
 	    }
 
 	  g_bytes_unref (key_bytes);
@@ -1550,8 +1546,8 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
   /* The lock tables. */
 
   database->locks = g_hash_table_new_full
-    (dataclient_qualified_key_hash, dataclient_qualified_key_equal,
-     dataclient_qualified_key_free, (GDestroyNotify) free_lock);
+    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref,
+     (GDestroyNotify) free_lock);
   database->range_locks = gzochid_itree_new
     (gzochid_util_bytes_compare_null_first,
      gzochid_util_bytes_compare_null_last);
@@ -1559,11 +1555,9 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
   /* The lock request tables. */
   
   database->read_lock_requests = g_hash_table_new_full
-    (dataclient_qualified_key_hash, dataclient_qualified_key_equal,
-     dataclient_qualified_key_free, NULL);
+    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref, NULL);
   database->write_lock_requests = g_hash_table_new_full
-    (dataclient_qualified_key_hash, dataclient_qualified_key_equal,
-     dataclient_qualified_key_free, NULL);
+    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref, NULL);
 
   database->range_lock_requests = gzochid_itree_new
     (gzochid_util_bytes_compare_null_first,
