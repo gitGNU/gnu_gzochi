@@ -95,6 +95,8 @@ struct _GzochidDataClient
   
   GHashTable *application_callback_queues; 
 
+  GMutex queue_mutex; /* Synchronizes interactions with the callback queues. */
+   
   /* The socket server for the data client. */
 
   GzochidSocketServer *socket_server;
@@ -171,7 +173,8 @@ gzochid_data_client_finalize (GObject *gobject)
   g_hash_table_destroy (client->application_callback_queues);
 
   g_byte_array_unref (client->outbound_messages);
-  
+
+  g_mutex_clear (&client->queue_mutex);
   g_mutex_clear (&client->mutex);
   g_cond_clear (&client->cond);
 }
@@ -256,7 +259,7 @@ acquire_callback_queue (GzochidDataClient *client, char *app)
 {
   dataclient_callback_queue *queue = NULL;
   
-  g_mutex_lock (&client->mutex);
+  g_mutex_lock (&client->queue_mutex);
 
   if (g_hash_table_contains (client->application_callback_queues, app))   
     queue = g_hash_table_lookup (client->application_callback_queues, app);
@@ -275,7 +278,7 @@ acquire_callback_queue (GzochidDataClient *client, char *app)
     }
 
   g_mutex_lock (&queue->mutex);  
-  g_mutex_unlock (&client->mutex);
+  g_mutex_unlock (&client->queue_mutex);
 
   return queue;
 }
@@ -297,6 +300,7 @@ gzochid_data_client_init (GzochidDataClient *self)
   self->outbound_messages = g_byte_array_new ();
 
   self->running = FALSE;
+  g_mutex_init (&self->queue_mutex);
   g_mutex_init (&self->mutex);
   g_cond_init (&self->cond);
 }
