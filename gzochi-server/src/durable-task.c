@@ -1033,6 +1033,9 @@ schedule_coordinator_task (gzochid_application_context *app_context,
   gzochid_task_transaction_context *tx_context =
     join_transaction (app_context);
 
+  gzochid_game_context *game_context = (gzochid_game_context *)
+    ((gzochid_context *) app_context)->parent;
+
   gzochid_data_managed_reference *chain_context_ref =
     gzochid_data_create_reference
     (app_context, &task_chain_context_serialization, chain_context, &err);
@@ -1067,8 +1070,10 @@ schedule_coordinator_task (gzochid_application_context *app_context,
 
   /* ...and bundle them into an execution to facilitate retry. */
   
-  coordinator_execution = gzochid_transactional_application_task_execution_new
-    (coordinator_main_task, coordinator_catch_task, coordinator_cleanup_task);
+  coordinator_execution =
+    gzochid_transactional_application_task_timed_execution_new
+    (coordinator_main_task, coordinator_catch_task, coordinator_cleanup_task,
+     game_context->tx_timeout);
 
   /* Note that the task as constructed below doesn't use the delay offset from
      the task in the queue that it wraps. Possible avenue of enhancement for the
