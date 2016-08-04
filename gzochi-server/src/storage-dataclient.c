@@ -585,8 +585,9 @@ find_range_lock_covering_point (gpointer from, gpointer to, gpointer data,
 	    }
 	  else return FALSE;
 	}
-      else if (g_bytes_compare (search_context->from, from) >= 0
-	       && g_bytes_compare (search_context->from, to) < 0)
+      else if
+	(gzochid_util_bytes_compare_null_first (search_context->from, from) >= 0
+	 && gzochid_util_bytes_compare_null_last (search_context->from, to) < 0)
 	{
 	  /* The "from" key under search must be exactly less than the upper 
 	     bound of the matched range lock. */
@@ -2068,15 +2069,17 @@ transaction_next_key (gzochid_storage_transaction *tx,
 	  /* The key doesn't have to come from the delegate B+tree store. We can
 	     get it directly from the lock obtained by the transaction. */
 
-	  const char *data = g_bytes_get_data
-	    (search_context.range_lock->to, &ret_len);
+	  if (search_context.range_lock->to != NULL)
+	    {
+	      const char *data = g_bytes_get_data
+		(search_context.range_lock->to, &ret_len);
 	  
-	  ret = malloc (sizeof (char) * ret_len);
-	  memcpy (ret, data, ret_len);
+	      ret = malloc (sizeof (char) * ret_len);
+	      memcpy (ret, data, ret_len);
 
-	  if (next_key_len != NULL)
-	    *next_key_len = ret_len;
-	  
+	      if (next_key_len != NULL)
+		*next_key_len = ret_len;
+	    }    
 	  return ret;
 	}	  
       else return NULL;
