@@ -239,6 +239,10 @@ struct _dataclient_database
   /* `GBytes' bounds to `dataclient_range_lock_requests'. */
   
   gzochid_itree *range_lock_requests;
+
+  /* A read-through cache of `GBytes' keys to `GBytes' values. */
+
+  GHashTable *value_cache;
   
   gzochid_storage_store *delegate_store; /* The delegate mem store. */
 };
@@ -269,6 +273,11 @@ struct _dataclient_transaction
 
   GArray *changeset; 
 
+  /* Tracks deleted keys, which need to be purged from the value cache if the 
+     transaction commits. */
+
+  GList *deleted_keys; 
+  
   gzochid_storage_transaction *delegate_tx; /* The delegate transaction. */
 };
 
@@ -679,35 +688,18 @@ lock_success_callback (GBytes *data, gpointer user_data)
 
       g_hash_table_insert
 	(database->locks, g_bytes_ref (callback_data->key), lock);
-
-      if (data != NULL)
-	{
-	  /* Only insert a value for the key if the value exists; note that it's
-	     certainly possible to obtain locks for keys with no value. */
-	  
-	  dataclient_environment *environment =
-	    callback_data->store->context->environment;
-	  gzochid_storage_transaction *tx = environment->delegate_iface
-	    ->transaction_begin (environment->delegate_context);
-	  
-	  environment->delegate_iface->transaction_put
-	    (tx, database->delegate_store,
-	     (char *) g_bytes_get_data (callback_data->key, NULL),
-	     g_bytes_get_size (callback_data->key),
-	     (char *) g_bytes_get_data (data, NULL), g_bytes_get_size (data));
-
-	  environment->delegate_iface->transaction_prepare (tx);
-
-	  /* It should be impossible for this transaction to fail, since it
-	     only needs a single write lock in the B+tree and is willing to wait
-	     forever. It may cause other transactions to fail, however, if they
-	     are more complex or time-constrained. */
-	     
-	  assert (!tx->rollback);
-	  
-	  environment->delegate_iface->transaction_commit (tx);
-	}
     }
+
+  if (data != NULL)
+
+    /* If there's data, don't insert it directly into the mem store (since 
+       doing so requires a transaction and may induce contention) put it in the
+       fallback cache, which will be consulted by readers if there's a miss in
+       the mem store. */
+    
+    g_hash_table_insert
+      (database->value_cache, g_bytes_ref (callback_data->key),
+       g_bytes_ref (data));
   
   if (callback_data->for_write)
     {
@@ -1562,6 +1554,10 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
   database->range_lock_requests = gzochid_itree_new
     (gzochid_util_bytes_compare_null_first,
      gzochid_util_bytes_compare_null_last);
+
+  database->value_cache = g_hash_table_new_full
+    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref,
+     (GDestroyNotify) g_bytes_unref);
   
   g_mutex_init (&database->mutex);
 
@@ -1607,6 +1603,7 @@ close_store (gzochid_storage_store *store)
   g_hash_table_destroy (database->read_lock_requests);
   g_hash_table_destroy (database->write_lock_requests);
   gzochid_itree_free (database->range_lock_requests);  
+  g_hash_table_destroy (database->value_cache);
   
   g_mutex_clear (&database->mutex);
 
@@ -1706,6 +1703,8 @@ cleanup_transaction (gzochid_storage_transaction *tx)
   gzochid_itree_free (txn->range_locks);
   g_array_unref (txn->changeset);
 
+  g_list_free_full (txn->deleted_keys, (GDestroyNotify) callback_data_free);
+
   free (txn);
   free (tx);
 }
@@ -1728,13 +1727,25 @@ transaction_commit (gzochid_storage_transaction *tx)
 {
   dataclient_transaction *txn = tx->txn;
   dataclient_environment *env = tx->context->environment;
+  GList *deleted_key_ptr = txn->deleted_keys;
 
   env->delegate_iface->transaction_commit (txn->delegate_tx);
 
   if (txn->changeset->len > 0)
     gzochid_dataclient_submit_changeset
       (env->client, env->app_name, txn->changeset);
+
+  /* For each key deleted in this transacton, remove it from the cache. */
   
+  while (deleted_key_ptr != NULL)
+    {
+      dataclient_callback_data *key = deleted_key_ptr->data;
+      dataclient_database *database = key->store->database;
+      
+      g_hash_table_remove (database->value_cache, key->key);
+      deleted_key_ptr = deleted_key_ptr->next;
+    }
+
   cleanup_transaction (tx);
 }
 
@@ -1786,6 +1797,66 @@ propagate_transaction_status (gzochid_storage_transaction *tx)
     }
 }
 
+/* A `GCompareFunc' implementation for `dataclient_callback_data'. */
+
+static gint
+callback_data_compare (gconstpointer a, gconstpointer b)
+{
+  const dataclient_callback_data *cba = a;
+  const dataclient_callback_data *cbb = b;
+
+  if (cba->store == cbb->store)
+    return g_bytes_compare (cba->key, cbb->key);
+  else return -1;
+}
+
+/* Returns `TRUE' if the specified key has been deleted from the target store in
+   the specified transaction, `FALSE' otherwise. */
+
+static gboolean
+is_deleted (gzochid_storage_transaction *tx, gzochid_storage_store *store,
+	    char *key, size_t key_len)
+{
+  GBytes *key_bytes = g_bytes_new_static (key, key_len);
+  dataclient_transaction *dtx = tx->txn;
+  dataclient_callback_data cb = (dataclient_callback_data)
+    { store, key_bytes, TRUE };
+  GList *ptr = g_list_find_custom
+    (dtx->deleted_keys, &cb, callback_data_compare);
+
+  g_bytes_unref (key_bytes);
+
+  return ptr != NULL;
+}
+
+/* Retrieves the value (if any) bound to the specified key in the dataclient
+   cache for the target store. */
+
+static unsigned char *
+get_from_cache (dataclient_database *database, unsigned char *key,
+		size_t key_len, size_t *value_len)
+{
+  unsigned char *ret = NULL;
+  GBytes *cache_key = g_bytes_new_static (key, key_len);
+  GBytes *value = g_hash_table_lookup (database->value_cache, cache_key);
+  
+  if (value != NULL)
+    {
+      size_t tmp_len = 0;
+      gconstpointer value_data = g_bytes_get_data (value, &tmp_len);
+      
+      ret = malloc (sizeof (unsigned char) * tmp_len);
+      memcpy (ret, value_data, tmp_len);
+      
+      if (value_len != NULL)
+	*value_len = tmp_len;
+    }
+  
+  g_bytes_unref (cache_key);
+
+  return ret;
+}
+
 /* Returns the value for the specified key or `NULL' if none exists. */
 
 static char *
@@ -1803,8 +1874,14 @@ transaction_get (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	 value_len);
 
       propagate_transaction_status (tx);
-      
-      return ret;
+
+      /* Didn't find a value in the mem store? (And we haven't already deleted 
+	 it in this transaction?) Check the cache. */
+
+      if (ret == NULL && !tx->rollback && !is_deleted (tx, store, key, key_len))
+	return (char *) get_from_cache
+	  (database, (unsigned char *) key, key_len, value_len);
+      else return ret;
     }
   else return NULL;
 }
@@ -1828,7 +1905,13 @@ transaction_get_for_update (gzochid_storage_transaction *tx,
 	 value_len);
 
       propagate_transaction_status (tx);
+
+      /* Didn't find a value in the mem store? (And we haven't already deleted 
+	 it in this transaction?) Check the cache. */
       
+      if (ret == NULL && !tx->rollback && !is_deleted (tx, store, key, key_len))
+	return (char *) get_from_cache
+	  (database, (unsigned char *) key, key_len, value_len);
       return ret;
     }
   else return NULL;
@@ -1896,6 +1979,13 @@ transaction_delete (gzochid_storage_transaction *tx,
 	  change.data = NULL;
 
 	  g_array_append_val (dataclient_tx->changeset, change);
+
+	  /* Append this key to the deleted key list, so that we can purge the
+	     key from the cache on commit. */
+	  
+	  dataclient_tx->deleted_keys = g_list_append
+	    (dataclient_tx->deleted_keys,
+	     create_callback_data (store, g_bytes_new (key, key_len), TRUE));
 	}
 
       propagate_transaction_status (tx);
