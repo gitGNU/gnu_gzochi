@@ -17,7 +17,6 @@
 
 #include <assert.h>
 #include <glib.h>
-#include <gmp.h>
 #include <gzochi-common.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -38,7 +37,6 @@ struct _gzochid_game_client
   
   gzochid_application_context *app_context;
   gzochid_auth_identity *identity;
-  mpz_t oid;
   
   gboolean disconnected;
   gzochid_client_socket *sock;
@@ -51,9 +49,6 @@ server_accept (GIOChannel *channel, const char *desc, gpointer data)
   gzochid_game_client *client = calloc (1, sizeof (gzochid_game_client));
   gzochid_client_socket *sock = gzochid_client_socket_new
     (channel, desc, gzochid_game_client_protocol, client);
-    
-  mpz_init (client->oid);
-  mpz_set_si (client->oid, -1);
 
   /* This is the initial bootstrap context for the client. Once they 
      authenticate, we'll assign them a real application context. */
@@ -237,7 +232,6 @@ client_free (gpointer data)
 {
   gzochid_game_client *client = data;
   
-  mpz_clear (client->oid);
   free (client);
 }
 
