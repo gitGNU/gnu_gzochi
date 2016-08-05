@@ -1,5 +1,5 @@
 ;; echo-chamber/client.scm --- Echo chamber benchmark, client side
-;; Copyright (C) 2015 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -150,11 +150,8 @@
 
     (client-messages-sent-set! client (+ (client-messages-sent client) 1))
     (client-outstanding-pongs-set! client (benchmark-total-clients benchmark))
-    (client-last-sent-time-set! client (gettimeofday))
-    
-    (gzochi:main-loop-add-source!
-     (benchmark-main-loop benchmark) (client-session client)))
-  
+    (client-last-sent-time-set! client (gettimeofday)))
+
   (define (send-timeout-prepare/check source)
     (let ((ready-clients (benchmark-ready-clients benchmark))) 
       (and (not (null? ready-clients)) (can-send? (car ready-clients)))))
@@ -228,13 +225,6 @@
 
     (if (eqv? (client-outstanding-pongs client) 0)
 	(let ((benchmark (client-benchmark client)))
-
-	  ;; Remove the client session from the main loop; it doesn't need to
-	  ;; get notified of new messages until it's sent its next PING.
-	  
-	  (gzochi:main-loop-remove-source!
-	   (benchmark-main-loop benchmark) (client-session client))
-	  
 	  (if (>= (client-messages-sent client)
 		  (benchmark-messages-per-client benchmark))
 
