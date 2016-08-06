@@ -223,7 +223,6 @@ test_periodic_cancel ()
   gzochid_schedule_task_queue_stop (game_context->task_queue);
   g_thread_pool_free (pool, TRUE, TRUE);
 
-  mpz_clear (context.handle_oid);  
   gzochid_auth_identity_unref (identity);  
   application_context_clear (app_context);
 }
