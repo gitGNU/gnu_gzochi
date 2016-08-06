@@ -35,11 +35,10 @@ server.fs.data = @localstatedir@/gzochid/data
 storage.engine.dir = @libdir@/gzochid/storage
 
 # The name of the storage engine to use to store game application data. Must be
-# one of bdb, hdb, lmdb, and mem; which correspond to Berkeley DB, hamsterdb, 
-# Symas Lightning DB, and gzochid's built-in B*tree-based storage engine,
-# respectively. Support for each storage engine (besides 'mem') depends on the
-# requisite module (and associated third-party database libraries) being 
-# installed
+# bdb (for Berkeley DB) or mem (for gzochid's built-in B*tree-based storage
+# engine respectively). Support for storage engines (besides 'mem') depends on
+# the requisite module (and associated third-party database libraries) being 
+# installed.
 # 
 # If this setting is omitted, the server will fall back to using the 'mem' 
 # storage engine, which means that game application data will not be persisted 
