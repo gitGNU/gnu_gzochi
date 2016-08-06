@@ -1075,6 +1075,9 @@ schedule_coordinator_task (gzochid_application_context *app_context,
     (coordinator_main_task, coordinator_catch_task, coordinator_cleanup_task,
      game_context->tx_timeout);
 
+  /* Not necessary to hold a ref to these, as we've transferred them to the
+     execution. */
+
   gzochid_application_task_unref (coordinator_main_task);
   gzochid_application_task_unref (coordinator_catch_task);
   gzochid_application_task_unref (coordinator_cleanup_task);
@@ -1152,6 +1155,8 @@ gzochid_schedule_durable_task_chain (gzochid_application_context *app_context,
     (app_task, &gzochid_task_chain_bootstrap_task_serialization,
      (struct timeval) { 0, 0 }, NULL, &local_err);
 
+  /* Decrease the ref count, as it's been handed off to the task handle. */
+  
   gzochid_application_task_unref (app_task);
 
   if (local_err == NULL)

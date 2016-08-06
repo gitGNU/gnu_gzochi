@@ -1070,6 +1070,8 @@ gzochid_channel_join (gzochid_application_context *context,
     (app_task, &gzochid_channel_operation_task_serialization,
      (struct timeval) { 0, 0 }, NULL, NULL);
 
+  /* Decrease the ref count, as it's been handed off to the task handle. */
+  
   gzochid_application_task_unref (app_task);
   
   /* ...and add it to the task queue. */
@@ -1129,6 +1131,8 @@ gzochid_channel_leave (gzochid_application_context *context,
     (app_task, &gzochid_channel_operation_task_serialization,
      (struct timeval) { 0, 0 }, NULL, NULL);
 
+  /* Decrease the ref count, as it's been handed off to the task handle. */
+
   gzochid_application_task_unref (app_task);
   
   /* ...and add it to the task queue. */
@@ -1183,6 +1187,8 @@ gzochid_channel_send (gzochid_application_context *context,
     (app_task, &gzochid_channel_operation_task_serialization,
      (struct timeval) { 0, 0 }, NULL, NULL);
 
+  /* Decrease the ref count, as it's been handed off to the task handle. */
+
   gzochid_application_task_unref (app_task);
 
   /* ...and add it to the task queue. */
@@ -1227,6 +1233,8 @@ gzochid_channel_close (gzochid_application_context *context,
   task_handle = gzochid_create_durable_application_task_handle
     (app_task, &gzochid_channel_operation_task_serialization,
      (struct timeval) { 0, 0 }, NULL, NULL);
+
+  /* Decrease the ref count, as it's been handed off to the task handle. */
 
   gzochid_application_task_unref (app_task);
   
