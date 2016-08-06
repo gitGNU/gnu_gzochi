@@ -374,22 +374,21 @@ static void
 login_catch_worker (gzochid_application_context *context,
 		    gzochid_auth_identity *identity, gpointer data)
 {
-  char *session_oid_str = data;
+  guint64 *session_oid = data;
   gzochid_game_client *client = g_hash_table_lookup
-    (context->oids_to_clients, session_oid_str);
+    (context->oids_to_clients, session_oid);
 
   g_info
-    ("Disconnecting session '%s'; failed login transaction.", session_oid_str);
+    ("Disconnecting session '%lx'; failed login transaction.", *session_oid);
 
   g_mutex_lock (&context->client_mapping_lock);
-  g_hash_table_remove (context->oids_to_clients, session_oid_str);
+  g_hash_table_remove (context->oids_to_clients, session_oid);
   g_hash_table_remove (context->clients_to_oids, client);
   g_mutex_unlock (&context->client_mapping_lock);
       
   gzochid_game_client_disconnect (client);
 
-  gzochid_client_session_disconnected_worker
-    (context, identity, session_oid_str);
+  gzochid_client_session_disconnected_worker (context, identity, session_oid);
 }
 
 /* The application task worker for the login event.  */
