@@ -419,8 +419,9 @@ remove_session (gzochid_application_context *context, guint64 session_oid,
 
 	  /* Now do the same thing for the Scheme representation of the
 	     client lifecycle handler. */
-	  
-	  gzochid_data_remove_object (scm_handler_reference, &local_err);
+
+	  if (local_err == NULL)
+	    gzochid_data_remove_object (scm_handler_reference, &local_err);
 
 	  if (local_err == NULL ||
 	      !g_error_matches (local_err, GZOCHID_DATA_ERROR,
