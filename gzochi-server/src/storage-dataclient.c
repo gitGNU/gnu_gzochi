@@ -1815,19 +1815,29 @@ callback_data_compare (gconstpointer a, gconstpointer b)
    the specified transaction, `FALSE' otherwise. */
 
 static gboolean
+is_deleted_bytes (gzochid_storage_transaction *tx, gzochid_storage_store *store,
+		  GBytes *key_bytes)
+{
+  dataclient_transaction *dtx = tx->txn;
+  dataclient_callback_data cb = (dataclient_callback_data)
+    { store, key_bytes, TRUE };
+  
+  return g_list_find_custom
+    (dtx->deleted_keys, &cb, callback_data_compare) != NULL;
+}
+
+/* A variation on `is_deleted_bytes' that works on an `unsigned char *' and an 
+   explicit length argument. */
+
+static gboolean
 is_deleted (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	    char *key, size_t key_len)
 {
   GBytes *key_bytes = g_bytes_new_static (key, key_len);
-  dataclient_transaction *dtx = tx->txn;
-  dataclient_callback_data cb = (dataclient_callback_data)
-    { store, key_bytes, TRUE };
-  GList *ptr = g_list_find_custom
-    (dtx->deleted_keys, &cb, callback_data_compare);
-
+  gboolean ret = is_deleted_bytes (tx, store, key_bytes);
+  
   g_bytes_unref (key_bytes);
-
-  return ptr != NULL;
+  return ret;
 }
 
 /* Retrieves the value (if any) bound to the specified key in the dataclient
@@ -1968,6 +1978,20 @@ transaction_delete (gzochid_storage_transaction *tx,
       gboolean ret = environment->delegate_iface->transaction_delete
 	(dataclient_tx->delegate_tx, database->delegate_store, key, key_len);
 
+      /* If the value wasn't found in the delegate store, that could be because
+	 it's been fetched but not modified. In that case, it'll be in the value
+	 cache. We'll need to check the deletion list to ensure that it hasn't
+	 already been deleted in this transaction. */
+      
+      if (ret == GZOCHID_STORAGE_ENOTFOUND)
+	{
+	  GBytes *key_bytes = g_bytes_new_static (key, key_len);
+	  
+	  if (g_hash_table_contains (database->value_cache, key_bytes)
+	      && !is_deleted_bytes (tx, store, key_bytes))
+	    ret = 0;
+	}
+      
       if (ret == 0)
 	{
 	  /* Enqueue the change for persistence on the meta server. */
