@@ -392,23 +392,26 @@ login_catch_worker (gzochid_application_context *context,
     (context, identity, session_oid_str);
 }
 
-void 
-gzochid_application_client_logged_in (gzochid_application_context *context, 
-				      gzochid_game_client *client)
+/* The application task worker for the login event.  */
+
+static void
+logged_in_task (gzochid_application_context *context,
+		gzochid_auth_identity *identity, gpointer data)
 {
   GError *err = NULL;
-  gzochid_auth_identity *identity = gzochid_game_client_get_identity (client);
+  gzochid_game_client *client = data;
   gzochid_game_context *game_context = 
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
   gzochid_client_session *session = gzochid_client_session_new (identity);
+  
+  guint64 *session_oid = malloc (sizeof (guint64));
 
+  gzochid_application_task *login_task = NULL;
+  gzochid_application_task *login_catch_task = NULL;
   gzochid_application_task *application_task = NULL;
-  gzochid_application_task *login_task = NULL, *login_catch_task = NULL;
-  gzochid_transactional_application_task_execution *execution = NULL;
+  gzochid_transactional_application_task_execution *execution = NULL;    
 
   gzochid_task task;
-
-  guint64 *session_oid = malloc (sizeof (guint64));
   
   gzochid_client_session_persist (context, session, session_oid, &err);
 
@@ -455,6 +458,25 @@ gzochid_application_client_logged_in (gzochid_application_context *context,
   gettimeofday (&task.target_execution_time, NULL);
 
   gzochid_schedule_run_task (game_context->task_queue, &task);
+}
+
+void 
+gzochid_application_client_logged_in (gzochid_application_context *context, 
+				      gzochid_game_client *client)
+{
+  gzochid_game_context *game_context = 
+    (gzochid_game_context *) ((gzochid_context *) context)->parent;
+  
+  gzochid_application_task *application_task = gzochid_application_task_new
+    (context, gzochid_game_client_get_identity (client), logged_in_task,
+     client);
+
+  gzochid_task *task = gzochid_task_immediate_new
+    (gzochid_application_task_thread_worker, application_task);
+
+  gzochid_schedule_submit_task (game_context->task_queue, task);
+
+  gzochid_task_free (task);
 }
 
 void 
@@ -516,6 +538,22 @@ gzochid_application_client_disconnected (gzochid_application_context *context,
     }
 }
 
+/* Cleanup handler for the received message event. */
+
+static void
+cleanup_received_message_arguments (gzochid_application_context *context,
+				    gzochid_auth_identity *identity,
+				    gpointer data)
+{
+  void **args = data;
+
+  /* The session oid (arg 0) comes from the client-session mapping table and
+     can't be freed here. */
+  
+  g_bytes_unref (args[1]);  
+  free (args);
+}
+
 void 
 gzochid_application_session_received_message
 (gzochid_application_context *context, gzochid_game_client *client, 
@@ -525,7 +563,6 @@ gzochid_application_session_received_message
     (gzochid_game_context *) ((gzochid_context *) context)->parent;
 
   guint64 *session_oid = NULL;
-  void *data[3];
 
   g_mutex_lock (&context->client_mapping_lock);
   session_oid = g_hash_table_lookup (context->clients_to_oids, client);
@@ -535,35 +572,42 @@ gzochid_application_session_received_message
     return;
   else 
     {
+      void **data = malloc (sizeof (void *) * 2);
+      
       gzochid_application_task *transactional_task = NULL;
+      gzochid_application_task *cleanup_task = NULL;
       gzochid_application_task *application_task = NULL;
       gzochid_transactional_application_task_execution *execution = NULL;
       gzochid_task task;
 
       data[0] = session_oid;
-      data[1] = msg;
-      data[2] = &len;
+      data[1] = g_bytes_new (msg, len);
       
       transactional_task = gzochid_application_task_new
 	(context, gzochid_game_client_get_identity (client),
 	 gzochid_scheme_application_received_message_worker, data);
 
+      cleanup_task = gzochid_application_task_new
+	(context, gzochid_game_client_get_identity (client),
+	 cleanup_received_message_arguments, data);
+      
       execution = gzochid_transactional_application_task_timed_execution_new
-	(transactional_task, NULL, NULL, game_context->tx_timeout);
+	(transactional_task, NULL, cleanup_task, game_context->tx_timeout);
 
-      /* Not necessary to hold a ref to this, as we've transferred them to the
+      /* Not necessary to hold a ref to these, as we've transferred them to the
 	 execution. */
   
       gzochid_application_task_unref (transactional_task);
+      gzochid_application_task_unref (cleanup_task);
       
       application_task = gzochid_application_task_new
 	(context, gzochid_game_client_get_identity (client),
-	 gzochid_application_reexecuting_transactional_task_worker, execution);
+	 gzochid_application_resubmitting_transactional_task_worker, execution);
       
       task.worker = gzochid_application_task_thread_worker;
       task.data = application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
-      gzochid_schedule_run_task (game_context->task_queue, &task);
+      gzochid_schedule_submit_task (game_context->task_queue, &task);
     }
 }

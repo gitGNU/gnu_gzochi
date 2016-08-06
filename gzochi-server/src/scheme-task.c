@@ -328,8 +328,9 @@ gzochid_scheme_application_received_message_worker
   void **data = ptr;
 
   guint64 *session_oid = data[0];
-  unsigned char *message = data[1];
-  short *message_len_ptr = data[2];
+  size_t message_len;
+  unsigned char *message = (unsigned char *) g_bytes_get_data
+    (data[1], &message_len);
 
   session_reference = gzochid_data_create_reference_to_oid 
     (context, &gzochid_client_session_serialization, *session_oid);
@@ -344,7 +345,8 @@ gzochid_scheme_application_received_message_worker
 
   session = session_reference->obj;
 
-  bv = gzochid_scheme_create_bytevector (message, *message_len_ptr);
+  bv = gzochid_scheme_create_bytevector (message, message_len);
+  
   callback_reference =
     gzochid_data_create_reference_to_oid
     (context, &gzochid_scheme_data_serialization,
