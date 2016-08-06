@@ -1,5 +1,5 @@
 ;; echo-chamber/server.scm --- Echo chamber benchmark, server side
-;; Copyright (C) 2015 Julian Graham
+;; Copyright (C) 2016 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -20,6 +20,12 @@
   (export disconnected initialized logged-in received-message)
   (import (only (guile) string-prefix?) (gzochi) (rnrs))
 
+  ;; Collocates the client session with the "echo" channel so that the channel
+  ;; binding doesn't have to be looked up on every messages.
+  
+  (gzochi:define-managed-record-type echo-chamber-client
+    (fields session channel))
+  
   ;; Create the echo channel.
   
   (define (initialized properties) (gzochi:create-channel "echo"))
@@ -29,23 +35,26 @@
   ;; echo channel; and it forwards "PONG" messages to the session that sent the
   ;; "PING" to which the sender is responding.
   
-  (define (received-message msg client-session)
+  (define (received-message msg client)
     (let ((str (utf8->string msg)))
       (cond ((string-prefix? "PING" str)
-             (gzochi:send-channel-message (gzochi:get-channel "echo") msg))
+             (gzochi:send-channel-message
+	      (echo-chamber-client-channel client) msg))
             ((string-prefix? "PONG" str)
              (let ((ping-session (gzochi:get-binding (substring str 5)))
-                   (pong-message (string-append
-                                  "PONG " (gzochi:client-session-name
-                                           client-session))))
+                   (pong-message
+		    (string-append
+		     "PONG " (gzochi:client-session-name
+			      (echo-chamber-client-session client)))))
                (gzochi:send-message ping-session (string->utf8 pong-message))))
             (else (raise (make-assertion-violation))))))
 
   ;; Remove the session binding and remove the session from the channel.
   
-  (define (disconnected client-session)
-    (gzochi:remove-binding! (gzochi:client-session-name client-session))
-    (gzochi:leave-channel (gzochi:get-channel "echo") client-session))
+  (define (disconnected client)
+    (let ((session (echo-chamber-client-session client)))
+      (gzochi:remove-binding! (gzochi:client-session-name session))
+      (gzochi:leave-channel (echo-chamber-client-channel client) session)))
 
   ;; Bind the session by name and add it to the channel.
   
@@ -53,8 +62,9 @@
     (let ((echo-channel (gzochi:get-channel "echo")))
       (gzochi:set-binding!
        (gzochi:client-session-name client-session) client-session)
-      (gzochi:join-channel echo-channel client-session))
-
-    (gzochi:make-client-session-listener
-     (g:@ received-message client-session) (g:@ disconnected client-session)))
+      (gzochi:join-channel echo-channel client-session)
+      
+      (let ((client (make-echo-chamber-client client-session echo-channel)))
+	(gzochi:make-client-session-listener
+	 (g:@ received-message client) (g:@ disconnected client)))))
 )
