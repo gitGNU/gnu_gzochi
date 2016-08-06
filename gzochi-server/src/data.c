@@ -470,16 +470,6 @@ get_reference_by_ptr (gzochid_application_context *context, void *ptr,
       
       reference = create_new_reference (context, ptr, serialization);
 
-      if (tx_context->transaction->rollback)
-	{
-	  gzochid_transaction_mark_for_rollback 
-	    (&data_participant, tx_context->transaction->should_retry);
-	  g_set_error 
-	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
-	     "Transaction rolled back while creating new reference.");
-	  return NULL;
-	}
-      
       assert (g_hash_table_lookup 
 	      (tx_context->oids_to_references, &reference->oid) == NULL);
       assert (g_hash_table_lookup 
@@ -490,6 +480,16 @@ get_reference_by_ptr (gzochid_application_context *context, void *ptr,
       
       g_hash_table_insert (tx_context->oids_to_references, key, reference);
       g_hash_table_insert (tx_context->ptrs_to_references, ptr, reference);
+
+      if (tx_context->transaction->rollback)
+	{
+	  gzochid_transaction_mark_for_rollback 
+	    (&data_participant, tx_context->transaction->should_retry);
+	  g_set_error 
+	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	     "Transaction rolled back while creating new reference.");
+	  return NULL;
+	}
     }
   
   return reference;

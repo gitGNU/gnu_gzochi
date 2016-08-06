@@ -86,7 +86,7 @@ gzochid_channel_new (char *name)
 {
   gzochid_channel *channel = calloc (1, sizeof (gzochid_channel));
 
-  channel->name = name;
+  channel->name = strdup (name);
 
   return channel;
 }
@@ -94,6 +94,7 @@ gzochid_channel_new (char *name)
 void
 gzochid_channel_free (gzochid_channel *channel)
 {
+  free (channel->name);
   free (channel);
 }
 
@@ -1033,6 +1034,8 @@ gzochid_channel_join (gzochid_application_context *context,
   gzochid_channel_pending_operation *operation = 
     (gzochid_channel_pending_operation *) join_operation;
 
+  gzochid_application_task *app_task = NULL;
+  
   if (tx_context == NULL)
     return;
   
@@ -1058,14 +1061,17 @@ gzochid_channel_join (gzochid_application_context *context,
   join_operation->target_session = session_reference->oid;
 
   /* Create a task to execute the join... */
+
+  app_task = gzochid_application_task_new
+     (context, gzochid_auth_system_identity (), channel_operation_worker,
+      operation);
   
   task_handle = gzochid_create_durable_application_task_handle
-    (gzochid_application_task_new
-     (context, gzochid_auth_system_identity (), channel_operation_worker,
-      operation),
-     &gzochid_channel_operation_task_serialization, (struct timeval) { 0, 0 },
-     NULL, NULL);
+    (app_task, &gzochid_channel_operation_task_serialization,
+     (struct timeval) { 0, 0 }, NULL, NULL);
 
+  gzochid_application_task_unref (app_task);
+  
   /* ...and add it to the task queue. */
 
   if (task_handle != NULL)
@@ -1090,6 +1096,8 @@ gzochid_channel_leave (gzochid_application_context *context,
   gzochid_channel_pending_operation *operation = 
     (gzochid_channel_pending_operation *) leave_operation;
 
+  gzochid_application_task *app_task = NULL;
+
   channel_reference = gzochid_data_create_reference 
     (context, &gzochid_channel_serialization, channel, NULL);
 
@@ -1112,14 +1120,17 @@ gzochid_channel_leave (gzochid_application_context *context,
   leave_operation->target_session = session_reference->oid;
 
   /* Create a task to execute the exit from the channel... */
+
+  app_task = gzochid_application_task_new
+    (context, gzochid_auth_system_identity (), channel_operation_worker,
+     operation);
   
   task_handle = gzochid_create_durable_application_task_handle
-    (gzochid_application_task_new
-     (context, gzochid_auth_system_identity (), channel_operation_worker,
-      operation),
-     &gzochid_channel_operation_task_serialization, (struct timeval) { 0, 0 },
-     NULL, NULL);
+    (app_task, &gzochid_channel_operation_task_serialization,
+     (struct timeval) { 0, 0 }, NULL, NULL);
 
+  gzochid_application_task_unref (app_task);
+  
   /* ...and add it to the task queue. */
 
   if (task_handle != NULL)
@@ -1143,6 +1154,8 @@ gzochid_channel_send (gzochid_application_context *context,
   gzochid_channel_pending_operation *operation = 
     (gzochid_channel_pending_operation *) send_operation;
 
+  gzochid_application_task *app_task = NULL;
+
   channel_reference = gzochid_data_create_reference 
     (context, &gzochid_channel_serialization, channel, NULL);
 
@@ -1162,12 +1175,15 @@ gzochid_channel_send (gzochid_application_context *context,
 
   /* Create a task to execute the message broadcast... */
 
+  app_task = gzochid_application_task_new
+    (context, gzochid_auth_system_identity (), channel_operation_worker,
+     operation);    
+  
   task_handle = gzochid_create_durable_application_task_handle
-    (gzochid_application_task_new
-     (context, gzochid_auth_system_identity (), channel_operation_worker,
-      operation),
-     &gzochid_channel_operation_task_serialization, (struct timeval) { 0, 0 },
-     NULL, NULL);
+    (app_task, &gzochid_channel_operation_task_serialization,
+     (struct timeval) { 0, 0 }, NULL, NULL);
+
+  gzochid_application_task_unref (app_task);
 
   /* ...and add it to the task queue. */
 
@@ -1189,6 +1205,8 @@ gzochid_channel_close (gzochid_application_context *context,
   gzochid_channel_pending_operation *operation = malloc 
     (sizeof (gzochid_channel_pending_operation));
 
+  gzochid_application_task *app_task = NULL;
+
   channel_reference = gzochid_data_create_reference 
     (context, &gzochid_channel_serialization, channel, NULL);
 
@@ -1202,13 +1220,16 @@ gzochid_channel_close (gzochid_application_context *context,
   
   /* Create a task to execute the channel shutdown... */
 
+  app_task = gzochid_application_task_new
+    (context, gzochid_auth_system_identity (), channel_operation_worker,
+     operation);
+  
   task_handle = gzochid_create_durable_application_task_handle
-    (gzochid_application_task_new
-     (context, gzochid_auth_system_identity (), channel_operation_worker,
-      operation),
-     &gzochid_channel_operation_task_serialization, (struct timeval) { 0, 0 },
-     NULL, NULL);
+    (app_task, &gzochid_channel_operation_task_serialization,
+     (struct timeval) { 0, 0 }, NULL, NULL);
 
+  gzochid_application_task_unref (app_task);
+  
   /* ...and add it to the task queue. */
 
   if (task_handle != NULL)

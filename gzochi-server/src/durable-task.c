@@ -1075,6 +1075,10 @@ schedule_coordinator_task (gzochid_application_context *app_context,
     (coordinator_main_task, coordinator_catch_task, coordinator_cleanup_task,
      game_context->tx_timeout);
 
+  gzochid_application_task_unref (coordinator_main_task);
+  gzochid_application_task_unref (coordinator_catch_task);
+  gzochid_application_task_unref (coordinator_cleanup_task);
+  
   /* Note that the task as constructed below doesn't use the delay offset from
      the task in the queue that it wraps. Possible avenue of enhancement for the
      future, if desired. */
@@ -1139,14 +1143,17 @@ gzochid_schedule_durable_task_chain (gzochid_application_context *app_context,
 
   /* Construct and assemble the primordial context components, checking for
      transaction failure along the way. */
+
+  gzochid_application_task *app_task = gzochid_application_task_new
+    (app_context, identity, task_chain_bootstrap_worker, chain_context);
   
   gzochid_durable_application_task_handle *bootstrap_handle =
     gzochid_create_durable_application_task_handle
-    (gzochid_application_task_new
-     (app_context, identity, task_chain_bootstrap_worker, chain_context),
-     &gzochid_task_chain_bootstrap_task_serialization,
+    (app_task, &gzochid_task_chain_bootstrap_task_serialization,
      (struct timeval) { 0, 0 }, NULL, &local_err);
-  
+
+  gzochid_application_task_unref (app_task);
+
   if (local_err == NULL)
     chain_context->bootstrap_ref = gzochid_data_create_reference
       (app_context, &gzochid_durable_application_task_handle_serialization,

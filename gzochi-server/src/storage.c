@@ -85,6 +85,7 @@ gzochid_storage_load_engine (const char *dir, const char *name)
 	      return NULL;
 	    }
 
+	  free (path);
 	  engine->handle = engine_handle;
 	      
 	  g_info ("Loaded storage engine '%s'", engine->interface->name);

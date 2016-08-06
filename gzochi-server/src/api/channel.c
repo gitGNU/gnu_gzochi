@@ -51,7 +51,8 @@ SCM_DEFINE (primitive_create_channel, "primitive-create-channel", 1, 0, 0,
       gzochid_data_dereference (scm_reference, NULL);      
       ret = scm_reference->obj;
     }
-  
+
+  free (cname);
   gzochid_api_check_transaction ();
   return ret;
 }
