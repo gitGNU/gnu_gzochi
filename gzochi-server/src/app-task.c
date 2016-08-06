@@ -280,18 +280,6 @@ gzochid_application_transaction_execute_timed
   return gzochid_transaction_execute_timed (event_func_wrapper, args, timeout);
 }
 
-static void
-wrap_and_execute (gzochid_application_context *app_context,
-		  gzochid_auth_identity *identity,
-		  gzochid_application_task *inner)
-{
-  gzochid_transactional_application_task_execution *execution = 
-    gzochid_transactional_application_task_execution_new (inner, NULL, NULL);
-
-  gzochid_application_reexecuting_transactional_task_worker
-    (app_context, identity, execution);
-}
-
 void 
 gzochid_application_reexecuting_transactional_task_worker 
 (gzochid_application_context *app_context, gzochid_auth_identity *identity, 
@@ -305,7 +293,22 @@ gzochid_application_reexecuting_transactional_task_worker
 
   if (execution->result != GZOCHID_TRANSACTION_SUCCESS
       && execution->catch_task != NULL)
-    wrap_and_execute (app_context, identity, execution->catch_task);
+    {
+      gzochid_transactional_application_task_execution *catch_execution = NULL;
+
+      if (execution->timeout != NULL)
+	catch_execution =
+	  gzochid_transactional_application_task_timed_execution_new
+	  (execution->catch_task, NULL, NULL, *execution->timeout);
+      else catch_execution =
+	     gzochid_transactional_application_task_execution_new
+	     (execution->catch_task, NULL, NULL);
+
+      catch_execution->max_attempts = 1;
+      
+      gzochid_application_reexecuting_transactional_task_worker
+	(app_context, identity, catch_execution);
+    }
 
   if (execution->cleanup_task != NULL)
     execution->cleanup_task->worker
