@@ -271,7 +271,7 @@ test_client_dispatch_one_reserve_oids (dataserver_protocol_fixture *fixture,
   gzochi_metad_dataserver_client *client =
     _gzochid_client_socket_get_protocol_data (fixture->client_socket);
 
-  char buf[16];
+  char buf[18];
   GByteArray *bytes = g_byte_array_new ();
 
   g_byte_array_append (bytes, "\x00\x05\x20test", 8);
