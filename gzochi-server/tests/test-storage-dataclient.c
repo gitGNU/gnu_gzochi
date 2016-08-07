@@ -123,6 +123,8 @@ create_closure
   
   closure->failure_callback = failure_callback;
   closure->failure_data = failure_data;
+
+  return closure;
 }
 
 static dataclient_storage_response *
