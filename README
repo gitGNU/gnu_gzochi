@@ -21,3 +21,4 @@ component of the distribution:
 * examples/ - some example games with client and server component 
   implementations intended to help new developers understand the gzochi
   framework
+* contrib/ - useful supplemental files
