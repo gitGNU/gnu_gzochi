@@ -1,5 +1,5 @@
-This is version 0.9 of gzochid, the server container for the gzochi game
-development framework.
+This is version 0.9 of gzochid and gzochi-metad, the server components for the
+gzochi game development framework.
 
 gzochi is a framework for developing massively multiplayer online games. A
 server container provides services to deployed games, which are written in 
@@ -13,28 +13,33 @@ gzochi Scheme API and listens for socket connections from client programs. It
 includes some simple embedded reporting tools to track throughput and resource 
 usage.
 
+gzochi-metad is the (optional) daemon program that supports a highly-available
+cluster of gzochid instances by distributing client connections and task
+execution across them. Like gzochid, it includes an embedded reporting console.
 
 Additional INSTALL instructions ===============================================
 
-Generic instructions for configuring and compiling gzochid can be found in the
-INSTALL file. gzochid-specific information and configuration options can be
-found below.
+Generic instructions for configuring and compiling gzochid and gzochi-metad can
+be found in the INSTALL file. Application-specific information and configuration
+options can be found below.
 
-gzochid depends on the following external libraries.
+gzochid and gzochi-metad depend on the following external libraries.
 - libdb
 - libg
 - libgobject
-- libguile
 - libgzochi-common
 - libmicrohttpd
 - libz
+
+In addition, gzochid depends on
+- libguile
 
 The dependencies on libg, libguile, libmicrohttpd, and libz are configured 
 using `pkg-config'.
 
 libgzochi-common is provided as part of the gzochi distribution and is assumed
-to have been built in a directory adjacent to the directory in which gzochid is
-being configured and built.
+to have been built in a directory adjacent to the directory in which gzochid and
+gzochi-metad are being configured and built.
 
 To build the optional `krb5' authentication plugin, development files for MIT
 Kerberos 5 must be installed. The build process will search for these files by
@@ -46,7 +51,7 @@ link-time flags to be used to build the plugin.
 
 Required External Packages ====================================================
 
-gzochid requires the following external packages:
+gzochid and gzochi-metad require the following external packages:
 
   - Oracle BerkeleyDB, at least version 5.1
 
@@ -55,9 +60,9 @@ gzochid requires the following external packages:
     
   - GNU GLib and GObject, at least version 2.32
 
-    GLib is used throughout gzochid for its general-purpose utility functions
-    and data structures. The GObject library is used for component modeling and
-    wiring. Both are available from http://www.gtk.org/ .
+    GLib is used throughout gzochid / gzochi-metad for its general-purpose
+    utility functions and data structures. The GObject library is used for
+    component modeling and wiring. Both are available from http://www.gtk.org/ .
 
   - GNU Guile, at least version 2.0.4
  
@@ -69,8 +74,9 @@ gzochid requires the following external packages:
   - GNU libmicrohttpd, at least version 0.9.17
 
     libmicrohttpd is used to serve pages that provide statistical information
-    about the running gzochid instance and its hosted applications. It is
-    available from http://www.gnu.org/software/libmicrohttpd/ .
+    about running gzochid / gzochi-metad instances and their hosted
+    applications. It is available from
+    http://www.gnu.org/software/libmicrohttpd/ .
 
   - zlib, at least version 1.2.5
 
@@ -78,8 +84,8 @@ gzochid requires the following external packages:
 
   - pkg-config
 
-    gzochid's ./configure script uses pkg-config to discover the correct 
-    compile and link options for a number of the libraries above.
+    The ./configure script uses pkg-config to discover the correct compile and
+    link options for a number of the libraries above.
 
 
 Optional External Packages ====================================================
@@ -108,8 +114,8 @@ About This Distribution =======================================================
 Interesting files include:
 
 - COPYING, which contains the terms of GNU General Public License.
-- INSTALL, which contains general instructions for building/installing gzochid.
-- NEWS, which describes user-visible changes since the last release of gzochid.
+- INSTALL, which contains general instructions for building/installing.
+- NEWS, which describes user-visible changes since the last release.
 
 Files are usually installed according to the prefix specified to configure,
 /usr/local by default. Building and installing gives you:
@@ -117,3 +123,4 @@ Files are usually installed according to the prefix specified to configure,
 Executables, in ${prefix}/bin:
 
  gzochid --- the server container for gzochi
+ gzochi-metad --- the gzochi meta server

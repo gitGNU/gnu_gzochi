@@ -1,0 +1,36 @@
+gzochi-metad, the gzochi meta server, is an experimental component that makes it
+possible to scale a gzochi game application horizontally across a cluster of
+gzochid containers, while providing the same guarantees around data consistency
+and transactional atomicity offered by a configuration with a single gzochid
+instance.
+
+This "high availability" configuration works by having the meta server act as
+the authoritative store for game application data, allowing individual gzochid
+server instances obtain temporary locks on groups of keys (and key ranges) for
+the purpose of transactional task processing. While these locks are held, data
+modified by game transactions is periodically transmitted back to the meta
+server for durable persistence. When the locks expire, the server instance's
+local cache of data for those keys is purged, and another server instance is
+free to seize the locks.
+
+In the future, the meta server will also be responsible for balancing client
+connections and coordinating task execution and channel events across gzochid
+server instances.
+
+Right now, only the lock acquisition aspect of the transaction model described
+above is implemented; once a gzochid server obtains a lock, it doesn't let it go
+until it disconnects from the meta server. Because of that, it's not practically
+possible to distribute client connections to the same game application across
+multiple gzochid servers connected to the same meta store - there's too much
+potential for lock contention. However, you can still use the meta store to
+create a gzochid cluster that supports hot "failover" from one gzochid server
+instance to another.
+
+To do so, launch a meta server instance and configure two gzochid instances (A
+and B) to connect to it using the "metaserver" section of the gzochid.conf file.
+Direct clients to connect to server A when available, server B otherwise. If
+server A is shut down, server B will automatically begin serving the game
+application in a consistent state.
+
+More meta server functionality (and documentation!) is coming soon. In the
+meantime, Please send any questions (and any bugs) to gzochi-devel@nongnu.org.
