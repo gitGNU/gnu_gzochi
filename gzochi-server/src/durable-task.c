@@ -681,6 +681,13 @@ void gzochid_schedule_durable_task_handle
   execution = gzochid_transactional_application_task_timed_execution_new 
     (transactional_task, catch_task, cleanup_task, game_context->tx_timeout);
 
+  /* Not necessary to hold a ref to these, as we've transferred them to the
+     execution. */
+
+  gzochid_application_task_unref (transactional_task);
+  gzochid_application_task_unref (catch_task);
+  gzochid_application_task_unref (cleanup_task);
+  
   application_task = gzochid_application_task_new
     (app_context, cloned_identity,
      gzochid_application_resubmitting_transactional_task_worker, execution);
