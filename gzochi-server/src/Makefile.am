@@ -25,7 +25,7 @@ SUBDIRS = api auth scheme storage
 bin_PROGRAMS = gzochid gzochi-metad gzochi-dump gzochi-load gzochi-migrate
 dist_noinst_DATA = dtd/game.dtd dtd/migration.dtd
 dist_sysconf_DATA = conf/gzochi-metad.conf conf/gzochid.conf
-EXTRA_DIST = conf/gzochi-metad.conf conf/gzochid.conf.in
+EXTRA_DIST = conf/gzochi-metad.conf.in conf/gzochid.conf.in
 
 substitute = sed -e 's,[@]datarootdir[@],$(datarootdir),g' \
 	-e 's,[@]libdir[@],$(libdir),g' \
