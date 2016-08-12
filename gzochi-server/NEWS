@@ -1,9 +1,91 @@
 gzochid NEWS -- history of user-visible changes
-Copyright (C) 2015 Julian Graham
+Copyright (C) 2016 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.10 (since 0.9):
+
+* Changes to the distribution
+
+** gzochi-metad, the gzochi meta server
+
+The default build in the `gzochi-server' folder now produces a new executable:
+gzochi-metad, a daemon service that supports a highly available cluster of
+gzochid container servers. See the `README.gzochi-metad' file for provisional
+documentation.
+
+** GNU MP no longer required
+
+The GNU Multiple Precision Arithmetic Library is no longer a first-order,
+compile-time dependency of `gzochid'. (There is still, however, a transitive
+runtime dependency on it via GNU Guile.)
+
+** GNU GObject required
+
+`gzochid' and `gzochi-metad' have compile-time and runtime dependencies on the
+GObject module of GNU GLib. 
+
+* Incompatible changes
+
+** Object id and channel serialization format changes
+
+As a side effect of several performance enhancements to the gzochid container's
+data services, game objects written to the container's store are now identified
+by a fixed-width byte key, as opposed to a variable-width hexadecimal string
+key. The internal representation of the `gzochi:channel' structure has also
+changed in a backwards-incompatible way. Consequently, application data stores
+created by a previous release of the container are not compatible with version
+0.10.
+
+Migrating a store created by a previous release is possible, but not
+automatically so with the toolchain bundled with this source distribution; email
+"gzochi-devel@nongnu.org" for help.
+
+** LMDB and upscaledb (hamsterdb) no longer supported
+
+Neither LMDB nor upscaledb has a lock strategy that supports truly interleaved,
+concurrent transactions. The corresponding storage engine modules have been
+removed from the distribution.
+
+** Non-transactional functions removed from storage engine SPI
+
+The non-transactional / single-operation variants of the "get," "put," etc.
+operator fields have been removed from the `gzochid_storage_engine_interface'
+struct.
+
+* Notable changes
+
+** Improved transaction throughput and concurrency against mem store
+
+The built-in, memory-backed transactional store introduced in version 0.8 now
+groups individual key-value records into 4k pages, similar to the B+tree
+implementation in Berkeley DB and other key-value databases. As a result, the
+potential for deadlock in several common gzochid persistence workloads (such as
+durable task scheduling) is greatly reduced.
+
+** Reduced lock contention on several key code paths
+
+In addition to the storage-level enhancements described above, the lock
+acquisition order for disconnected session handling and for the
+`gzochi:removing-binding' operation have been optimized to avoid contention with
+simultaneously executing transactions.
+
+** Lower average latency for client message processing
+
+Processing of client messages was previously being serialized on the I/O main
+loop thread. Messages are now dispatched to the task queue's thread pool for
+asynchronous execution, yielding a throughput improvement proportional to the
+size of that pool.
+
+* Bug fixes
+
+** Sporadic SIGSEGV during deletes against mem storage manager
+** Sporadic test failure: /storage-mem/tx/deadlock/simple
+** Guile modules installed to incorrect location.
+** Channel side effects lack proper transaction semantics
+
+
 Changes in 0.9 (since 0.8):
 
 * Changes to the distribution
@@ -471,7 +553,7 @@ API counterparts) from the `(gzochi data)' and `(gzochi)' libraries:
 
 Copyright information:
 
-Copyright (C) 2015 Julian Graham
+Copyright (C) 2016 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the

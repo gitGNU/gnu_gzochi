@@ -1,9 +1,17 @@
 (gzochi client) NEWS -- history of user-visible changes
-Copyright (C) 2015 Julian Graham
+Copyright (C) 2016 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.10 (since 0.9):
+
+* Bug fixes
+
+** Stack overflow from `with-mutex' in Guile 2.0.
+** Guile modules installed to incorrect location.
+
+
 Changes in 0.9 (since 0.8):
 
 * Additions to the API
@@ -13,7 +21,6 @@ Changes in 0.9 (since 0.8):
 A new procedure allows callers to remove event sources from a main loop. See the
 `(gzochi main-loop)' source code for inline documentation.
 
-
 
 Changes in 0.8 (since 0.7):
 
@@ -22,11 +29,10 @@ Changes in 0.8 (since 0.7):
 ** Disconnect client on empty read in `(gzochi client)'.
 ** Avoid a `#f' pollable source in `(gzochi main-loop)'.
 
-
 
 Copyright information:
 
-Copyright (C) 2015 Julian Graham
+Copyright (C) 2016 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the

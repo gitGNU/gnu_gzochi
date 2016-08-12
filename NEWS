@@ -1,9 +1,22 @@
 gzochi NEWS -- history of user-visible changes
-Copyright (C) 2015 Julian Graham
+Copyright (C) 2016 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.10 (since 0.8)
+
+* Changes to the distribution
+
+** Support for building gzochi in a Docker container
+
+The top-level `contrib/' folder contains a `Dockerfile' for an image that
+includes all of the necessary dependencies for building the gzochi framework and
+the example applications from scratch. Use it for a faster bootstrap experience
+when building from the source distribution. (This is the same image that's used
+for the build and test pipeline on https://gitlab.com/joolean/gzochi.)
+
+
 Changes in 0.8 (since 0.7)
 
 * Changes to the distribution
@@ -95,7 +108,7 @@ in which state is shared between multiple players.
 
 Copyright information:
 
-Copyright (C) 2015 Julian Graham
+Copyright (C) 2016 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the
