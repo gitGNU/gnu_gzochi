@@ -24,12 +24,12 @@
 /* A `gzochid_server_protocol' implementation for the gzochi game application
    protocol. */
 
-gzochid_server_protocol gzochid_game_server_protocol;
+extern gzochid_server_protocol gzochid_game_server_protocol;
 
 /* A `gzochid_client_protocol' implementation for the gzochi game application
    protocol. */
 
-gzochid_client_protocol gzochid_game_client_protocol;
+extern gzochid_client_protocol gzochid_game_client_protocol;
 
 /* A struct representing a connected gzochi game application client. 
    `gzochid_game_client' instances are created and managed by the protocol. */

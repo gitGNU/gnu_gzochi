@@ -121,7 +121,7 @@ libgzochi_metad_la_LIBADD = @GLIB_LIBS@ @GMODULE_LIBS@ @GTHREAD_LIBS@ \
 
 gzochi_metad_CFLAGS = @CFLAGS@ \
 	-DGZOCHI_METAD_CONF_LOCATION=$(sysconfdir)/gzochi-metad.conf \
-	@GLIB_CFLAGS@ @GOBJECT_LIBS@ @GTHREAD_CFLAGS@ -Wall -Werror
+	@GLIB_CFLAGS@ @GOBJECT_CFLAGS@ @GTHREAD_CFLAGS@ -Wall -Werror
 
 gzochi_metad_SOURCES = gzochi-metad.c
 gzochi_metad_LDADD = libgzochi-metad.la

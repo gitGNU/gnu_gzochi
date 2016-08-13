@@ -16,7 +16,6 @@
  */
 
 #include <glib.h>
-#include <gmp.h>
 #include <sys/time.h>
 
 #include "oids.h"
