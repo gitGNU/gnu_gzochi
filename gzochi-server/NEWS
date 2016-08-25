@@ -4,6 +4,13 @@ See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.10.1 (since 0.10):
+
+* Bug fixes
+
+** Warnings and test failures during i686 `make distcheck'
+
+
 Changes in 0.10 (since 0.9):
 
 * Changes to the distribution
