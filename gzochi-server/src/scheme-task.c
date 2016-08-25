@@ -328,7 +328,7 @@ gzochid_scheme_application_received_message_worker
   void **data = ptr;
 
   guint64 *session_oid = data[0];
-  size_t message_len;
+  gsize message_len;
   unsigned char *message = (unsigned char *) g_bytes_get_data
     (data[1], &message_len);
 
@@ -404,11 +404,11 @@ gzochid_scheme_application_disconnected_worker
     {
       if (err->message != NULL)
 	g_warning
-	  ("Failed to dereference disconnecting session '%lx': %s", 
-	   *session_oid, err->message);
+	  ("Failed to dereference disconnecting session '%" G_GUINT64_FORMAT
+	   "': %s", *session_oid, err->message);
       else g_warning 
-	     ("Failed to dereference disconnecting session '%lx'.",
-	      *session_oid);
+	     ("Failed to dereference disconnecting session '%" G_GUINT64_FORMAT
+	      "'.", *session_oid);
 
       g_error_free (err);
       return;
@@ -426,8 +426,8 @@ gzochid_scheme_application_disconnected_worker
 	 Just jump straight to removing the session from the data store. */
       
       gzochid_tx_warning 
-	(context, "Session '%lx' disconnected after incomplete login.",
-	 *session_oid);
+	(context, "Session '%" G_GUINT64_FORMAT
+	 "' disconnected after incomplete login.", *session_oid);
       gzochid_client_session_disconnected_worker (context, identity, ptr);
       
       return;
@@ -445,11 +445,11 @@ gzochid_scheme_application_disconnected_worker
     {
       if (err->message != NULL)
 	g_warning
-	  ("Failed to retrieve disconnect callback for session '%lx': %s", 
-	   *session_oid, err->message);
+	  ("Failed to retrieve disconnect callback for session '%"
+	   G_GUINT64_FORMAT "': %s", *session_oid, err->message);
       else g_warning 
-	     ("Failed to retrieve disconnect callback for session '%lx'.", 
-	      *session_oid);
+	     ("Failed to retrieve disconnect callback for session '%"
+	      G_GUINT64_FORMAT "'.", *session_oid);
 
       g_error_free (err);      
       return;
@@ -487,8 +487,8 @@ gzochid_scheme_application_disconnected_worker
       if (err != NULL)
 	{
 	  g_warning
-	    ("Failed to remove lifecycle handler for session '%lx': %s",
-	     *session_oid,  err->message);
+	    ("Failed to remove lifecycle handler for session '%"
+	     G_GUINT64_FORMAT "': %s", *session_oid,  err->message);
 	  
 	  g_error_free (err);
 	}

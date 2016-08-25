@@ -150,7 +150,8 @@ flush_reference (gzochid_data_managed_reference *reference,
       out = g_byte_array_new ();
       assert (reference->obj != NULL);
 
-      g_debug ("Flushing new/modified reference '%lx'.", reference->oid);
+      g_debug ("Flushing new/modified reference '%" G_GUINT64_FORMAT "'.",
+	       reference->oid);
 
       reference->serialization->serializer
 	(context->context, reference->obj, out, &err);
@@ -518,7 +519,8 @@ dereference (gzochid_data_transaction_context *context,
       return;
     }
 
-  g_debug ("Retrieving data for reference '%lx'.", reference->oid);
+  g_debug ("Retrieving data for reference '%" G_GUINT64_FORMAT "'.",
+	   reference->oid);
 
   encoded_oid = gzochid_util_encode_oid (reference->oid);
   
@@ -536,13 +538,13 @@ dereference (gzochid_data_transaction_context *context,
 	(&data_participant, context->transaction->should_retry);
       g_set_error 
 	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
-	 "Transaction rolled back while retrieving reference '%lx'.",
-	 reference->oid);
+	 "Transaction rolled back while retrieving reference '%"
+	 G_GUINT64_FORMAT "'.", reference->oid);
     }
   else if (data == NULL)
     g_set_error 
       (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
-       "No data found for reference '%lx'.", reference->oid);
+       "No data found for reference '%" G_GUINT64_FORMAT "'.", reference->oid);
   else 
     {
       GError *local_err = NULL;
@@ -590,21 +592,22 @@ remove_object (gzochid_data_transaction_context *context, guint64 oid,
 
   guint64 encoded_oid = gzochid_util_encode_oid (oid);
   
-  g_debug ("Removing reference '%lx'.", oid);
+  g_debug ("Removing reference '%" G_GUINT64_FORMAT "'.", oid);
   ret = APP_STORAGE_INTERFACE (context->context)->transaction_delete 
     (context->transaction, context->context->oids, (char *) &encoded_oid, 
      sizeof (guint64));
 
   if (ret == GZOCHID_STORAGE_ENOTFOUND)
     g_set_error (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND, 
-		 "No data found for reference '%lx'.", oid);
+		 "No data found for reference '%" G_GUINT64_FORMAT "'.", oid);
   else if (ret == GZOCHID_STORAGE_ETXFAILURE)
     {
       gzochid_transaction_mark_for_rollback 
 	(&data_participant, tx_context->transaction->should_retry);
       g_set_error 
 	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
-	 "Transaction rolled back while removing reference '%lx'.", oid);
+	 "Transaction rolled back while removing reference '%"
+	 G_GUINT64_FORMAT "'.", oid);
     }
 
   return;
@@ -933,7 +936,8 @@ gzochid_data_mark (gzochid_application_context *context,
       guint64 encoded_oid = gzochid_util_encode_oid (reference->oid);
       
       reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
-      g_debug ("Marking reference '%lx' for update.", reference->oid);
+      g_debug ("Marking reference '%" G_GUINT64_FORMAT "' for update.",
+	       reference->oid);
 
       data = APP_STORAGE_INTERFACE (context)->transaction_get_for_update
 	(tx_context->transaction, tx_context->context->oids,
@@ -945,8 +949,8 @@ gzochid_data_mark (gzochid_application_context *context,
 	    (&data_participant, tx_context->transaction->should_retry);
 	  g_set_error 
 	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
-	     "Transaction rolled back while removing reference '%lx'.",
-	     reference->oid);
+	     "Transaction rolled back while removing reference '%"
+	     G_GUINT64_FORMAT "'.", reference->oid);
 	}
       else free (data);
     }
@@ -990,8 +994,8 @@ gzochid_data_print_references (gzochid_data_transaction_context *context)
 	default: state = "UNKNOWN";
 	}
       
-      printf ("%lx (serialization: %p) -> %s\n", ref->oid, ref->serialization,
-	      state);
+      printf ("%" G_GUINT64_FORMAT " (serialization: %p) -> %s\n", ref->oid,
+	      ref->serialization, state);
 
       values_ptr = values_ptr->next;
     }

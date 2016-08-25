@@ -685,11 +685,12 @@ migrate_object_tx (gpointer data)
     {
       if (g_error_matches 
 	  (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_NOT_FOUND))
-	g_warning ("No data found for oid %lx.", *oid);
+	g_warning ("No data found for oid %" G_GUINT64_FORMAT ".", *oid);
       else 
 	{
 	  g_critical 
-	    ("Failed to deserialize data for oid %lx: %s", *oid, err->message);
+	    ("Failed to deserialize data for oid %" G_GUINT64_FORMAT ": %s",
+	     *oid, err->message);
 	  exit (EXIT_FAILURE);
 	}
     }
@@ -702,7 +703,8 @@ migrate_object_tx (gpointer data)
 	  gzochid_data_remove_object (obj_ref, &err);
 	  if (err != NULL)
 	    {
-	      g_critical ("Failed to remove data for oid %lx", *oid);
+	      g_critical
+		("Failed to remove data for oid %" G_GUINT64_FORMAT, *oid);
 	      exit (EXIT_FAILURE);
 	    }
 	  
@@ -864,9 +866,10 @@ report_stats (struct migration *m)
   fprintf (stderr, "Migration complete in %lu ms.\n", 
 	   ret.tv_sec * 1000 + ret.tv_usec / 1000);
 
-  fprintf (stderr, "Objects visited: %lu\n", m->num_visited);
-  fprintf (stderr, "Objects transformed: %lu\n", m->num_transformed);
-  fprintf (stderr, "Objects removed: %lu\n", m->num_removed);
+  fprintf (stderr, "Objects visited: %" G_GUINT64_FORMAT "\n", m->num_visited);
+  fprintf (stderr, "Objects transformed: %" G_GUINT64_FORMAT "\n",
+	   m->num_transformed);
+  fprintf (stderr, "Objects removed: %" G_GUINT64_FORMAT "\n", m->num_removed);
 }
 
 static struct migration_descriptor *

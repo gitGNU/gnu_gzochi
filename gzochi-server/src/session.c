@@ -202,8 +202,8 @@ session_commit_operation
   if (client == NULL)
     {
       g_warning
-	("Client not found for session '%lx'; skipping operation.",
-	 op->target_session);
+	("Client not found for session '%" G_GUINT64_FORMAT
+	 "'; skipping operation.", op->target_session);
 
       g_mutex_unlock (&context->client_mapping_lock);
       return;
@@ -375,7 +375,7 @@ remove_session (gzochid_application_context *context, guint64 session_oid,
   GError *local_err = NULL;
   GString *binding = g_string_new (SESSION_PREFIX);
 
-  g_string_printf (binding, "%lx", session_oid);
+  g_string_printf (binding, "%" G_GUINT64_FORMAT, session_oid);
   gzochid_data_remove_binding (context, binding->str, &local_err);
   if (local_err == NULL)
     {
@@ -408,8 +408,8 @@ remove_session (gzochid_application_context *context, guint64 session_oid,
 
 	      if (local_err->message != NULL)
 		g_info
-		  ("Unable to remove Scheme object for session '%lx': %s",
-		   session_oid, local_err->message);
+		  ("Unable to remove Scheme object for session '%"
+		   G_GUINT64_FORMAT "': %s", session_oid, local_err->message);
 	    }
 
 	  if (local_err == NULL ||
@@ -670,7 +670,7 @@ persistence_task_worker (gzochid_application_context *context,
   persistence_task->holder->oid = reference->oid;
 
   binding = g_string_new (persistence_task->prefix);
-  g_string_printf (binding, "%lx", reference->oid);
+  g_string_printf (binding, "%" G_GUINT64_FORMAT, reference->oid);
 
   g_clear_error (&persistence_task->holder->err);
   
@@ -777,8 +777,8 @@ gzochid_sweep_client_sessions (gzochid_application_context *context,
 	{
 	  g_set_error
 	    (err, GZOCHID_SESSION_ERROR, GZOCHID_SESSION_ERROR_DISCONNECT,
-	     "Transaction rollback while sweeping disconnected session '%lx'.",
-	     oid);
+	     "Transaction rollback while sweeping disconnected session '%"
+	     G_GUINT64_FORMAT "'.", oid);
 	  
 	  free (next_binding);
 	  return;

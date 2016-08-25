@@ -62,7 +62,7 @@ transaction_new (void)
   transaction->id = transaction_counter++;
   g_mutex_unlock (&transaction_mutex);
 
-  transaction->name = g_strdup_printf ("%lx", transaction->id);
+  transaction->name = g_strdup_printf ("%" G_GUINT64_FORMAT, transaction->id);
   transaction->state = GZOCHID_TRANSACTION_STATE_ACTIVE;
 
   return transaction;

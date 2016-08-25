@@ -66,8 +66,9 @@ gzochid_dataclient_received_oids (GzochidDataClient *client,
 {
   client->activity_log = g_list_append
     (client->activity_log,
-     g_strdup_printf ("RECEIVED OID BLOCK %s/%lu:%lu", response->app,
-		      response->block.block_start, response->block.block_size));
+     g_strdup_printf
+     ("RECEIVED OID BLOCK %s/%" G_GUINT64_FORMAT ":%hu", response->app,
+      response->block.block_start, response->block.block_size));
 }
 
 void

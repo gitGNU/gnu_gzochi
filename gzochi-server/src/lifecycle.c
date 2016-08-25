@@ -379,7 +379,8 @@ login_catch_worker (gzochid_application_context *context,
     (context->oids_to_clients, session_oid);
 
   g_info
-    ("Disconnecting session '%lx'; failed login transaction.", *session_oid);
+    ("Disconnecting session '%" G_GUINT64_FORMAT "'; failed login transaction.",
+     *session_oid);
 
   g_mutex_lock (&context->client_mapping_lock);
   g_hash_table_remove (context->oids_to_clients, session_oid);

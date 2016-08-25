@@ -402,10 +402,12 @@ list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
             
       g_string_append (response_str, "      <li><a href=\"");
       g_string_append_printf
-	(response_str, "%lx", gzochid_util_decode_oid (encoded_oid));
+	(response_str, "%" G_GUINT64_FORMAT,
+	 gzochid_util_decode_oid (encoded_oid));
       g_string_append (response_str, "\">");
       g_string_append_printf
-	(response_str, "%lx", gzochid_util_decode_oid (encoded_oid));
+	(response_str, "%" G_GUINT64_FORMAT,
+	 gzochid_util_decode_oid (encoded_oid));
       g_string_append (response_str, "</a></li>\n");
 
       tx = iface->transaction_begin (app_context->storage_context);      

@@ -544,8 +544,8 @@ channel_side_effect_commit (gpointer data)
 		  if (iter != NULL)
 		    {
 		      g_debug 
-			("Client not found for messaged channel session '%lx'; "
-			 "removing.", session_oid);
+			("Client not found for messaged channel session "
+			 "'%" G_GUINT64_FORMAT "'; removing.", session_oid);
 
 		      g_sequence_remove (iter);
 		    }
