@@ -18,11 +18,13 @@
 #ifndef GZOCHI_COMMON_IO_H
 #define GZOCHI_COMMON_IO_H
 
+#include <stdint.h>
+
 /* Read a big-endian representation of a 64-bit integer from the specified byte
    array, starting from the specified offset. There must be at least 8 bytes
    in the array following the offset. */
 
-long long gzochi_common_io_read_long (const unsigned char *, int);
+int64_t gzochi_common_io_read_long (const unsigned char *, int);
 
 int gzochi_common_io_read_int (const unsigned char *, int);
 short gzochi_common_io_read_short (const unsigned char *, int);
@@ -31,7 +33,7 @@ short gzochi_common_io_read_short (const unsigned char *, int);
    integer to the specified byte starting from the specified offset. There must
    be at least 8 bytes in the array following the offset. */
 
-void gzochi_common_io_write_long (long long, unsigned char *, int);
+void gzochi_common_io_write_long (int64_t, unsigned char *, int);
 
 void gzochi_common_io_write_int (int, unsigned char *, int);
 void gzochi_common_io_write_short (short, unsigned char *, int);

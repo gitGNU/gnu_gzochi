@@ -15,19 +15,21 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdint.h>
+
 #include "io.h"
 
-long long
+int64_t
 gzochi_common_io_read_long (const unsigned char *bytes, int offset)
 {
-  return ((long long) bytes[offset] << 56)
-    + ((long long) bytes[offset + 1] << 48)
-    + ((long long) bytes[offset + 2] << 40)
-    + ((long long) bytes[offset + 3] << 32)
-    + ((long long) bytes[offset + 4] << 24)
-    + ((long long) bytes[offset + 5] << 16)
-    + ((long long) bytes[offset + 6] << 8)
-    + ((long long) bytes[offset + 7]);
+  return ((int64_t) bytes[offset] << 56)
+    + ((int64_t) bytes[offset + 1] << 48)
+    + ((int64_t) bytes[offset + 2] << 40)
+    + ((int64_t) bytes[offset + 3] << 32)
+    + ((int64_t) bytes[offset + 4] << 24)
+    + ((int64_t) bytes[offset + 5] << 16)
+    + ((int64_t) bytes[offset + 6] << 8)
+    + ((int64_t) bytes[offset + 7]);
 }
 
 int
@@ -46,7 +48,7 @@ gzochi_common_io_read_short (const unsigned char *bytes, int offset)
 }
 
 void
-gzochi_common_io_write_long (long long val, unsigned char *bytes, int offset)
+gzochi_common_io_write_long (int64_t val, unsigned char *bytes, int offset)
 {
   bytes[offset] = val >> 56;
   bytes[offset + 1] = val >> 48 & 0xff;
