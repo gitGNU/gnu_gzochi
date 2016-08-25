@@ -50,7 +50,7 @@ enum GzochidOidError
 struct _gzochid_data_oids_block
 {
   guint64 block_start; /* The first object id in the block. */
-  size_t block_size; /* The size of the block. */
+  guint16 block_size; /* The size of the block. */
 };
 
 typedef struct _gzochid_data_oids_block gzochid_data_oids_block;
