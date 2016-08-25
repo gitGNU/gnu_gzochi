@@ -16,7 +16,7 @@ dnl You should have received a copy of the GNU General Public License
 dnl along with this package.  If not, see <http://www.gnu.org/licenses/>.
 dnl
 
-AC_INIT([gzochid], [0.10], [joolean@undecidable.net], [],
+AC_INIT([gzochid], [0.10.1], [joolean@undecidable.net], [],
         [http://www.nongnu.org/gzochi/])
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_MACRO_DIR([m4])
