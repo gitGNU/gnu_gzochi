@@ -19,7 +19,7 @@ dnl
 AC_INIT([gzochi], [0.10.1], [joolean@undecidable.net], [], 
         [http://www.nongnu.org/gzochi/])
 
-AM_INIT_AUTOMAKE(1.6)
+AM_INIT_AUTOMAKE(1.13)
 
 AC_CONFIG_FILES([Makefile
                  examples/tx/Makefile])

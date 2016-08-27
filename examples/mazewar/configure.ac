@@ -19,7 +19,7 @@ dnl
 AC_INIT([gzochi mazewar], [0.2], [joolean@undecidable.net], [], 
         [http://www.nongnu.org/gzochi/])
 
-AM_INIT_AUTOMAKE(1.6)
+AM_INIT_AUTOMAKE(1.13)
 
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_SUBDIRS([client])

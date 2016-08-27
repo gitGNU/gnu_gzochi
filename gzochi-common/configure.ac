@@ -21,7 +21,7 @@ AC_INIT([libgzochi-common], [0.10.1], [joolean@undecidable.net], [],
 AC_CONFIG_AUX_DIR([.])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/gzochi-common.h])
-AM_INIT_AUTOMAKE(1.6)
+AM_INIT_AUTOMAKE(1.13)
 
 AC_LANG(C)
 AC_PROG_CC
