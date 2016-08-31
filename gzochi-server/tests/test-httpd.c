@@ -16,6 +16,7 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -122,7 +123,7 @@ test_add_terminal_simple (test_httpd_fixture *fixture, gconstpointer user_data)
     (fixture->http_server, "/", test_terminal_handler, NULL);
 
   g_io_channel_write_chars
-    (fixture->client_channel, "GET / HTTP/1.1\n\n", 16, NULL, &err);
+    (fixture->client_channel, "GET / HTTP/1.1\r\n\r\n", 18, NULL, &err);
   g_assert_no_error (err);
   
   g_io_channel_flush (fixture->client_channel, &err);
@@ -146,7 +147,7 @@ test_add_continuation_simple (test_httpd_fixture *fixture,
     (partial, "/", test_continuation_terminal, NULL);  
 
   g_io_channel_write_chars
-    (fixture->client_channel, "GET /foo/ HTTP/1.1\n\n", 20, NULL, NULL);
+    (fixture->client_channel, "GET /foo/ HTTP/1.1\r\n\r\n", 22, NULL, NULL);
   
   g_io_channel_flush (fixture->client_channel, NULL);
 
