@@ -1,5 +1,5 @@
 /* test-bdb.c: Test routines for storage/bdb.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -38,6 +38,16 @@ struct test_storage_fixture
   gzochid_storage_context *context;
 };
 
+static gboolean
+ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
+                 const gchar *message, gpointer user_data)
+{
+  if (log_level & G_LOG_LEVEL_CRITICAL
+      || log_level & G_LOG_LEVEL_WARNING)
+    return FALSE;
+  else return log_level & G_LOG_FLAG_FATAL;
+}
+
 static void 
 test_storage_fixture_setup 
 (struct test_storage_fixture *fixture, gconstpointer user_data)
@@ -73,8 +83,9 @@ test_storage_open_create
 {
   gchar *db = g_strconcat (fixture->dir, "/oids", NULL);
   gzochid_storage_store *store = NULL;
- 
-  g_test_expect_message (NULL, G_LOG_LEVEL_WARNING, "*");
+
+  g_test_log_set_fatal_handler (ignore_warnings, NULL);
+
   g_assert (fixture->bdb_interface->open (fixture->context, db, 0) == NULL);
   store = fixture->bdb_interface->open
     (fixture->context, db, GZOCHID_STORAGE_CREATE);
@@ -93,8 +104,9 @@ test_storage_open_excl
   gzochid_storage_store *store = fixture->bdb_interface->open 
     (fixture->context, db, GZOCHID_STORAGE_CREATE);
 
+  g_test_log_set_fatal_handler (ignore_warnings, NULL);
+
   fixture->bdb_interface->close_store (store);
-  g_test_expect_message (NULL, G_LOG_LEVEL_WARNING, "*");
   store = fixture->bdb_interface->open
     (fixture->context, db, GZOCHID_STORAGE_CREATE | GZOCHID_STORAGE_EXCL);
   g_assert (store == NULL);
