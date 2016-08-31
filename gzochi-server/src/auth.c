@@ -229,7 +229,7 @@ probe_auth_plugin (gpointer data, gpointer user_data)
 	}
       else 
 	{
-	  g_info ("Loaded auth plugin '%s'", plugin->info->name);
+	  g_message ("Loaded auth plugin '%s'", plugin->info->name);
 	  g_hash_table_insert 
 	    (context->auth_plugins, plugin->info->name, plugin);
 	  plugin->handle = plugin_handle;
@@ -288,5 +288,5 @@ gzochid_auth_init (gzochid_game_context *context)
 {
   if (g_module_supported ())
     probe_auth_plugins (context, context->auth_plugin_dir);
-  else g_info ("Plugins not supported; skipping auth plugin probe.");
+  else g_message ("Plugins not supported; skipping auth plugin probe.");
 }

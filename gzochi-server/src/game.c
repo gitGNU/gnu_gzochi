@@ -327,10 +327,10 @@ gzochid_game_context_init (gzochid_game_context *context,
 	(config, "storage.engine");
 
       if (conf_storage_engine != NULL)
-	g_info
+	g_message
 	  ("Meta server client configuration detected; ignoring configured "
 	   "storage engine '%s'.", conf_storage_engine);
-      else g_info
+      else g_message
 	     ("Meta server client configuration detected; using data client "
 	      "storage engine.");
 
@@ -356,12 +356,12 @@ gzochid_game_context_init (gzochid_game_context *context,
       context->storage_engine = gzochid_storage_load_engine 
 	(dir, g_hash_table_lookup (config, "storage.engine"));
     }
-  else g_info 
+  else g_message 
 	 ("No durable storage engine configured; memory engine will be used.");
 
   if (context->storage_engine == NULL)
     {
-      g_info
+      g_message
 	("Using in-memory storage for application data. THIS CONFIGURATION IS "
 	 "NOT SAFE FOR PRODUCTION USE.");
 

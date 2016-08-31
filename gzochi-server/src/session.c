@@ -407,7 +407,7 @@ remove_session (gzochid_application_context *context, guint64 session_oid,
 		 successfully. */
 
 	      if (local_err->message != NULL)
-		g_info
+		g_message
 		  ("Unable to remove Scheme object for session '%"
 		   G_GUINT64_FORMAT "': %s", session_oid, local_err->message);
 	    }

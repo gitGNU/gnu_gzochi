@@ -81,7 +81,7 @@ initialize_auth (int from_state, int to_state, gpointer user_data)
     }
   else
     {
-      g_info 
+      g_message 
 	("No auth plugin specified for application '%s'; " 
 	 "pass-thru authentication will be used.", 
 	 app_context->descriptor->name);
@@ -378,7 +378,7 @@ login_catch_worker (gzochid_application_context *context,
   gzochid_game_client *client = g_hash_table_lookup
     (context->oids_to_clients, session_oid);
 
-  g_info
+  g_message
     ("Disconnecting session '%" G_GUINT64_FORMAT "'; failed login transaction.",
      *session_oid);
 

@@ -171,7 +171,7 @@ prepare (gzochid_transaction *transaction)
 	(gzochid_transaction_participant_registration *) participant_ptr->data;
       if (!participant->participant->prepare (participant->data))
 	{
-	  g_info 
+	  g_message 
 	    ("Participant '%s' in transaction '%s' failed to prepare.",
 	     participant->participant->name, transaction->name);
 

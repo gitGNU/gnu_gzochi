@@ -52,7 +52,7 @@ initialize (char *path)
     }
   else 
     {
-      g_info ("BDB data directory %s does not exist; creating...", path);
+      g_message ("BDB data directory %s does not exist; creating...", path);
       if (g_mkdir (path, 493) != 0)
 	{
 	  g_warning ("Unable to create BDB data directory %s.", path);

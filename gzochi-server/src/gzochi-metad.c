@@ -300,7 +300,7 @@ main (int argc, char *argv[])
       conf_path = env ? env : QUOTE(GZOCHI_METAD_CONF_LOCATION);
     }
 
-  g_info ("Reading configuration from %s", conf_path);
+  g_message ("Reading configuration from %s", conf_path);
   g_key_file_load_from_file (key_file, conf_path, G_KEY_FILE_NONE, &err);
   
   if (err != NULL)

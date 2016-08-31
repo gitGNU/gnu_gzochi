@@ -437,8 +437,8 @@ ensure_connection (gpointer data)
 	  else
 	    {
 	      client->client_socket = socket;
-	      g_info ("Connected to meta server at %s:%d.", client->hostname,
-		      client->port);
+	      g_message ("Connected to meta server at %s:%d.", client->hostname,
+			 client->port);
 
 	      if (client->outbound_messages->len > 0)
 		{

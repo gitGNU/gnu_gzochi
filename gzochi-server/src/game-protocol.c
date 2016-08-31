@@ -115,7 +115,7 @@ dispatch_login_request (gzochid_game_client *client, char *endpoint,
     }
   else 
     {
-      g_info
+      g_message
 	("Client at %s authenticated to endpoint %s as %s",
 	 gzochid_client_socket_get_connection_description (client->sock),
 	 endpoint, gzochid_auth_identity_name (client->identity));

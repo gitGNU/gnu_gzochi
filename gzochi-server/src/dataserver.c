@@ -251,12 +251,12 @@ gzochi_metad_dataserver_start (GzochiMetadDataServer *self)
       self->storage_engine = gzochid_storage_load_engine 
         (dir, g_hash_table_lookup (self->configuration, "storage.engine"));
     }
-  else g_info 
+  else g_message 
          ("No durable storage engine configured; memory engine will be used.");
   
   if (self->storage_engine == NULL)
     {
-      g_info ("\
+      g_message ("\
 Using in-memory storage for application data. THIS CONFIGURATION IS NOT SAFE \
 FOR PRODUCTION USE.");
 

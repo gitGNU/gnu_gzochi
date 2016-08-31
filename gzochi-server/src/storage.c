@@ -88,13 +88,14 @@ gzochid_storage_load_engine (const char *dir, const char *name)
 	  free (path);
 	  engine->handle = engine_handle;
 	      
-	  g_info ("Loaded storage engine '%s'", engine->interface->name);
+	  g_message ("Loaded storage engine '%s'", engine->interface->name);
 	  return engine;
 	}
     }
   else 
     {
-      g_info ("Plugins not supported; cannot load storage engine '%s'.", name);
+      g_message
+	("Plugins not supported; cannot load storage engine '%s'.", name);
       return NULL;
     }
 }
