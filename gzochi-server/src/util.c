@@ -311,3 +311,18 @@ gzochid_util_decode_oid (guint64 oid)
   return GUINT64_FROM_BE (oid);
 #endif
 }
+
+GList *
+gzochid_util_list_copy_deep (GList *list, GCopyFunc func, gpointer user_data)
+{
+  GList *new_list = NULL;
+  GList *list_ptr = list;
+
+  while (list_ptr != NULL)
+    {
+      new_list = g_list_prepend (new_list, func (list_ptr->data, user_data));
+      list_ptr = list_ptr->next;
+    }
+
+  return g_list_reverse (new_list);
+}

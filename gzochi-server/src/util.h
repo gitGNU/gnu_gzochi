@@ -100,4 +100,12 @@ guint64 gzochid_util_encode_oid (guint64);
 
 guint64 gzochid_util_decode_oid (guint64);
 
+/* 
+   Makes a full (deep) copy of a GList.
+
+   This is a "backport" of `g_list_copy_deep' which was introduced in GLib 2.34.
+*/
+
+GList *gzochid_util_list_copy_deep (GList *, GCopyFunc, gpointer);
+
 #endif /* GZOCHID_UTIL_H */

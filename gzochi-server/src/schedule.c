@@ -1,5 +1,5 @@
 /* schedule.c: Task execution and task queue management routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 
 #include "schedule.h"
 #include "task.h"
+#include "util.h"
 
 /* The enumeration of possible states for submitted tasks. */
 
@@ -271,7 +272,7 @@ void
 gzochid_schedule_submit_task_chain (gzochid_task_queue *task_queue, 
 				    GList *tasks)
 {
-  GList *tasks_copy = g_list_copy_deep (tasks, clone_task, NULL);
+  GList *tasks_copy = gzochid_util_list_copy_deep (tasks, clone_task, NULL);
   gzochid_task task;
 
   assert (g_list_length (tasks) > 0);

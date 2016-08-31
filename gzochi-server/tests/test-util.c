@@ -505,6 +505,43 @@ test_util_decode_oid_simple ()
   g_bytes_unref (two_bytes);
 }
 
+static gpointer
+copy_int (gconstpointer src, gpointer data)
+{
+  gint *x = malloc (sizeof (gint));
+  const gint *y = src;
+  
+  *x = *y;
+  
+  return x;
+}
+
+static void
+test_util_list_copy_deep ()
+{
+  gint *x = malloc (sizeof (gint));
+  gint *y = NULL;
+  
+  GList *l1 = NULL;
+  GList *l2 = NULL;
+
+  *x = 1;
+  
+  l1 = g_list_append (NULL, x);
+  l2 = gzochid_util_list_copy_deep (l1, copy_int, NULL);
+
+  y = l2->data;
+  
+  g_assert_cmpint (*x, ==, *y);
+
+  *x = 2;
+
+  g_assert_cmpint (*x, !=, *y);
+  
+  g_list_free_full (l1, g_free);
+  g_list_free_full (l2, g_free);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -550,6 +587,8 @@ main (int argc, char *argv[])
 
   g_test_add_func ("/util/encode_oid/simple", test_util_encode_oid_simple);
   g_test_add_func ("/util/decode_oid/simple", test_util_decode_oid_simple);
+
+  g_test_add_func ("/util/list_copy_deep/simple", test_util_list_copy_deep);
   
   return g_test_run ();
 }
