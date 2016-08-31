@@ -83,7 +83,7 @@ test_oids_storage_reserve_first (test_oids_storage *fixture,
   gzochid_data_oids_block oids_block;
   guint64 new_counter_value = 0;
   
-  g_assert_true
+  g_assert
     (gzochid_oids_reserve_block (fixture->strategy, &oids_block, &err));
   g_assert_no_error (err);
 
@@ -110,7 +110,7 @@ test_oids_storage_reserve_next (test_oids_storage *fixture,
   fixture->interface->transaction_prepare (transaction);
   fixture->interface->transaction_commit (transaction);
   
-  g_assert_true
+  g_assert
     (gzochid_oids_reserve_block (fixture->strategy, &oids_block, &err));
   g_assert_no_error (err);
 

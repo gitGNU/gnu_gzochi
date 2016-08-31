@@ -48,7 +48,7 @@ test_storage_fixture_setup
   GModule *module = g_module_open 
     (QUOTE (BDB_MODULE_LOCATION), G_MODULE_BIND_LOCAL);
 
-  g_assert_nonnull (module);
+  g_assert (module != NULL);
   g_assert (g_module_symbol (module, "gzochid_storage_init_engine", 
 			     (gpointer *) &initializer));
   initializer (&engine);
@@ -75,10 +75,10 @@ test_storage_open_create
   gzochid_storage_store *store = NULL;
  
   g_test_expect_message (NULL, G_LOG_LEVEL_WARNING, "*");
-  g_assert_null (fixture->bdb_interface->open (fixture->context, db, 0));
+  g_assert (fixture->bdb_interface->open (fixture->context, db, 0) == NULL);
   store = fixture->bdb_interface->open
     (fixture->context, db, GZOCHID_STORAGE_CREATE);
-  g_assert_nonnull (store);
+  g_assert (store != NULL);
 
   fixture->bdb_interface->close_store (store);
   fixture->bdb_interface->destroy_store (fixture->context, db);
@@ -97,7 +97,7 @@ test_storage_open_excl
   g_test_expect_message (NULL, G_LOG_LEVEL_WARNING, "*");
   store = fixture->bdb_interface->open
     (fixture->context, db, GZOCHID_STORAGE_CREATE | GZOCHID_STORAGE_EXCL);
-  g_assert_null (store);
+  g_assert (store == NULL);
 
   fixture->bdb_interface->destroy_store (fixture->context, db);
   g_free (db);

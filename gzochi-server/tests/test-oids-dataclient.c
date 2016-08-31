@@ -78,7 +78,7 @@ test_oids_dataclient_reserve ()
   gzochid_data_oids_block block;
   GError *err = NULL;
   
-  g_assert_true (gzochid_oids_reserve_block (strategy, &block, &err));
+  g_assert (gzochid_oids_reserve_block (strategy, &block, &err));
   g_assert_no_error (err);
   g_assert_cmpint (block.block_start, ==, 1);
   g_assert_cmpint (block.block_size, ==, 100);

@@ -57,12 +57,12 @@ test_oid_strategy_allocation ()
 
   reset_counters ();
 
-  g_assert_true (gzochid_oids_reserve_block (strategy, &block, NULL));
+  g_assert (gzochid_oids_reserve_block (strategy, &block, NULL));
 
   g_assert_cmpint (block.block_start, ==, 1);
   g_assert_cmpint (block.block_size, ==, BLOCK_SIZE);
 
-  g_assert_true (gzochid_oids_reserve_block (strategy, &block, NULL));
+  g_assert (gzochid_oids_reserve_block (strategy, &block, NULL));
   
   g_assert_cmpint (block.block_start, ==, 124);
   g_assert_cmpint (block.block_size, ==, BLOCK_SIZE);

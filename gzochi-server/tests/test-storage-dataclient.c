@@ -319,8 +319,8 @@ test_get_cached (dataclient_storage_fixture *fixture, gconstpointer user_data)
   value = fixture->iface->transaction_get
     (tx, fixture->store, "foo", 4, &value_len);
 
-  g_assert_nonnull (value);
-  g_assert_true (memcmp (value, "bar", MIN (4, value_len)) == 0);
+  g_assert (value != NULL);
+  g_assert (memcmp (value, "bar", MIN (4, value_len)) == 0);
 
   free (value);
   free_response (response);
@@ -351,8 +351,8 @@ test_get_uncached_success (dataclient_storage_fixture *fixture,
   value = fixture->iface->transaction_get
     (tx, fixture->store, "foo", 4, &value_len);
 
-  g_assert_nonnull (value);
-  g_assert_true (memcmp (value, "bar", MIN (4, value_len)) == 0);
+  g_assert (value != NULL);
+  g_assert (memcmp (value, "bar", MIN (4, value_len)) == 0);
 
   free (value);
   
@@ -385,8 +385,8 @@ test_get_uncached_failure_success (dataclient_storage_fixture *fixture,
   value = fixture->iface->transaction_get
     (tx, fixture->store, "foo", 4, &value_len);
 
-  g_assert_nonnull (value);
-  g_assert_true (memcmp (value, "bar", MIN (4, value_len)) == 0);
+  g_assert (value != NULL);
+  g_assert (memcmp (value, "bar", MIN (4, value_len)) == 0);
 
   free (value);
   free_response (response1);
@@ -410,9 +410,9 @@ test_get_uncached_timeout (dataclient_storage_fixture *fixture,
 
   value = fixture->iface->transaction_get (tx, fixture->store, "foo", 4, NULL);
 
-  g_assert_null (value);
-  g_assert_true (tx->rollback);
-  g_assert_true (tx->should_retry);
+  g_assert (value == NULL);
+  g_assert (tx->rollback);
+  g_assert (tx->should_retry);
   
   fixture->iface->transaction_rollback (tx);
 
@@ -446,8 +446,8 @@ test_get_for_update_cached (dataclient_storage_fixture *fixture,
   value = fixture->iface->transaction_get_for_update
     (tx, fixture->store, "foo", 4, &value_len);
 
-  g_assert_nonnull (value);
-  g_assert_true (memcmp (value, "bar", MIN (4, value_len)) == 0);
+  g_assert (value != NULL);
+  g_assert (memcmp (value, "bar", MIN (4, value_len)) == 0);
 
   free (value);
   free_response (response);
@@ -487,8 +487,8 @@ test_get_for_update_cached_upgrade (dataclient_storage_fixture *fixture,
   value = fixture->iface->transaction_get_for_update
     (tx, fixture->store, "foo", 4, &value_len);
 
-  g_assert_nonnull (value);
-  g_assert_true (memcmp (value, "bar", MIN (4, value_len)) == 0);
+  g_assert (value != NULL);
+  g_assert (memcmp (value, "bar", MIN (4, value_len)) == 0);
 
   free (value);
   free_response (response1);
@@ -520,8 +520,8 @@ test_get_for_update_uncached_success (dataclient_storage_fixture *fixture,
   value = fixture->iface->transaction_get_for_update
     (tx, fixture->store, "foo", 4, &value_len);
 
-  g_assert_nonnull (value);
-  g_assert_true (memcmp (value, "bar", MIN (4, value_len)) == 0);
+  g_assert (value != NULL);
+  g_assert (memcmp (value, "bar", MIN (4, value_len)) == 0);
 
   free (value);
   
@@ -554,8 +554,8 @@ test_get_for_update_uncached_failure_success
   value = fixture->iface->transaction_get_for_update
     (tx, fixture->store, "foo", 4, &value_len);
 
-  g_assert_nonnull (value);
-  g_assert_true (memcmp (value, "bar", MIN (4, value_len)) == 0);
+  g_assert (value != NULL);
+  g_assert (memcmp (value, "bar", MIN (4, value_len)) == 0);
 
   free (value);
   free_response (response1);
@@ -580,9 +580,9 @@ test_get_for_update_uncached_timeout (dataclient_storage_fixture *fixture,
   value = fixture->iface->transaction_get_for_update
     (tx, fixture->store, "foo", 4, NULL);
 
-  g_assert_null (value);
-  g_assert_true (tx->rollback);
-  g_assert_true (tx->should_retry);
+  g_assert (value == NULL);
+  g_assert (tx->rollback);
+  g_assert (tx->should_retry);
   
   fixture->iface->transaction_rollback (tx);
 
@@ -611,7 +611,7 @@ test_put_cached (dataclient_storage_fixture *fixture, gconstpointer user_data)
 
   fixture->iface->transaction_put (tx, fixture->store, "foo", 4, "baz", 4);
 
-  g_assert_false (tx->rollback);
+  g_assert (! tx->rollback);
   
   fixture->iface->transaction_prepare (tx);
   fixture->iface->transaction_commit (tx);
@@ -648,7 +648,7 @@ test_put_cached_upgrade (dataclient_storage_fixture *fixture,
 
   fixture->iface->transaction_put (tx, fixture->store, "foo", 4, "baz", 4);
 
-  g_assert_false (tx->rollback);
+  g_assert (! tx->rollback);
   
   fixture->iface->transaction_prepare (tx);
   fixture->iface->transaction_commit (tx);
@@ -679,7 +679,7 @@ test_put_uncached_success (dataclient_storage_fixture *fixture,
   
   fixture->iface->transaction_put (tx, fixture->store, "foo", 4, "baz", 4);
 
-  g_assert_false (tx->rollback);
+  g_assert (! tx->rollback);
   
   fixture->iface->transaction_prepare (tx);
   fixture->iface->transaction_commit (tx);  
@@ -714,7 +714,7 @@ test_put_uncached_failure_success (dataclient_storage_fixture *fixture,
   
   fixture->iface->transaction_put (tx, fixture->store, "foo", 4, "baz", 4);
 
-  g_assert_false (tx->rollback);
+  g_assert (! tx->rollback);
   
   fixture->iface->transaction_prepare (tx);
   fixture->iface->transaction_commit (tx);  
@@ -737,8 +737,8 @@ test_put_uncached_timeout (dataclient_storage_fixture *fixture,
 
   fixture->iface->transaction_put (tx, fixture->store, "foo", 4, "bar", 4);
 
-  g_assert_true (tx->rollback);
-  g_assert_true (tx->should_retry);
+  g_assert (tx->rollback);
+  g_assert (tx->should_retry);
   
   fixture->iface->transaction_rollback (tx);
 
@@ -770,7 +770,7 @@ test_delete_cached (dataclient_storage_fixture *fixture,
   ret = fixture->iface->transaction_delete (tx, fixture->store, "foo", 4);
 
   g_assert_cmpint (ret, ==, 0);
-  g_assert_false (tx->rollback);
+  g_assert (! tx->rollback);
   
   fixture->iface->transaction_prepare (tx);
   fixture->iface->transaction_commit (tx);
@@ -810,7 +810,7 @@ test_delete_cached_upgrade (dataclient_storage_fixture *fixture,
   ret = fixture->iface->transaction_delete (tx, fixture->store, "foo", 4);
 
   g_assert_cmpint (ret, ==, 0);
-  g_assert_false (tx->rollback);
+  g_assert (! tx->rollback);
   
   fixture->iface->transaction_prepare (tx);
   fixture->iface->transaction_commit (tx);
@@ -842,7 +842,7 @@ test_delete_uncached_success (dataclient_storage_fixture *fixture,
   ret = fixture->iface->transaction_delete (tx, fixture->store, "foo", 4);
 
   g_assert_cmpint (ret, ==, 0);
-  g_assert_false (tx->rollback);
+  g_assert (! tx->rollback);
   
   fixture->iface->transaction_prepare (tx);
   fixture->iface->transaction_commit (tx);  
@@ -878,7 +878,7 @@ test_delete_uncached_failure_success (dataclient_storage_fixture *fixture,
   ret = fixture->iface->transaction_delete (tx, fixture->store, "foo", 4);
 
   g_assert_cmpint (ret, ==, 0);  
-  g_assert_false (tx->rollback);
+  g_assert (! tx->rollback);
   
   fixture->iface->transaction_prepare (tx);
   fixture->iface->transaction_commit (tx);  
@@ -902,8 +902,8 @@ test_delete_uncached_timeout (dataclient_storage_fixture *fixture,
   int ret = fixture->iface->transaction_delete (tx, fixture->store, "foo", 4);
 
   g_assert_cmpint (ret, ==, GZOCHID_STORAGE_ETXFAILURE);  
-  g_assert_true (tx->rollback);
-  g_assert_true (tx->should_retry);
+  g_assert (tx->rollback);
+  g_assert (tx->should_retry);
   
   fixture->iface->transaction_rollback (tx);
 
@@ -934,8 +934,8 @@ test_first_key_cached (dataclient_storage_fixture *fixture,
   tx = fixture->iface->transaction_begin (fixture->storage_context);
   key = fixture->iface->transaction_first_key (tx, fixture->store, &key_len);
 
-  g_assert_nonnull (key);
-  g_assert_true (memcmp (key, "bar", MIN (4, key_len)) == 0);
+  g_assert (key != NULL);
+  g_assert (memcmp (key, "bar", MIN (4, key_len)) == 0);
 
   free (key);
   free_response (response);
@@ -964,8 +964,8 @@ test_first_key_uncached_success (dataclient_storage_fixture *fixture,
   
   key = fixture->iface->transaction_first_key (tx, fixture->store, NULL);
 
-  g_assert_nonnull (key);
-  g_assert_true (memcmp (key, "bar", MIN (4, key_len)) == 0);
+  g_assert (key != NULL);
+  g_assert (memcmp (key, "bar", MIN (4, key_len)) == 0);
 
   fixture->iface->transaction_rollback (tx);
 
@@ -996,8 +996,8 @@ test_first_key_uncached_failure_success (dataclient_storage_fixture *fixture,
   
   key = fixture->iface->transaction_first_key (tx, fixture->store, &key_len);
 
-  g_assert_nonnull (key);
-  g_assert_true (memcmp (key, "bar", MIN (4, key_len)) == 0);
+  g_assert (key != NULL);
+  g_assert (memcmp (key, "bar", MIN (4, key_len)) == 0);
 
   free (key);
   free_response (response1);
@@ -1020,9 +1020,9 @@ test_first_key_uncached_timeout (dataclient_storage_fixture *fixture,
 
   key = fixture->iface->transaction_first_key (tx, fixture->store, NULL);
 
-  g_assert_null (key);
-  g_assert_true (tx->rollback);
-  g_assert_true (tx->should_retry);
+  g_assert (key == NULL);
+  g_assert (tx->rollback);
+  g_assert (tx->should_retry);
   
   fixture->iface->transaction_rollback (tx);
 
@@ -1054,8 +1054,8 @@ test_next_key_cached (dataclient_storage_fixture *fixture,
   key = fixture->iface->transaction_next_key
     (tx, fixture->store, "bar", 4, &key_len);
 
-  g_assert_nonnull (key);
-  g_assert_true (memcmp (key, "foo", MIN (4, key_len)) == 0);
+  g_assert (key != NULL);
+  g_assert (memcmp (key, "foo", MIN (4, key_len)) == 0);
 
   free (key);
   free_response (response);
@@ -1085,8 +1085,8 @@ test_next_key_uncached_success (dataclient_storage_fixture *fixture,
   key = fixture->iface->transaction_next_key
     (tx, fixture->store, "bar", 4, NULL);
 
-  g_assert_nonnull (key);
-  g_assert_true (memcmp (key, "foo", MIN (4, key_len)) == 0);
+  g_assert (key != NULL);
+  g_assert (memcmp (key, "foo", MIN (4, key_len)) == 0);
 
   fixture->iface->transaction_rollback (tx);
 
@@ -1118,8 +1118,8 @@ test_next_key_uncached_failure_success (dataclient_storage_fixture *fixture,
   key = fixture->iface->transaction_next_key
     (tx, fixture->store, "bar", 4, &key_len);
 
-  g_assert_nonnull (key);
-  g_assert_true (memcmp (key, "foo", MIN (4, key_len)) == 0);
+  g_assert (key != NULL);
+  g_assert (memcmp (key, "foo", MIN (4, key_len)) == 0);
 
   free (key);
   free_response (response1);
@@ -1143,9 +1143,9 @@ test_next_key_uncached_timeout (dataclient_storage_fixture *fixture,
   key = fixture->iface->transaction_next_key
     (tx, fixture->store, "bar", 4, NULL);
 
-  g_assert_null (key);
-  g_assert_true (tx->rollback);
-  g_assert_true (tx->should_retry);
+  g_assert (key == NULL);
+  g_assert (tx->rollback);
+  g_assert (tx->should_retry);
   
   fixture->iface->transaction_rollback (tx);
 

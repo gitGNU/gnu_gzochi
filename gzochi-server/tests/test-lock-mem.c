@@ -43,10 +43,10 @@ test_check (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
 
-  g_assert_false (gzochid_lock_check (fixture->lock_table, 1, key, FALSE));
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 1, key, FALSE, NULL));
-  g_assert_true (gzochid_lock_check (fixture->lock_table, 1, key, FALSE));
+  g_assert (! gzochid_lock_check (fixture->lock_table, 1, key, FALSE));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 1, key, FALSE, NULL));
+  g_assert (gzochid_lock_check (fixture->lock_table, 1, key, FALSE));
 
   g_bytes_unref (key);
 }
@@ -56,8 +56,8 @@ test_read_single (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
 
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 1, key, FALSE, NULL));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 1, key, FALSE, NULL));
 
   g_bytes_unref (key);
 }
@@ -69,8 +69,8 @@ test_read_multiple (test_lock_table_fixture *fixture, gconstpointer user_data)
 
   gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
 
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, key, FALSE, NULL));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, key, FALSE, NULL));
 
   g_bytes_unref (key);
 }
@@ -84,8 +84,8 @@ test_read_with_range_lock (test_lock_table_fixture *fixture,
 
   gzochid_lock_range_check_and_set (fixture->lock_table, 1, from, to, NULL);
 
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, from, FALSE, NULL));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, from, FALSE, NULL));
 
   g_bytes_unref (from);
   g_bytes_unref (to);
@@ -99,8 +99,8 @@ test_read_conflict_with_write (test_lock_table_fixture *fixture,
 
   gzochid_lock_check_and_set (fixture->lock_table, 1, key, TRUE, NULL);
 
-  g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, key, FALSE, NULL));
+  g_assert (! gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, key, FALSE, NULL));
 
   g_bytes_unref (key);
 }
@@ -110,8 +110,8 @@ test_write (test_lock_table_fixture *fixture, gconstpointer user_data)
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
 
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 1, key, TRUE, NULL));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 1, key, TRUE, NULL));
 
   g_bytes_unref (key);
 }
@@ -124,8 +124,8 @@ test_write_conflict_with_read (test_lock_table_fixture *fixture,
 
   gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
 
-  g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, key, TRUE, NULL));
+  g_assert (! gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, key, TRUE, NULL));
 
   g_bytes_unref (key);
 }
@@ -138,8 +138,8 @@ test_write_conflict_with_write (test_lock_table_fixture *fixture,
 
   gzochid_lock_check_and_set (fixture->lock_table, 1, key, TRUE, NULL);
 
-  g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, key, TRUE, NULL));
+  g_assert (! gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, key, TRUE, NULL));
 
   g_bytes_unref (key);
 }
@@ -153,8 +153,8 @@ test_write_conflict_with_range_lock (test_lock_table_fixture *fixture,
 
   gzochid_lock_range_check_and_set (fixture->lock_table, 1, from, to, NULL);
 
-  g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, from, TRUE, NULL));
+  g_assert (! gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, from, TRUE, NULL));
 
   g_bytes_unref (from);
   g_bytes_unref (to);
@@ -167,8 +167,8 @@ test_upgrade (test_lock_table_fixture *fixture, gconstpointer user_data)
 
   gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
 
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 1, key, TRUE, NULL));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 1, key, TRUE, NULL));
 
   g_bytes_unref (key);
 }
@@ -182,8 +182,8 @@ test_upgrade_conflict_with_read (test_lock_table_fixture *fixture,
   gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
   gzochid_lock_check_and_set (fixture->lock_table, 2, key, FALSE, NULL);
 
-  g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 1, key, TRUE, NULL));
+  g_assert (! gzochid_lock_check_and_set
+	    (fixture->lock_table, 1, key, TRUE, NULL));
 
   g_bytes_unref (key);
 }
@@ -198,8 +198,8 @@ test_upgrade_conflict_with_range_lock (test_lock_table_fixture *fixture,
   gzochid_lock_check_and_set (fixture->lock_table, 1, from, FALSE, NULL);
   gzochid_lock_range_check_and_set (fixture->lock_table, 2, from, to, NULL);
 
-  g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 1, from, TRUE, NULL));
+  g_assert (! gzochid_lock_check_and_set
+	    (fixture->lock_table, 1, from, TRUE, NULL));
 
   g_bytes_unref (from);
   g_bytes_unref (to);
@@ -211,8 +211,8 @@ test_range_lock (test_lock_table_fixture *fixture, gconstpointer user_data)
   GBytes *from = g_bytes_new_static ("foo", 4);
   GBytes *to = g_bytes_new_static ("foo2", 5);
 
-  g_assert_true (gzochid_lock_range_check_and_set
-		 (fixture->lock_table, 1, from, to, NULL));
+  g_assert (gzochid_lock_range_check_and_set
+	    (fixture->lock_table, 1, from, to, NULL));
 
   g_bytes_unref (from);
   g_bytes_unref (to);
@@ -225,10 +225,10 @@ test_range_lock_lower_null (test_lock_table_fixture *fixture,
   GBytes *key = g_bytes_new_static ("foo", 4);
   GBytes *to = g_bytes_new_static ("foo2", 5);
 
-  g_assert_true (gzochid_lock_range_check_and_set
-		 (fixture->lock_table, 1, NULL, to, NULL));
-  g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, key, TRUE, NULL));
+  g_assert (gzochid_lock_range_check_and_set
+	    (fixture->lock_table, 1, NULL, to, NULL));
+  g_assert (! gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, key, TRUE, NULL));
 
   g_bytes_unref (to);
   g_bytes_unref (key);
@@ -241,10 +241,10 @@ test_range_lock_upper_null (test_lock_table_fixture *fixture,
   GBytes *key = g_bytes_new_static ("foo2", 5);
   GBytes *from = g_bytes_new_static ("foo", 4);
 
-  g_assert_true (gzochid_lock_range_check_and_set
-		 (fixture->lock_table, 1, from, NULL, NULL));
-  g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, key, TRUE, NULL));
+  g_assert (gzochid_lock_range_check_and_set
+	    (fixture->lock_table, 1, from, NULL, NULL));
+  g_assert (! gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, key, TRUE, NULL));
 
   g_bytes_unref (from);
   g_bytes_unref (key);
@@ -256,10 +256,10 @@ test_range_lock_null_null (test_lock_table_fixture *fixture,
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
   
-  g_assert_true (gzochid_lock_range_check_and_set
-		 (fixture->lock_table, 1, NULL, NULL, NULL));
-  g_assert_false (gzochid_lock_check_and_set
-		  (fixture->lock_table, 2, key, TRUE, NULL));
+  g_assert (gzochid_lock_range_check_and_set
+	    (fixture->lock_table, 1, NULL, NULL, NULL));
+  g_assert (! gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, key, TRUE, NULL));
     
   g_bytes_unref (key);
 }
@@ -275,8 +275,8 @@ test_range_lock_conflict_with_range_lock (test_lock_table_fixture *fixture,
 
   gzochid_lock_range_check_and_set (fixture->lock_table, 1, from1, to1, NULL);
 
-  g_assert_false (gzochid_lock_range_check_and_set
-		  (fixture->lock_table, 2, from2, to2, NULL));
+  g_assert (! gzochid_lock_range_check_and_set
+	    (fixture->lock_table, 2, from2, to2, NULL));
 
   g_bytes_unref (from1);
   g_bytes_unref (to1);
@@ -294,8 +294,8 @@ test_range_lock_conflict_with_write (test_lock_table_fixture *fixture,
 
   gzochid_lock_check_and_set (fixture->lock_table, 1, from, TRUE, NULL);
 
-  g_assert_false (gzochid_lock_range_check_and_set
-		  (fixture->lock_table, 2, from, to, NULL));
+  g_assert (! gzochid_lock_range_check_and_set
+	    (fixture->lock_table, 2, from, to, NULL));
 
   g_bytes_unref (from);
   g_bytes_unref (to);
@@ -344,8 +344,8 @@ test_release_read_lock (test_lock_table_fixture *fixture,
   gzochid_lock_check_and_set (fixture->lock_table, 1, key, FALSE, NULL);
   gzochid_lock_release (fixture->lock_table, 1, key);
 
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, key, TRUE, NULL));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, key, TRUE, NULL));
 
   g_bytes_unref (key);
 }
@@ -359,8 +359,8 @@ test_release_write_lock (test_lock_table_fixture *fixture,
   gzochid_lock_check_and_set (fixture->lock_table, 1, key, TRUE, NULL);
   gzochid_lock_release (fixture->lock_table, 1, key);
 
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, key, FALSE, NULL));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, key, FALSE, NULL));
 
   g_bytes_unref (key);
 }
@@ -375,8 +375,8 @@ test_release_range_lock (test_lock_table_fixture *fixture,
   gzochid_lock_range_check_and_set (fixture->lock_table, 1, from, to, NULL);
   gzochid_lock_release_range (fixture->lock_table, 1, from, to);
 
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, from, TRUE, NULL));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, from, TRUE, NULL));
 
   g_bytes_unref (from);
   g_bytes_unref (to);
@@ -393,8 +393,8 @@ test_release_all (test_lock_table_fixture *fixture, gconstpointer user_data)
 
   gzochid_lock_release_all (fixture->lock_table, 1);
   
-  g_assert_true (gzochid_lock_check_and_set
-		 (fixture->lock_table, 2, from, TRUE, NULL));
+  g_assert (gzochid_lock_check_and_set
+	    (fixture->lock_table, 2, from, TRUE, NULL));
 
   g_bytes_unref (from);
   g_bytes_unref (to);

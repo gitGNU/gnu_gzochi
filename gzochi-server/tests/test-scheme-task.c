@@ -165,9 +165,10 @@ test_disconnected_worker_no_handler (struct test_scheme_task_fixture *fixture,
   tx = fixture->storage_interface->transaction_begin
     (fixture->context->storage_context);
 
-  g_assert_null
+  g_assert
     (fixture->storage_interface->transaction_get
-     (tx, fixture->context->oids, (char *) &one, sizeof (guint64), NULL));
+     (tx, fixture->context->oids, (char *) &one, sizeof (guint64), NULL) ==
+     NULL);
 
   fixture->storage_interface->transaction_rollback (tx);
 

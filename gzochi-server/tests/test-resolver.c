@@ -550,7 +550,7 @@ test_require_simple ()
   TestObjectB *b = gzochid_resolver_require (TEST_TYPE_OBJECT_B, &err);
   
   g_assert_no_error (err);
-  g_assert_nonnull (b->a);
+  g_assert (b->a != NULL);
 
   g_object_unref (b);
 }
@@ -561,7 +561,7 @@ test_require_bad_constructor ()
   GError *err = NULL;
   TestObjectC *c = gzochid_resolver_require (TEST_TYPE_OBJECT_C, &err);
 
-  g_assert_null (c);
+  g_assert (c == NULL);
   g_assert_error
     (err, GZOCHID_RESOLUTION_ERROR,
      GZOCHID_RESOLUTION_ERROR_INCOMPATIBLE_CONSTRUCTOR);
@@ -575,7 +575,7 @@ test_require_circular ()
   GError *err = NULL;
   TestObjectD *d = gzochid_resolver_require (TEST_TYPE_OBJECT_D, &err);
 
-  g_assert_null (d);
+  g_assert (d == NULL);
   g_assert_error
     (err, GZOCHID_RESOLUTION_ERROR,
      GZOCHID_RESOLUTION_ERROR_CIRCULAR_DEPENDENCY);
@@ -590,13 +590,13 @@ test_require_resolution_context ()
   TestObjectE *e1 = gzochid_resolver_require (TEST_TYPE_OBJECT_E, &err);
   TestObjectE *e2 = NULL;
 
-  g_assert_nonnull (e1);
+  g_assert (e1 != NULL);
   g_assert_no_error (err);
 
   e2 = gzochid_resolver_require_full
     (e1->resolution_context, TEST_TYPE_OBJECT_E, &err);
 
-  g_assert_nonnull (e2);
+  g_assert (e2 != NULL);
   g_assert_no_error (err);
 
   g_assert (e1 == e2);
@@ -621,7 +621,7 @@ test_provide ()
   g = gzochid_resolver_require_full
     (resolution_context, TEST_TYPE_OBJECT_G, &err);
 
-  g_assert_nonnull (g);
+  g_assert (g != NULL);
   g_assert_no_error (err);
 
   g_assert (g->f == f);

@@ -100,8 +100,7 @@ test_client_can_dispatch_true ()
   g_byte_array_append
     (bytes, "\x00\x11\x51test\x00oids\x00\x01\x00\x04""foo\x00", 20);
   
-  g_assert_true
-    (gzochid_dataclient_client_protocol.can_dispatch (bytes, client));
+  g_assert (gzochid_dataclient_client_protocol.can_dispatch (bytes, client));
 
   g_byte_array_unref (bytes);
   g_object_unref (client);
@@ -116,8 +115,7 @@ test_client_can_dispatch_false ()
   g_byte_array_append
     (bytes, "\x00\x11\x51test\x00oids\x00\x01\x00\x04", 16);
 
-  g_assert_false
-    (gzochid_dataclient_client_protocol.can_dispatch (bytes, client));
+  g_assert (! gzochid_dataclient_client_protocol.can_dispatch (bytes, client));
 
   g_byte_array_unref (bytes);
   g_object_unref (client);
@@ -211,7 +209,7 @@ test_client_error ()
   GzochidDataClient *client = g_object_new (GZOCHID_TYPE_DATA_CLIENT, NULL);
   
   gzochid_dataclient_client_protocol.error (client);
-  g_assert_false (client->connected);
+  g_assert (! client->connected);
   
   g_object_unref (client);
 }

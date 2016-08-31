@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <glib.h>
+#include <glib-object.h>
 #include <glib-unix.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -131,11 +132,11 @@ test_socket_fixture_set_up (test_socket_fixture *fixture,
   _gzochid_server_socket_getsockname (fixture->server_socket, &addr, &addrlen);
   connect (fixture->client_socket_fd, &addr, addrlen);
 
-  g_assert_true
+  g_assert
     (g_main_context_iteration
      (fixture->socket_server->main_context, FALSE));
 
-  g_assert_nonnull (fixture->client_socket);
+  g_assert (fixture->client_socket != NULL);
 }
 
 static void

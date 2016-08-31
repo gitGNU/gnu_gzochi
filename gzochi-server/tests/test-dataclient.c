@@ -17,6 +17,7 @@
 
 #include <arpa/inet.h>
 #include <glib.h>
+#include <glib-object.h>
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -234,7 +235,7 @@ test_reserve_oids_simple (dataclient_fixture *fixture, gconstpointer user_data)
   g_main_loop_run (fixture->socket_server->main_loop);
   
   g_assert_cmpint (fixture->bytes_received->len, ==, 8);  
-  g_assert_true
+  g_assert
     (memcmp (fixture->bytes_received->data, "\x00\x05\x20test\x00", 8) == 0);
 }
 
@@ -273,7 +274,7 @@ test_request_value_simple (dataclient_fixture *fixture, gconstpointer user_data)
   g_main_loop_run (fixture->socket_server->main_loop);
   
   g_assert_cmpint (fixture->bytes_received->len, ==, 20);  
-  g_assert_true
+  g_assert
     (memcmp (fixture->bytes_received->data,
 	     "\x00\x11\x21test\x00oids\x00\x01\x00\x04""foo\x00", 20) == 0);
 
@@ -299,7 +300,7 @@ test_received_value_success (dataclient_fixture *fixture,
 
   gzochid_dataclient_received_value (fixture->dataclient, &response);
 
-  g_assert_true (g_bytes_equal (response.data, callback_data.value));
+  g_assert (g_bytes_equal (response.data, callback_data.value));
   
   g_bytes_unref (response.data);
   g_bytes_unref (callback_data.value);
@@ -327,7 +328,7 @@ test_received_value_failure (dataclient_fixture *fixture,
 
   gzochid_dataclient_received_value (fixture->dataclient, &response);
 
-  g_assert_true (timercmp (&response.timeout, &callback_data.timeout, ==));
+  g_assert (timercmp (&response.timeout, &callback_data.timeout, ==));
   
   g_bytes_unref (key);
 }
@@ -353,7 +354,7 @@ test_received_value_unexpected (dataclient_fixture *fixture,
 
   gzochid_dataclient_received_value (fixture->dataclient, &response);
 
-  g_assert_null (callback_data.value);  
+  g_assert (callback_data.value == NULL);  
 
   g_bytes_unref (key);
   g_bytes_unref (response.data);
@@ -373,9 +374,8 @@ test_request_next_key_simple (dataclient_fixture *fixture,
   g_main_loop_run (fixture->socket_server->main_loop);
   
   g_assert_cmpint (fixture->bytes_received->len, ==, 20);  
-  g_assert_true
-    (memcmp (fixture->bytes_received->data,
-	     "\x00\x11\x22test\x00names\x00\x00\x04""foo\x00", 20) == 0);
+  g_assert (memcmp (fixture->bytes_received->data,
+		    "\x00\x11\x22test\x00names\x00\x00\x04""foo\x00", 20) == 0);
 
   g_bytes_unref (key);
 }
@@ -399,7 +399,7 @@ test_received_next_key_success (dataclient_fixture *fixture,
 
   gzochid_dataclient_received_next_key (fixture->dataclient, &response);
 
-  g_assert_true (g_bytes_equal (response.data, callback_data.value));
+  g_assert (g_bytes_equal (response.data, callback_data.value));
   
   g_bytes_unref (response.data);
   g_bytes_unref (callback_data.value);
@@ -427,7 +427,7 @@ test_received_next_key_failure (dataclient_fixture *fixture,
 
   gzochid_dataclient_received_next_key (fixture->dataclient, &response);
 
-  g_assert_true (timercmp (&response.timeout, &callback_data.timeout, ==));
+  g_assert (timercmp (&response.timeout, &callback_data.timeout, ==));
   
   g_bytes_unref (key);
 }
@@ -453,7 +453,7 @@ test_received_next_key_unexpected (dataclient_fixture *fixture,
 
   gzochid_dataclient_received_next_key (fixture->dataclient, &response);
 
-  g_assert_null (callback_data.value);  
+  g_assert (callback_data.value == NULL);  
 
   g_bytes_unref (key);
   g_bytes_unref (response.data);
@@ -514,8 +514,7 @@ test_submit_changeset_simple (dataclient_fixture *fixture,
   actual_outbound_message = g_bytes_new
     (fixture->bytes_received->data, fixture->bytes_received->len);
   
-  g_assert_true
-    (g_bytes_equal (expected_outbound_message, actual_outbound_message));
+  g_assert (g_bytes_equal (expected_outbound_message, actual_outbound_message));
 
   g_bytes_unref (expected_outbound_message);
   g_bytes_unref (actual_outbound_message);

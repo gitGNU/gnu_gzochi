@@ -36,9 +36,9 @@ test_config_extract_group ()
 
   props = gzochid_configuration_extract_group (configuration, "group_1");
 
-  g_assert_nonnull (props);
+  g_assert (props != NULL);
   g_assert_cmpint (g_hash_table_size (props), ==, 1);
-  g_assert_true (g_hash_table_contains (props, "foo"));
+  g_assert (g_hash_table_contains (props, "foo"));
   g_assert_cmpstr (g_hash_table_lookup (props, "foo"), ==, "bar");
 
   g_hash_table_destroy (props);

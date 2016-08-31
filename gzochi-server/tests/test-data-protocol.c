@@ -42,7 +42,7 @@ test_reserve_oids_response ()
   bytes = g_byte_array_free_to_bytes (arr);
   response2 = gzochid_data_protocol_reserve_oids_response_read (bytes);
 
-  g_assert_nonnull (response2);
+  g_assert (response2 != NULL);
   g_assert_cmpstr (response2->app, ==, "test");
   g_assert_cmpint (response2->block.block_start, ==, 123);
   g_assert_cmpint (response2->block.block_size, ==, 100);
@@ -105,7 +105,7 @@ test_changeset ()
   bytes = g_byte_array_free_to_bytes (arr);
   changeset2 = gzochid_data_protocol_changeset_read (bytes);
 
-  g_assert_nonnull (changeset2);
+  g_assert (changeset2 != NULL);
   
   object_change1b = &g_array_index (changes, gzochid_data_change, 0);
   object_change2b = &g_array_index (changes, gzochid_data_change, 1);
@@ -113,18 +113,17 @@ test_changeset ()
   binding_change1b = &g_array_index (changes, gzochid_data_change, 2);
   binding_change2b = &g_array_index (changes, gzochid_data_change, 3);
 
-  g_assert_true (g_bytes_equal (object_change1a->key, object_change1b->key));
-  g_assert_true (object_change1b->delete);
-  g_assert_true (g_bytes_equal (object_change2a->key, object_change2b->key));
-  g_assert_false (object_change2b->delete);
-  g_assert_true (g_bytes_equal (object_change2a->data, object_change2b->data));
+  g_assert (g_bytes_equal (object_change1a->key, object_change1b->key));
+  g_assert (object_change1b->delete);
+  g_assert (g_bytes_equal (object_change2a->key, object_change2b->key));
+  g_assert (! object_change2b->delete);
+  g_assert (g_bytes_equal (object_change2a->data, object_change2b->data));
 
-  g_assert_true (g_bytes_equal (binding_change1a->key, binding_change1b->key));
-  g_assert_true (binding_change1b->delete);
-  g_assert_true (g_bytes_equal (binding_change2a->key, binding_change2b->key));
-  g_assert_false (binding_change2b->delete);
-  g_assert_true (g_bytes_equal (binding_change2a->data,
-				binding_change2b->data));
+  g_assert (g_bytes_equal (binding_change1a->key, binding_change1b->key));
+  g_assert (binding_change1b->delete);
+  g_assert (g_bytes_equal (binding_change2a->key, binding_change2b->key));
+  g_assert (! binding_change2b->delete);
+  g_assert (g_bytes_equal (binding_change2a->data, binding_change2b->data));
   
   gzochid_data_changeset_free (changeset1);
   gzochid_data_changeset_free (changeset2);
@@ -163,12 +162,12 @@ test_data_response_success ()
   bytes = g_byte_array_free_to_bytes (arr);
   response2 = gzochid_data_protocol_response_read (bytes);
 
-  g_assert_nonnull (response2);
+  g_assert (response2 != NULL);
   g_assert_cmpstr (response2->app, ==, "test");
   g_assert_cmpstr (response2->store, ==, "oids");
-  g_assert_true (response2->success);
-  g_assert_nonnull (response2->data);
-  g_assert_true (g_bytes_equal (data, response2->data));
+  g_assert (response2->success);
+  g_assert (response2->data != NULL);
+  g_assert (g_bytes_equal (data, response2->data));
   
   gzochid_data_response_free (response1);
   gzochid_data_response_free (response2);
@@ -192,11 +191,11 @@ test_data_response_not_found ()
   bytes = g_byte_array_free_to_bytes (arr);
   response2 = gzochid_data_protocol_response_read (bytes);
 
-  g_assert_nonnull (response2);
+  g_assert (response2 != NULL);
   g_assert_cmpstr (response2->app, ==, "test");
   g_assert_cmpstr (response2->store, ==, "names");
-  g_assert_true (response2->success);
-  g_assert_null (response2->data);
+  g_assert (response2->success);
+  g_assert (response2->data == NULL);
   
   gzochid_data_response_free (response1);
   gzochid_data_response_free (response2);
@@ -219,11 +218,11 @@ test_data_response_failure ()
   bytes = g_byte_array_free_to_bytes (arr);
   response2 = gzochid_data_protocol_response_read (bytes);
 
-  g_assert_nonnull (response2);
+  g_assert (response2 != NULL);
   g_assert_cmpstr (response2->app, ==, "test");
   g_assert_cmpstr (response2->store, ==, "oids");
-  g_assert_false (response2->success);
-  g_assert_null (response2->data);
+  g_assert (! response2->success);
+  g_assert (response2->data == NULL);
   
   gzochid_data_response_free (response1);
   gzochid_data_response_free (response2);

@@ -90,8 +90,8 @@ test_queue_peek ()
   data = gzochid_durable_queue_pop (queue, &string_serialization, NULL);
   g_assert_cmpstr (data, ==, "foo");
 
-  g_assert_null
-    (gzochid_durable_queue_peek (queue, &string_serialization, &err));
+  g_assert
+    (gzochid_durable_queue_peek (queue, &string_serialization, &err) == NULL);
   g_assert_no_error (err);
   
   gzochid_durable_queue_free (queue);
@@ -109,8 +109,8 @@ test_queue_pop ()
   gzochid_durable_queue_pop (queue, &string_serialization, &err);
   g_assert_no_error (err);
   
-  g_assert_null
-    (gzochid_durable_queue_pop (queue, &string_serialization, &err));
+  g_assert
+    (gzochid_durable_queue_pop (queue, &string_serialization, &err) == NULL);
   g_assert_no_error (err);
   
   gzochid_durable_queue_free (queue);

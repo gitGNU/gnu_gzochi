@@ -80,11 +80,11 @@ game_protocol_fixture_set_up (game_protocol_fixture *fixture,
   _gzochid_server_socket_getsockname (fixture->server_socket, &addr, &addrlen);
   connect (socket_fd, &addr, addrlen);
 
-  g_assert_true
+  g_assert
     (g_main_context_iteration
      (fixture->game_context->socket_server->main_context, FALSE));
 
-  g_assert_nonnull (fixture->client_socket);
+  g_assert (fixture->client_socket != NULL);
 }
 
 static void
@@ -111,7 +111,7 @@ test_server_accept (game_protocol_fixture *fixture, gconstpointer user_data)
 {
   gzochid_client_protocol protocol;
   
-  g_assert_nonnull (fixture->client_socket);
+  g_assert (fixture->client_socket != NULL);
 
   protocol = _gzochid_client_socket_get_protocol (fixture->client_socket);
 
@@ -131,7 +131,7 @@ test_client_can_dispatch_true (game_protocol_fixture *fixture,
 
   g_byte_array_append (byte_array, "\000\001\020\000", 4);
 
-  g_assert_true
+  g_assert
     (gzochid_game_client_protocol.can_dispatch (byte_array, client));
 
   g_byte_array_free (byte_array, TRUE);
@@ -146,13 +146,11 @@ test_client_can_dispatch_false (game_protocol_fixture *fixture,
   
   GByteArray *byte_array = g_byte_array_new ();
   
-  g_assert_false
-    (gzochid_game_client_protocol.can_dispatch (byte_array, client));
+  g_assert (! gzochid_game_client_protocol.can_dispatch (byte_array, client));
 
   g_byte_array_append (byte_array, "\000\001\001", 3);
 
-  g_assert_false
-    (gzochid_game_client_protocol.can_dispatch (byte_array, client));
+  g_assert (! gzochid_game_client_protocol.can_dispatch (byte_array, client));
 
   g_byte_array_free (byte_array, TRUE);
 }
@@ -208,7 +206,7 @@ test_client_error (game_protocol_fixture *fixture, gconstpointer user_data)
   g_source_ref (source);  
 
   gzochid_game_client_protocol.error (client);
-  g_assert_true (_gzochid_game_client_disconnected (client));
+  g_assert (_gzochid_game_client_disconnected (client));
 
   g_source_unref (source);
 }

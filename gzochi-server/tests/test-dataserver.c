@@ -176,8 +176,8 @@ test_request_value (dataserver_fixture *fixture, gconstpointer user_data)
   response = gzochi_metad_dataserver_request_value
     (fixture->server, 1, "test", "oids", key, FALSE, NULL);
 
-  g_assert_true (response->success);
-  g_assert_true (g_bytes_equal (response->data, expected));
+  g_assert (response->success);
+  g_assert (g_bytes_equal (response->data, expected));
 
   g_bytes_unref (expected);
   g_bytes_unref (key);
@@ -195,8 +195,8 @@ test_request_value_not_found (dataserver_fixture *fixture,
   response = gzochi_metad_dataserver_request_value
     (fixture->server, 1, "test", "oids", key, FALSE, NULL);
 
-  g_assert_true (response->success);
-  g_assert_null (response->data);
+  g_assert (response->success);
+  g_assert (response->data == NULL);
 
   gzochid_data_response_free (response);
   g_bytes_unref (key);
@@ -215,7 +215,7 @@ test_request_value_failure (dataserver_fixture *fixture,
   response2 = gzochi_metad_dataserver_request_value
     (fixture->server, 2, "test", "oids", key, FALSE, NULL);
 
-  g_assert_false (response2->success);
+  g_assert (! response2->success);
 
   gzochid_data_response_free (response1);
   gzochid_data_response_free (response2);
@@ -240,14 +240,14 @@ test_request_next_key (dataserver_fixture *fixture, gconstpointer user_data)
   response1 = gzochi_metad_dataserver_request_next_key
     (fixture->server, 1, "test", "names", key, NULL);
 
-  g_assert_true (response1->success);
-  g_assert_nonnull (response1->data);
-  g_assert_true (g_bytes_equal (next_key, response1->data));
+  g_assert (response1->success);
+  g_assert (response1->data != NULL);
+  g_assert (g_bytes_equal (next_key, response1->data));
   
   response2 = gzochi_metad_dataserver_request_value
     (fixture->server, 2, "test", "names", middle_key, TRUE, NULL);
 
-  g_assert_false (response2->success);
+  g_assert (! response2->success);
 
   gzochid_data_response_free (response1);
   gzochid_data_response_free (response2);
@@ -272,9 +272,9 @@ test_request_next_key_null (dataserver_fixture *fixture,
   response = gzochi_metad_dataserver_request_next_key
     (fixture->server, 1, "test", "names", NULL, NULL);
 
-  g_assert_true (response->success);
-  g_assert_nonnull (response->data);
-  g_assert_true (g_bytes_equal (expected, response->data));
+  g_assert (response->success);
+  g_assert (response->data != NULL);
+  g_assert (g_bytes_equal (expected, response->data));
 
   gzochid_data_response_free (response);
   g_bytes_unref (expected);
@@ -295,8 +295,8 @@ test_request_next_key_not_found (dataserver_fixture *fixture,
   response = gzochi_metad_dataserver_request_next_key
     (fixture->server, 1, "test", "names", key, NULL);
 
-  g_assert_true (response->success);
-  g_assert_null (response->data);
+  g_assert (response->success);
+  g_assert (response->data == NULL);
 
   gzochid_data_response_free (response);
   g_bytes_unref (key);
@@ -323,7 +323,7 @@ test_request_next_key_failure (dataserver_fixture *fixture,
   response2 = gzochi_metad_dataserver_request_next_key
     (fixture->server, 2, "test", "names", key2, NULL);
 
-  g_assert_false (response2->success);
+  g_assert (! response2->success);
   
   gzochid_data_response_free (response1);
   gzochid_data_response_free (response2);
@@ -346,7 +346,7 @@ test_release_key (dataserver_fixture *fixture, gconstpointer user_data)
   response2 = gzochi_metad_dataserver_request_value
     (fixture->server, 2, "test", "oids", key, TRUE, NULL);
 
-  g_assert_true (response2->success);
+  g_assert (response2->success);
 
   gzochid_data_response_free (response1);
   gzochid_data_response_free (response2);
@@ -369,7 +369,7 @@ test_release_key_range (dataserver_fixture *fixture,
   response2 = gzochi_metad_dataserver_request_value
     (fixture->server, 2, "test", "names", key, TRUE, NULL);
 
-  g_assert_true (response2->success);
+  g_assert (response2->success);
 
   gzochid_data_response_free (response1);
   gzochid_data_response_free (response2);
@@ -401,17 +401,17 @@ test_release_all (dataserver_fixture *fixture, gconstpointer user_data)
   response1b = gzochi_metad_dataserver_request_next_key
     (fixture->server, 2, "test", "names", NULL, NULL);
 
-  g_assert_true (response1b->success);
+  g_assert (response1b->success);
   
   response2b = gzochi_metad_dataserver_request_value
     (fixture->server, 2, "test", "names", key1, TRUE, NULL);
 
-  g_assert_true (response2b->success);
+  g_assert (response2b->success);
 
   response3b = gzochi_metad_dataserver_request_value
     (fixture->server, 2, "test", "oids", key2, TRUE, NULL);
   
-  g_assert_true (response3b->success);
+  g_assert (response3b->success);
 
   gzochid_data_response_free (response1a);
   gzochid_data_response_free (response1b);
@@ -505,31 +505,31 @@ test_process_changeset (dataserver_fixture *fixture, gconstpointer user_data)
   transaction = iface->transaction_begin (test_context);
   data = iface->transaction_get (transaction, oids, "1", 2, NULL);
 
-  g_assert_nonnull (data);
+  g_assert (data != NULL);
   g_assert_cmpstr (data, ==, "bar");
   free (data);
 
   data = iface->transaction_get (transaction, oids, "2", 2, NULL);
-  g_assert_null (data);
+  g_assert (data == NULL);
 
   data = iface->transaction_get (transaction, oids, "3", 2, NULL);
 
-  g_assert_nonnull (data);
+  g_assert (data != NULL);
   g_assert_cmpstr (data, ==, "baz");
   free (data);
 
   data = iface->transaction_get (transaction, names, "binding-1", 10, NULL);
 
-  g_assert_nonnull (data);
+  g_assert (data != NULL);
   g_assert_cmpstr (data, ==, "2");
   free (data);
   
   data = iface->transaction_get (transaction, names, "binding-2", 10, NULL);
-  g_assert_null (data);
+  g_assert (data == NULL);
   
   data = iface->transaction_get (transaction, names, "binding-3", 10, NULL);
 
-  g_assert_nonnull (data);  
+  g_assert (data != NULL);  
   g_assert_cmpstr (data, ==, "3");
   free (data);
   

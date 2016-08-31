@@ -181,11 +181,10 @@ dataserver_protocol_fixture_set_up (dataserver_protocol_fixture *fixture,
   _gzochid_server_socket_getsockname (fixture->server_socket, &addr, &addrlen);
   connect (socket_fd, &addr, addrlen);
 
-  g_assert_true
-    (g_main_context_iteration
-     (fixture->socket_server->main_context, TRUE));
+  g_assert (g_main_context_iteration
+	    (fixture->socket_server->main_context, TRUE));
 
-  g_assert_nonnull (fixture->client_socket);
+  g_assert (fixture->client_socket != NULL);
 
   fixture->socket_channel = g_io_channel_unix_new (socket_fd);
   g_io_channel_set_flags (fixture->socket_channel, G_IO_FLAG_NONBLOCK, NULL);
@@ -223,7 +222,7 @@ test_client_can_dispatch_true (dataserver_protocol_fixture *fixture,
 
   g_byte_array_append (bytes, "\x00\x18\x10\x01http://localhost:8080/", 27);
 
-  g_assert_true
+  g_assert
     (gzochi_metad_dataserver_client_protocol.can_dispatch (bytes, client));
 
   g_byte_array_unref (bytes);
@@ -240,8 +239,8 @@ test_client_can_dispatch_false (dataserver_protocol_fixture *fixture,
 
   g_byte_array_append (bytes, "\x00\x18\x10\x01http", 9);
 
-  g_assert_false
-    (gzochi_metad_dataserver_client_protocol.can_dispatch (bytes, client));
+  g_assert
+    (! gzochi_metad_dataserver_client_protocol.can_dispatch (bytes, client));
 
   g_byte_array_unref (bytes);
 }
