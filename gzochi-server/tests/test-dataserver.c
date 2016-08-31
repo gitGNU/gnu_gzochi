@@ -564,6 +564,12 @@ test_process_changeset (dataserver_fixture *fixture, gconstpointer user_data)
 int
 main (int argc, char *argv[])
 {
+#if GLIB_CHECK_VERSION (2, 36, 0)
+  /* No need for `g_type_init'. */
+#else
+  g_type_init ();
+#endif /* GLIB_CHECK_VERSION */
+
   g_test_init (&argc, &argv, NULL);
 
   mem_initialize = gzochid_storage_engine_interface_mem.initialize;

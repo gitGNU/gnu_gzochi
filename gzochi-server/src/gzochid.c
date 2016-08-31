@@ -257,8 +257,7 @@ main (int argc, char *argv[])
 
   GKeyFile *key_file = g_key_file_new ();
   GzochidConfiguration *configuration = NULL;
-  GzochidResolutionContext *resolution_context = g_object_new
-    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+  GzochidResolutionContext *resolution_context = NULL;
   GzochidRootContext *root_context = NULL;
 
   GHashTable *metaserver_config = NULL;
@@ -306,6 +305,13 @@ main (int argc, char *argv[])
 
   initialize_logging (key_file);
 
+#if GLIB_CHECK_VERSION (2, 36, 0)
+  /* No need for `g_type_init'. */
+#else
+  g_type_init ();
+#endif /* GLIB_CHECK_VERSION */
+
+  resolution_context = g_object_new (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
   configuration = g_object_new
     (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
   gzochid_resolver_provide (resolution_context, G_OBJECT (configuration), NULL);

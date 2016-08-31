@@ -537,8 +537,14 @@ test_submit_changeset_simple (dataclient_fixture *fixture,
 int
 main (int argc, char *argv[])
 {  
-  g_test_init (&argc, &argv, NULL);
+#if GLIB_CHECK_VERSION (2, 36, 0)
+  /* No need for `g_type_init'. */
+#else
+  g_type_init ();
+#endif /* GLIB_CHECK_VERSION */
 
+  g_test_init (&argc, &argv, NULL);
+  
   g_test_add
     ("/dataclient/reserve-oids/simple", dataclient_fixture, NULL,
      dataclient_connected_fixture_setup, test_reserve_oids_simple,

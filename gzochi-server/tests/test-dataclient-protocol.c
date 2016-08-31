@@ -219,6 +219,12 @@ test_client_error ()
 int
 main (int argc, char *argv[])
 {
+#if GLIB_CHECK_VERSION (2, 36, 0)
+  /* No need for `g_type_init'. */
+#else
+  g_type_init ();
+#endif /* GLIB_CHECK_VERSION */
+
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/client/can_dispatch/true", test_client_can_dispatch_true);
