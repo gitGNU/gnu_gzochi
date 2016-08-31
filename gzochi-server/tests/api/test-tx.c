@@ -22,6 +22,7 @@
 
 #include "../app.h"
 #include "../channel.h"
+#include "../context.h"
 #include "../guile.h"
 #include "../gzochid-auth.h"
 #include "../session.h"
@@ -325,6 +326,13 @@ bind_scm (char *module, SCM *binding, char *name)
 }
 
 static void 
+application_context_init (gzochid_application_context *context)
+{
+  gzochid_context *base = (gzochid_context *) context;
+  g_mutex_init (&base->mutex);
+}
+
+static void 
 inner_main (void *data, int argc, char *argv[])
 {
   struct test_context t;
@@ -344,6 +352,8 @@ inner_main (void *data, int argc, char *argv[])
     calloc (1, sizeof (gzochid_application_descriptor));
   t.app_context->deployment_root = "";
 
+  application_context_init (t.app_context);
+  
   t.identity = gzochid_auth_identity_new ("[TEST]");
   
   g_test_add_data_func ("/api/tx/primitive-join-transaction", &t,

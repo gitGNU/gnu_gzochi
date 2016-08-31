@@ -53,7 +53,8 @@ test_serialization_exception ()
 
   context->descriptor = calloc (1, sizeof (gzochid_application_descriptor));
   context->deployment_root = "/";
-
+  g_mutex_init (&((gzochid_context *) context)->mutex);
+  
   gzochid_util_serialize_string ("test-unknown-type", str);
 
   g_assert
@@ -75,6 +76,7 @@ test_serialization_corrupt ()
   GByteArray *str = g_byte_array_new ();
   GError *err = NULL;
 
+  g_mutex_init (&((gzochid_context *) context)->mutex);
   gzochid_util_serialize_int (16, str);  
 
   g_assert

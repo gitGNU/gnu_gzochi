@@ -41,6 +41,8 @@ test_application_task_ref ()
   gzochid_application_task *task =
     gzochid_application_task_new (context, identity, null_worker, NULL);
 
+  g_mutex_init (&((gzochid_context *) context)->mutex);
+  
   g_assert (task == gzochid_application_task_ref (task));
 
   gzochid_application_task_unref (task);
@@ -160,6 +162,8 @@ app_task_fixture_set_up (app_task_fixture *fixture, gconstpointer user_data)
 
   base = (gzochid_context *) fixture->context;
   base->parent = calloc (1, sizeof (gzochid_game_context));
+
+  g_mutex_init (&base->mutex);
 }
 
 static void

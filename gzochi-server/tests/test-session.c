@@ -74,6 +74,9 @@ application_context_init (gzochid_application_context *context)
   gzochid_context *base = (gzochid_context *) context;
   gzochid_game_context *game_context = gzochid_game_context_new (NULL);
   base->parent = (gzochid_context *) game_context;
+
+  g_mutex_init (&base->mutex);
+  g_mutex_init (&base->parent->mutex);
   
   game_context->storage_engine = malloc (sizeof (gzochid_storage_engine));
   game_context->storage_engine->interface = 

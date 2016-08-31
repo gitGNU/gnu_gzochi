@@ -72,6 +72,9 @@ test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
   base_context = (gzochid_context *) fixture->context;
   base_context->parent = (gzochid_context *) game_context;
 
+  g_mutex_init (&base_context->mutex);
+  g_mutex_init (&base_context->parent->mutex);
+  
   game_context->storage_engine = storage_engine;
   storage_engine->interface = &gzochid_storage_engine_interface_mem;
   
@@ -281,6 +284,8 @@ test_ready_throws_exception ()
 
   GError *tmp_err = NULL;
 
+  g_mutex_init (&((gzochid_context *) context)->mutex);
+  
   scm_c_module_define (module, "ready", ready);
 
   descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);

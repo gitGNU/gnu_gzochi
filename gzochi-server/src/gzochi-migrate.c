@@ -584,6 +584,9 @@ create_application_context (char *path, char *app)
       g_critical ("storage.engine is required.");
       exit (EXIT_FAILURE);
     }
+
+  g_mutex_init (&((gzochid_context *) context)->mutex);
+  g_mutex_init (&((gzochid_context *) parent)->mutex);
   
   parent->storage_engine =
     gzochid_tool_probe_storage_engine (config, storage_engine);

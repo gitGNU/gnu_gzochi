@@ -16,6 +16,7 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <stddef.h>
 #include <string.h>
 #include <sys/types.h>
@@ -70,6 +71,8 @@ game_protocol_fixture_set_up (game_protocol_fixture *fixture,
   g_test_log_set_fatal_handler (ignore_warnings, NULL);
   
   fixture->game_context = gzochid_game_context_new ();
+  g_mutex_init (&((gzochid_context *) fixture->game_context)->mutex);
+  
   fixture->game_context->socket_server = g_object_new
     (GZOCHID_TYPE_SOCKET_SERVER, NULL);
   fixture->server_socket = gzochid_server_socket_new
