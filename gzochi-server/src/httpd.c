@@ -77,7 +77,12 @@ struct _GzochidHttpServer
   GObject parent_instance;
 
   GNode *root; /* The root of the request mapping hierarchy. */
-  
+
+  /* The socket address to which the server is bound. */
+
+  struct sockaddr_in addr; 
+
+  socklen_t addrlen; /* The size of the socket address. */
   struct MHD_Daemon *daemon; /* The GNU microhttpd daemon struct. */
 };
 
@@ -110,6 +115,14 @@ static void
 gzochid_http_server_init (GzochidHttpServer *self)
 {
   self->root = g_node_new (create_pattern_node (""));
+
+  self->addrlen = sizeof (struct sockaddr_in);
+  memset (&self->addr, 0, self->addrlen);
+
+  self->addr.sin_family = AF_INET;
+  self->addr.sin_port = 0;
+  self->addr.sin_addr.s_addr = INADDR_ANY;
+  
   self->daemon = NULL;
 }
 
@@ -594,10 +607,15 @@ void
 gzochid_http_server_start (GzochidHttpServer *server, guint port, GError **err)
 {
   assert (server->daemon == NULL);
-  
-  server->daemon = MHD_start_daemon 
-    (MHD_USE_SELECT_INTERNALLY, port, NULL, NULL, dispatch, server,
-     MHD_OPTION_END);
+
+  if (port == 0)
+    server->daemon = MHD_start_daemon 
+      (MHD_USE_SELECT_INTERNALLY, 1, NULL, NULL, dispatch, server,
+       MHD_OPTION_SOCK_ADDR, &server->addr, MHD_OPTION_END);      
+
+  else server->daemon = MHD_start_daemon 
+	 (MHD_USE_SELECT_INTERNALLY, port, NULL, NULL, dispatch, server,
+	  MHD_OPTION_END);
 
   if (server->daemon == NULL)
     g_set_error
@@ -605,13 +623,11 @@ gzochid_http_server_start (GzochidHttpServer *server, guint port, GError **err)
        "Failed to start HTTP server on port %d.", port);
   else
     {
-      struct sockaddr_in addr;
-      socklen_t addrlen = sizeof (struct sockaddr_in);
-
       _gzochid_http_server_getsockname
-	(server, (struct sockaddr *) &addr, &addrlen);
+	(server, (struct sockaddr *) &server->addr, &server->addrlen);
       
-      g_message ("HTTP server listening on port %d.", ntohs (addr.sin_port));
+      g_message ("HTTP server listening on port %d.",
+		 ntohs (server->addr.sin_port));
     }
 }
 
