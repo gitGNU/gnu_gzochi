@@ -46,7 +46,8 @@ allocate (gpointer user_data, gzochid_data_oids_block *block, GError **err)
   block->block_size = BLOCK_SIZE;
 
   block_start += BLOCK_SIZE;
-} 
+  return TRUE;
+}
 
 static void
 test_oid_strategy_allocation ()
