@@ -1,3 +1,4 @@
 *.log
 *.trs
-test-client
+test-*
+!test-*.c
