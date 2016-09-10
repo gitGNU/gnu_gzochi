@@ -1,6 +1,6 @@
 dnl configure.ac --- food for -*-autoconf-*- et al
 dnl
-dnl Copyright (C) 2015 Julian Graham
+dnl Copyright (C) 2016 Julian Graham
 dnl
 dnl This is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/abermud.c])
 
 AM_INIT_AUTOMAKE(1.13)
+AM_SILENT_RULES([yes])
 
 AC_LANG(C)
 AC_PROG_CC

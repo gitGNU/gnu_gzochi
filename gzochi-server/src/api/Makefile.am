@@ -26,10 +26,14 @@ noinst_HEADERS = admin.h channel.h data.h log.h session.h task.h tx.h util.h
 libgzochid_api_la_SOURCES = admin.c channel.c data.c log.c session.c \
 	task.c tx.c util.c
 
+AM_V_SNARF = $(AM_V_SNARF_$(V))
+AM_V_SNARF_ = $(AM_V_SNARF_$(AM_DEFAULT_VERBOSITY))
+AM_V_SNARF_0 = @echo "  GUILE-SNARF  " $@;
+
 SUFFIXES = .x
 .c.x:
-	guile-snarf -o $@ $< -I$(builddir) @DEFS@ @CFLAGS@ @GLIB_CFLAGS@ \
-	@GUILE_CFLAGS@
+	$(AM_V_SNARF)guile-snarf -o $@ $< -I$(builddir) @DEFS@ @CFLAGS@ \
+		@GLIB_CFLAGS@ @GUILE_CFLAGS@
 
 BUILT_SOURCES = admin.x channel.x data.x log.x session.x task.x tx.x
 CLEANFILES = $(BUILT_SOURCES)
