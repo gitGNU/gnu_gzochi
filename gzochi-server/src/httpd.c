@@ -452,10 +452,10 @@ gzochid_httpd_append_continuation (gzochid_httpd_partial *partial,
 
 static int 
 not_found404 (struct MHD_Connection *connection, const char *page, 
-	      int must_free, int must_copy)
+	      enum MHD_ResponseMemoryMode memory_mode)
 {
-  struct MHD_Response *response = MHD_create_response_from_data 
-    (strlen (page), (void *) page, must_free, must_copy);
+  struct MHD_Response *response = MHD_create_response_from_buffer 
+    (strlen (page), (void *) page, memory_mode);
   int ret = MHD_queue_response (connection, 404, response);
 
   MHD_destroy_response (response);
@@ -467,15 +467,16 @@ static int
 not_found404_default (struct MHD_Connection *connection)
 {
   return not_found404 
-    (connection, "<html><body>Not found.</body></html>", FALSE, FALSE);
+    (connection, "<html><body>Not found.</body></html>",
+     MHD_RESPMEM_PERSISTENT);
 }
 
 void
 gzochid_http_write_response
 (gzochid_http_response_sink *sink, int code, char *bytes, size_t len)
 {
-  struct MHD_Response *response =
-    MHD_create_response_from_data (len, bytes, TRUE, TRUE);
+  struct MHD_Response *response = MHD_create_response_from_buffer
+    (len, bytes, MHD_RESPMEM_MUST_COPY);
 
   sink->queue_code = MHD_queue_response (sink->connection, code, response);
   MHD_destroy_response (response);
