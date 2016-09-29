@@ -223,9 +223,9 @@ session_commit_operation
 	  || op->target_session != tx_context->login_operation->target_session) 
 	{
 	  msg_op = (gzochid_client_session_pending_message_operation *) op;
-	  gzochid_application_event_dispatch
+	  gzochid_event_dispatch
 	    (context->event_source,
-	     gzochid_application_event_new (MESSAGE_SENT));
+	     g_object_new (GZOCHID_TYPE_EVENT, "type", MESSAGE_SENT, NULL));
 	  gzochid_game_client_send (client, msg_op->message, msg_op->len);
 	}
 

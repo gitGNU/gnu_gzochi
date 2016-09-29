@@ -1,5 +1,5 @@
 /* app-task.c: Support for application-bound transactional task execution
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 struct _gzochid_event_transaction_context
 {
   gzochid_application_context *app_context;
-  struct timeval start_time;
+  guint64 start_time;
 };
 
 typedef struct _gzochid_event_transaction_context
@@ -178,7 +178,7 @@ create_transaction_context (gzochid_application_context *app_context)
     malloc (sizeof (gzochid_event_transaction_context));
 
   tx_context->app_context = app_context;
-  gettimeofday (&tx_context->start_time, NULL);
+  tx_context->start_time = g_get_monotonic_time ();
 
   return tx_context;
 }
@@ -193,14 +193,13 @@ static void
 event_commit (gpointer data)
 {
   gzochid_event_transaction_context *tx_context = data;
-  struct timeval now, duration;
+  guint64 duration_us = g_get_monotonic_time () - tx_context->start_time;
 
-  gettimeofday (&now, NULL);
-  timersub (&now, &tx_context->start_time, &duration);
-
-  gzochid_application_event_dispatch 
+  gzochid_event_dispatch 
     (tx_context->app_context->event_source,
-     gzochid_application_transaction_event_new (TRANSACTION_COMMIT, duration));
+     g_object_new (GZOCHID_TYPE_TRANSACTION_EVENT,
+		   "type", TRANSACTION_COMMIT, "duration-us", duration_us,
+		   NULL));
 
   free (tx_context);
 }
@@ -209,15 +208,13 @@ static void
 event_rollback (gpointer data)
 {
   gzochid_event_transaction_context *tx_context = data;
-  struct timeval now, duration;
-
-  gettimeofday (&now, NULL);
-  timersub (&now, &tx_context->start_time, &duration);
+  guint64 duration_us = g_get_monotonic_time () - tx_context->start_time;
   
-  gzochid_application_event_dispatch 
+  gzochid_event_dispatch 
     (tx_context->app_context->event_source,
-     gzochid_application_transaction_event_new
-     (TRANSACTION_ROLLBACK, duration));
+     g_object_new (GZOCHID_TYPE_TRANSACTION_EVENT,
+		   "type", TRANSACTION_ROLLBACK, "duration-us", duration_us,
+		   NULL));
 
   free (tx_context);
 }
@@ -247,8 +244,9 @@ event_func_wrapper (gpointer data)
 
   join_transaction (context);
 
-  gzochid_application_event_dispatch
-    (context->event_source, gzochid_application_event_new (TRANSACTION_START));
+  gzochid_event_dispatch
+    (context->event_source,
+     g_object_new (GZOCHID_TYPE_EVENT, "type", TRANSACTION_START, NULL));
 
   func (func_data);  
 }

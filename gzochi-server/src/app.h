@@ -95,7 +95,7 @@ struct _gzochid_application_context
 
   GMutex channel_mapping_lock; /* Protects the channel oid mapping. */
   
-  gzochid_application_event_source *event_source;
+  gzochid_event_source *event_source;
   gzochid_application_stats *stats;
 };
 

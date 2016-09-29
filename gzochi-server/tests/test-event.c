@@ -1,5 +1,5 @@
 /* test-event.c: Test routines for event.c in gzochid.
- * Copyright (C) 2014 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <sys/time.h>
@@ -23,7 +24,7 @@
 #include "event.h"
 
 static void test_handler 
-(gzochid_application_event *event, gpointer user_data)
+(GzochidEvent *event, gpointer user_data)
 {
   *((gboolean *) user_data) = TRUE;
 }
@@ -40,22 +41,18 @@ static void test_event_dispatch ()
   GMainLoop *main_loop = g_main_loop_new (NULL, FALSE);
   GMainContext *main_context = g_main_loop_get_context (main_loop);
 
-  gzochid_application_event_source *event_source = 
-    gzochid_application_event_source_new ();
+  gzochid_event_source *event_source = gzochid_event_source_new ();
   GSource *timeout_source = g_timeout_source_new (100);
-  gzochid_application_event *event = 
-    malloc (sizeof (gzochid_application_event));
+  GzochidEvent *event = g_object_new
+    (GZOCHID_TYPE_TRANSACTION_EVENT, "type", TRANSACTION_START, NULL);
   gboolean handled = FALSE;
 
   g_source_attach ((GSource *) event_source, main_context);
   g_source_attach (timeout_source, main_context);
   g_source_set_callback (timeout_source, quit_main_loop, main_loop, NULL);
 
-  event->type = TRANSACTION_START;
-  gettimeofday (&event->timestamp, NULL);
-
-  gzochid_application_event_attach (event_source, test_handler, &handled);
-  gzochid_application_event_dispatch (event_source, event);
+  gzochid_event_attach (event_source, test_handler, &handled);
+  gzochid_event_dispatch (event_source, event);
 
   g_main_loop_run (main_loop);
 
@@ -66,6 +63,12 @@ int main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
+#if GLIB_CHECK_VERSION (2, 36, 0)
+  /* No need for `g_type_init'. */
+#else
+  g_type_init ();
+#endif /* GLIB_CHECK_VERSION */
+  
   g_test_add_func ("/event/dispatch", test_event_dispatch);
 
   return g_test_run ();

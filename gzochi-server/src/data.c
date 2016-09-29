@@ -168,9 +168,10 @@ flush_reference (gzochid_data_managed_reference *reference,
 	 (char *) &encoded_oid, sizeof (guint64),
 	 (char *) out->data, out->len);
 
-      gzochid_application_event_dispatch
+      gzochid_event_dispatch
 	(context->context->event_source,
-	 gzochid_application_data_event_new (BYTES_WRITTEN, out->len));
+	 g_object_new (GZOCHID_TYPE_DATA_EVENT,
+		       "type", BYTES_WRITTEN, "bytes", out->len, NULL));
 
       g_byte_array_unref (out);
       
@@ -550,9 +551,10 @@ dereference (gzochid_data_transaction_context *context,
       GError *local_err = NULL;
       guint64 *key = malloc (sizeof (guint64));
       
-      gzochid_application_event_dispatch
+      gzochid_event_dispatch
 	(context->context->event_source,
-	 gzochid_application_data_event_new (BYTES_READ, data_len));
+	 g_object_new (GZOCHID_TYPE_DATA_EVENT,
+		       "type", BYTES_READ, "bytes", data_len, NULL));
 
       in = g_byte_array_sized_new (data_len);
       g_byte_array_append (in, (unsigned char *) data, data_len);

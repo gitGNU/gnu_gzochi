@@ -22,6 +22,7 @@
 #include "app.h"
 #include "app-task.h"
 #include "auth_int.h"
+#include "event.h"
 #include "fsm.h"
 #include "game.h"
 #include "game-protocol.h"
@@ -315,7 +316,7 @@ stop (int from_state, int to_state, gpointer user_data)
 }
 
 static void 
-update_stats (gzochid_application_event *event, gpointer data)
+update_stats (GzochidEvent *event, gpointer data)
 {
   gzochid_stats_update_from_event (data, event);
 }
@@ -364,8 +365,7 @@ gzochid_application_context_init (gzochid_application_context *context,
   context->authenticator = gzochid_auth_function_pass_thru;
   context->descriptor = descriptor;
   
-  gzochid_application_event_attach
-    (context->event_source, update_stats, context->stats);
+  gzochid_event_attach (context->event_source, update_stats, context->stats);
 
   gzochid_context_init ((gzochid_context *) context, parent, fsm);
 }

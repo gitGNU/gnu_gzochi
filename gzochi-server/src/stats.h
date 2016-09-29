@@ -1,5 +1,5 @@
 /* stats.h: Prototypes and declarations for stats.c
- * Copyright (C) 2013 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@
 
 #include "event.h"
 
-typedef struct _gzochid_application_stats
+struct _gzochid_application_stats
 {
   unsigned int num_messages_received;
   unsigned int num_messages_sent;
@@ -35,9 +35,11 @@ typedef struct _gzochid_application_stats
 
   unsigned long bytes_read;
   unsigned long bytes_written;
-} gzochid_application_stats;
+};
+
+typedef struct _gzochid_application_stats gzochid_application_stats;
 
 void gzochid_stats_update_from_event
-(gzochid_application_stats *, gzochid_application_event *);
+(gzochid_application_stats *, GzochidEvent *);
 
 #endif /* GZOCHID_STATS_H */

@@ -1,5 +1,5 @@
 /* app.c: Application context routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@ gzochid_application_context_new (void)
 
   g_mutex_init (&context->channel_mapping_lock);
   
-  context->event_source = gzochid_application_event_source_new ();
+  context->event_source = gzochid_event_source_new ();
   context->stats = calloc (1, sizeof (gzochid_application_stats));
   return context;
 }
@@ -69,7 +69,7 @@ gzochid_application_context_free (gzochid_application_context *app_context)
 
   g_mutex_clear (&app_context->channel_mapping_lock);
   
-  gzochid_application_event_source_free (app_context->event_source);
+  gzochid_event_source_free (app_context->event_source);
   free (app_context->stats);
 
   free (context);

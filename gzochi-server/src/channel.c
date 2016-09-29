@@ -523,9 +523,10 @@ channel_side_effect_commit (gpointer data)
 	      
 	      if (client != NULL)
 		{
-		  gzochid_application_event_dispatch
+		  gzochid_event_dispatch
 		    (tx_context->app_context->event_source,
-		     gzochid_application_event_new (MESSAGE_SENT));
+		     g_object_new (GZOCHID_TYPE_EVENT,
+				   "type", MESSAGE_SENT, NULL));
 		  gzochid_game_client_send
 		    (client, message_side_effect->msg,
 		     message_side_effect->len);

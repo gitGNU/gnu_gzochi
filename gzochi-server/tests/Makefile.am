@@ -72,7 +72,8 @@ treefile_la_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ -Wall -Werror
 treefile_la_LIBADD = @GLIB_LIBS@
 treefile_la_LDFLAGS = -module -avoid-version -rpath $(abs_srcdir)
 
-test_app_task_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_app_task_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
+	@GUILE_CFLAGS@
 test_app_task_SOURCES = test-app-task.c
 test_app_task_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-app-task.o \
@@ -85,7 +86,8 @@ test_app_task_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-txlog.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GOBJECT_LIBS@ \
+	@GUILE_LIBS@
 
 test_auth_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
 test_auth_SOURCES = test-auth.c
@@ -175,11 +177,11 @@ test_durable_task_SOURCES = test-durable-task.c
 test_durable_task_LDADD = $(top_builddir)/src/libgzochid.la \
 	@GZOCHI_COMMON_LIBS@ @GMODULE_LIBS@ @GLIB_LIBS@ @GUILE_LIBS@
 
-test_event_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_event_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_event_SOURCES = test-event.c
 test_event_LDADD = $(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
-	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_fsm_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_fsm_SOURCES = test-fsm.c
@@ -241,7 +243,7 @@ test_queue_LDADD = $(top_builddir)/src/libgzochid_la-io.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 
 test_reloc_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
-	@GUILE_CFLAGS@
+	@GOBJECT_CFLAGS@ @GUILE_CFLAGS@
 test_reloc_SOURCES = test-reloc.c
 test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-auth.o \
@@ -255,14 +257,16 @@ test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GOBJECT_LIBS@ \
+	@GUILE_LIBS@
 
 test_resolver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_resolver_SOURCES = test-resolver.c
 test_resolver_LDADD = $(top_builddir)/src/libgzochid_la-resolver.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@
 
-test_scheme_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_scheme_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
+	@GUILE_CFLAGS@
 test_scheme_SOURCES = test-scheme.c mock-data.c
 test_scheme_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-auth.o \
@@ -276,7 +280,8 @@ test_scheme_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GOBJECT_LIBS@ \
+	@GUILE_LIBS@
 
 test_scheme_task_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_scheme_task_SOURCES = test-scheme-task.c 

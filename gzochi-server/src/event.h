@@ -1,5 +1,5 @@
 /* event.h: Prototypes and declarations for event.c
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,92 +19,134 @@
 #define GZOCHID_EVENT_H
 
 #include <glib.h>
+#include <glib-object.h>
 #include <sys/time.h>
 
-enum _gzochid_application_event_type
-  {
-    BYTES_READ, /* Bytes have been read from the data store. */
-    BYTES_WRITTEN, /* Bytes have been written to the data store. */
+/* Enumeration of base event types. */
 
+enum _gzochid_event_type
+  {
     MESSAGE_RECEIVED, /* A message has been received from a client session. */
     MESSAGE_SENT, /* A message has been sent to a client session. */
     
-    TRANSACTION_START, /* An application transaction has been started. */
+    TRANSACTION_START /* An application transaction has been started. */
+  };
+
+typedef enum _gzochid_event_type gzochid_event_type;
+
+/* Enumeration of data-related event types. */
+
+enum _gzochid_data_event_type
+  {
+    BYTES_READ, /* Bytes have been read from the data store. */
+    BYTES_WRITTEN /* Bytes have been written to the data store. */
+  };
+
+typedef enum _gzochid_data_event_type gzochid_data_event_type;
+
+/* Enumeration of transaction-related event types. */
+
+enum _gzochid_transaction_event_type
+  {
     TRANSACTION_COMMIT, /* A transaction has been committed. */
     TRANSACTION_ROLLBACK /* A transaction has been rolled back. */
   };
 
-typedef enum _gzochid_application_event_type gzochid_application_event_type;
+typedef enum _gzochid_transaction_event_type gzochid_transaction_event_type;
 
-struct _gzochid_application_event
+/* GObject type definition for base event type. */
+
+#define GZOCHID_TYPE_EVENT gzochid_event_get_type ()
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_DERIVABLE_TYPE' can be used. */
+
+GType gzochid_event_get_type (void);
+
+typedef struct _GzochidEvent GzochidEvent;
+
+struct _GzochidEventClass
 {
-  gzochid_application_event_type type; /* The type of event. */
-  struct timeval timestamp; /* The time the event was fired. */
+  GObjectClass parent_class;
 };
 
-typedef struct _gzochid_application_event gzochid_application_event;
+typedef struct _GzochidEventClass GzochidEventClass;
 
-struct _gzochid_application_transaction_event
+static inline GzochidEvent *
+GZOCHID_EVENT (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_event_get_type (), GzochidEvent);
+}
+
+/* End boilerplate. */
+
+/* GObject type definition for data event sub-type. */
+
+#define GZOCHID_TYPE_DATA_EVENT gzochid_data_event_get_type ()
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_data_event_get_type (void);
+
+typedef struct _GzochidDataEvent GzochidDataEvent;
+
+struct _GzochidDataEventClass
 {
-  gzochid_application_event base;
-  struct timeval duration; /* The transaction duration. */
+  GzochidEventClass parent_class;
 };
 
-typedef struct _gzochid_application_transaction_event
-gzochid_application_transaction_event;
+typedef struct _GzochidDataEventClass GzochidDataEventClass;
 
-struct _gzochid_application_data_event
+static inline GzochidDataEvent *
+GZOCHID_DATA_EVENT (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_data_event_get_type (), GzochidDataEvent);
+}
+
+/* End boilerplate. */
+
+/* GObject type definition for transaction event sub-type. */
+
+#define GZOCHID_TYPE_TRANSACTION_EVENT gzochid_transaction_event_get_type ()
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_transaction_event_get_type (void);
+
+typedef struct _GzochidTransactionEvent GzochidTransactionEvent;
+
+struct _GzochidTransactionEventClass
 {
-  gzochid_application_event base;
-  unsigned long bytes; /* The number of bytes. */
+  GzochidEventClass parent_class;
 };
 
-typedef struct _gzochid_application_data_event gzochid_application_data_event;
+typedef struct _GzochidTransactionEventClass GzochidTransactionEventClass;
 
-typedef struct _gzochid_application_event_source 
-gzochid_application_event_source;
+static inline GzochidTransactionEvent *
+GZOCHID_TRANSACTION_EVENT (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_transaction_event_get_type (), GzochidTransactionEvent);
+}
 
-gzochid_application_event_source *gzochid_application_event_source_new (void);
-void gzochid_application_event_source_free
-(gzochid_application_event_source *);
+/* End boilerplate. */
 
-typedef void (*gzochid_application_event_handler) 
-(gzochid_application_event *, gpointer);
+typedef struct _gzochid_event_source gzochid_event_source;
 
-/* Create and return a new application event of the specified type, which must
-   be `TRANSACTION_START'. Do not free the memory referenced by the returned 
-   pointer; it will be freed after the event has been dispatched. */
+gzochid_event_source *gzochid_event_source_new (void);
+void gzochid_event_source_free (gzochid_event_source *);
 
-gzochid_application_event *gzochid_application_event_new
-(gzochid_application_event_type);
+typedef void (*gzochid_event_handler) (GzochidEvent *, gpointer);
 
-/* Create and return a new application event of the specified type, which must
-   be one of `BYTES_READ' or `BYTES_WRITTEN', with the specified byte count. Do
-   not free the memory referenced by the returned pointer; it will be freed 
-   after the event has been dispatched. */
+/* Attaches the specified event handler to the event source.*/
 
-gzochid_application_event *gzochid_application_data_event_new
-(gzochid_application_event_type, unsigned long);
+void gzochid_event_attach
+(gzochid_event_source *, gzochid_event_handler, gpointer);
 
-/* Create and return a new application event of the specified type, which must
-   be one of `TRANSACTION_COMMIT' or `TRANSACTION_ROLLBACK', along with the
-   specified transaction duration. Do not free the memory referenced by the 
-   returned pointer; it will be freed after the event has been dispatched. */
+/* Dispatches an event to the event source, triggering all registered 
+   handlers. */
 
-gzochid_application_event *gzochid_application_transaction_event_new
-(gzochid_application_event_type, struct timeval);
-
-/* Attaches the specified application event handler to the event source.*/
-
-void gzochid_application_event_attach 
-(gzochid_application_event_source *, gzochid_application_event_handler, 
- gpointer);
-
-/* Dispatches an event to the event source, triggering all registered handlers.
-   The application event's memory will be freed once all handlers have been
-   invoked. */
-
-void gzochid_application_event_dispatch
-(gzochid_application_event_source *, gzochid_application_event *);
+void gzochid_event_dispatch (gzochid_event_source *, GzochidEvent *);
 
 #endif /* GZOCHID_EVENT_H */

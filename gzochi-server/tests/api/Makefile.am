@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2015 Julian Graham
+# Copyright (C) 2016 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ AM_TESTS_ENVIRONMENT = GUILE_LOAD_PATH='$(top_srcdir)/src/scheme'; \
 TESTS = $(test_programs)
 
 test_tx_CFLAGS = -I$(top_srcdir)/src/api @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
-	@GUILE_CFLAGS@
+	@GOBJECT_CFLAGS@ @GUILE_CFLAGS@
 test_tx_SOURCES = test-tx.c
 test_tx_LDADD = $(top_builddir)/src/api/tx.o \
 	$(top_builddir)/src/api/util.o \
@@ -44,4 +44,5 @@ test_tx_LDADD = $(top_builddir)/src/api/tx.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GOBJECT_LIBS@ \
+	@GUILE_LIBS@
