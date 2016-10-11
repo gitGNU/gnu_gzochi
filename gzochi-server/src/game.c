@@ -74,8 +74,8 @@ initialize_application (gzochid_game_context *context, const char *dir,
 
   gzochid_application_context_init
     (application_context, (gzochid_context *) context, descriptor);
-  g_source_attach ((GSource *) application_context->event_source, 
-		   g_main_loop_get_context (context->event_loop));
+  gzochid_event_source_attach
+    (context->event_loop, application_context->event_source);
 }
 
 static void 
@@ -235,30 +235,13 @@ initialize_complete (int from_state, int to_state, gpointer user_data)
   gzochid_fsm_to_state (context->fsm, GZOCHID_GAME_STATE_RUNNING);
 }
 
-static gpointer 
-event_loop (gpointer data)
-{
-  gzochid_game_context *context = data;
-  g_main_loop_run (context->event_loop);
-  return NULL;
-}
-
-static void 
-initialize_event_loop (int from_state, int to_state, gpointer user_data)
-{
-  g_thread_new ("event-loop", event_loop, user_data);
-}
-
 gzochid_game_context *
 gzochid_game_context_new ()
 {
-  GMainContext *event_context = g_main_context_new ();
   gzochid_game_context *context = calloc (1, sizeof (gzochid_game_context));
 
   context->applications = g_hash_table_new (g_str_hash, g_str_equal);
   context->auth_plugins = g_hash_table_new (g_str_hash, g_str_equal);
-
-  context->event_loop = g_main_loop_new (event_context, FALSE);
 
   return context;
 }
@@ -275,6 +258,8 @@ gzochid_game_context_free (gzochid_game_context *context)
     g_object_unref (context->root_context);
   if (context->socket_server != NULL)
     g_object_unref (context->socket_server);
+  if (context->event_loop != NULL)
+    g_object_unref (context->event_loop);
   
   free (context);
 } 
@@ -292,7 +277,9 @@ gzochid_game_context_init (gzochid_game_context *context,
   context->root_context = g_object_ref (root_context);
   context->socket_server = gzochid_resolver_require_full
     (root_context->resolution_context, GZOCHID_TYPE_SOCKET_SERVER, NULL);
-
+  context->event_loop = gzochid_resolver_require_full
+    (root_context->resolution_context, GZOCHID_TYPE_EVENT_LOOP, NULL);
+  
   context->pool = gzochid_thread_pool_new 
     (context, 
      gzochid_config_to_int 
@@ -380,8 +367,6 @@ gzochid_game_context_init (gzochid_game_context *context,
   gzochid_fsm_add_transition
     (fsm, GZOCHID_GAME_STATE_RUNNING, GZOCHID_GAME_STATE_STOPPED);
 
-  gzochid_fsm_on_enter
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_event_loop, context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_server, context);
   gzochid_fsm_on_enter 

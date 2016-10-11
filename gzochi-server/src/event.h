@@ -149,10 +149,56 @@ GZOCHID_TRANSACTION_EVENT (gconstpointer ptr) {
 
 /* End boilerplate. */
 
+/* The gzochid event loop object is a lightweight wrapper around GLib's 
+   `GMainLoop' and `GMainContext', to make it easy to share and inject those
+   objects using gzochid's dependency injector. */
+
+#define GZOCHID_TYPE_EVENT_LOOP gzochid_event_loop_get_type ()
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_event_loop_get_type (void);
+
+typedef struct _GzochidEventLoop GzochidEventLoop;
+
+struct _GzochidEventLoopClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _GzochidEventLoopClass GzochidEventLoopClass;
+
+static inline GzochidEventLoop *
+GZOCHID_EVENT_LOOP (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_event_loop_get_type (), GzochidEventLoop);
+}
+
+/* End boilerplate. */
+
+/* Start the specified event loop, launching a new thread to run its 
+   iterations. It is a programming error (and will violate an assertion) to
+   start an event loop more than once. */
+
+void gzochid_event_loop_start (GzochidEventLoop *);
+
+/* Stop the specified event loop, terminating its associated thread. After
+   this function returns, no further event notifications will take place until
+   the event loop is started again. */
+
+void gzochid_event_loop_stop (GzochidEventLoop *);
+
 typedef struct _gzochid_event_source gzochid_event_source;
 
 gzochid_event_source *gzochid_event_source_new (void);
 void gzochid_event_source_free (gzochid_event_source *);
+
+/* Attach the specified event source to the specified main loop. This function
+   is a thin wrapper around GLib's `g_source_attach', and, as such, may be
+   called when the event loop is running or when it is stopped. */
+
+void gzochid_event_source_attach (GzochidEventLoop *, gzochid_event_source *);
 
 typedef void (*gzochid_event_handler) (GzochidEvent *, gpointer);
 

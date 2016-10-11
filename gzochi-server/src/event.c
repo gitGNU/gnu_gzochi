@@ -295,6 +295,91 @@ gzochid_transaction_event_init (GzochidTransactionEvent *self)
 {
 }
 
+/* The event loop object struct. */
+
+struct _GzochidEventLoop
+{
+  GObject parent_instance; /* The base struct, for casting. */
+  
+  GMainContext *main_context; /* The event loop's main context. */
+  GMainLoop *main_loop; /* The event loop's main loop. */
+
+  /* The event thread, non-NULL when the loop is running. */
+
+  GThread *event_thread; 
+};
+
+/* Boilerplate setup for the event loop type. */
+
+G_DEFINE_TYPE (GzochidEventLoop, gzochid_event_loop, G_TYPE_OBJECT);
+
+static void
+gzochid_event_loop_dispose (GObject *gobject)
+{
+  GzochidEventLoop *event_loop = GZOCHID_EVENT_LOOP (gobject);
+
+  g_main_loop_unref (event_loop->main_loop);
+  g_main_context_unref (event_loop->main_context);
+}
+
+static void
+gzochid_event_loop_class_init (GzochidEventLoopClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = gzochid_event_loop_dispose;
+}
+
+static void
+gzochid_event_loop_init (GzochidEventLoop *self)
+{
+  self->main_context = g_main_context_new ();
+  self->main_loop = g_main_loop_new (self->main_context, FALSE);
+
+  self->event_thread = NULL;
+}
+
+static gpointer
+event_loop_thread_func (gpointer data)
+{
+  /* Run the loop. This call will return when another thread calls 
+     `gzochid_event_loop_stop'. */
+  
+  g_main_loop_run (data);
+  return NULL;
+}
+
+void
+gzochid_event_loop_start (GzochidEventLoop *event_loop)
+{
+  assert (event_loop->event_thread == NULL);
+
+  event_loop->event_thread =
+    g_thread_new ("event-loop", event_loop_thread_func, event_loop->main_loop);
+}
+
+void
+gzochid_event_loop_stop (GzochidEventLoop *event_loop)
+{
+  assert (event_loop->event_thread != NULL);
+
+  /* Break the thread of the main loop... */
+  
+  g_main_loop_quit (event_loop->main_loop);
+
+  /* ...and wait for it to exit. */
+  
+  g_thread_join (event_loop->event_thread);
+  event_loop->event_thread = NULL;
+}
+
+void
+gzochid_event_source_attach (GzochidEventLoop *event_loop,
+			     gzochid_event_source *event_source)
+{
+  g_source_attach ((GSource *) event_source, event_loop->main_context);
+}
+
 struct _gzochid_event_handler_registration
 {
   gzochid_event_handler handler;
@@ -375,6 +460,7 @@ static GSourceFuncs event_funcs = { prepare, check, dispatch, finalize };
 gzochid_event_source *
 gzochid_event_source_new ()
 {
+  
   gzochid_event_source *source = (gzochid_event_source *) g_source_new
     (&event_funcs, sizeof (gzochid_event_source));
 
@@ -389,7 +475,7 @@ void
 gzochid_event_source_free (gzochid_event_source *source)
 {
   g_mutex_clear (&source->mutex);
-  g_list_free (source->handlers);
+  g_list_free_full (source->handlers, (GDestroyNotify) free);
   g_queue_free (source->events);
   g_source_unref ((GSource *) source);
 }

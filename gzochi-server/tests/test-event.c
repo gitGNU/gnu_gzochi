@@ -23,40 +23,61 @@
 
 #include "event.h"
 
+struct handler_data
+{
+  GMutex mutex;
+  GCond cond;
+  
+  gboolean handled;
+};
+
 static void test_handler 
 (GzochidEvent *event, gpointer user_data)
 {
-  *((gboolean *) user_data) = TRUE;
-}
+  struct handler_data *handler_data = user_data;
 
-static gboolean quit_main_loop (gpointer user_data)
-{
-  GMainLoop *main_loop = (GMainLoop *) user_data;
-  g_main_loop_quit (main_loop);
-  return TRUE;
+  g_mutex_lock (&handler_data->mutex);
+
+  handler_data->handled = TRUE;
+  
+  g_cond_signal (&handler_data->cond);
+  g_mutex_unlock (&handler_data->mutex);
 }
 
 static void test_event_dispatch ()
 {
-  GMainLoop *main_loop = g_main_loop_new (NULL, FALSE);
-  GMainContext *main_context = g_main_loop_get_context (main_loop);
-
+  GzochidEventLoop *event_loop = g_object_new (GZOCHID_TYPE_EVENT_LOOP, NULL);
   gzochid_event_source *event_source = gzochid_event_source_new ();
-  GSource *timeout_source = g_timeout_source_new (100);
+
   GzochidEvent *event = g_object_new
     (GZOCHID_TYPE_TRANSACTION_EVENT, "type", TRANSACTION_START, NULL);
-  gboolean handled = FALSE;
+  struct handler_data handler_data;
 
-  g_source_attach ((GSource *) event_source, main_context);
-  g_source_attach (timeout_source, main_context);
-  g_source_set_callback (timeout_source, quit_main_loop, main_loop, NULL);
-
-  gzochid_event_attach (event_source, test_handler, &handled);
+  g_mutex_init (&handler_data.mutex);
+  g_cond_init (&handler_data.cond);  
+  handler_data.handled = FALSE;
+  
+  gzochid_event_source_attach (event_loop, event_source);
+  gzochid_event_attach (event_source, test_handler, &handler_data);
   gzochid_event_dispatch (event_source, event);
 
-  g_main_loop_run (main_loop);
+  g_mutex_lock (&handler_data.mutex);
+  gzochid_event_loop_start (event_loop);
 
-  g_assert (handled);
+  g_cond_wait (&handler_data.cond, &handler_data.mutex);
+  
+  g_assert (handler_data.handled);
+
+  g_mutex_unlock (&handler_data.mutex);
+
+  g_mutex_clear (&handler_data.mutex);
+  g_cond_clear (&handler_data.cond);
+
+  gzochid_event_loop_stop (event_loop);
+  gzochid_event_source_free (event_source);
+
+  g_object_unref (event);
+  g_object_unref (event_loop);
 }
 
 int main (int argc, char *argv[])
@@ -69,7 +90,7 @@ int main (int argc, char *argv[])
   g_type_init ();
 #endif /* GLIB_CHECK_VERSION */
   
-  g_test_add_func ("/event/dispatch", test_event_dispatch);
+  g_test_add_func ("/event-loop/dispatch", test_event_dispatch);
 
   return g_test_run ();
 }

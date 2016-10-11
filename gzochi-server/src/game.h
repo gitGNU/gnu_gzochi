@@ -58,8 +58,7 @@ struct _gzochid_game_context
 
   gzochid_server_socket *server_socket; /* The game protocol server socket. */
   GzochidSocketServer *socket_server; /* The game server socket server. */
-
-  GMainLoop *event_loop;
+  GzochidEventLoop *event_loop;
 };
 
 typedef struct _gzochid_game_context gzochid_game_context;
