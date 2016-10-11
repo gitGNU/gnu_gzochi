@@ -63,6 +63,23 @@ typedef enum _gzochid_transaction_event_type gzochid_transaction_event_type;
 
 GType gzochid_event_get_type (void);
 
+/*
+  The base event object. Visible here to support the creation of event 
+  sub-types outside of event.c. The following properties are available: 
+  
+  type - the event type, as an int that can be mapped to as type-specific enum
+  timestamp-us - the event timestamp, in microseconds since the Unix epoch 
+*/
+
+struct _GzochidEvent
+{
+  GObject parent_instance; /* The base struct, for casting. */
+
+  /* Pointer to the instance's private struct. */
+
+  struct _GzochidEventPrivate *priv; 
+};
+
 typedef struct _GzochidEvent GzochidEvent;
 
 struct _GzochidEventClass

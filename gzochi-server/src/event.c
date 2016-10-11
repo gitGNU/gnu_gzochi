@@ -27,12 +27,10 @@
 
 #define DEFAULT_EVENT_POLL_INTERVAL_MS 1000
 
-/* The base event object. */
+/* The private contents of GzochidEvent. */
 
-struct _GzochidEvent
+struct _GzochidEventPrivate
 {
-  GObject parent_instance;
-
   /* The event type. This will be an enum value scoped to the GObject type.
      I.e., For GzochidDataEvents, this will be one of the values in 
      `gzochid_data_event_type'. */
@@ -43,6 +41,8 @@ struct _GzochidEvent
 
   guint64 timestamp_us; 
 };
+
+typedef struct _GzochidEventPrivate GzochidEventPrivate;
 
 /* Boilerplate setup for the base event object. */
 
@@ -61,7 +61,8 @@ static void
 gzochid_event_get_property (GObject *object, guint property_id,
 			    GValue *value, GParamSpec *pspec)
 {
-  GzochidEvent *event = GZOCHID_EVENT (object);
+  GzochidEventPrivate *event = G_TYPE_INSTANCE_GET_PRIVATE
+    (object, GZOCHID_TYPE_EVENT, GzochidEventPrivate);
 
   switch (property_id)
     {
@@ -83,7 +84,8 @@ static void
 gzochid_event_set_property (GObject *object, guint property_id,
 			    const GValue *value, GParamSpec *pspec)
 {
-  GzochidEvent *event = GZOCHID_EVENT (object);
+  GzochidEventPrivate *event = G_TYPE_INSTANCE_GET_PRIVATE
+    (object, GZOCHID_TYPE_EVENT, GzochidEventPrivate);
 
   switch (property_id)
     {
@@ -119,15 +121,19 @@ gzochid_event_class_init (GzochidEventClass *klass)
 
   g_object_class_install_properties
     (object_class, N_EVENT_PROPERTIES, event_properties);
+  g_type_class_add_private (klass, sizeof (GzochidEventPrivate));
 }
 
 static void
 gzochid_event_init (GzochidEvent *self)
 {
+  self->priv = G_TYPE_INSTANCE_GET_PRIVATE
+    (self, GZOCHID_TYPE_EVENT, GzochidEventPrivate);
+  
   /* Initialize the event timestamp to the current time; in most cases, this 
      won't need to be overridden by clients. */     
   
-  self->timestamp_us = g_get_monotonic_time ();
+  self->priv->timestamp_us = g_get_monotonic_time ();
 }
 
 /* The data event object. */
