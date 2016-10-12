@@ -26,9 +26,31 @@
 
 #include "config.h"
 #include "dataclient.h"
+#include "httpd.h"
 #include "oids.h"
 #include "resolver.h"
 #include "socket.h"
+
+struct _GzochidHttpServer
+{
+  GObject parent_instance;
+};
+
+G_DEFINE_TYPE (GzochidHttpServer, gzochid_http_server, G_TYPE_OBJECT);
+
+static void gzochid_http_server_class_init (GzochidHttpServerClass *klass)
+{
+}
+
+static void gzochid_http_server_init (GzochidHttpServer *self)
+{
+}
+
+const char *
+gzochid_http_server_get_base_url (GzochidHttpServer *server)
+{
+  return "http://127.0.0.1/";
+}
 
 struct _dataclient_fixture
 {
@@ -168,17 +190,15 @@ dataclient_fixture_setup (dataclient_fixture *fixture, gconstpointer user_data)
 }
 
 static void
-dataclient_connected_fixture_setup (dataclient_fixture *fixture,
-				    gconstpointer user_data)
+dataclient_connected_fixture_setup_inner (dataclient_fixture *fixture,
+					  GKeyFile *key_file)
 {
   struct sockaddr_in addr;
   size_t addrlen = sizeof (struct sockaddr_in);
   char *server_address = NULL;
-  GKeyFile *key_file = g_key_file_new ();
 
   fixture->resolution_context = g_object_new
     (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
-
   fixture->socket_server = gzochid_resolver_require_full
     (fixture->resolution_context, GZOCHID_TYPE_SOCKET_SERVER, NULL);
   fixture->server_socket = gzochid_server_socket_new
@@ -201,10 +221,30 @@ dataclient_connected_fixture_setup (dataclient_fixture *fixture,
 
   g_free (server_address);
   
-  dataclient_fixture_setup_inner (fixture, key_file);
-  g_key_file_unref (key_file);
-  
+  dataclient_fixture_setup_inner (fixture, key_file);  
   gzochid_dataclient_start (fixture->dataclient, NULL);
+}
+
+static void
+dataclient_connected_fixture_setup (dataclient_fixture *fixture,
+				    gconstpointer user_data)
+{
+  GKeyFile *key_file = g_key_file_new ();
+
+  dataclient_connected_fixture_setup_inner (fixture, key_file);
+  g_key_file_unref (key_file);  
+}
+
+static void
+dataclient_connected_fixture_with_httpd_setup (dataclient_fixture *fixture,
+					       gconstpointer user_data)
+{
+  GKeyFile *key_file = g_key_file_new ();
+
+  g_key_file_set_value (key_file, "admin", "module.httpd.enabled", "true");
+
+  dataclient_connected_fixture_setup_inner (fixture, key_file);
+  g_key_file_unref (key_file);
 }
 
 static void
@@ -218,7 +258,7 @@ dataclient_fixture_teardown (dataclient_fixture *fixture,
 
 static void
 dataclient_connected_fixture_teardown (dataclient_fixture *fixture,
-			     gconstpointer user_data)
+				       gconstpointer user_data)
 {
   gzochid_dataclient_stop (fixture->dataclient);
 
@@ -226,8 +266,44 @@ dataclient_connected_fixture_teardown (dataclient_fixture *fixture,
 }
 
 static void
+ignore_login (dataclient_fixture *fixture)
+{
+  g_timeout_add (2000, exit_loop, fixture);
+  g_main_loop_run (fixture->socket_server->main_loop);
+
+  if (fixture->bytes_received->len > 0)
+    g_byte_array_remove_range
+      (fixture->bytes_received, 0, fixture->bytes_received->len);  
+}
+
+static void
+test_login_simple (dataclient_fixture *fixture, gconstpointer user_data)
+{
+  g_timeout_add (2000, exit_loop, fixture);
+  g_main_loop_run (fixture->socket_server->main_loop);
+
+  g_assert_cmpint (fixture->bytes_received->len, ==, 5);  
+  g_assert
+    (memcmp (fixture->bytes_received->data, "\x00\x02\x10\x02\x00", 5) == 0);
+}
+
+static void
+test_login_http_server_enabled (dataclient_fixture *fixture,
+				gconstpointer user_data)
+{
+  g_timeout_add (2000, exit_loop, fixture);
+  g_main_loop_run (fixture->socket_server->main_loop);
+
+  g_assert_cmpint (fixture->bytes_received->len, ==, 22);  
+  g_assert (memcmp (fixture->bytes_received->data,
+		    "\x00\x13\x10\x02http://127.0.0.1/\x00", 22) == 0);
+}
+
+static void
 test_reserve_oids_simple (dataclient_fixture *fixture, gconstpointer user_data)
 {
+  ignore_login (fixture);
+  
   gzochid_dataclient_reserve_oids
     (fixture->dataclient, "test", oids_callback, NULL);
 
@@ -266,6 +342,8 @@ test_request_value_simple (dataclient_fixture *fixture, gconstpointer user_data)
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
   
+  ignore_login (fixture);
+
   gzochid_dataclient_request_value
     (fixture->dataclient, "test", "oids", key, TRUE,
      success_callback, NULL, failure_callback, NULL);
@@ -366,6 +444,8 @@ test_request_next_key_simple (dataclient_fixture *fixture,
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
   
+  ignore_login (fixture);
+
   gzochid_dataclient_request_next_key
     (fixture->dataclient, "test", "names", key,
      success_callback, NULL, failure_callback, NULL);
@@ -473,6 +553,8 @@ test_submit_changeset_simple (dataclient_fixture *fixture,
   GBytes *expected_outbound_message = NULL, *actual_outbound_message = NULL;
   gzochid_data_changeset *changeset = NULL;
   
+  ignore_login (fixture);
+
   obj_change1.store = strdup ("oids");
   obj_change1.key = g_bytes_new_static ("1", 2);
   obj_change1.delete = FALSE;
@@ -543,6 +625,15 @@ main (int argc, char *argv[])
 #endif /* GLIB_CHECK_VERSION */
 
   g_test_init (&argc, &argv, NULL);
+
+  g_test_add
+    ("/dataclient/login/simple", dataclient_fixture, NULL,
+     dataclient_connected_fixture_setup, test_login_simple,
+     dataclient_connected_fixture_teardown);
+  g_test_add
+    ("/dataclient/login/http-server-enabled", dataclient_fixture, NULL,
+     dataclient_connected_fixture_with_httpd_setup,
+     test_login_http_server_enabled, dataclient_connected_fixture_teardown);
   
   g_test_add
     ("/dataclient/reserve-oids/simple", dataclient_fixture, NULL,

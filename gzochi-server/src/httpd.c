@@ -80,9 +80,10 @@ struct _GzochidHttpServer
 
   /* The socket address to which the server is bound. */
 
-  struct sockaddr_in addr; 
+  struct sockaddr_in addr;
 
   socklen_t addrlen; /* The size of the socket address. */
+  char *base_url; /* The HTTP server base URL. */
   struct MHD_Daemon *daemon; /* The GNU microhttpd daemon struct. */
 };
 
@@ -637,9 +638,51 @@ gzochid_http_server_stop (GzochidHttpServer *server)
 {
   assert (server->daemon != NULL);
 
+  if (server->base_url != NULL)
+    {
+      g_free (server->base_url);
+      server->base_url = NULL;
+    }
+  
   MHD_stop_daemon (server->daemon);
   server->daemon = NULL;
 }
+
+const char *
+gzochid_http_server_get_base_url (GzochidHttpServer *server)
+{
+  assert (server->daemon != NULL);
+
+  if (server->base_url == NULL)
+    {
+      uint32_t addr = 0;
+      int port = ntohs (server->addr.sin_port);
+      char *desc = NULL;
+
+      /* If we were listening on `INADDR_ANY', the socket address won't be a 
+	 "real" address (i.e., it'll be `0.0.0.0'). So return localhost in that
+	 case. */
+      
+      if (server->addr.sin_addr.s_addr == INADDR_ANY)
+	addr = htonl (INADDR_LOOPBACK);
+      else addr = ntohs (server->addr.sin_addr.s_addr);
+      
+      desc = g_strdup_printf 
+	("%d.%d.%d.%d",
+	 addr & 0xff,
+	 (addr & 0xff00) >> 8,
+	 (addr & 0xff0000) >> 16,
+	 (addr & 0xff000000) >> 24);
+      
+      if (port != 80)
+	server->base_url = g_strdup_printf ("http://%s:%d/", desc, port);
+      else server->base_url = g_strdup_printf ("http://%s/", desc);
+      
+      free (desc);
+    }
+
+  return server->base_url;  
+}  
 
 void
 _gzochid_http_server_getsockname (GzochidHttpServer *server,

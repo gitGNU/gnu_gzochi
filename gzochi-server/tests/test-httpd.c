@@ -17,6 +17,7 @@
 
 #include <glib.h>
 #include <glib-object.h>
+#include <netinet/in.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -156,6 +157,25 @@ test_add_continuation_simple (test_httpd_fixture *fixture,
   assert_next_line (fixture->client_channel, "SUCCESS\n");
 }
 
+static void
+test_get_base_url (test_httpd_fixture *fixture, gconstpointer user_data)
+{
+  struct sockaddr_in addr;
+  socklen_t addrlen = sizeof (struct sockaddr_in);
+
+  const char *base_url = gzochid_http_server_get_base_url
+    (fixture->http_server);
+  gchar *expected_url = NULL;
+
+  _gzochid_http_server_getsockname
+    (fixture->http_server, (struct sockaddr *) &addr, &addrlen);
+  expected_url = g_strdup_printf
+    ("http://127.0.0.1:%d/", ntohs (addr.sin_port));
+
+  g_assert_cmpstr (base_url, ==, expected_url);
+  g_free (expected_url);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -174,6 +194,10 @@ main (int argc, char *argv[])
   g_test_add
     ("/httpd/add_continuation/simple", test_httpd_fixture, NULL,
      test_httpd_fixture_set_up, test_add_continuation_simple,
+     test_httpd_fixture_tear_down);
+  g_test_add
+    ("/httpd/get_base_url/simple", test_httpd_fixture, NULL,
+     test_httpd_fixture_set_up, test_get_base_url,
      test_httpd_fixture_tear_down);
   
   return g_test_run ();

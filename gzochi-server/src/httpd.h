@@ -148,6 +148,16 @@ gzochid_httpd_partial *gzochid_httpd_append_continuation
 void gzochid_http_write_response
 (gzochid_http_response_sink *, int, char *, size_t);
 
+/*
+  Returns a string giving the base URL of the HTTP server.
+
+  The returned string is owned by the HTTP server and should not be modified or
+  freed by the caller. It is a programming error to call this function on an
+  HTTP server that has not been started. 
+*/
+
+const char *gzochid_http_server_get_base_url (GzochidHttpServer *);
+
 /* Private httpd service context API, visible for testing only. */
 
 /* Copies the actual socket address of the specified httpd service context to 

@@ -34,6 +34,7 @@
 #include "data-protocol.h"
 #include "dataclient.h"
 #include "dataclient-protocol.h"
+#include "resolver.h"
 #include "socket.h"
 
 /* Captures callback configuration for a request issued through the data 
@@ -89,8 +90,19 @@ struct _GzochidDataClient
 {
   GObject parent_instance;
 
-  GHashTable *configuration; /* The data client configuration table. */
+  GzochidConfiguration *configuration; /* The global configuration object. */
 
+  /* The data client configuration table; extracted from the global 
+     configuration object and cached for convenience. */
+
+  GHashTable *dataclient_configuration; 
+
+  /* The global resolution context; used for getting a (temporary) handle to
+     the container's embedded HTTP server (if available) to extract the base
+     URL to send to the meta server as part of the login request. */
+  
+  GzochidResolutionContext *resolution_context;
+  
   /* A map of application names to `dataclient_callback_queue' objects. */
   
   GHashTable *application_callback_queues; 
@@ -101,6 +113,12 @@ struct _GzochidDataClient
 
   GzochidSocketServer *socket_server;
 
+  /* When the data client has been started, holds the base URL of the gzochid 
+     admin HTTP console, if available; otherwise, a heap-allocated empty 
+     string. */
+  
+  char *admin_server_base_url;
+  
   /* The client's current connection to the data server. */
 
   gzochid_client_socket *client_socket;
@@ -135,6 +153,7 @@ G_DEFINE_TYPE (GzochidDataClient, gzochid_data_client, G_TYPE_OBJECT);
 enum gzochid_data_client_properties
   {
     PROP_CONFIGURATION = 1,
+    PROP_RESOLUTION_CONTEXT,
     PROP_SOCKET_SERVER,
     N_PROPERTIES
   };
@@ -150,8 +169,11 @@ gzochid_data_client_set_property (GObject *object, guint property_id,
   switch (property_id)
     {
     case PROP_CONFIGURATION:
-      self->configuration = gzochid_configuration_extract_group
-	(GZOCHID_CONFIGURATION (g_value_get_object (value)), "metaserver");
+      self->configuration = g_object_ref (g_value_get_object (value));
+      break;
+
+    case PROP_RESOLUTION_CONTEXT:
+      self->resolution_context = g_object_ref (g_value_get_object (value));
       break;
       
     case PROP_SOCKET_SERVER:
@@ -165,13 +187,28 @@ gzochid_data_client_set_property (GObject *object, guint property_id,
 }
 
 static void
+gzochid_data_client_constructed (GObject *gobject)
+{
+  GzochidDataClient *client = GZOCHID_DATA_CLIENT (gobject);  
+
+  /* Extract and save the "metaserver" configuration group to use to look up
+     connection details. */
+  
+  client->dataclient_configuration = gzochid_configuration_extract_group
+    (client->configuration, "metaserver");  
+}
+
+static void
 gzochid_data_client_finalize (GObject *gobject)
 {
   GzochidDataClient *client = GZOCHID_DATA_CLIENT (gobject);
-
-  g_hash_table_destroy (client->configuration);
+  
+  g_hash_table_destroy (client->dataclient_configuration);
   g_hash_table_destroy (client->application_callback_queues);
 
+  if (client->admin_server_base_url != NULL)
+    free (client->admin_server_base_url);
+  
   g_byte_array_unref (client->outbound_messages);
 
   g_mutex_clear (&client->queue_mutex);
@@ -184,6 +221,8 @@ gzochid_data_client_dispose (GObject *gobject)
 {
   GzochidDataClient *client = GZOCHID_DATA_CLIENT (gobject);
 
+  g_object_unref (client->configuration);
+  g_object_unref (client->resolution_context);
   g_object_unref (client->socket_server);
 }
 
@@ -192,6 +231,7 @@ gzochid_data_client_class_init (GzochidDataClientClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
+  object_class->constructed = gzochid_data_client_constructed;
   object_class->dispose = gzochid_data_client_dispose;
   object_class->finalize = gzochid_data_client_finalize;
   object_class->set_property = gzochid_data_client_set_property;
@@ -201,6 +241,12 @@ gzochid_data_client_class_init (GzochidDataClientClass *klass)
      "Set the gzochi server configuration", GZOCHID_TYPE_CONFIGURATION,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
+  obj_properties[PROP_RESOLUTION_CONTEXT] = g_param_spec_object
+    ("resolution-context", "gzochi data client resolution context",
+     "Set the gzochi server resolution context",
+     GZOCHID_TYPE_RESOLUTION_CONTEXT,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+  
   obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
     ("socket-server", "Socket server", "Set the socket server",
      GZOCHID_TYPE_SOCKET_SERVER,
@@ -306,6 +352,35 @@ gzochid_data_client_init (GzochidDataClient *self)
 }
 
 /* End boilerplate. */
+
+/*
+  A convenience function for prefixing a message payload with its size and
+  opcode. Every message needs these things and the memory management is a
+  bit tedious. 
+
+  Returns a pointer to a newly-allocated buffer containing the complete message,
+  which should be freed when no longer needed. The `formatted_len' argument, if
+  provided, will be set to the length of this buffer. 
+*/
+
+static unsigned char *
+format_message (guchar opcode, GBytes *payload, size_t *formatted_len)
+{
+  size_t len = 0;
+  const unsigned char *data = g_bytes_get_data (payload, &len);
+  unsigned char *buf = malloc (sizeof (unsigned char) * (len + 3));
+
+  /* Prefix the message with its length. */
+  
+  gzochi_common_io_write_short (len, buf, 0);
+  buf[2] = opcode;
+  memcpy (buf + 3, data, len);
+
+  if (formatted_len != NULL)
+    *formatted_len = len + 3;
+  
+  return buf;
+}
 
 /* Attempts to connect to the specified hostname and port. Returns a new 
    `gzochid_client_socket' on success, `NULL' on failure (in which case the
@@ -436,10 +511,46 @@ ensure_connection (gpointer data)
 	    }
 	  else
 	    {
+	      GBytes *login_message_payload = NULL;
+	      GByteArray *login_message_payload_arr = g_byte_array_new ();
+	      unsigned char *login_message_bytes = NULL;
+	      size_t login_message_len = 0;
+	      
 	      client->client_socket = socket;
 	      g_message ("Connected to meta server at %s:%d.", client->hostname,
 			 client->port);
 
+	      /* Create the message payload by concatenating the protocol
+		 version byte with the admin server base URL; the base URL will
+		 never be `NULL', though it may be an empty string. */
+	      
+	      g_byte_array_append
+		(login_message_payload_arr,
+		 (unsigned char[]) { GZOCHID_DATACLIENT_PROTOCOL_VERSION }, 1);
+	      
+	      g_byte_array_append
+		(login_message_payload_arr,
+		 (unsigned char *) client->admin_server_base_url,
+		 strlen (client->admin_server_base_url) + 1);
+
+	      login_message_payload = g_byte_array_free_to_bytes
+		(login_message_payload_arr);
+
+	      /* Prefix the message with its length and opcode. */
+	      
+	      login_message_bytes = format_message
+		(GZOCHID_DATA_PROTOCOL_LOGIN, login_message_payload,
+		 &login_message_len);
+
+	      /* Enqueue it to be sent; can't use `write_message' here because
+		 we already hold the client mutex. */
+	      
+	      gzochid_client_socket_write
+		(client->client_socket, login_message_bytes, login_message_len);
+	      
+	      g_bytes_unref (login_message_payload);
+	      free (login_message_bytes);
+	      
 	      if (client->outbound_messages->len > 0)
 		{
 		  gzochid_client_socket_write
@@ -474,7 +585,7 @@ static gboolean
 extract_hostname_port (GzochidDataClient *dataclient, GError **err)
 {
   const char *hostname_port = g_hash_table_lookup
-    (dataclient->configuration, "server.address");
+    (dataclient->dataclient_configuration, "server.address");
 
   if (hostname_port == NULL)
     {
@@ -517,6 +628,40 @@ extract_hostname_port (GzochidDataClient *dataclient, GError **err)
     }
 }
 
+/*
+  Set the admin server base URL; if the admin HTTP server is enabled, 
+  retrieve a handle to it and ask it what its base URL is. Otherwise, set the
+  admin server base URL to a zero-length string.
+
+  Note that the server's base URL is only available after it has been started.
+  For the reason, the data client should be started after the HTTP server (if 
+  enabled). 
+*/
+
+static void
+init_admin_server_base_url (GzochidDataClient *client)
+{
+  GHashTable *admin_configuration = gzochid_configuration_extract_group
+    (client->configuration, "admin");
+
+  if (gzochid_config_to_boolean
+      (g_hash_table_lookup (admin_configuration, "module.httpd.enabled"),
+       FALSE))
+    {
+      GzochidHttpServer *http_server = gzochid_resolver_require_full
+	(client->resolution_context, GZOCHID_TYPE_HTTP_SERVER, NULL);
+
+      /* Make a copy of the base URL; we're not holding a reference to the HTTP
+	 server, so it could be subsequently disposed / finalized. */
+      
+      client->admin_server_base_url =
+	strdup (gzochid_http_server_get_base_url (http_server));
+    }
+  else client->admin_server_base_url = strdup ("");
+  
+  g_hash_table_destroy (admin_configuration);
+}
+
 void
 gzochid_dataclient_start (GzochidDataClient *dataclient, GError **err)
 {
@@ -529,8 +674,10 @@ gzochid_dataclient_start (GzochidDataClient *dataclient, GError **err)
       return;
     }
 
+  init_admin_server_base_url (dataclient);
+  
   dataclient->connect_attempt_interval_seconds = gzochid_config_to_int
-    (g_hash_table_lookup (dataclient->configuration,
+    (g_hash_table_lookup (dataclient->dataclient_configuration,
 			  "server.connect.interval.sec"), 5);
 
   /* Set the running flag to keep the maintenance loop going. */
@@ -551,6 +698,11 @@ gzochid_dataclient_stop (GzochidDataClient *dataclient)
       
       g_mutex_lock (&dataclient->mutex);
 
+      /* Clean up the admin server base URL. */
+      
+      free (dataclient->admin_server_base_url);
+      dataclient->admin_server_base_url = NULL;
+      
       /* Unset the running flag and wake up the maintenance thread so that it
 	 can exit. */
       
@@ -589,29 +741,21 @@ static void
 write_message (GzochidDataClient *client, guchar opcode, GBytes *payload)
 {
   size_t len = 0;
-  const unsigned char *data = g_bytes_get_data (payload, &len);
-  unsigned char *buf = malloc (sizeof (unsigned char) * (len + 3));
-
-  /* Prefix the message with its length. */
+  unsigned char *buf = format_message (opcode, payload, &len);
   
-  gzochi_common_io_write_short (len, buf, 0);
-  buf[2] = opcode;
-  memcpy (buf + 3, data, len);
-
   g_mutex_lock (&client->mutex);
-
   
   if (client->client_socket != NULL)
 
     /* Queue up the bytes to sent on the socket. */
     
-    gzochid_client_socket_write (client->client_socket, buf, len + 3);
+    gzochid_client_socket_write (client->client_socket, buf, len);
   else
 
     /* If the client is known to be disconnected, queue up the message bytes to
        be sent on reconnnect. */
     
-    g_byte_array_append (client->outbound_messages, buf, len + 3);
+    g_byte_array_append (client->outbound_messages, buf, len);
   
   g_mutex_unlock (&client->mutex);
   

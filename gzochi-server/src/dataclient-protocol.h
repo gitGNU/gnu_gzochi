@@ -20,6 +20,10 @@
 
 #include "protocol.h"
 
+/* The version of the data protocol understood by the client. */
+
+#define GZOCHID_DATACLIENT_PROTOCOL_VERSION 0x01
+
 /* A `gzochid_client_protocol' implementation for the dataclient protocol. */
 
 gzochid_client_protocol gzochid_dataclient_client_protocol;
