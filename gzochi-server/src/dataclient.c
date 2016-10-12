@@ -34,6 +34,7 @@
 #include "data-protocol.h"
 #include "dataclient.h"
 #include "dataclient-protocol.h"
+#include "httpd.h"
 #include "resolver.h"
 #include "socket.h"
 
