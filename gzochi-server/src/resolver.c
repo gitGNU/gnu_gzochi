@@ -115,6 +115,17 @@ struct _constructor
 
 typedef struct _constructor constructor;
 
+/* Returns `TRUE' if the specified parameter is a candidate for dependency
+   injection by the resolver framework. */
+
+static gboolean
+is_injectable (const GParamSpec *pspec)
+{
+  return g_type_is_a (pspec->value_type, G_TYPE_OBJECT)
+    && pspec->flags & G_PARAM_WRITABLE
+    && pspec->flags & G_PARAM_CONSTRUCT;
+}
+
 static constructor *
 injectable_constructor_for_type (GType type, GError **err)
 {
@@ -134,8 +145,7 @@ injectable_constructor_for_type (GType type, GError **err)
     {
       GParamSpec *pspec = properties[i];
 
-      if (g_type_is_a (pspec->value_type, G_TYPE_OBJECT)
-	  && pspec->flags & G_PARAM_CONSTRUCT)
+      if (is_injectable (pspec))
 	n_injectable_properties++;
       else if (pspec->flags & G_PARAM_CONSTRUCT_ONLY)
 	{
@@ -169,10 +179,8 @@ injectable_constructor_for_type (GType type, GError **err)
 	{
 	  GParamSpec *pspec = properties[i];
 	  
-	  if (g_type_is_a (pspec->value_type, G_TYPE_OBJECT)
-	      && pspec->flags & G_PARAM_CONSTRUCT)
+	  if (is_injectable (pspec))
 	    ctor->parameters[j++] = *properties[i];
-	  else free (properties[i]);
 	}
     }
   
