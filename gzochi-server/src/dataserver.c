@@ -179,7 +179,7 @@ gzochi_metad_data_server_set_property (GObject *object, guint property_id,
       break;
 
     case PROP_RESOLUTION_CONTEXT:
-      self->resolution_context = g_object_ref (g_value_get_object (value));
+      self->resolution_context = g_object_ref_sink (g_value_get_object (value));
       break;
       
     case PROP_SOCKET_SERVER:
@@ -326,6 +326,8 @@ init_admin_server_base_url (GzochiMetadDataServer *server)
 
       server->admin_server_base_url =
 	strdup (gzochid_http_server_get_base_url (http_server));
+
+      g_object_unref (http_server);
     }
   else server->admin_server_base_url = strdup ("");
   

@@ -78,7 +78,7 @@ root_context_set_property (GObject *object, guint property_id,
       break;
 
     case PROP_RESOLUTION_CONTEXT:
-      self->resolution_context = g_object_ref (g_value_get_object (value));
+      self->resolution_context = g_object_ref_sink (g_value_get_object (value));
       break;
       
     default:
