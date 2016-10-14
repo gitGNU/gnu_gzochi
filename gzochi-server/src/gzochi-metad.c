@@ -28,6 +28,7 @@
 
 #include "config.h"
 #include "dataserver.h"
+#include "event.h"
 #include "httpd.h"
 #include "httpd-meta.h"
 #include "log.h"
@@ -66,6 +67,7 @@ struct _GzochiMetadRootContext
   GObject parent_intance;
 
   GzochidHttpServer *http_server; /* The admin web console. */
+  GzochidEventLoop *event_loop; /* The global event loop. */
 
   /* The meta server global socket server. */
 
@@ -88,6 +90,7 @@ G_DEFINE_TYPE (GzochiMetadRootContext, gzochi_metad_root_context,
 enum gzochi_metad_root_context_properties
   {
     PROP_HTTP_SERVER = 1,
+    PROP_EVENT_LOOP,
     PROP_SOCKET_SERVER,
     PROP_DATA_SERVER,
     N_PROPERTIES
@@ -107,6 +110,10 @@ root_context_set_property (GObject *object, guint property_id,
       self->http_server = g_object_ref (g_value_get_object (value));
       break;
 
+    case PROP_EVENT_LOOP:
+      self->event_loop = g_object_ref (g_value_get_object (value));
+      break;
+      
     case PROP_SOCKET_SERVER:
       self->socket_server = g_object_ref (g_value_get_object (value));
       break;
@@ -128,17 +135,21 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
 
   object_class->set_property = root_context_set_property;
   obj_properties[PROP_HTTP_SERVER] = g_param_spec_object
-    ("http-server", "Admin HTTP server", "Set the admin HTTP server",
-     GZOCHID_TYPE_HTTP_SERVER,
+    ("http-server", "httpd", "The admin HTTP server", GZOCHID_TYPE_HTTP_SERVER,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
+  obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
+    ("event-loop", "event-loop", "The global event loop",
+     GZOCHID_TYPE_EVENT_LOOP,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+  
   obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
-    ("socket-server", "Socket server", "Set the socket server",
+    ("socket-server", "socket-server", "The global socket server",
      GZOCHID_TYPE_SOCKET_SERVER,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
   obj_properties[PROP_DATA_SERVER] = g_param_spec_object
-    ("data-server", "Data server", "Set the data server",
+    ("data-server", "data-server", "The data server",
      GZOCHI_METAD_TYPE_DATA_SERVER,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
@@ -337,6 +348,7 @@ main (int argc, char *argv[])
       exit (1);
     }
 
+  gzochid_event_loop_start (root_context->event_loop);
   initialize_httpd (root_context->http_server, key_file);
   gzochi_metad_dataserver_start (root_context->data_server);
   g_main_loop_run (root_context->socket_server->main_loop);

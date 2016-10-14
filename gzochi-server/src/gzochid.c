@@ -28,6 +28,7 @@
 #include "admin.h"
 #include "config.h"
 #include "dataclient.h"
+#include "event.h"
 #include "game.h"
 #include "guile.h"
 #include "gzochid.h"
@@ -48,6 +49,7 @@ G_DEFINE_TYPE (GzochidRootContext, gzochid_root_context, G_TYPE_OBJECT);
 enum gzochid_root_context_properties
   {
     PROP_CONFIGURATION = 1,
+    PROP_EVENT_LOOP,
     PROP_SOCKET_SERVER,
     PROP_RESOLUTION_CONTEXT,
     N_PROPERTIES
@@ -65,6 +67,10 @@ root_context_set_property (GObject *object, guint property_id,
     {
     case PROP_CONFIGURATION:
       self->configuration = g_object_ref (g_value_get_object (value));
+      break;
+
+    case PROP_EVENT_LOOP:
+      self->event_loop = g_object_ref (g_value_get_object (value));
       break;
       
     case PROP_SOCKET_SERVER:
@@ -89,17 +95,22 @@ gzochid_root_context_class_init (GzochidRootContextClass *klass)
   object_class->set_property = root_context_set_property;
 
   obj_properties[PROP_CONFIGURATION] = g_param_spec_object
-    ("configuration", "Configuration", "Set the configuration",
+    ("configuration", "configuration", "The server configuration",
      GZOCHID_TYPE_CONFIGURATION,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
+  obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
+    ("event-loop", "event-loop", "The global event loop",
+     GZOCHID_TYPE_EVENT_LOOP,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+  
   obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
-    ("socket-server", "Socket server", "Set the socket server",
+    ("socket-server", "socket-server", "The global socket server",
      GZOCHID_TYPE_SOCKET_SERVER,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
   obj_properties[PROP_RESOLUTION_CONTEXT] = g_param_spec_object
-    ("resolution-context", "Resolution context", "Set the resolution context",
+    ("resolution-context", "resolutuon-context", "The root resolution context",
      GZOCHID_TYPE_RESOLUTION_CONTEXT,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
@@ -223,6 +234,8 @@ root_context_start (GzochidRootContext *root_context)
 
   g_hash_table_unref (game_config);
   
+  gzochid_event_loop_start (root_context->event_loop);
+
   if (root_context->admin_context != NULL)
     {  
       gzochid_admin_context_init 

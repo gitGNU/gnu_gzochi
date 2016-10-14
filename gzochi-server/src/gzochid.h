@@ -23,6 +23,7 @@
 
 #include "config.h"
 #include "dataclient.h"
+#include "event.h"
 #include "resolver.h"
 #include "socket.h"
 
@@ -51,6 +52,7 @@ struct _GzochidRootContext
   const char *gzochid_conf_path;
   GzochidConfiguration *configuration; /* The server configuration. */
   GzochidSocketServer *socket_server; /* The global socket server. */  
+  GzochidEventLoop *event_loop; /* The global event loop. */
 
   /*
     A reference to the resolution context that "owns" the root context, for
@@ -60,6 +62,9 @@ struct _GzochidRootContext
 
   GzochidResolutionContext *resolution_context;
 
+  /* The meta server data client, if running in distributed mode; `NULL'
+     otherwise. */
+  
   GzochidDataClient *data_client;
   
   /* Components that can't yet be auto-resolved. */
