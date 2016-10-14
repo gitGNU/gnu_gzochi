@@ -19,6 +19,7 @@
 #include <gzochi-common.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "data-protocol.h"
 #include "dataclient.h"
@@ -41,6 +42,60 @@ client_can_dispatch (const GByteArray *buffer, gpointer user_data)
 {
   return buffer->len >= 3
     && buffer->len >= gzochi_common_io_read_short (buffer->data, 0) + 3;
+}
+
+/*
+  Finds the bounds of the `NULL'-terminated string that begins at `bytes', 
+  returning a pointer to that string and setting `str_len' appropriately.
+  Returns `NULL' if the string is not `NULL'-terminated. 
+  
+  TODO: This function duplicates a function in `data-protocol.c'. Consider 
+  making them available via a shared utility.
+*/
+
+static char *
+read_str (const unsigned char *bytes, const size_t bytes_len, size_t *str_len)
+{
+  unsigned char *end = memchr (bytes, 0, bytes_len);
+
+  if (end == NULL)
+    return NULL;
+  else
+    {
+      if (str_len != NULL)
+        *str_len = end - bytes + 1;
+      return (char *) bytes;
+    }
+}
+
+/* Processes the message payload following the 
+   `GZOZCHID_DATA_PROTOCOL_LOGIN_RESPONSE' opcode. Returns `TRUE' if the 
+   message was successfully decoded and the data protocol version advertised by
+   the meta server is supported by the client, `FALSE' otherwise. */
+
+static gboolean
+dispatch_login_response (GzochidDataClient *client, const unsigned char *data,
+			 unsigned short len)
+{
+  size_t str_len = 0;
+  unsigned char version = data[0];
+  char *admin_server_base_url = NULL;
+  
+  if (version != GZOCHID_DATACLIENT_PROTOCOL_VERSION)
+    return FALSE;
+
+  admin_server_base_url = read_str (data + 1, len - 1, &str_len);
+  
+  /* The admin server base URL can be empty, but not absent. */
+  
+  if (admin_server_base_url == NULL)
+    {
+      g_warning
+	("Received malformed 'LOGIN RESPONSE' message from metaserver.");
+      return FALSE;
+    }
+  
+  return TRUE;
 }
 
 /* Processes the message payload following the 
@@ -141,6 +196,9 @@ dispatch_message (GzochidDataClient *client, unsigned char *message,
   
   switch (opcode)
     {
+    case GZOCHID_DATA_PROTOCOL_LOGIN_RESPONSE:
+      dispatch_login_response (client, payload, len);
+      break;
     case GZOCHID_DATA_PROTOCOL_OIDS_RESPONSE:
       dispatch_oids_response (client, payload, len);
       break;      

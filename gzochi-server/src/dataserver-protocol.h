@@ -22,13 +22,6 @@
 
 typedef struct _gzochi_metad_dataserver_client gzochi_metad_dataserver_client;
 
-/* Returns the admin server base URL for the connected gzochi applicaiton node 
-   represented by the specified `gzochi_metad_dataserver_client', or `NULL' if
-   one has not been set. */
-
-const char *gzochi_metad_dataserver_client_get_admin_server_base_url
-(gzochi_metad_dataserver_client *);
-
 /* A `gzochid_server_protocol' implementation for the dataserver protocol. */
 
 gzochid_server_protocol gzochi_metad_dataserver_server_protocol;

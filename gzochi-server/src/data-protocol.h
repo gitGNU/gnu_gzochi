@@ -35,12 +35,20 @@
   Login to the data server and pass some configuration data from the client.
   Format:
   
-  1 byte: Data protocol version. (0x01)
+  1 byte: Data protocol version. (0x02)
   `NULL'-terminated string: gzochid admin server base URL
     or 1 `NULL' byte if the client is not running an admin web console
 */
 
 #define GZOCHID_DATA_PROTOCOL_LOGIN 0x10
+
+/*
+  1 byte: Data protocol version. (0x02)
+  `NULL'-terminated string: gzochi-metad admin server base URL
+    or 1 `NULL' byte if the meta server is not running an admin web console
+ */
+
+#define GZOCHID_DATA_PROTOCOL_LOGIN_RESPONSE 0x11
 
 /*
   Reserve a block of object ids from the data server. Format:

@@ -26,9 +26,11 @@
 #include "dataserver.h"
 #include "dataserver-protocol.h"
 #include "gzochid-storage.h"
+#include "httpd.h"
 #include "lock.h"
 #include "oids.h"
 #include "oids-storage.h"
+#include "resolver.h"
 #include "socket.h"
 #include "storage.h"
 #include "storage-mem.h"
@@ -78,9 +80,26 @@ gzochi_metad_dataserver_application_store;
 
 struct _GzochiMetadDataServer
 {
-  GObject parent_instance;
+  GObject parent_instance; /* The parent struct, for casting. */
 
-  GHashTable *configuration; /* The dataserver configuration table. */
+  GzochidConfiguration *configuration; /* The global configuration object. */
+
+  /* The data client configuration table; extracted from the global 
+     configuration object and cached for convenience. */
+
+  GHashTable *data_configuration;
+
+  /* The global resolution context; used for getting a (temporary) handle to
+     the meta server's embedded HTTP server (if available) to extract the base
+     URL to send to the client as part of the login response. */
+  
+  GzochidResolutionContext *resolution_context;
+  
+  /* When the data server has been started, holds the base URL of the gzochid 
+     admin HTTP console, if available; otherwise, a heap-allocated empty 
+     string. */
+
+  char *admin_server_base_url;
 
   /* The socket server for the data server. */
   
@@ -108,11 +127,44 @@ G_DEFINE_TYPE (GzochiMetadDataServer, gzochi_metad_data_server, G_TYPE_OBJECT);
 enum gzochi_metad_data_server_properties
   {
     PROP_CONFIGURATION = 1,
+    PROP_RESOLUTION_CONTEXT,
     PROP_SOCKET_SERVER,
+    PROP_ADMIN_SERVER_BASE_URL,
     N_PROPERTIES
   };
 
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+gzochi_metad_data_server_constructed (GObject *object)
+{
+  GzochiMetadDataServer *data_server = GZOCHI_METAD_DATA_SERVER (object);
+
+  data_server->data_configuration = gzochid_configuration_extract_group
+    (data_server->configuration, "data");
+  
+  data_server->port = gzochid_config_to_int
+    (g_hash_table_lookup (data_server->data_configuration, "server.port"),
+     9001);
+}
+
+static void
+gzochi_metad_data_server_get_property (GObject *object, guint property_id,
+				       GValue *value, GParamSpec *pspec)
+{
+  GzochiMetadDataServer *data_server = GZOCHI_METAD_DATA_SERVER (object);
+
+  switch (property_id)
+    {
+    case PROP_ADMIN_SERVER_BASE_URL:
+      g_value_set_static_string (value, data_server->admin_server_base_url);
+      break;
+      
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
 
 static void
 gzochi_metad_data_server_set_property (GObject *object, guint property_id,
@@ -123,14 +175,13 @@ gzochi_metad_data_server_set_property (GObject *object, guint property_id,
   switch (property_id)
     {
     case PROP_CONFIGURATION:
-      self->configuration = gzochid_configuration_extract_group
-	(GZOCHID_CONFIGURATION (g_value_get_object (value)), "data");
-
-      self->port = gzochid_config_to_int
-	(g_hash_table_lookup (self->configuration, "server.port"), 9001);
-
+      self->configuration = g_object_ref (g_value_get_object (value));
       break;
 
+    case PROP_RESOLUTION_CONTEXT:
+      self->resolution_context = g_object_ref (g_value_get_object (value));
+      break;
+      
     case PROP_SOCKET_SERVER:
       self->socket_server = g_object_ref (g_value_get_object (value));
       break;
@@ -173,7 +224,7 @@ gzochi_metad_data_server_finalize (GObject *gobject)
 {
   GzochiMetadDataServer *server = GZOCHI_METAD_DATA_SERVER (gobject);
   
-  g_hash_table_destroy (server->configuration);
+  g_hash_table_destroy (server->data_configuration);
 
   g_hash_table_foreach_remove
     (server->application_stores, close_application_store, server);
@@ -188,6 +239,9 @@ gzochi_metad_data_server_finalize (GObject *gobject)
 	
 	free (server->storage_engine);
     }
+
+  if (server->admin_server_base_url != NULL)
+    free (server->admin_server_base_url);
 }
 
 static void
@@ -195,6 +249,8 @@ gzochi_metad_data_server_dispose (GObject *gobject)
 {
   GzochiMetadDataServer *server = GZOCHI_METAD_DATA_SERVER (gobject);
 
+  g_object_unref (server->configuration);
+  g_object_unref (server->resolution_context);
   g_object_unref (server->socket_server);
 }
 
@@ -203,20 +259,31 @@ gzochi_metad_data_server_class_init (GzochiMetadDataServerClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
+  object_class->constructed = gzochi_metad_data_server_constructed;
   object_class->dispose = gzochi_metad_data_server_dispose;
   object_class->finalize = gzochi_metad_data_server_finalize;
+  object_class->get_property = gzochi_metad_data_server_get_property;
   object_class->set_property = gzochi_metad_data_server_set_property;
 
   obj_properties[PROP_CONFIGURATION] = g_param_spec_object
-    ("configuration", "gzochi meta server configuration",
-     "Set the meta server configuration", GZOCHID_TYPE_CONFIGURATION,
+    ("configuration", "config", "The global configuration object",
+     GZOCHID_TYPE_CONFIGURATION,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+
+  obj_properties[PROP_RESOLUTION_CONTEXT] = g_param_spec_object
+    ("resolution-context", "resolution-context",
+     "The global resolution context", GZOCHID_TYPE_RESOLUTION_CONTEXT,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
   
   obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
-    ("socket-server", "Socket server", "Set the socket server",
+    ("socket-server", "socket-server", "The global socket server",
      GZOCHID_TYPE_SOCKET_SERVER,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
+  obj_properties[PROP_ADMIN_SERVER_BASE_URL] = g_param_spec_string
+    ("admin-server-base-url", "base-url", "The admin server base URL", NULL,
+     G_PARAM_READABLE);
+  
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
 }
@@ -231,10 +298,44 @@ gzochi_metad_data_server_init (GzochiMetadDataServer *self)
   self->port = 0;
 }
 
+/*
+  Set the admin server base URL; if the admin HTTP server is enabled, 
+  retrieve a handle to it and ask it what its base URL is. Otherwise, set the
+  admin server base URL to a zero-length string.
+
+  Note that the meta server's base URL is only available after it has been 
+  started. For the reason, the data server should be started after the HTTP 
+  server (if enabled). 
+*/
+
+static void
+init_admin_server_base_url (GzochiMetadDataServer *server)
+{
+  GHashTable *admin_configuration = gzochid_configuration_extract_group
+    (server->configuration, "admin");
+
+  if (gzochid_config_to_boolean
+      (g_hash_table_lookup (admin_configuration, "module.httpd.enabled"),
+       FALSE))
+    {
+      GzochidHttpServer *http_server = gzochid_resolver_require_full
+	(server->resolution_context, GZOCHID_TYPE_HTTP_SERVER, NULL);
+
+      /* Make a copy of the base URL; we're not holding a reference to the HTTP
+	 server, so it could be subsequently disposed / finalized. */
+
+      server->admin_server_base_url =
+	strdup (gzochid_http_server_get_base_url (http_server));
+    }
+  else server->admin_server_base_url = strdup ("");
+  
+  g_hash_table_destroy (admin_configuration);
+}
+
 void
 gzochi_metad_dataserver_start (GzochiMetadDataServer *self)
 {
-  if (g_hash_table_contains (self->configuration, "storage.engine"))
+  if (g_hash_table_contains (self->data_configuration, "storage.engine"))
     {
       const char *dir = NULL;
       const char *env = getenv ("GZOCHID_STORAGE_ENGINE_DIR");
@@ -244,12 +345,12 @@ gzochi_metad_dataserver_start (GzochiMetadDataServer *self)
       else 
         {
           const char *conf_dir = g_hash_table_lookup
-	    (self->configuration, "storage.engine.dir");
+	    (self->data_configuration, "storage.engine.dir");
           dir = conf_dir == NULL ? GZOCHID_STORAGE_ENGINE_DIR : conf_dir;
         }
 
       self->storage_engine = gzochid_storage_load_engine 
-        (dir, g_hash_table_lookup (self->configuration, "storage.engine"));
+        (dir, g_hash_table_lookup (self->data_configuration, "storage.engine"));
     }
   else g_message 
          ("No durable storage engine configured; memory engine will be used.");
@@ -264,6 +365,8 @@ FOR PRODUCTION USE.");
       self->storage_engine->interface = &gzochid_storage_engine_interface_mem;
     }
   
+  init_admin_server_base_url (self);
+
   gzochid_server_socket_listen
     (self->socket_server, self->server_socket, self->port);
 }

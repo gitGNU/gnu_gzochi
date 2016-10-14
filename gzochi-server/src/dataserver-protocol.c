@@ -27,7 +27,9 @@
 #include "protocol.h"
 #include "socket.h"
 
-#define DATASERVER_PROTOCOL_VERSION 0x01
+/* The version of the data protocol understood by the server. */
+
+#define DATASERVER_PROTOCOL_VERSION 0x02
 
 /* Local counter for assigning node ids. In the future, when there is more than
    one metaserver, this will not be a reliable way to assign ids. */
@@ -40,20 +42,9 @@ struct _gzochi_metad_dataserver_client
 {
   guint node_id; /* The client ephemeral node id. */
 
-  /* The client's admin server base URL, if specifeid. */
-
-  char *admin_server_base_url;
-  
   GzochiMetadDataServer *dataserver; /* Reference to the data server. */
   gzochid_client_socket *sock; /* The client socket. */
 };
-
-const char *
-gzochi_metad_dataserver_client_get_admin_server_base_url
-(gzochi_metad_dataserver_client *client)
-{
-  return client->admin_server_base_url;
-}
 
 static gzochid_client_socket *
 server_accept (GIOChannel *channel, const char *desc, gpointer data)
@@ -155,26 +146,55 @@ dispatch_login (gzochi_metad_dataserver_client *client, unsigned char *data,
 {
   size_t str_len = 0;
   unsigned char version = data[0];
-  char *admin_server_base_url = NULL;
+  char *client_admin_server_base_url = NULL;
 
   if (version != DATASERVER_PROTOCOL_VERSION)
     return FALSE;
 
-  admin_server_base_url = read_str (data + 1, len - 1, &str_len);
+  client_admin_server_base_url = read_str (data + 1, len - 1, &str_len);
 
   /* The admin server base URL can be empty, but not absent. */
   
-  if (admin_server_base_url == NULL)
+  if (client_admin_server_base_url == NULL)
     {
       g_warning
 	("Received malformed 'LOGIN' message from node %d.", client->node_id);
       return FALSE;
     }
+  else
+    {
+      char *admin_server_base_url = NULL;
+      GByteArray *login_response_message = g_byte_array_new ();
+      
+      g_object_get
+	(client->dataserver,
+	 "admin-server-base-url", &admin_server_base_url,
+	 NULL);
 
-  if (str_len > 1)
-    client->admin_server_base_url = strdup (admin_server_base_url);
+      /* Pad with two `NULL' bytes to leave space for the actual length to be 
+	 encoded. */
+      
+      g_byte_array_append
+	(login_response_message,
+	 (unsigned char[]) { 0x00, 0x00, GZOCHID_DATA_PROTOCOL_LOGIN_RESPONSE,
+	    DATASERVER_PROTOCOL_VERSION }, 4);
 
-  return TRUE;
+      g_byte_array_append
+	(login_response_message, (unsigned char *) admin_server_base_url,
+	 strlen (admin_server_base_url) + 1);
+
+      gzochi_common_io_write_short
+	(login_response_message->len - 3, login_response_message->data, 0);
+
+      gzochid_client_socket_write
+	(client->sock, login_response_message->data,
+	 login_response_message->len);
+
+      g_byte_array_unref (login_response_message);
+      g_free (admin_server_base_url);
+      
+      return TRUE;
+    }  
 }
 
 /* Processes the message payload following the 

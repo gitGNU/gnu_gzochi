@@ -26,8 +26,30 @@
 #include "data-protocol.h"
 #include "dataserver.h"
 #include "gzochid-storage.h"
+#include "httpd.h"
 #include "resolver.h"
 #include "storage-mem.h"
+
+struct _GzochidHttpServer
+{
+  GObject parent_instance;
+};
+
+G_DEFINE_TYPE (GzochidHttpServer, gzochid_http_server, G_TYPE_OBJECT);
+
+static void gzochid_http_server_class_init (GzochidHttpServerClass *klass)
+{
+}
+
+static void gzochid_http_server_init (GzochidHttpServer *self)
+{
+}
+
+const char *
+gzochid_http_server_get_base_url (GzochidHttpServer *server)
+{
+  return "http://127.0.0.1/";
+}
 
 static gzochid_storage_context *test_context = NULL;
 
@@ -119,10 +141,10 @@ put (gzochid_storage_store *store, char *key, size_t key_len, char *value,
 }
 
 static void
-setup_dataserver (dataserver_fixture *fixture, gconstpointer user_data)
+setup_dataserver_inner (dataserver_fixture *fixture, gconstpointer user_data,
+			GKeyFile *key_file)
 {
   GError *err = NULL;
-  GKeyFile *key_file = g_key_file_new ();
   GzochidConfiguration *configuration = g_object_new
     (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
   GzochidResolutionContext *resolution_context = g_object_new
@@ -137,7 +159,6 @@ setup_dataserver (dataserver_fixture *fixture, gconstpointer user_data)
   
   g_assert_no_error (err);
   
-  g_key_file_unref (key_file);
   g_object_unref (resolution_context);
   g_object_unref (configuration);
   
@@ -145,9 +166,56 @@ setup_dataserver (dataserver_fixture *fixture, gconstpointer user_data)
 }
 
 static void
+setup_dataserver (dataserver_fixture *fixture, gconstpointer user_data)
+{
+  GKeyFile *key_file = g_key_file_new ();
+
+  setup_dataserver_inner (fixture, user_data, key_file);
+  
+  g_key_file_unref (key_file);
+}
+
+static void
+setup_dataserver_with_httpd (dataserver_fixture *fixture,
+			     gconstpointer user_data)
+{
+  GKeyFile *key_file = g_key_file_new ();
+
+  g_key_file_set_value (key_file, "admin", "module.httpd.enabled", "true");  
+  setup_dataserver_inner (fixture, user_data, key_file);
+  
+  g_key_file_unref (key_file);
+}
+
+static void
 teardown_dataserver (dataserver_fixture *fixture, gconstpointer user_data)
 {
   g_object_unref (fixture->server);
+}
+
+static void
+test_start_simple (dataserver_fixture *fixture, gconstpointer user_data)
+{
+  char *admin_server_base_url = NULL;
+
+  g_object_get
+    (fixture->server, "admin-server-base-url", &admin_server_base_url, NULL);
+
+  g_assert_cmpstr (admin_server_base_url, ==, "");  
+  g_free (admin_server_base_url);
+}
+
+static void
+test_start_http_server_enabled (dataserver_fixture *fixture,
+				gconstpointer user_data)
+{
+  char *admin_server_base_url = NULL;
+
+  g_object_get
+    (fixture->server, "admin-server-base-url", &admin_server_base_url, NULL);
+
+  g_assert_cmpstr (admin_server_base_url, ==, "http://127.0.0.1/");  
+  g_free (admin_server_base_url);
 }
 
 static void
@@ -582,7 +650,12 @@ main (int argc, char *argv[])
     test_storage_close_context;
   gzochid_storage_engine_interface_mem.open = test_storage_open;
   gzochid_storage_engine_interface_mem.close_store = test_storage_close_store;
-  
+
+  g_test_add ("/dataserver/start/simple", dataserver_fixture, NULL,
+	      setup_dataserver, test_start_simple, teardown_dataserver);
+  g_test_add ("/dataserver/start/http-server-enabled",
+	      dataserver_fixture, NULL, setup_dataserver_with_httpd,
+	      test_start_http_server_enabled, teardown_dataserver);
   g_test_add ("/dataserver/reserve-oids", dataserver_fixture, NULL,
 	      setup_dataserver, test_reserve_oids, teardown_dataserver);
   g_test_add ("/dataserver/request-value", dataserver_fixture, NULL,

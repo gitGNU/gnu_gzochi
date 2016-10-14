@@ -22,7 +22,7 @@
 
 /* The version of the data protocol understood by the client. */
 
-#define GZOCHID_DATACLIENT_PROTOCOL_VERSION 0x01
+#define GZOCHID_DATACLIENT_PROTOCOL_VERSION 0x02
 
 /* A `gzochid_client_protocol' implementation for the dataclient protocol. */
 

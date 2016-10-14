@@ -30,6 +30,58 @@
 #include "resolver.h"
 #include "socket.h"
 
+struct _GzochiMetadDataServer
+{
+  GObject parent_instance;
+};
+
+G_DEFINE_TYPE (GzochiMetadDataServer, gzochi_metad_data_server, G_TYPE_OBJECT);
+
+enum test_data_server_properties
+  {
+    PROP_ADMIN_SERVER_BASE_URL = 1,
+    N_PROPERTIES
+  };
+
+static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+get_property (GObject *object, guint property_id, GValue *value,
+	      GParamSpec *pspec)
+{
+  GzochiMetadDataServer *data_server = GZOCHI_METAD_DATA_SERVER (object);
+
+  switch (property_id)
+    {
+    case PROP_ADMIN_SERVER_BASE_URL:
+      g_value_set_static_string (value, "http://localhost:8081/");
+      break;
+
+    default:
+      g_test_fail ();
+    }
+}
+
+static void
+gzochi_metad_data_server_class_init (GzochiMetadDataServerClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->get_property = get_property;
+  
+  obj_properties[PROP_ADMIN_SERVER_BASE_URL] = g_param_spec_string
+    ("admin-server-base-url", "base-url", "Test admin server base URL", NULL,
+     G_PARAM_READABLE);
+
+  g_object_class_install_properties
+    (object_class, N_PROPERTIES, obj_properties);
+}
+
+static void
+gzochi_metad_data_server_init (GzochiMetadDataServer *self)
+{
+}
+
 static GList *activity_log = NULL;
 
 static void
@@ -220,7 +272,7 @@ test_client_can_dispatch_true (dataserver_protocol_fixture *fixture,
 
   GByteArray *bytes = g_byte_array_new ();
 
-  g_byte_array_append (bytes, "\x00\x18\x10\x01http://localhost:8080/", 27);
+  g_byte_array_append (bytes, "\x00\x18\x10\x02http://localhost:8080/", 27);
 
   g_assert
     (gzochi_metad_dataserver_client_protocol.can_dispatch (bytes, client));
@@ -237,7 +289,7 @@ test_client_can_dispatch_false (dataserver_protocol_fixture *fixture,
 
   GByteArray *bytes = g_byte_array_new ();
 
-  g_byte_array_append (bytes, "\x00\x18\x10\x01http", 9);
+  g_byte_array_append (bytes, "\x00\x18\x10\x02http", 9);
 
   g_assert
     (! gzochi_metad_dataserver_client_protocol.can_dispatch (bytes, client));
@@ -252,15 +304,20 @@ test_client_dispatch_one_login (dataserver_protocol_fixture *fixture,
   gzochi_metad_dataserver_client *client =
     _gzochid_client_socket_get_protocol_data (fixture->client_socket);
 
+  char buf[27];
   GByteArray *bytes = g_byte_array_new ();
 
-  g_byte_array_append (bytes, "\x00\x18\x10\x01http://localhost:8080/", 27);
+  g_byte_array_append (bytes, "\x00\x18\x10\x02http://localhost:8080/", 27);
   gzochi_metad_dataserver_client_protocol.dispatch (bytes, client);
   g_byte_array_unref (bytes);
 
-  g_assert_cmpstr
-    (gzochi_metad_dataserver_client_get_admin_server_base_url (client), ==,
-     "http://localhost:8080/");
+  g_main_context_iteration (fixture->socket_server->main_context, FALSE);
+  
+  g_assert_cmpint
+    (g_io_channel_read_chars (fixture->socket_channel, buf, 27, NULL, NULL), ==,
+     G_IO_STATUS_NORMAL);
+
+  g_assert(memcmp (buf, "\x00\x18\x11\x02http://localhost:8081/", 27) == 0);
 }
 
 static void
