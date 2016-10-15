@@ -24,6 +24,8 @@
 #include "data-protocol.h"
 #include "dataserver.h"
 #include "dataserver-protocol.h"
+#include "event.h"
+#include "event-meta.h"
 #include "protocol.h"
 #include "socket.h"
 
@@ -166,11 +168,35 @@ dispatch_login (gzochi_metad_dataserver_client *client, unsigned char *data,
       char *admin_server_base_url = NULL;
       GByteArray *login_response_message = g_byte_array_new ();
       
+      GzochiMetadClientEvent *event = NULL;
+      gzochid_event_source *event_source = NULL;
+      const char *conn_desc = gzochid_client_socket_get_connection_description
+	(client->sock);
+      
+      if (str_len > 1)
+	event = g_object_new
+	  (GZOCHI_METAD_TYPE_CLIENT_EVENT,
+	   "type", CLIENT_CONNECTED,
+	   "node-id", client->node_id,
+	   "connection-description", conn_desc,	 
+	   "admin-server-base-url", client_admin_server_base_url,
+	   NULL);
+      else event = g_object_new
+	     (GZOCHI_METAD_TYPE_CLIENT_EVENT,
+	      "type", CLIENT_CONNECTED,
+	      "node-id", client->node_id,
+	      "connection-description", conn_desc,	 
+	      NULL);
+      
       g_object_get
 	(client->dataserver,
+	 "event-source", &event_source,
 	 "admin-server-base-url", &admin_server_base_url,
 	 NULL);
-
+      
+      gzochid_event_dispatch (event_source, GZOCHID_EVENT (event));
+      g_object_unref (event);
+       
       /* Pad with two `NULL' bytes to leave space for the actual length to be 
 	 encoded. */
       
@@ -192,6 +218,7 @@ dispatch_login (gzochi_metad_dataserver_client *client, unsigned char *data,
 
       g_byte_array_unref (login_response_message);
       g_free (admin_server_base_url);
+      g_source_unref ((GSource *) event_source);
       
       return TRUE;
     }  
@@ -626,6 +653,18 @@ static void
 client_error (gpointer user_data)
 {
   gzochi_metad_dataserver_client *client = user_data;
+  gzochid_event_source *event_source = NULL;
+  GzochidEvent *event = GZOCHID_EVENT
+    (g_object_new (GZOCHI_METAD_TYPE_CLIENT_EVENT,
+		   "type", CLIENT_DISCONNECTED,
+		   "node-id", client->node_id,
+		   NULL));
+  
+  g_object_get (client->dataserver, "event-source", &event_source, NULL);
+  
+  gzochid_event_dispatch (event_source, event);
+  g_object_unref (event);
+  g_source_unref ((GSource *) event_source);
   
   gzochi_metad_dataserver_release_all (client->dataserver, client->node_id);
 }

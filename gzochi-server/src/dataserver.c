@@ -25,6 +25,7 @@
 #include "config.h"
 #include "dataserver.h"
 #include "dataserver-protocol.h"
+#include "event.h"
 #include "gzochid-storage.h"
 #include "httpd.h"
 #include "lock.h"
@@ -105,6 +106,10 @@ struct _GzochiMetadDataServer
   
   GzochidSocketServer *socket_server; 
 
+  /* An event source for client connect / disconnect events. */
+
+  gzochid_event_source *event_source; 
+  
   gzochid_storage_engine *storage_engine; /* The storage engine. */
 
   /* Mapping application name to `gzochi_metad_dataserver_application_store'. */
@@ -129,6 +134,8 @@ enum gzochi_metad_data_server_properties
     PROP_CONFIGURATION = 1,
     PROP_RESOLUTION_CONTEXT,
     PROP_SOCKET_SERVER,
+    PROP_EVENT_LOOP,
+    PROP_EVENT_SOURCE,
     PROP_ADMIN_SERVER_BASE_URL,
     N_PROPERTIES
   };
@@ -156,6 +163,10 @@ gzochi_metad_data_server_get_property (GObject *object, guint property_id,
 
   switch (property_id)
     {
+    case PROP_EVENT_SOURCE:
+      g_value_set_boxed (value, data_server->event_source);
+      break;
+      
     case PROP_ADMIN_SERVER_BASE_URL:
       g_value_set_static_string (value, data_server->admin_server_base_url);
       break;
@@ -184,6 +195,15 @@ gzochi_metad_data_server_set_property (GObject *object, guint property_id,
       
     case PROP_SOCKET_SERVER:
       self->socket_server = g_object_ref (g_value_get_object (value));
+      break;
+
+    case PROP_EVENT_LOOP:
+
+      /* Don't need to store a reference to the event loop, just attach the
+	 event source to it. */
+
+      gzochid_event_source_attach
+	(g_value_get_object (value), self->event_source);
       break;
       
     default:
@@ -240,6 +260,9 @@ gzochi_metad_data_server_finalize (GObject *gobject)
 	free (server->storage_engine);
     }
 
+  g_source_destroy ((GSource *) server->event_source);
+  g_source_unref ((GSource *) server->event_source);
+
   if (server->admin_server_base_url != NULL)
     free (server->admin_server_base_url);
 }
@@ -280,6 +303,15 @@ gzochi_metad_data_server_class_init (GzochiMetadDataServerClass *klass)
      GZOCHID_TYPE_SOCKET_SERVER,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
+  obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
+    ("event-loop", "event-loop", "The global event loop",
+     GZOCHID_TYPE_EVENT_LOOP,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+
+  obj_properties[PROP_EVENT_SOURCE] = g_param_spec_boxed
+    ("event-source", "event-source", "The data server event source",
+     G_TYPE_SOURCE, G_PARAM_READABLE);
+
   obj_properties[PROP_ADMIN_SERVER_BASE_URL] = g_param_spec_string
     ("admin-server-base-url", "base-url", "The admin server base URL", NULL,
      G_PARAM_READABLE);
@@ -291,6 +323,7 @@ gzochi_metad_data_server_class_init (GzochiMetadDataServerClass *klass)
 static void
 gzochi_metad_data_server_init (GzochiMetadDataServer *self)
 {
+  self->event_source = gzochid_event_source_new ();
   self->server_socket = gzochid_server_socket_new
     ("Data server", gzochi_metad_dataserver_server_protocol, self);
   self->application_stores = g_hash_table_new_full

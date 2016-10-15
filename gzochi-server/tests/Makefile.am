@@ -145,6 +145,8 @@ test_dataserver_SOURCES = test-dataserver.c
 test_dataserver_LDADD = $(top_builddir)/src/libgzochi_metad_la-dataserver.o \
 	$(top_builddir)/src/libgzochid_la-config.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochi_metad_la-event-meta.o \
 	$(top_builddir)/src/libgzochid_la-itree.o \
 	$(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
 	$(top_builddir)/src/libgzochid_la-oids.o \
@@ -162,6 +164,8 @@ test_dataserver_protocol_SOURCES = test-dataserver-protocol.c
 test_dataserver_protocol_LDADD = \
 	$(top_builddir)/src/libgzochi_metad_la-dataserver-protocol.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochi_metad_la-event-meta.o \
 	$(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
