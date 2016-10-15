@@ -192,7 +192,6 @@ void gzochid_event_loop_stop (GzochidEventLoop *);
 typedef struct _gzochid_event_source gzochid_event_source;
 
 gzochid_event_source *gzochid_event_source_new (void);
-void gzochid_event_source_free (gzochid_event_source *);
 
 /* Attach the specified event source to the specified main loop. This function
    is a thin wrapper around GLib's `g_source_attach', and, as such, may be

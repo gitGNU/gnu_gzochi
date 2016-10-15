@@ -453,6 +453,11 @@ dispatch (GSource *source, GSourceFunc cb, gpointer user_data)
 static void
 finalize (GSource *source)
 {
+  gzochid_event_source *event_source = (gzochid_event_source *) source;
+  
+  g_mutex_clear (&event_source->mutex);
+  g_list_free_full (event_source->handlers, (GDestroyNotify) free);
+  g_queue_free (event_source->events);
 }
 
 static GSourceFuncs event_funcs = { prepare, check, dispatch, finalize };
@@ -460,7 +465,6 @@ static GSourceFuncs event_funcs = { prepare, check, dispatch, finalize };
 gzochid_event_source *
 gzochid_event_source_new ()
 {
-  
   gzochid_event_source *source = (gzochid_event_source *) g_source_new
     (&event_funcs, sizeof (gzochid_event_source));
 
@@ -469,15 +473,6 @@ gzochid_event_source_new ()
   g_mutex_init (&source->mutex);
   
   return source;
-}
-
-void
-gzochid_event_source_free (gzochid_event_source *source)
-{
-  g_mutex_clear (&source->mutex);
-  g_list_free_full (source->handlers, (GDestroyNotify) free);
-  g_queue_free (source->events);
-  g_source_unref ((GSource *) source);
 }
 
 void

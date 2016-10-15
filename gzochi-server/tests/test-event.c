@@ -74,8 +74,9 @@ static void test_event_dispatch ()
   g_cond_clear (&handler_data.cond);
 
   gzochid_event_loop_stop (event_loop);
-  gzochid_event_source_free (event_source);
-
+  g_source_destroy ((GSource *) event_source);
+  g_source_unref ((GSource *) event_source);
+  
   g_object_unref (event);
   g_object_unref (event_loop);
 }

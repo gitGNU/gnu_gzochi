@@ -68,8 +68,9 @@ gzochid_application_context_free (gzochid_application_context *app_context)
   g_hash_table_destroy (app_context->channel_oids_to_local_session_oids);
 
   g_mutex_clear (&app_context->channel_mapping_lock);
-  
-  gzochid_event_source_free (app_context->event_source);
+
+  g_source_destroy ((GSource *) app_context->event_source);
+  g_source_unref ((GSource *) app_context->event_source);
   free (app_context->stats);
 
   free (context);
