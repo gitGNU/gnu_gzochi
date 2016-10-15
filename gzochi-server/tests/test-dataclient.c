@@ -26,6 +26,8 @@
 
 #include "config.h"
 #include "dataclient.h"
+#include "event.h"
+#include "event-app.h"
 #include "httpd.h"
 #include "oids.h"
 #include "resolver.h"
@@ -615,6 +617,70 @@ test_submit_changeset_simple (dataclient_fixture *fixture,
   g_bytes_unref (binding_change2.key);  
 }
 
+struct callback_data
+{
+  GMutex mutex;
+  GCond cond;
+
+  gboolean handled;
+};
+
+static void
+disconnected_event_handler (GzochidEvent *event, gpointer user_data)
+{
+  GzochidMetaServerEvent *metaserver_event = GZOCHID_META_SERVER_EVENT (event);
+  struct callback_data *callback_data = user_data;
+  gzochid_meta_server_event_type type;
+
+  g_mutex_lock (&callback_data->mutex);
+  
+  g_object_get (metaserver_event, "type", &type, NULL);
+  g_assert_cmpint (type, ==, META_SERVER_DISCONNECTED);
+  callback_data->handled = TRUE;
+
+  g_cond_signal (&callback_data->cond);
+  g_mutex_unlock (&callback_data->mutex);
+}
+
+static void
+test_nullify_connection (dataclient_fixture *fixture, gconstpointer user_data)
+{
+  gzochid_event_source *event_source = NULL;
+  GzochidEventLoop *event_loop = gzochid_resolver_require_full
+    (fixture->resolution_context, GZOCHID_TYPE_EVENT_LOOP, NULL);
+  struct callback_data callback_data;
+
+  g_object_get (fixture->dataclient, "event-source", &event_source, NULL);
+  gzochid_event_attach
+    (event_source, disconnected_event_handler, &callback_data);
+  g_source_unref ((GSource *) event_source);
+  
+  g_mutex_init (&callback_data.mutex);
+  g_cond_init (&callback_data.cond);
+  callback_data.handled = FALSE;
+  
+  gzochid_event_loop_start (event_loop);
+
+  g_mutex_lock (&callback_data.mutex);  
+  
+  gzochid_dataclient_nullify_connection (fixture->dataclient);
+
+  g_cond_wait_until
+    (&callback_data.cond, &callback_data.mutex,
+     g_get_monotonic_time () + 100000);
+
+  g_mutex_unlock (&callback_data.mutex);
+  
+  gzochid_event_loop_stop (event_loop);
+
+  g_assert (callback_data.handled);
+
+  g_mutex_clear (&callback_data.mutex);
+  g_cond_clear (&callback_data.cond);
+  
+  g_object_unref (event_loop);
+}
+
 int
 main (int argc, char *argv[])
 {  
@@ -685,5 +751,10 @@ main (int argc, char *argv[])
      dataclient_connected_fixture_setup, test_submit_changeset_simple,
      dataclient_connected_fixture_teardown);
 
+  g_test_add
+    ("/dataclient/nullify-connection/simple", dataclient_fixture, NULL,
+     dataclient_connected_fixture_setup, test_nullify_connection,
+     dataclient_connected_fixture_teardown);
+  
   return g_test_run ();
 }

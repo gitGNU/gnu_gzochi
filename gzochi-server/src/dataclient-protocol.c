@@ -24,6 +24,8 @@
 #include "data-protocol.h"
 #include "dataclient.h"
 #include "dataclient-protocol.h"
+#include "event.h"
+#include "event-app.h"
 #include "protocol.h"
 
 /*
@@ -77,14 +79,14 @@ static gboolean
 dispatch_login_response (GzochidDataClient *client, const unsigned char *data,
 			 unsigned short len)
 {
-  size_t str_len = 0;
+  size_t url_len = 0;
   unsigned char version = data[0];
   char *admin_server_base_url = NULL;
   
   if (version != GZOCHID_DATACLIENT_PROTOCOL_VERSION)
     return FALSE;
 
-  admin_server_base_url = read_str (data + 1, len - 1, &str_len);
+  admin_server_base_url = read_str (data + 1, len - 1, &url_len);
   
   /* The admin server base URL can be empty, but not absent. */
   
@@ -94,8 +96,43 @@ dispatch_login_response (GzochidDataClient *client, const unsigned char *data,
 	("Received malformed 'LOGIN RESPONSE' message from metaserver.");
       return FALSE;
     }
-  
-  return TRUE;
+  else
+    {
+      GzochidMetaServerEvent *event = NULL;
+
+      gzochid_event_source *event_source = NULL;
+      char *conn_desc = NULL;
+
+      g_object_get
+	(client,
+	 "connection-description", &conn_desc,
+	 "event-source", &event_source,
+	 NULL);
+      
+      if (url_len > 0)
+	event = g_object_new
+	  (GZOCHID_TYPE_META_SERVER_EVENT,
+	   "type", META_SERVER_CONNECTED,
+	   "connection-description", conn_desc,	 
+	   "admin-server-base-url", admin_server_base_url,
+	   NULL);
+
+      /* When there's no admin console available, the base URL will be empty. */
+      
+      else event = g_object_new
+	     (GZOCHID_TYPE_META_SERVER_EVENT,
+	      "type", META_SERVER_CONNECTED,
+	      "connection-description", conn_desc,	 
+	      NULL);
+      
+      gzochid_event_dispatch (event_source, GZOCHID_EVENT (event));
+      g_object_unref (event);
+      
+      g_free (conn_desc);
+      g_source_unref ((GSource *) event_source);
+      
+      return TRUE;
+    }
 }
 
 /* Processes the message payload following the 

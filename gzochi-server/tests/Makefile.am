@@ -121,6 +121,8 @@ test_dataclient_LDADD = \
 	$(top_builddir)/src/libgzochid_la-config.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
 	$(top_builddir)/src/libgzochid_la-dataclient.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochid_la-event-app.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
@@ -132,6 +134,8 @@ test_dataclient_protocol_SOURCES = test-dataclient-protocol.c
 test_dataclient_protocol_LDADD = \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
 	$(top_builddir)/src/libgzochid_la-dataclient-protocol.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochid_la-event-app.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 

@@ -34,6 +34,8 @@
 #include "data-protocol.h"
 #include "dataclient.h"
 #include "dataclient-protocol.h"
+#include "event.h"
+#include "event-app.h"
 #include "httpd.h"
 #include "resolver.h"
 #include "socket.h"
@@ -114,6 +116,11 @@ struct _GzochidDataClient
 
   GzochidSocketServer *socket_server;
 
+  /* An event source for posting meta server connection / disconnection 
+     events. */
+  
+  gzochid_event_source *event_source;
+
   /* When the data client has been started, holds the base URL of the gzochid 
      admin HTTP console, if available; otherwise, a heap-allocated empty 
      string. */
@@ -156,10 +163,39 @@ enum gzochid_data_client_properties
     PROP_CONFIGURATION = 1,
     PROP_RESOLUTION_CONTEXT,
     PROP_SOCKET_SERVER,
+    PROP_CONNECTION_DESCRIPTION,
+    PROP_EVENT_LOOP,
+    PROP_EVENT_SOURCE,
     N_PROPERTIES
   };
 
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+gzochid_data_client_get_property (GObject *object, guint property_id,
+				  GValue *value, GParamSpec *pspec)
+{
+  GzochidDataClient *data_client = GZOCHID_DATA_CLIENT (object);
+
+  switch (property_id)
+    {
+    case PROP_EVENT_SOURCE:
+      g_value_set_boxed (value, data_client->event_source);
+      break;
+
+    case PROP_CONNECTION_DESCRIPTION:      
+      if (data_client->client_socket != NULL)
+	g_value_set_static_string
+	  (value, gzochid_client_socket_get_connection_description
+	   (data_client->client_socket));
+      else g_value_set_static_string (value, NULL);
+      break;
+      
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
 
 static void
 gzochid_data_client_set_property (GObject *object, guint property_id,
@@ -181,6 +217,15 @@ gzochid_data_client_set_property (GObject *object, guint property_id,
       self->socket_server = g_object_ref (g_value_get_object (value));
       break;
 
+    case PROP_EVENT_LOOP:
+
+      /* Don't need to store a reference to the event loop, just attach the
+	 event source to it. */
+      
+      gzochid_event_source_attach
+	(g_value_get_object (value), self->event_source);
+      break;
+      
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -212,6 +257,9 @@ gzochid_data_client_finalize (GObject *gobject)
   
   g_byte_array_unref (client->outbound_messages);
 
+  g_source_destroy ((GSource *) client->event_source);
+  g_source_unref ((GSource *) client->event_source);
+    
   g_mutex_clear (&client->queue_mutex);
   g_mutex_clear (&client->mutex);
   g_cond_clear (&client->cond);
@@ -235,6 +283,7 @@ gzochid_data_client_class_init (GzochidDataClientClass *klass)
   object_class->constructed = gzochid_data_client_constructed;
   object_class->dispose = gzochid_data_client_dispose;
   object_class->finalize = gzochid_data_client_finalize;
+  object_class->get_property = gzochid_data_client_get_property;
   object_class->set_property = gzochid_data_client_set_property;
 
   obj_properties[PROP_CONFIGURATION] = g_param_spec_object
@@ -253,6 +302,18 @@ gzochid_data_client_class_init (GzochidDataClientClass *klass)
      GZOCHID_TYPE_SOCKET_SERVER,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
+  obj_properties[PROP_CONNECTION_DESCRIPTION] = g_param_spec_string
+    ("connection-description", "Connection description",
+     "Get the connection description", NULL, G_PARAM_READABLE);
+
+  obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
+    ("event-loop", "Event loop", "Set the event loop", GZOCHID_TYPE_EVENT_LOOP,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+  
+  obj_properties[PROP_EVENT_SOURCE] = g_param_spec_boxed
+    ("event-source", "Event source", "Get the event source", G_TYPE_SOURCE,
+     G_PARAM_READABLE);
+  
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
 }
@@ -347,6 +408,9 @@ gzochid_data_client_init (GzochidDataClient *self)
   self->outbound_messages = g_byte_array_new ();
 
   self->running = FALSE;
+
+  self->event_source = gzochid_event_source_new ();
+  
   g_mutex_init (&self->queue_mutex);
   g_mutex_init (&self->mutex);
   g_cond_init (&self->cond);
@@ -695,17 +759,8 @@ gzochid_dataclient_stop (GzochidDataClient *dataclient)
 {
   if (dataclient->thread != NULL)
     {
-      g_free (dataclient->hostname);
-      dataclient->hostname = NULL;
-      dataclient->port = 0;
-      
       g_mutex_lock (&dataclient->mutex);
 
-      /* Clean up the admin server base URL. */
-      
-      free (dataclient->admin_server_base_url);
-      dataclient->admin_server_base_url = NULL;
-      
       /* Unset the running flag and wake up the maintenance thread so that it
 	 can exit. */
       
@@ -717,18 +772,35 @@ gzochid_dataclient_stop (GzochidDataClient *dataclient)
       /* Ensure that the maintenance thread has exited. */
       
       g_thread_join (dataclient->thread);
+
+      g_free (dataclient->hostname);
+      dataclient->hostname = NULL;
+      dataclient->port = 0;
+
+      /* Clean up the admin server base URL. */
+      
+      free (dataclient->admin_server_base_url);
+      dataclient->admin_server_base_url = NULL;
     }
 }
 
 void
 gzochid_dataclient_nullify_connection (GzochidDataClient *dataclient)
 {
+  GzochidEvent *event = GZOCHID_EVENT
+    (g_object_new (GZOCHID_TYPE_META_SERVER_EVENT,
+		   "type", META_SERVER_DISCONNECTED,
+		   NULL));
+  
   g_mutex_lock (&dataclient->mutex);
 
   dataclient->client_socket = NULL;
-
+  gzochid_event_dispatch (dataclient->event_source, event);
+  
   g_cond_signal (&dataclient->cond);
   g_mutex_unlock (&dataclient->mutex);
+
+  g_object_unref (event);
 }
 
 /*
