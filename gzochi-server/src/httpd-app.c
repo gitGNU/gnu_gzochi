@@ -29,6 +29,8 @@
 #include "httpd-app.h"
 #include "util.h"
 
+#define HEADER "  <head><title>gzochid v" VERSION "</title></head>"
+
 /* The following declaraitons support rendering the contents of an object in the
    object store. */
 
@@ -192,16 +194,35 @@ not_found404_default (gzochid_http_response_sink *sink)
   "applications running within container, including their attached data " \
   "stores.</p>"
 
+/* Writes a global header to the specified outbut buffer. */
+
+static void
+append_header (GString *response_str)
+{
+  g_string_append (response_str, "<html>\n");
+  g_string_append (response_str, HEADER);
+  g_string_append (response_str, "  <body>\n");
+}
+
+/* Writes a global footer to the specified output buffer. */
+
+static void
+append_footer (GString *response_str)
+{
+  g_string_append (response_str, "  </body>\n");
+  g_string_append (response_str, "</html>\n");
+}
+
 static void
 hello_world (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	     gpointer request_context, gpointer user_data)
 {
   GString *response_str = g_string_new (NULL);
 
-  g_string_append (response_str, "<html><body>");
+  append_header (response_str);
   g_string_append (response_str, GREETING);
   g_string_append (response_str, "<a href=\"app/\">app/</a>");
-  g_string_append (response_str, "</body></html>");
+  append_footer (response_str);
 
   gzochid_http_write_response
     (sink, 200, response_str->str, response_str->len);
@@ -224,8 +245,7 @@ list_apps (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
       GList *apps_ptr = apps;
       GString *response_str = g_string_new (NULL);
 
-      g_string_append (response_str, "<html>\n");
-      g_string_append (response_str, "  <body>\n");
+      append_header (response_str);
       g_string_append (response_str, "    <ul>\n");
       
       while (apps_ptr != NULL)
@@ -241,8 +261,7 @@ list_apps (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	}
 
       g_string_append (response_str, "    </ul>\n");
-      g_string_append (response_str, "  </body>\n");
-      g_string_append (response_str, "</html>");
+      append_footer (response_str);
 
       gzochid_http_write_response
 	(sink, 200, response_str->str, response_str->len);
@@ -276,8 +295,7 @@ app_info (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   GString *response_str = g_string_new (NULL);
   gzochid_application_context *app_context = request_context;
 
-  g_string_append (response_str, "<html>\n");
-  g_string_append (response_str, "  <body>\n");
+  append_header (response_str);
 
   g_string_append_printf 
     (response_str, "    <h1>%s</h1>\n", app_context->descriptor->name);
@@ -361,8 +379,7 @@ app_info (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
     }
 
   g_string_append (response_str, "    </table>\n");
-  g_string_append (response_str, "  </body>\n");
-  g_string_append (response_str, "</html>");
+  append_footer (response_str);
 
   gzochid_http_write_response
     (sink, 200, response_str->str, response_str->len);
@@ -387,8 +404,7 @@ list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 
   assert (klen == sizeof (guint64));  
 
-  g_string_append (response_str, "<html>\n");
-  g_string_append (response_str, "  <body>\n");
+  append_header (response_str);
   g_string_append_printf 
     (response_str, "    <h1>%s</h1><br />\n", app_context->descriptor->name);
   g_string_append (response_str, "    <ul>\n");
@@ -420,8 +436,7 @@ list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
     }
   
   g_string_append (response_str, "    </ul>\n");
-  g_string_append (response_str, "  </body>\n");
-  g_string_append (response_str, "</html>");
+  append_footer (response_str);
 
   gzochid_http_write_response
     (sink, 200, response_str->str, response_str->len);
@@ -482,9 +497,8 @@ list_names (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   char *k = iface->transaction_first_key (tx, app_context->names, &klen);
 
   iface->transaction_rollback (tx);
-  
-  g_string_append (response_str, "<html>\n");
-  g_string_append (response_str, "  <body>\n");
+
+  append_header (response_str);
   g_string_append_printf 
     (response_str, "    <h1>%s</h1><br />\n", app_context->descriptor->name);
   g_string_append (response_str, "    <ul>\n");
@@ -507,8 +521,7 @@ list_names (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
     }
 
   g_string_append (response_str, "    </ul>\n");
-  g_string_append (response_str, "  </body>\n");
-  g_string_append (response_str, "</html>");
+  append_footer (response_str);
 
   gzochid_http_write_response
     (sink, 200, response_str->str, response_str->len);
