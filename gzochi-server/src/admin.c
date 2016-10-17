@@ -78,7 +78,8 @@ initialize (int from_state, int to_state, gpointer user_data)
       
       gzochid_httpd_app_register_handlers
 	(admin_context->http_server, (gzochid_game_context *)
-	 admin_context->root_context->game_server);
+	 admin_context->root_context->game_server,
+	 admin_context->root_context->resolution_context);
 
       gzochid_http_server_start (admin_context->http_server, port, NULL);
     }

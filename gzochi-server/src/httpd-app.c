@@ -24,9 +24,12 @@
 #include <string.h>
 
 #include "app.h"
+#include "event.h"
+#include "event-app.h"
 #include "game.h"
 #include "httpd.h"
 #include "httpd-app.h"
+#include "resolver.h"
 #include "util.h"
 
 #define HEADER "  <head><title>gzochid v" VERSION "</title></head>"
@@ -37,6 +40,84 @@
 #define OID_PREFIX_LEN 26
 #define OID_SUFFIX_LEN 29
 #define OID_LINE_LEN 80
+
+/* Holds information about the current meta server connection. */
+
+struct _gzochid_metaserver_info
+{
+  char *connection_description; /* The socket address of the meta server. */
+
+  /* The base URL of the meta server's admin HTTP console, or `NULL' if the
+     meta server didn't provide an address. */
+
+  char *admin_server_base_url; 
+};
+
+typedef struct _gzochid_metaserver_info gzochid_metaserver_info;
+
+/* Construct and return new `gzochid_metaserver_info' instance, copying the
+   specified connection description and admin server base URL (which can be 
+   `NULL'). The returned pointer should be freed via 
+   `gzochid_metaserver_info_free' when no longer in use. */
+
+static gzochid_metaserver_info *
+gzochid_metaserver_info_new (const char *connection_description,
+			     const char *admin_server_base_url)
+{
+  gzochid_metaserver_info *info = malloc (sizeof (gzochid_metaserver_info));
+
+  info->connection_description = strdup (connection_description);
+
+  if (admin_server_base_url != NULL)
+    info->admin_server_base_url = strdup (admin_server_base_url);
+  else info->admin_server_base_url = NULL;
+  
+  return info;
+}
+
+/* Release the memory associated with the specified `gzochid_metaserver_info'
+   object. */
+
+static void
+gzochid_metaserver_info_free (gzochid_metaserver_info *info)
+{
+  free (info->connection_description);
+
+  if (info->admin_server_base_url != NULL)
+    free (info->admin_server_base_url);
+
+  free (info);
+}
+
+/* The state of the gzochid application container, in terms of the information
+   displayed on the admin console. This is effectively an "offline"
+   representation, to decouple the rendering of the admin console from what's
+   actually going on in the container. */
+
+struct _gzochid_server_state
+{
+  /* Information about the currently-connected meta server, if such a connection
+     has been configured and is active; otherwise, `NULL'. */
+  
+  gzochid_metaserver_info *metaserver_info;
+
+  GMutex mutex; /* Mutex to protect updates to the state object. */
+};
+
+typedef struct _gzochid_server_state gzochid_server_state;
+
+/* Construct and return a pointer to a new `gzochid_server_state' object. */
+
+static gzochid_server_state *
+gzochid_server_state_new ()
+{
+  gzochid_server_state *state = malloc (sizeof (gzochid_server_state));
+
+  state->metaserver_info = NULL;
+  g_mutex_init (&state->mutex);
+  
+  return state;
+}
 
 /* Captures serialization state of an object. */
 
@@ -217,10 +298,32 @@ static void
 hello_world (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	     gpointer request_context, gpointer user_data)
 {
+  gzochid_server_state *state = user_data;
   GString *response_str = g_string_new (NULL);
 
   append_header (response_str);
   g_string_append (response_str, GREETING);
+
+  g_mutex_lock (&state->mutex);
+
+  if (state->metaserver_info != NULL)
+    {
+      g_string_append (response_str, "<p>Connected to the meta server at ");
+
+      if (state->metaserver_info->admin_server_base_url != NULL)
+	g_string_append_printf
+	  (response_str, "<a href=\"%s\">%s</a>",
+	   state->metaserver_info->admin_server_base_url,
+	   state->metaserver_info->connection_description);
+
+      else g_string_append
+	     (response_str, state->metaserver_info->connection_description);
+      
+      g_string_append (response_str, ".</p>\n");
+    }
+  
+  g_mutex_unlock (&state->mutex);
+  
   g_string_append (response_str, "<a href=\"app/\">app/</a>");
   append_footer (response_str);
 
@@ -540,14 +643,103 @@ null_continuation (const GMatchInfo *match_info,
   return request_context;
 }
 
+/* `gzochid_event_handler' implementation to update the admin console's
+   representation of the server state in response to meta server events. */
+
+static void
+handle_metaserver_event (GzochidEvent *event, gpointer user_data)
+{
+  gzochid_server_state *state = user_data;
+  GzochidMetaServerEvent *metaserver_event = GZOCHID_META_SERVER_EVENT (event);
+  gzochid_meta_server_event_type type;
+
+  g_object_get (metaserver_event, "type", &type, NULL);
+
+  g_mutex_lock (&state->mutex);
+
+  switch (type)
+    {
+    case META_SERVER_CONNECTED:
+      {
+	char *connection_description = NULL;
+	char *admin_server_base_url = NULL;
+
+	g_object_get
+	  (metaserver_event,
+	   "connection-description", &connection_description,
+	   "admin-server-base-url", &admin_server_base_url,
+	   NULL);
+
+	state->metaserver_info = gzochid_metaserver_info_new
+	  (connection_description, admin_server_base_url);
+
+	g_free (connection_description);
+
+	if (admin_server_base_url != NULL)
+	  g_free (admin_server_base_url);
+	break;
+      }
+      
+    case META_SERVER_DISCONNECTED:
+
+      if (state->metaserver_info != NULL)
+	{
+	  gzochid_metaserver_info_free (state->metaserver_info);
+	  state->metaserver_info = NULL;
+	}
+      break;
+    }
+  
+  g_mutex_unlock (&state->mutex);
+}
+
+/* Conditionally attach the admin console's handler for meta server events to
+   the data client's event source, if a data client is available. */
+
+static void
+attach_data_client_handler (GzochidResolutionContext *res_context,
+			    gzochid_server_state *state)
+{
+  GzochidConfiguration *configuration = gzochid_resolver_require_full
+    (res_context, GZOCHID_TYPE_CONFIGURATION, NULL);
+  GHashTable *metaserver_config = gzochid_configuration_extract_group
+    (configuration, "metaserver");
+  
+  if (gzochid_config_to_boolean
+      (g_hash_table_lookup (metaserver_config, "client.enabled"), FALSE))
+    {
+      /* If there's a meta server configured, a data client object should be
+	 available. Require it and grab its event source to attach the handler
+	 for meta server events. */
+      
+      GzochidDataClient *data_client = gzochid_resolver_require_full
+	(res_context, GZOCHID_TYPE_DATA_CLIENT, NULL);
+      gzochid_event_source *event_source = NULL;
+
+      g_object_get (data_client, "event-source", &event_source, NULL);
+      gzochid_event_attach (event_source, handle_metaserver_event, state);
+      g_source_unref ((GSource *) event_source);
+
+      g_object_unref (data_client);
+    }
+
+  g_hash_table_destroy (metaserver_config);
+  g_object_unref (configuration);
+}
+
 void
 gzochid_httpd_app_register_handlers (GzochidHttpServer *http_server,
-				     gzochid_game_context *game_context)
+				     gzochid_game_context *game_context,
+				     GzochidResolutionContext *res_context)
 {
   gzochid_httpd_partial *apps_root = NULL;
   gzochid_httpd_partial *oids_root = NULL;
+
+  gzochid_server_state *state = gzochid_server_state_new ();
+
+  attach_data_client_handler (res_context, state);
   
-  gzochid_httpd_add_terminal (http_server, "/", hello_world, NULL);
+  gzochid_httpd_add_terminal (http_server, "/", hello_world, state);
   gzochid_httpd_add_terminal (http_server, "/app/", list_apps, game_context);
 
   apps_root = gzochid_httpd_add_continuation

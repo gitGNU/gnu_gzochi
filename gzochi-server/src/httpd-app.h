@@ -20,6 +20,7 @@
 
 #include "game.h"
 #include "httpd.h"
+#include "resolver.h"
 
 /* Configure the specified HTTP server context with a RESTful hierarchy of 
    handlers for providing feedback about the state of a running gzochi 
@@ -34,10 +35,11 @@
          /oids/ - List of object ids
 	   [oid] - Object contents, in hex dump format.
 
-  The specified `gzochid_game_context' is used to resolve application name
-  references. */
+  The specified `gzochid_game_context' and `GzochidResolutionContext' are used
+  to resolve application name references and other parts of the container 
+  infrastructure. */
 
 void gzochid_httpd_app_register_handlers
-(GzochidHttpServer *, gzochid_game_context *);
+(GzochidHttpServer *, gzochid_game_context *, GzochidResolutionContext *);
 
 #endif /* GZOCHID_HTTPD_APP_H */
