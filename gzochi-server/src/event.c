@@ -94,7 +94,12 @@ gzochid_event_set_property (GObject *object, guint property_id,
       break;
       
     case PROP_EVENT_TIMESTAMP_US:
-      event->timestamp_us = g_value_get_uint64 (value);
+
+      /* The constructor sets a dynamic default value; don't override it with
+	 the static default. */
+      
+      if (! g_param_value_defaults (pspec, (GValue *) value))
+	event->timestamp_us = g_value_get_uint64 (value);
       break;
       
     default:
@@ -133,7 +138,7 @@ gzochid_event_init (GzochidEvent *self)
   /* Initialize the event timestamp to the current time; in most cases, this 
      won't need to be overridden by clients. */     
   
-  self->priv->timestamp_us = g_get_monotonic_time ();
+  self->priv->timestamp_us = g_get_real_time ();
 }
 
 /* The data event object. */
