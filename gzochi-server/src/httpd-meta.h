@@ -19,16 +19,22 @@
 #define GZOCHID_HTTPD_META_H
 
 #include "httpd.h"
+#include "resolver.h"
 
-/* Configure the specified HTTP server context with a RESTful hierarchy of 
-   handlers for providing feedback about the state of a running gzochi meta
-   server.
+/*
+  Configure the specified HTTP server context with a RESTful hierarchy of 
+  handlers for providing feedback about the state of a running gzochi meta
+  server.
 
-   The resource tree looks like:
+  The resource tree looks like:
 
-   / - Server root
+  / - Server root
+
+  The specified `GzochidResolutionContext' is used to resolve other parts of
+  the meta server's infrastructure. 
 */
 
-void gzochid_httpd_meta_register_handlers (GzochidHttpServer *);
+void gzochid_httpd_meta_register_handlers (GzochidHttpServer *,
+					   GzochidResolutionContext *);
 
 #endif /* GZOCHID_HTTPD_META_H */

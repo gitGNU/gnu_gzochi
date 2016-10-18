@@ -253,7 +253,9 @@ initialize_logging (GKeyFile *key_file)
 /* Configure and start the admin web console if it's enabled. */
 
 static void
-initialize_httpd (GzochidHttpServer *http_server, GKeyFile *key_file)
+initialize_httpd (GzochidHttpServer *http_server,
+		  GzochidResolutionContext *resolution_context,
+		  GKeyFile *key_file)
 {
   GHashTable *admin_config =
     gzochid_config_keyfile_extract_config (key_file, "admin");
@@ -264,7 +266,7 @@ initialize_httpd (GzochidHttpServer *http_server, GKeyFile *key_file)
       int port = gzochid_config_to_int
 	(g_hash_table_lookup (admin_config, "module.httpd.port"), 8800);
 
-      gzochid_httpd_meta_register_handlers (http_server);
+      gzochid_httpd_meta_register_handlers (http_server, resolution_context);
       gzochid_http_server_start (http_server, port, NULL);
     }
   
@@ -349,7 +351,7 @@ main (int argc, char *argv[])
     }
 
   gzochid_event_loop_start (root_context->event_loop);
-  initialize_httpd (root_context->http_server, key_file);
+  initialize_httpd (root_context->http_server, resolution_context, key_file);
   gzochi_metad_dataserver_start (root_context->data_server);
   g_main_loop_run (root_context->socket_server->main_loop);
   
