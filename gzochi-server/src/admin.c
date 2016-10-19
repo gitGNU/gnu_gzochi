@@ -40,7 +40,6 @@ struct _gzochid_admin_context
   GzochidRootContext *root_context;
   GzochidHttpServer *http_server;
   
-  GThreadPool *pool;
   GHashTable *config;
 };
 
@@ -56,13 +55,6 @@ initialize (int from_state, int to_state, gpointer user_data)
 {
   gzochid_context *context = user_data;
   gzochid_admin_context *admin_context = (gzochid_admin_context *) context;
-
-  admin_context->pool = 
-    gzochid_thread_pool_new 
-    (context, gzochid_config_to_int 
-     (g_hash_table_lookup 
-      (admin_context->config, "thread_pool.max_threads"), 4), 
-     TRUE, NULL);
 
   if (gzochid_config_to_boolean 
       (g_hash_table_lookup 
