@@ -151,9 +151,11 @@ dispatch_session_message (gzochid_game_client *client, unsigned char *msg,
 	 gzochid_client_socket_get_connection_description (client->sock));
   else
     {
-      gzochid_event_dispatch
-	(client->app_context->event_source,
-	 g_object_new (GZOCHID_TYPE_EVENT, "type", MESSAGE_RECEIVED, NULL));
+      GzochidEvent *event = g_object_new
+	(GZOCHID_TYPE_EVENT, "type", MESSAGE_RECEIVED, NULL);
+      gzochid_event_dispatch(client->app_context->event_source, event);
+      g_object_unref (event);
+      
       gzochid_application_session_received_message 
 	(client->app_context, client, msg, len);
     }

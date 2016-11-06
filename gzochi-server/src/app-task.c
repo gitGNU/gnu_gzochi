@@ -194,13 +194,14 @@ event_commit (gpointer data)
 {
   gzochid_event_transaction_context *tx_context = data;
   guint64 duration_us = g_get_monotonic_time () - tx_context->start_time;
+  GzochidEvent *event = g_object_new (GZOCHID_TYPE_TRANSACTION_EVENT,
+				      "type", TRANSACTION_COMMIT,
+				      "duration-us", duration_us,
+				      NULL);
+  
+  gzochid_event_dispatch (tx_context->app_context->event_source, event);
 
-  gzochid_event_dispatch 
-    (tx_context->app_context->event_source,
-     g_object_new (GZOCHID_TYPE_TRANSACTION_EVENT,
-		   "type", TRANSACTION_COMMIT, "duration-us", duration_us,
-		   NULL));
-
+  g_object_unref (event);
   free (tx_context);
 }
 
@@ -209,13 +210,14 @@ event_rollback (gpointer data)
 {
   gzochid_event_transaction_context *tx_context = data;
   guint64 duration_us = g_get_monotonic_time () - tx_context->start_time;
+  GzochidEvent *event = g_object_new (GZOCHID_TYPE_TRANSACTION_EVENT,
+				      "type", TRANSACTION_ROLLBACK,
+				      "duration-us", duration_us,
+				      NULL);
   
-  gzochid_event_dispatch 
-    (tx_context->app_context->event_source,
-     g_object_new (GZOCHID_TYPE_TRANSACTION_EVENT,
-		   "type", TRANSACTION_ROLLBACK, "duration-us", duration_us,
-		   NULL));
+  gzochid_event_dispatch (tx_context->app_context->event_source, event);
 
+  g_object_unref (event);
   free (tx_context);
 }
 
@@ -241,13 +243,14 @@ event_func_wrapper (gpointer data)
   gzochid_application_context *context = args[0];
   void (*func) (gpointer) = (void (*) (gpointer)) args[1];
   gpointer func_data = args[2];
-
+  GzochidEvent *event = g_object_new
+    (GZOCHID_TYPE_EVENT, "type", TRANSACTION_START, NULL);
+  
   join_transaction (context);
 
-  gzochid_event_dispatch
-    (context->event_source,
-     g_object_new (GZOCHID_TYPE_EVENT, "type", TRANSACTION_START, NULL));
-
+  gzochid_event_dispatch (context->event_source, event);
+     
+  g_object_unref (event);
   func (func_data);  
 }
 
