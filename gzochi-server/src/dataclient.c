@@ -992,21 +992,13 @@ gzochid_dataclient_received_next_key (GzochidDataClient *client,
   release_callback_queue (queue);
 }
 
-void
-gzochid_dataclient_request_next_key
-(GzochidDataClient *client, char *app, char *store, GBytes *key,
- gzochid_dataclient_success_callback success_callback, gpointer success_data,
- gzochid_dataclient_failure_callback failure_callback, gpointer failure_data)
+/* Convenience function to append a length-prefixed array of bytes to the
+   specified `GByteArray', or a pair of `NULL' bytes if the specified byte
+   buffer is `NULL'. */
+
+static void
+write_nullable_bytes (GByteArray *payload, const GBytes *key)
 {
-  dataclient_callback_queue *queue = acquire_callback_queue (client, app);
-  GByteArray *payload = g_byte_array_new ();
-  GBytes *payload_bytes = NULL;
-  
-  /* Serialize the key request message. */
-
-  g_byte_array_append (payload, (unsigned char *) app, strlen (app) + 1);
-  g_byte_array_append (payload, (unsigned char *) store, strlen (store) + 1);
-
   if (key != NULL)
     {
       size_t payload_len = 0, key_len = 0;
@@ -1025,6 +1017,25 @@ gzochid_dataclient_request_next_key
     }
   else g_byte_array_append
 	 (payload, (unsigned char *) &(unsigned char[]) { 0, 0 }, 2);
+}
+
+void
+gzochid_dataclient_request_next_key
+(GzochidDataClient *client, char *app, char *store, GBytes *key,
+ gzochid_dataclient_success_callback success_callback, gpointer success_data,
+ gzochid_dataclient_failure_callback failure_callback, gpointer failure_data,
+ gzochid_dataclient_release_callback release_callback, gpointer release_data)
+{
+  dataclient_callback_queue *queue = acquire_callback_queue (client, app);
+  GByteArray *payload = g_byte_array_new ();
+  GBytes *payload_bytes = NULL;
+  
+  /* Serialize the key request message. */
+
+  g_byte_array_append (payload, (unsigned char *) app, strlen (app) + 1);
+  g_byte_array_append (payload, (unsigned char *) store, strlen (store) + 1);
+
+  write_nullable_bytes (payload, key);
 
   payload_bytes = g_byte_array_free_to_bytes (payload);
   write_message (client, GZOCHID_DATA_PROTOCOL_REQUEST_NEXT_KEY, payload_bytes);
