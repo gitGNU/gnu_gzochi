@@ -617,6 +617,49 @@ test_submit_changeset_simple (dataclient_fixture *fixture,
   g_bytes_unref (binding_change2.key);  
 }
 
+static void
+test_release_key_simple (dataclient_fixture *fixture, gconstpointer user_data)
+{
+  GBytes *key = g_bytes_new_static ("foo", 4);
+
+  ignore_login (fixture);
+  
+  gzochid_dataclient_release_key (fixture->dataclient, "test", "oids", key);
+  
+  g_timeout_add (2000, exit_loop, fixture);
+  g_main_loop_run (fixture->socket_server->main_loop);
+  
+  g_assert_cmpint (fixture->bytes_received->len, ==, 19);
+  g_assert (memcmp (fixture->bytes_received->data,
+		    "\x00\x10\x40test\x00oids\x00\x00\x04""foo\x00", 19) == 0);
+
+  g_bytes_unref (key);
+}
+
+static void
+test_release_key_range_simple (dataclient_fixture *fixture,
+			       gconstpointer user_data)
+{
+  GBytes *from = g_bytes_new_static ("bar", 4);
+  GBytes *to = g_bytes_new_static ("foo", 4);
+
+  ignore_login (fixture);
+  
+  gzochid_dataclient_release_key_range
+    (fixture->dataclient, "test", "oids", from, to);
+
+  g_timeout_add (2000, exit_loop, fixture);
+  g_main_loop_run (fixture->socket_server->main_loop);
+  
+  g_assert_cmpint (fixture->bytes_received->len, ==, 25);
+  g_assert (memcmp (fixture->bytes_received->data,
+		    "\x00\x16\x42test\x00oids\x00\x00\x04""bar\x00\x00\x04"
+		    "foo\x00", 25) == 0);
+
+  g_bytes_unref (from);
+  g_bytes_unref (to);
+}
+
 struct callback_data
 {
   GMutex mutex;
@@ -751,6 +794,16 @@ main (int argc, char *argv[])
      dataclient_connected_fixture_setup, test_submit_changeset_simple,
      dataclient_connected_fixture_teardown);
 
+  g_test_add
+    ("/dataclient/release-key/simple", dataclient_fixture, NULL,
+     dataclient_connected_fixture_setup, test_release_key_simple,
+     dataclient_connected_fixture_teardown);
+
+  g_test_add
+    ("/dataclient/release-key-range/simple", dataclient_fixture, NULL,
+     dataclient_connected_fixture_setup, test_release_key_range_simple,
+     dataclient_connected_fixture_teardown);
+  
   g_test_add
     ("/dataclient/nullify-connection/simple", dataclient_fixture, NULL,
      dataclient_connected_fixture_setup, test_nullify_connection,

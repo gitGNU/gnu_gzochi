@@ -146,6 +146,18 @@ void gzochid_dataclient_request_next_key
 void gzochid_dataclient_submit_changeset
 (GzochidDataClient *, char *, GArray *);
 
+/* Notify the data server of the release of the lock held on the specified key 
+   with respect to the specified gzochi game application and store. */
+
+void gzochid_dataclient_release_key
+(GzochidDataClient *, char *, char *, GBytes *);
+
+/* Notify the data server of the release of the range lock held on the specified
+   key range with respect to the specified gzochi game application and store. */
+
+void gzochid_dataclient_release_key_range
+(GzochidDataClient *, char *, char *, GBytes *, GBytes *);
+
 /* The following functions are used by the dataclient protocol to notify the 
    client of a response to a previously-submitted request. With the exception of
    usage in test code, they should not be called outside of the protocol's flow

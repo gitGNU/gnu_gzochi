@@ -1060,6 +1060,74 @@ gzochid_dataclient_submit_changeset
   gzochid_data_changeset_free (changeset);
 }
 
+void gzochid_dataclient_release_key
+(GzochidDataClient *client, char *app, char *store, GBytes *key)
+{
+  GByteArray *payload = g_byte_array_new ();
+  const unsigned char *key_bytes = NULL;
+  size_t payload_len = 0, key_len = 0, len;
+  GBytes *payload_bytes = NULL;
+  unsigned char *buf = NULL;
+  
+  /* Serialize the key request message. */
+
+  g_byte_array_append (payload, (unsigned char *) app, strlen (app) + 1);
+  g_byte_array_append (payload, (unsigned char *) store, strlen (store) + 1);
+
+  key_bytes = g_bytes_get_data (key, &key_len);
+
+  /* Grow the byte array by 2 bytes. */
+  
+  payload_len = payload->len;
+  g_byte_array_set_size (payload, payload_len + 2);
+
+  /* Write the key length directly to the buffer. */
+  
+  gzochi_common_io_write_short (key_len, payload->data, payload_len);
+  
+  g_byte_array_append (payload, key_bytes, key_len);
+  
+  payload_bytes = g_byte_array_free_to_bytes (payload);
+
+  /* We can't call `write_message' here because it wants to lock the client
+     mutex. */
+
+  buf = format_message (GZOCHID_DATA_PROTOCOL_RELEASE_KEY, payload_bytes, &len);
+  gzochid_client_socket_write (client->client_socket, buf, len);
+  free (buf);
+
+  g_bytes_unref (payload_bytes);
+}
+
+void gzochid_dataclient_release_key_range
+(GzochidDataClient *client, char *app, char *store, GBytes *from, GBytes *to)
+{
+  GByteArray *payload = g_byte_array_new ();
+  GBytes *payload_bytes = NULL;
+  unsigned char *buf = NULL;
+  size_t len = 0;
+  
+  /* Serialize the key request message. */
+
+  g_byte_array_append (payload, (unsigned char *) app, strlen (app) + 1);
+  g_byte_array_append (payload, (unsigned char *) store, strlen (store) + 1);
+
+  write_nullable_bytes (payload, from);   
+  write_nullable_bytes (payload, to);
+
+  payload_bytes = g_byte_array_free_to_bytes (payload);
+
+  /* We can't call `write_message' here because it wants to lock the client
+     mutex. */
+  
+  buf = format_message
+    (GZOCHID_DATA_PROTOCOL_RELEASE_KEY_RANGE, payload_bytes, &len);
+  gzochid_client_socket_write (client->client_socket, buf, len);
+  free (buf);
+
+  g_bytes_unref (payload_bytes);
+}
+
 GQuark
 gzochid_data_client_error_quark ()
 {
