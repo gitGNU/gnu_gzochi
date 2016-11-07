@@ -997,7 +997,7 @@ gzochid_dataclient_received_next_key (GzochidDataClient *client,
    buffer is `NULL'. */
 
 static void
-write_nullable_bytes (GByteArray *payload, const GBytes *key)
+write_nullable_bytes (GByteArray *payload, GBytes *key)
 {
   if (key != NULL)
     {
@@ -1023,8 +1023,7 @@ void
 gzochid_dataclient_request_next_key
 (GzochidDataClient *client, char *app, char *store, GBytes *key,
  gzochid_dataclient_success_callback success_callback, gpointer success_data,
- gzochid_dataclient_failure_callback failure_callback, gpointer failure_data,
- gzochid_dataclient_release_callback release_callback, gpointer release_data)
+ gzochid_dataclient_failure_callback failure_callback, gpointer failure_data)
 {
   dataclient_callback_queue *queue = acquire_callback_queue (client, app);
   GByteArray *payload = g_byte_array_new ();
