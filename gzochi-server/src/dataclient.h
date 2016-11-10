@@ -100,6 +100,13 @@ typedef void (*gzochid_dataclient_success_callback) (GBytes *, gpointer);
 
 typedef void (*gzochid_dataclient_failure_callback) (struct timeval, gpointer);
 
+/* Function pointer typedef for a "release" callback, which indicates that the
+   holder of a point or range lock should call `gzochid_dataclient_release_key'
+   or `gzochid_dataclient_release_key_range' (as appropriate) at the earliest
+   opportunity to do so. */
+
+typedef void (*gzochid_dataclient_release_callback) (gpointer);
+
 /* Function pointer typedef for a response to a request for a block of oids.
    Object id reservations may not fail; an invocation of this callback indicates
    a successful reservation of the specified block. */
@@ -114,15 +121,23 @@ typedef void (*gzochid_dataclient_oids_callback)
 void gzochid_dataclient_reserve_oids
 (GzochidDataClient *, char *, gzochid_dataclient_oids_callback, gpointer);
 
-/* Request a value from the specified store (which must be "oids" or "names") 
-   associated with the specified gzochi game application. The response to this
-   request will be delivered to the specified success or failure callback (with
-   associated user data pointer) as appropriate. */
+/*
+  Request a value from the specified store (which must be "oids" or "names") 
+  associated with the specified gzochi game application. The response to this
+  request will be delivered to the specified success or failure callback (with
+  associated user data pointer) as appropriate. 
+  
+  The release callback will be called (with its associated user data pointer) 
+  `lock.release.msecs' milliseconds after the successful acquisition of a lock 
+  on this value. (Upgrading a read lock to a write lock does not extend the 
+  lease time.)
+*/
 
 void gzochid_dataclient_request_value
 (GzochidDataClient *, char *, char *, GBytes *, gboolean,
  gzochid_dataclient_success_callback, gpointer,
- gzochid_dataclient_failure_callback, gpointer);
+ gzochid_dataclient_failure_callback, gpointer,
+ gzochid_dataclient_release_callback, gpointer);
 
 /*
   Request the key from the specified store (which must be "oids" or "names") 
@@ -131,6 +146,10 @@ void gzochid_dataclient_request_value
   delivered to the specified success or failure callback (with associated user 
   data pointer) as appropriate.
   
+  The release callback will be called (with its associated user data pointer) 
+  `rangelock.release.msecs' milliseconds after the successful acquisition of a 
+  range lock on these bounds.
+
   The key argument may be `NULL' to indicate that the first key in the store
   should be returned.
 */
@@ -138,7 +157,8 @@ void gzochid_dataclient_request_value
 void gzochid_dataclient_request_next_key
 (GzochidDataClient *, char *, char *, GBytes *,
  gzochid_dataclient_success_callback, gpointer,
- gzochid_dataclient_failure_callback, gpointer);
+ gzochid_dataclient_failure_callback, gpointer,
+ gzochid_dataclient_release_callback, gpointer);
 
 /* Submit the specified array of changes against the specified gzochi game 
    application to the data server. */
@@ -178,7 +198,6 @@ void gzochid_dataclient_received_value
 
 void gzochid_dataclient_received_next_key
 (GzochidDataClient *, gzochid_data_response *);
-
 
 GQuark gzochid_data_client_error_quark ();
 

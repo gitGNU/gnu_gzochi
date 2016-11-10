@@ -78,6 +78,11 @@ struct _dataclient_data_callback_data
 {
   GBytes *value;
   struct timeval timeout;
+
+  gboolean released;
+
+  GMutex mutex;
+  GCond cond;
 };
 
 typedef struct _dataclient_data_callback_data dataclient_data_callback_data;
@@ -161,6 +166,19 @@ failure_callback (struct timeval wait_time, gpointer user_data)
 }
 
 static void
+release_callback (gpointer user_data)
+{
+  dataclient_data_callback_data *callback_data = user_data;
+
+  g_mutex_lock (&callback_data->mutex);
+
+  callback_data->released = TRUE;
+  
+  g_cond_signal (&callback_data->cond);
+  g_mutex_unlock (&callback_data->mutex);
+}
+
+static void
 dataclient_fixture_setup_inner (dataclient_fixture *fixture, GKeyFile *key_file)
 {
   GError *err = NULL;
@@ -233,6 +251,9 @@ dataclient_connected_fixture_setup (dataclient_fixture *fixture,
 {
   GKeyFile *key_file = g_key_file_new ();
 
+  g_key_file_set_value (key_file, "metaserver", "lock.release.msec", "10");
+  g_key_file_set_value (key_file, "metaserver", "rangelock.release.msec", "10");
+  
   dataclient_connected_fixture_setup_inner (fixture, key_file);
   g_key_file_unref (key_file);  
 }
@@ -348,7 +369,7 @@ test_request_value_simple (dataclient_fixture *fixture, gconstpointer user_data)
 
   gzochid_dataclient_request_value
     (fixture->dataclient, "test", "oids", key, TRUE,
-     success_callback, NULL, failure_callback, NULL);
+     success_callback, NULL, failure_callback, NULL, release_callback, NULL);
 
   g_timeout_add (2000, exit_loop, fixture);
   g_main_loop_run (fixture->socket_server->main_loop);
@@ -369,21 +390,39 @@ test_received_value_success (dataclient_fixture *fixture,
   dataclient_data_callback_data callback_data = { 0 };
   gzochid_data_response response;
 
+  g_mutex_init (&callback_data.mutex);
+  g_cond_init (&callback_data.cond);
+  
   response.app = "test";
   response.store = "oids";
   response.success = TRUE;
   response.data = g_bytes_new_static ("bar", 4);
+
+  g_mutex_lock (&callback_data.mutex);
   
   gzochid_dataclient_request_value
     (fixture->dataclient, "test", "oids", key, FALSE,
-     success_callback, &callback_data, failure_callback, &callback_data);
+     success_callback, &callback_data, failure_callback, &callback_data,
+     release_callback, &callback_data);
 
   gzochid_dataclient_received_value (fixture->dataclient, &response);
 
   g_assert (g_bytes_equal (response.data, callback_data.value));
+
+  g_assert (g_cond_wait_until
+	    (&callback_data.cond, &callback_data.mutex,
+	     g_get_monotonic_time () + 20000));
+
+  g_mutex_unlock (&callback_data.mutex);
+
+  g_assert (callback_data.released);
   
   g_bytes_unref (response.data);
   g_bytes_unref (callback_data.value);
+
+  g_mutex_clear (&callback_data.mutex);
+  g_cond_clear (&callback_data.cond);
+  
   g_bytes_unref (key);
 }
 
@@ -404,7 +443,8 @@ test_received_value_failure (dataclient_fixture *fixture,
 
   gzochid_dataclient_request_value
     (fixture->dataclient, "test", "oids", key, FALSE,
-     success_callback, &callback_data, failure_callback, &callback_data);
+     success_callback, &callback_data, failure_callback, &callback_data,
+     release_callback, NULL);
 
   gzochid_dataclient_received_value (fixture->dataclient, &response);
 
@@ -430,7 +470,8 @@ test_received_value_unexpected (dataclient_fixture *fixture,
 
   gzochid_dataclient_request_next_key
     (fixture->dataclient, "test", "names", key,
-     success_callback, &callback_data, failure_callback, &callback_data);
+     success_callback, &callback_data, failure_callback, &callback_data,
+     release_callback, NULL);
 
   gzochid_dataclient_received_value (fixture->dataclient, &response);
 
@@ -450,7 +491,7 @@ test_request_next_key_simple (dataclient_fixture *fixture,
 
   gzochid_dataclient_request_next_key
     (fixture->dataclient, "test", "names", key,
-     success_callback, NULL, failure_callback, NULL);
+     success_callback, NULL, failure_callback, NULL, release_callback, NULL);
 
   g_timeout_add (2000, exit_loop, fixture);
   g_main_loop_run (fixture->socket_server->main_loop);
@@ -470,21 +511,39 @@ test_received_next_key_success (dataclient_fixture *fixture,
   dataclient_data_callback_data callback_data = { 0 };
   gzochid_data_response response;
 
+  g_mutex_init (&callback_data.mutex);
+  g_cond_init (&callback_data.cond);
+  
   response.app = "test";
   response.store = "names";
   response.success = TRUE;
   response.data = g_bytes_new_static ("bar", 4);
   
+  g_mutex_lock (&callback_data.mutex);
+
   gzochid_dataclient_request_next_key
     (fixture->dataclient, "test", "names", key,
-     success_callback, &callback_data, failure_callback, &callback_data);
+     success_callback, &callback_data, failure_callback, &callback_data,
+     release_callback, &callback_data);
 
   gzochid_dataclient_received_next_key (fixture->dataclient, &response);
 
   g_assert (g_bytes_equal (response.data, callback_data.value));
   
+  g_assert (g_cond_wait_until
+	    (&callback_data.cond, &callback_data.mutex,
+	     g_get_monotonic_time () + 20000));
+
+  g_mutex_unlock (&callback_data.mutex);
+
+  g_assert (callback_data.released);
+  
   g_bytes_unref (response.data);
   g_bytes_unref (callback_data.value);
+
+  g_mutex_clear (&callback_data.mutex);
+  g_cond_clear (&callback_data.cond);
+
   g_bytes_unref (key);
 }
 
@@ -505,7 +564,8 @@ test_received_next_key_failure (dataclient_fixture *fixture,
 
   gzochid_dataclient_request_next_key
     (fixture->dataclient, "test", "names", key,
-     success_callback, &callback_data, failure_callback, &callback_data);
+     success_callback, &callback_data, failure_callback, &callback_data,
+     release_callback, NULL);
 
   gzochid_dataclient_received_next_key (fixture->dataclient, &response);
 
@@ -531,7 +591,8 @@ test_received_next_key_unexpected (dataclient_fixture *fixture,
 
   gzochid_dataclient_request_value
     (fixture->dataclient, "test", "oids", key, TRUE,
-     success_callback, &callback_data, failure_callback, &callback_data);
+     success_callback, &callback_data, failure_callback, &callback_data,
+     release_callback, NULL);
 
   gzochid_dataclient_received_next_key (fixture->dataclient, &response);
 
@@ -760,8 +821,8 @@ main (int argc, char *argv[])
   
   g_test_add
     ("/dataclient/received-value/success", dataclient_fixture, NULL,
-     dataclient_fixture_setup, test_received_value_success,
-     dataclient_fixture_teardown);
+     dataclient_connected_fixture_setup, test_received_value_success,
+     dataclient_connected_fixture_teardown);
   g_test_add
     ("/dataclient/received-value/failure", dataclient_fixture, NULL,
      dataclient_fixture_setup, test_received_value_failure,
@@ -778,8 +839,8 @@ main (int argc, char *argv[])
   
   g_test_add
     ("/dataclient/received-next-key/success", dataclient_fixture, NULL,
-     dataclient_fixture_setup, test_received_next_key_success,
-     dataclient_fixture_teardown);
+     dataclient_connected_fixture_setup, test_received_next_key_success,
+     dataclient_connected_fixture_teardown);
   g_test_add
     ("/dataclient/received-next-key/failure", dataclient_fixture, NULL,
      dataclient_fixture_setup, test_received_next_key_failure,

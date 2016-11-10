@@ -771,6 +771,14 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
   g_mutex_unlock (&database->mutex);
 }
 
+/* Temporary stub implementation of a lock release callback function for point
+   locks. */
+
+static void
+lock_release_callback (gpointer user_data)
+{
+}
+
 /*
   Increases the reference count of the specified lock request. 
 
@@ -990,7 +998,8 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 		    (environment->client, environment->app_name, database->name,
 		     lock_request->key->key, lock_request->for_write,
 		     lock_success_callback, callback_data,
-		     lock_failure_callback, callback_data);
+		     lock_failure_callback, callback_data,
+		     lock_release_callback, NULL);
 		  
 		  lock_request->requested = TRUE;
 		}
@@ -1155,6 +1164,14 @@ range_lock_failure_callback (struct timeval wait_time, gpointer user_data)
     }
 
   callback_data_free (callback_data);
+}
+
+/* Temporary stub implementation of a lock release callback function for range
+   locks. */
+
+static void
+range_lock_release_callback (gpointer user_data)
+{
 }
 
 /*
@@ -1402,8 +1419,10 @@ ensure_range_lock (gzochid_storage_transaction *tx,
       
 		  gzochid_dataclient_request_next_key
 		    (environment->client, environment->app_name, database->name,
-		     range_lock_request->from, range_lock_success_callback,
-		     callback_data, range_lock_failure_callback, callback_data);
+		     range_lock_request->from,
+		     range_lock_success_callback, callback_data,
+		     range_lock_failure_callback, callback_data,
+		     range_lock_release_callback, NULL);
 		  
 		  range_lock_request->requested = TRUE;
 		}

@@ -193,7 +193,8 @@ gzochid_dataclient_request_value
 (GzochidDataClient *client, char *app, char *store, GBytes *key,
  gboolean for_write, gzochid_dataclient_success_callback success_callback,
  gpointer success_data, gzochid_dataclient_failure_callback failure_callback,
- gpointer failure_data)
+ gpointer failure_data, gzochid_dataclient_release_callback release_callback,
+ gpointer release_data)
 {
   client->requested_values =
     g_list_append (client->requested_values, g_bytes_ref (key));
@@ -206,7 +207,8 @@ void
 gzochid_dataclient_request_next_key
 (GzochidDataClient *client, char *app, char *store, GBytes *key,
  gzochid_dataclient_success_callback success_callback, gpointer success_data,
- gzochid_dataclient_failure_callback failure_callback, gpointer failure_data)
+ gzochid_dataclient_failure_callback failure_callback, gpointer failure_data,
+ gzochid_dataclient_release_callback release_callback, gpointer release_data)
 {
   client->requested_keys = g_list_append
     (client->requested_keys, key == NULL ? NULL : g_bytes_ref (key));
@@ -221,6 +223,18 @@ gzochid_dataclient_submit_changeset (GzochidDataClient *client, char *app,
 {
   client->changesets = g_list_append
     (client->changesets, g_array_ref (changes));
+}
+
+void
+gzochid_dataclient_release_key (GzochidDataClient *client, char *app,
+				char *store, GBytes *key)
+{
+}
+
+void
+gzochid_dataclient_release_key_range (GzochidDataClient *client, char *app,
+				      char *store, GBytes *from, GBytes *to)
+{
 }
 
 struct _dataclient_storage_fixture

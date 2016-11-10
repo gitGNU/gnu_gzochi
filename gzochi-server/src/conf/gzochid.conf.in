@@ -99,6 +99,21 @@ server.address = localhost:9001
 
 server.connect.interval.sec = 5
 
+# The amount of time that a lock on a single key in an application's data store
+# can be held before the client will voluntarily release it back to the meta
+# server. Lowering this value will decrease latency for application nodes
+# contending for a lock but may also decrease task execution throughput.
+
+lock.release.msec = 1000
+
+# The amount of time that a lock on a range of keys in an application's data
+# store can be held before the client will voluntarily release it back to the
+# meta server. This value should usually be lower than the value for
+# `lock.release.msec' since range locks block a wider range of access to the
+# store.
+
+rangelock.release.msec = 500
+
 # System-wide logging configuration.
 
 [log]
