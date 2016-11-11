@@ -1091,12 +1091,11 @@ range_lock_success_callback (GBytes *key, gpointer user_data)
   
   if (search_context.range_lock == NULL)
     {
-      dataclient_qualified_key_range key_range =
-	(dataclient_qualified_key_range) { database->name, key, NULL };
+      dataclient_qualified_key_range kr = (dataclient_qualified_key_range)
+	{ database->name, callback_data->key, key };
       
       gzochid_itree_insert
-	(database->range_locks, callback_data->key, key,
-	 range_lock_new (&key_range));
+	(database->range_locks, callback_data->key, key, range_lock_new (&kr));
     }
 
   request_search_context.store = database->name;
