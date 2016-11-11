@@ -67,11 +67,6 @@ struct _dataclient_lock
   
   gboolean for_write; 
 
-  /* Protects the lock during cache eviction: all application transactions hold
-     a read lock on the lock during normal use; the eviction thread obtains a
-     write lock on the lock before reaping it. */
-  
-  GRWLock lock;
 };
 
 typedef struct _dataclient_lock dataclient_lock;
@@ -97,11 +92,7 @@ struct _dataclient_range_lock
   
   GBytes *to;
 
-  /* Protects the range lock during cache eviction: all application transactions
-     hold a read lock on the range lock during normal use; the eviction thread 
-     obtains a write lock on the range lock before reaping it. */
 
-  GRWLock lock;
 };
 
 typedef struct _dataclient_range_lock dataclient_range_lock;
@@ -385,7 +376,6 @@ static void
 free_lock (dataclient_lock *lock)
 {
   dataclient_qualified_key_free (lock->key);
-  g_rw_lock_clear (&lock->lock);
   free (lock);
 }
 
@@ -405,42 +395,8 @@ free_range_lock (dataclient_range_lock *range_lock)
   if (range_lock->to != NULL)
     g_bytes_unref (range_lock->to);
 
-  g_rw_lock_clear (&range_lock->lock);
   
   free (range_lock);
-}
-
-void
-gzochid_dataclient_storage_release_lock (gzochid_storage_store *store,
-					 GBytes *key)
-{
-  dataclient_database *database = store->database;
-  dataclient_environment *environment = store->context->environment;
-
-  dataclient_lock *lock = NULL;
-  gzochid_storage_transaction *tx = NULL;
-  
-  g_mutex_lock (&database->mutex);
-
-  lock = g_hash_table_lookup (database->locks, key);
-  assert (lock != NULL);
-  g_hash_table_remove (database->locks, key);
-
-  g_mutex_unlock (&database->mutex);
-
-  g_rw_lock_writer_lock (&lock->lock);
-  g_rw_lock_writer_unlock (&lock->lock);
-  free_lock (lock);
-
-  tx = environment->delegate_iface->transaction_begin
-    (environment->delegate_context);
-  
-  environment->delegate_iface->transaction_delete
-    (tx, database->delegate_store, (char *) g_bytes_get_data (key, NULL),
-     g_bytes_get_size (key));
-
-  environment->delegate_iface->transaction_prepare (tx);
-  environment->delegate_iface->transaction_commit (tx);
 }
 
 /* Captures state used during a search for a pending range lock request. */
@@ -685,7 +641,6 @@ lock_success_callback (GBytes *data, gpointer user_data)
       
       lock->key = dataclient_qualified_key_copy (&qualified_key);
       lock->for_write = callback_data->for_write;
-      g_rw_lock_init (&lock->lock);
 
       g_hash_table_insert
 	(database->locks, g_bytes_ref (callback_data->key), lock);
@@ -870,7 +825,6 @@ check_and_set_lock (dataclient_transaction *tx, dataclient_database *database,
 	  /* If everything is properly synchronized, it should be impossible for
 	     this block to be entered while a lock is being reaped. */	     
 	  
-	  assert (g_rw_lock_reader_trylock (&lock->lock));
 	  g_hash_table_insert
 	    (tx->locks, dataclient_qualified_key_copy (&qualified_key), lock);
 	  
@@ -1096,7 +1050,6 @@ range_lock_success_callback (GBytes *key, gpointer user_data)
 	? NULL : g_bytes_ref (callback_data->key);
       range_lock->to = key == NULL ? NULL : g_bytes_ref (key);
       
-      g_rw_lock_init (&range_lock->lock);
       gzochid_itree_insert
 	(database->range_locks, callback_data->key, key, range_lock);
     }
@@ -1202,8 +1155,6 @@ check_and_set_range_lock (dataclient_transaction *tx,
     {
       /* If everything is properly synchronized, it should be impossible for 
 	 this block to be entered while a lock is being reaped. */	     
-
-      assert (g_rw_lock_reader_trylock (&search_context.range_lock->lock));
 
       gzochid_itree_insert
 	(tx->range_locks, search_context.range_lock->from,
