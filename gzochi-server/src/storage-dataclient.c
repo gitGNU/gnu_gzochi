@@ -56,6 +56,18 @@ struct _dataclient_qualified_key
 
 typedef struct _dataclient_qualified_key dataclient_qualified_key;
 
+/* Combines a key range with the store to which it belongs, to disambiguate it
+   in contexts in which keys are not otherwise partitioned. */
+
+struct _dataclient_qualified_key_range
+{
+  char *store; /* The name of the store to which the key range belongs. */
+  GBytes *from; /* The start key, which may be `NULL'. */
+  GBytes *to; /* The end key, which may be `NULL'. */
+};
+
+typedef struct _dataclient_qualified_key_range dataclient_qualified_key_range;
+
 /* A point lock on a key in a store managed by the meta server, and currently
    held by this gzochi game application server. */
 
@@ -80,18 +92,7 @@ typedef struct _dataclient_lock dataclient_lock;
 
 struct _dataclient_range_lock
 {
-  char *store; /* The store to whose keyspace the range lock applies. */
-  
-  /* The lower end of the locked key space, or `NULL' to indicate the beginning
-     of the key space. */
-
-  GBytes *from;
-
-  /* The upper end of the locked key space, or `NULL' to indicate the end of the
-     key space. */
-  
-  GBytes *to;
-
+  dataclient_qualified_key_range *key_range; /* The subject of the lock. */
 
 };
 
@@ -148,18 +149,8 @@ typedef struct _dataclient_lock_request dataclient_lock_request;
 
 struct _dataclient_range_lock_request
 {
-  char *store; /* The target store. */
-
-  /* The lower end of the target key space, or `NULL' to indicate the beginning
-     of the key space. */
-
-  GBytes *from;
-
-  /* The upper end of the target key space, or `NULL' to indicate the end of the
-     key space. */
-
-  GBytes *to;
-
+  dataclient_qualified_key_range *key_range; /* The target key range. */
+  
   /* Protects the condition variable, requested indicator, and next request
      timestamp. */
 
@@ -368,6 +359,65 @@ dataclient_qualified_key_copy (dataclient_qualified_key *k)
   return dataclient_qualified_key_new (k->store, k->key);
 }
 
+/* Create and return a new `dataclient_qualified_key_range' structure with the 
+   speciifed store name and key range bytes. */
+
+static dataclient_qualified_key_range *
+dataclient_qualified_key_range_new (const char *store, GBytes *from, GBytes *to)
+{
+  dataclient_qualified_key_range *k =
+    malloc (sizeof (dataclient_qualified_key_range));
+
+  k->store = strdup (store);
+  k->from = from == NULL ? NULL : g_bytes_ref (from);
+  k->to = to == NULL ? NULL : g_bytes_ref (to);
+  
+  return k;  
+}
+
+/* Frees the specified `dataclient_qualified_key'. Can be used as a 
+   `GDestroyNotify' where appropriate. */
+
+static void
+dataclient_qualified_key_range_free (gpointer data)
+{
+  dataclient_qualified_key_range *key_range = data;
+  
+  free (key_range->store);
+
+  if (key_range->from != NULL)
+    g_bytes_unref (key_range->from);
+  if (key_range->to != NULL)
+    g_bytes_unref (key_range->to);
+  
+  free (key_range);
+}
+
+/* Create and return a new `dataclient_qualified_key_range' structure with a 
+   store name and from / to key bytes equal to those of the specified qualified
+   key range. */
+
+static dataclient_qualified_key_range *
+dataclient_qualified_key_range_copy (dataclient_qualified_key_range *k)
+{
+  return dataclient_qualified_key_range_new (k->store, k->from, k->to);
+}
+
+/* Create and return a new point lock structure for the specified qualified key
+   and with the specified access level. The memory used by this structure 
+   should be freed via `free_lock' when no longer in use. */
+
+static dataclient_lock *
+lock_new (dataclient_qualified_key *qualified_key, gboolean for_write)
+{
+  dataclient_lock *lock = malloc (sizeof (dataclient_lock));
+     
+  lock->key = dataclient_qualified_key_copy (qualified_key);
+  lock->for_write = for_write;
+
+  return lock;
+}
+
 /* Free the specified point lock structure. This function should only be called
    after the lock has been released by all users; i.e., all R/W locks have been
    released and the lock is no longer present in any lock tables. */
@@ -379,6 +429,20 @@ free_lock (dataclient_lock *lock)
   free (lock);
 }
 
+/* Create and return a new range lock structure for the specified qualified key
+   range. The memory used by this structure should be freed via 
+   `free_range_lock' when no longer in use. */
+
+static dataclient_range_lock *
+range_lock_new (dataclient_qualified_key_range *key_range)
+{
+  dataclient_range_lock *range_lock = malloc (sizeof (dataclient_range_lock));
+
+  range_lock->key_range = dataclient_qualified_key_range_copy (key_range);
+  
+  return range_lock;
+}
+  
 /* Free the specified range lock structure. This function should only be called
    after the lock has been released by all users; i.e., all R/W locks have been
    released and the lock is no longer present in any lock tables. */
@@ -386,16 +450,7 @@ free_lock (dataclient_lock *lock)
 static void
 free_range_lock (dataclient_range_lock *range_lock)
 {
-  free (range_lock->store);
-  
-  /* The upper and lower key bounds for range locks may be `NULL'. */
-  
-  if (range_lock->from != NULL)
-    g_bytes_unref (range_lock->from);
-  if (range_lock->to != NULL)
-    g_bytes_unref (range_lock->to);
-
-  
+  dataclient_qualified_key_range_free (range_lock->key_range);
   free (range_lock);
 }
 
@@ -459,7 +514,7 @@ find_exact_range_lock_request (gpointer from, gpointer to, gpointer data,
   dataclient_range_lock_request *request = data;
   dataclient_range_lock_request_search_context *search_context = user_data;
   
-  if (strcmp (search_context->store, request->store) == 0
+  if (strcmp (search_context->store, request->key_range->store) == 0
       && gzochid_util_bytes_compare_null_first (from, search_context->from) == 0
       && gzochid_util_bytes_compare_null_last (to, search_context->to) == 0)
     {
@@ -479,7 +534,7 @@ find_exact_range_lock (gpointer from, gpointer to, gpointer data,
   dataclient_range_lock_request *request = data;
   dataclient_range_lock_search_context *search_context = user_data;
   
-  if (strcmp (search_context->store, request->store) == 0
+  if (strcmp (search_context->store, request->key_range->store) == 0
       && g_bytes_equal (from, search_context->from)
       && g_bytes_equal (to, search_context->to))
     {
@@ -500,7 +555,7 @@ find_covering_range_lock_request (gpointer from, gpointer to, gpointer data,
   dataclient_range_lock_request *request = data;
   dataclient_range_lock_request_search_context *search_context = user_data;
   
-  if (strcmp (search_context->store, request->store) == 0
+  if (strcmp (search_context->store, request->key_range->store) == 0
       && gzochid_util_bytes_compare_null_first (from, search_context->from) <= 0
       && gzochid_util_bytes_compare_null_last (to, search_context->to) >= 0)
     {
@@ -527,7 +582,7 @@ find_range_lock_covering_point (gpointer from, gpointer to, gpointer data,
   dataclient_range_lock_request *request = data;
   dataclient_range_lock_search_context *search_context = user_data;
 
-  if (strcmp (search_context->store, request->store) == 0)
+  if (strcmp (search_context->store, request->key_range->store) == 0)
     {
       if (search_context->from == NULL)
 	{
@@ -633,18 +688,12 @@ lock_success_callback (GBytes *data, gpointer user_data)
       if (callback_data->for_write)
 	lock->for_write = TRUE;
     }
-  else
-    {
-      /* Otherwise create a new lock. */
-      
-      lock = malloc (sizeof (dataclient_lock));
-      
-      lock->key = dataclient_qualified_key_copy (&qualified_key);
-      lock->for_write = callback_data->for_write;
 
-      g_hash_table_insert
-	(database->locks, g_bytes_ref (callback_data->key), lock);
-    }
+  /* Otherwise create a new lock. */
+  
+  else g_hash_table_insert
+	 (database->locks, g_bytes_ref (callback_data->key),
+	  lock_new (&qualified_key, callback_data->for_write));
 
   if (data != NULL)
 
@@ -1026,7 +1075,6 @@ range_lock_success_callback (GBytes *key, gpointer user_data)
 {
   dataclient_callback_data *callback_data = user_data;
   dataclient_database *database = callback_data->store->database;
-  dataclient_range_lock *range_lock = NULL;
   dataclient_range_lock_search_context search_context;
   dataclient_range_lock_request_search_context request_search_context;
 
@@ -1043,15 +1091,12 @@ range_lock_success_callback (GBytes *key, gpointer user_data)
   
   if (search_context.range_lock == NULL)
     {
-      range_lock = malloc (sizeof (dataclient_range_lock));
-
-      range_lock->store = strdup (database->name);
-      range_lock->from = callback_data->key == NULL
-	? NULL : g_bytes_ref (callback_data->key);
-      range_lock->to = key == NULL ? NULL : g_bytes_ref (key);
+      dataclient_qualified_key_range key_range =
+	(dataclient_qualified_key_range) { database->name, key, NULL };
       
       gzochid_itree_insert
-	(database->range_locks, callback_data->key, key, range_lock);
+	(database->range_locks, callback_data->key, key,
+	 range_lock_new (&key_range));
     }
 
   request_search_context.store = database->name;
@@ -1157,8 +1202,8 @@ check_and_set_range_lock (dataclient_transaction *tx,
 	 this block to be entered while a lock is being reaped. */	     
 
       gzochid_itree_insert
-	(tx->range_locks, search_context.range_lock->from,
-	 search_context.range_lock->to, search_context.range_lock);
+	(tx->range_locks, search_context.range_lock->key_range->from,
+	 search_context.range_lock->key_range->to, search_context.range_lock);
       
       return TRUE;
     }
@@ -1199,12 +1244,7 @@ range_lock_request_unref (dataclient_range_lock_request *range_lock_request)
 
   if (ret)    
     {
-      free (range_lock_request->store);
-      
-      if (range_lock_request->from != NULL)
-	g_bytes_unref (range_lock_request->from);
-      if (range_lock_request->to != NULL)
-	g_bytes_unref (range_lock_request->to);
+      dataclient_qualified_key_range_free (range_lock_request->key_range);
 
       g_mutex_clear (&range_lock_request->mutex);
       g_cond_clear (&range_lock_request->cond);
@@ -1226,9 +1266,8 @@ range_lock_request_new (const char *store, GBytes *from, GBytes *to)
   dataclient_range_lock_request *range_lock_request =
     malloc (sizeof (dataclient_range_lock_request));
 
-  range_lock_request->store = strdup (store);
-  range_lock_request->from = from == NULL ? NULL : g_bytes_ref (from);
-  range_lock_request->to = to == NULL ? NULL : g_bytes_ref (to);
+  range_lock_request->key_range =
+    dataclient_qualified_key_range_new (store, from, to);
 
   range_lock_request->requested = FALSE;
   range_lock_request->next_request_time = 0;
@@ -1366,11 +1405,11 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 		  dataclient_environment *environment =
 		    store->context->environment;
 		  dataclient_callback_data *callback_data = create_callback_data
-		    (store, range_lock_request->from, FALSE);
+		    (store, range_lock_request->key_range->from, FALSE);
       
 		  gzochid_dataclient_request_next_key
 		    (environment->client, environment->app_name, database->name,
-		     range_lock_request->from,
+		     range_lock_request->key_range->from,
 		     range_lock_success_callback, callback_data,
 		     range_lock_failure_callback, callback_data,
 		     range_lock_release_callback, NULL);
@@ -1403,16 +1442,16 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 
 	  g_mutex_lock (&database->mutex);
 	  acquired_lock = check_and_set_range_lock
-	    (dataclient_tx, database, range_lock_request->from);
+	    (dataclient_tx, database, range_lock_request->key_range->from);
 	  g_mutex_unlock (&database->mutex);
 	}
       
       if (acquired_lock || !should_continue)
 	{
-	  GBytes *from = range_lock_request->from == NULL
-	    ? NULL : g_bytes_ref (range_lock_request->from);
-	  GBytes *to = range_lock_request->to ==  NULL
-	    ? NULL : g_bytes_ref (range_lock_request->to);
+	  GBytes *from = range_lock_request->key_range->from == NULL
+	    ? NULL : g_bytes_ref (range_lock_request->key_range->from);
+	  GBytes *to = range_lock_request->key_range->to == NULL
+	    ? NULL : g_bytes_ref (range_lock_request->key_range->to);
 	  
 	  g_mutex_lock (&database->mutex);
 	  g_mutex_unlock (&range_lock_request->mutex);
@@ -2038,7 +2077,7 @@ transaction_first_key (gzochid_storage_transaction *tx,
 	     get it directly from the lock obtained by the transaction. */
 	  
 	  const char *data = g_bytes_get_data
-	    (search_context.range_lock->to, &ret_len);
+	    (search_context.range_lock->key_range->to, &ret_len);
 	  
 	  ret = malloc (sizeof (char) * ret_len);
 	  memcpy (ret, data, ret_len);
@@ -2084,10 +2123,10 @@ transaction_next_key (gzochid_storage_transaction *tx,
 	  /* The key doesn't have to come from the delegate B+tree store. We can
 	     get it directly from the lock obtained by the transaction. */
 
-	  if (search_context.range_lock->to != NULL)
+	  if (search_context.range_lock->key_range->to != NULL)
 	    {
 	      const char *data = g_bytes_get_data
-		(search_context.range_lock->to, &ret_len);
+		(search_context.range_lock->key_range->to, &ret_len);
 	  
 	      ret = malloc (sizeof (char) * ret_len);
 	      memcpy (ret, data, ret_len);
