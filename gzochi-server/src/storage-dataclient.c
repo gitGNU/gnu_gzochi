@@ -1596,6 +1596,26 @@ destroy_store (gzochid_storage_context *context, char *name)
     (environment->delegate_context, name);
 }
 
+/*
+  A `GDestroyNotify' implementation to clear out an element in a `GArray' of
+  `gzochid_data_change' elements. 
+
+  Note that because this is used with `g_array_free' this function does not 
+  free the `gzochid_data_change' struct itself.
+*/
+
+static void
+clear_changeset (gpointer data)
+{
+  gzochid_data_change *change = data;
+
+  free (change->store);
+  g_bytes_unref (change->key);
+
+  if (change->data != NULL)
+    g_bytes_unref (change->data);
+}
+
 /* Create and return a new transaction over the specified dataclient 
    environment. The transaction will not attempt to acquire any locks after the
    specified monotonic timestamp has elapsed. */
@@ -1625,7 +1645,8 @@ create_transaction (gzochid_storage_context *context,
      gzochid_util_bytes_compare_null_last);
 
   txn->changeset = g_array_new (FALSE, FALSE, sizeof (gzochid_data_change));
-
+  g_array_set_clear_func (txn->changeset, clear_changeset);
+  
   tx->context = context;
   tx->txn = txn;
   
@@ -1672,8 +1693,8 @@ cleanup_transaction (gzochid_storage_transaction *tx)
 
   g_hash_table_destroy (txn->locks);
   gzochid_itree_free (txn->range_locks);
-  g_array_unref (txn->changeset);
 
+  g_array_free (txn->changeset, TRUE);
   g_list_free_full (txn->deleted_keys, (GDestroyNotify) callback_data_free);
 
   free (txn);
