@@ -79,6 +79,7 @@ struct _dataclient_lock
   
   gboolean for_write; 
 
+  int ref_count; /* The count of references to this lock. */
 };
 
 typedef struct _dataclient_lock dataclient_lock;
@@ -94,6 +95,7 @@ struct _dataclient_range_lock
 {
   dataclient_qualified_key_range *key_range; /* The subject of the lock. */
 
+  int ref_count; /* The count of references to this range lock. */
 };
 
 typedef struct _dataclient_range_lock dataclient_range_lock;
@@ -412,6 +414,7 @@ lock_new (dataclient_qualified_key *qualified_key, gboolean for_write)
 {
   dataclient_lock *lock = malloc (sizeof (dataclient_lock));
      
+  lock->ref_count = 1;
   lock->key = dataclient_qualified_key_copy (qualified_key);
   lock->for_write = for_write;
 
@@ -429,6 +432,43 @@ free_lock (dataclient_lock *lock)
   free (lock);
 }
 
+/* Increases the reference count of the specified lock by one, and returns
+   the lock. This function should not be called on locks that have been removed
+   from their store's lock table. */
+
+static dataclient_lock *
+lock_ref (dataclient_lock *lock)
+{
+  lock->ref_count++;
+  return lock;
+}
+
+/*
+  Decreases the reference count of the specified lock by one. Returns `TRUE' if
+  the lock's updated reference count is reduced to zero or less, `FALSE' 
+  otherwise.
+
+  Upon hitting zero, the data client for the specified environment is notified
+  that the lock should be released. The lock itself is also freed, via 
+  `free_lock'.
+*/
+
+static gboolean
+lock_unref (dataclient_environment *environment, dataclient_lock *lock)
+{
+  if (--lock->ref_count <= 0)
+    {
+      gzochid_dataclient_release_key
+	(environment->client, environment->app_name, lock->key->store,
+	 lock->key->key);
+
+      free_lock (lock);
+      return TRUE;
+    }
+  
+  return FALSE;
+}
+
 /* Create and return a new range lock structure for the specified qualified key
    range. The memory used by this structure should be freed via 
    `free_range_lock' when no longer in use. */
@@ -438,6 +478,7 @@ range_lock_new (dataclient_qualified_key_range *key_range)
 {
   dataclient_range_lock *range_lock = malloc (sizeof (dataclient_range_lock));
 
+  range_lock->ref_count = 1;
   range_lock->key_range = dataclient_qualified_key_range_copy (key_range);
   
   return range_lock;
@@ -452,6 +493,46 @@ free_range_lock (dataclient_range_lock *range_lock)
 {
   dataclient_qualified_key_range_free (range_lock->key_range);
   free (range_lock);
+}
+
+/* Increases the reference count of the specified range lock by one, and returns
+   the lock. This function should not be called on range locks that have been
+   removed from their store's range lock interval tree. */
+
+static dataclient_range_lock *
+range_lock_ref (dataclient_range_lock *range_lock)
+{
+  range_lock->ref_count++;
+  return range_lock;
+}
+
+/*
+  Decreases the reference count of the specified range lock by one. Returns 
+  `TRUE' if the range lock's updated reference count is reduced to zero or less,
+  `FALSE' otherwise.
+
+  Upon hitting zero, the data client for the specified environment is notified
+  that the range lock should be released. The range lock itself is also freed,
+  via `free_range_lock'.
+*/
+
+static gboolean
+range_lock_unref (dataclient_environment *environment,
+		  dataclient_range_lock *range_lock)
+{
+  if (--range_lock->ref_count <= 0)
+    {
+      gzochid_dataclient_release_key_range
+	(environment->client, environment->app_name,
+	 range_lock->key_range->store, range_lock->key_range->from,
+	 range_lock->key_range->to);
+
+      free_range_lock (range_lock);
+
+      return TRUE;
+    }
+
+  return FALSE;
 }
 
 /* Captures state used during a search for a pending range lock request. */
@@ -867,18 +948,18 @@ check_and_set_lock (dataclient_transaction *tx, dataclient_database *database,
     { database->name, key };
   dataclient_lock *lock = g_hash_table_lookup (database->locks, key);
       
-  if (lock != NULL)
+  if (lock != NULL && (!for_write || lock->for_write))
     {
-      if (!for_write || lock->for_write)
-	{
-	  /* If everything is properly synchronized, it should be impossible for
-	     this block to be entered while a lock is being reaped. */	     
+      if (! g_hash_table_contains (tx->locks, &qualified_key))
 	  
-	  g_hash_table_insert
-	    (tx->locks, dataclient_qualified_key_copy (&qualified_key), lock);
+	/* If everything is properly synchronized, it should be impossible for
+	   this block to be entered while a lock is being reaped. */	     
+	
+	g_hash_table_insert
+	  (tx->locks, dataclient_qualified_key_copy (&qualified_key),
+	   lock_ref (lock));
 	  
-	  return TRUE;
-	}
+      return TRUE;
     }
 
   return FALSE;
@@ -1202,7 +1283,8 @@ check_and_set_range_lock (dataclient_transaction *tx,
 
       gzochid_itree_insert
 	(tx->range_locks, search_context.range_lock->key_range->from,
-	 search_context.range_lock->key_range->to, search_context.range_lock);
+	 search_context.range_lock->key_range->to,
+	 range_lock_ref (search_context.range_lock));
       
       return TRUE;
     }
@@ -1721,6 +1803,35 @@ transaction_begin_timed (gzochid_storage_context *context,
   return create_transaction (context, delegate_tx, now + duration_usec);
 }
 
+/* A `GHFunc' implementation for use with `GHashTables' whose values are 
+   `dataclient_lock' objects; calls `lock_unref' on the value, passing the
+   user data argument as the `dataclient_environment' to which the lock
+   belongs. */
+
+static void
+lock_unref_ghfunc (gpointer key, gpointer value, gpointer user_data)
+{
+  lock_unref (user_data, value);
+}
+
+/*
+  A `gzochid_itree_search_func' implementation for use with `gzochid_itrees'
+  whose values are `dataclient_range_lock' objects; calls `range_lock_unref'
+  on the value, passing the user data argument as the `dataclient_environment'
+  to which the range lock belongs. 
+  
+  Intended for use in clearing the entire interval tree; always returns `FALSE'
+  to continue the traversal.
+*/
+
+static gboolean
+range_lock_unref_search_func (gpointer from, gpointer to, gpointer data,
+			      gpointer user_data)
+{
+  range_lock_unref (user_data, data);
+  return FALSE;
+}
+
 /* Frees the resources allocated for the specified transaction and removes it
    from the enclosing dataclient environment. */
 
@@ -1728,11 +1839,22 @@ static void
 cleanup_transaction (gzochid_storage_transaction *tx)
 {
   dataclient_transaction *txn = tx->txn;
+  dataclient_environment *env = tx->context->environment;
 
+  /* Unref all the locks in the table. Need to pass the environment as context,
+     so this can't be done as a `GDestroyNotify' on the value. */
+  
+  g_hash_table_foreach (txn->locks, lock_unref_ghfunc, env);  
   g_hash_table_destroy (txn->locks);
-  gzochid_itree_free (txn->range_locks);
 
+  /* Unref all the range locks in the tree. */
+  
+  gzochid_itree_search_interval
+    (txn->range_locks, NULL, NULL, range_lock_unref_search_func, env);
+  gzochid_itree_free (txn->range_locks);
+  
   g_array_free (txn->changeset, TRUE);
+  
   g_list_free_full (txn->deleted_keys, (GDestroyNotify) callback_data_free);
 
   free (txn);
