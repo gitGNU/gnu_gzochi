@@ -729,8 +729,15 @@ range_lock_unref (dataclient_environment *environment,
 {
   if (--range_lock->ref_count <= 0)
     {
+      /* The eviction list is in terms of the requested ranges, which means for
+	 the purposes of searching the list, the target upper bound is 
+	 `NULL'. */
+      
+      dataclient_qualified_key_range qualified_key_range =
+	(dataclient_qualified_key_range)
+	{ range_lock->key_range->store, range_lock->key_range->from, NULL };
       dataclient_evicted_key_range *evicted_key_range =
-	find_evicted_key_range (environment, range_lock->key_range);
+	find_evicted_key_range (environment, &qualified_key_range);
 
       gzochid_dataclient_release_key_range
 	(environment->client, environment->app_name,
@@ -999,7 +1006,8 @@ lock_success_callback (GBytes *data, gpointer user_data)
     { database->name, callback_data->key };
   
   dataclient_lock *lock = NULL;
-
+  gboolean lock_exists = FALSE;
+  
   g_mutex_lock (&database->mutex);
     
   lock = g_hash_table_lookup (database->locks, callback_data->key);  
@@ -1010,6 +1018,8 @@ lock_success_callback (GBytes *data, gpointer user_data)
       
       if (callback_data->for_write)
 	lock->for_write = TRUE;
+
+      lock_exists = TRUE;
     }
 
   /* Otherwise create a new lock. */
@@ -1041,9 +1051,15 @@ lock_success_callback (GBytes *data, gpointer user_data)
   notify_waiters (database->read_lock_requests, callback_data->key);
   g_hash_table_remove (database->read_lock_requests, callback_data->key);
 
-  /* The callback data doesn't need to be freed here; it'll be freed in the
-     release callback. */
+  if (lock_exists)
 
+    /* The callback data doesn't need to be freed here; it'll be freed in the
+       release callback. ...Unless this is an upgraed to an existing lock, in
+       which case, the release callback will only be called once, and we can
+       free the callback data now. */
+    
+    callback_data_free (callback_data);
+    
   g_mutex_unlock (&database->mutex);
 }
 
@@ -1678,6 +1694,8 @@ range_lock_release_callback (gpointer user_data)
 	g_bytes_unref (from);
     }
   
+  callback_data_free (callback_data);
+
   g_mutex_unlock (&database->mutex);
   g_mutex_unlock (&environment->mutex);
 }
@@ -2643,6 +2661,8 @@ transaction_delete (gzochid_storage_transaction *tx,
 	  if (g_hash_table_contains (database->value_cache, key_bytes)
 	      && !is_deleted_bytes (tx, store, key_bytes))
 	    ret = 0;
+
+	  g_bytes_unref (key_bytes);
 	}
       
       if (ret == 0)

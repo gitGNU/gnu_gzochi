@@ -426,9 +426,9 @@ dataclient_storage_fixture_teardown (dataclient_storage_fixture *fixture,
   g_list_free_full
     (fixture->dataclient->deferred_response_closures, execute_deferred_closure);
   g_list_free_full (fixture->dataclient->requested_keys, g_free);
-  g_list_free_full (fixture->dataclient->released_keys, g_free);
   g_list_free_full (fixture->dataclient->changesets, clear_changeset);
   g_hash_table_destroy (fixture->dataclient->release_closures);
+  g_list_free_full (fixture->dataclient->released_keys, g_free);
   
   g_object_unref (fixture->dataclient);
 
