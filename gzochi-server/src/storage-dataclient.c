@@ -2101,7 +2101,7 @@ close_context (gzochid_storage_context *context)
   if (environment->client != NULL)
     g_object_unref (environment->client);
   
-  free (environment->app_name);
+  g_free (environment->app_name);
   
   free (context->environment);  
   free (context);
