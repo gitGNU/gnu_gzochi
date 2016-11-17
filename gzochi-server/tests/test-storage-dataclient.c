@@ -15,11 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <glib-object.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/time.h>
 
 #include "dataclient.h"
@@ -48,10 +50,22 @@ struct _dataclient_storage_response_closure
 
   gzochid_dataclient_failure_callback failure_callback;
   gpointer failure_data;
+
+  gchar *qualified_key;
+  gzochid_dataclient_release_callback release_callback;
+  gpointer release_data;
 };
 
 typedef struct _dataclient_storage_response_closure
 dataclient_storage_response_closure;
+
+struct _dataclient_release_closure
+{
+  gzochid_dataclient_release_callback release_callback;
+  gpointer release_data;
+};
+
+typedef struct _dataclient_release_closure dataclient_release_closure;
 
 struct _GzochidDataClient
 {
@@ -59,9 +73,10 @@ struct _GzochidDataClient
 
   GList *responses;
   GList *requested_keys;
-  GList *requested_values;
+  GList *released_keys;
   GList *changesets;
   GList *deferred_response_closures;
+  GHashTable *release_closures;
 };
 
 G_DEFINE_TYPE (GzochidDataClient, gzochid_data_client, G_TYPE_OBJECT);
@@ -73,13 +88,36 @@ gzochid_data_client_class_init (GzochidDataClientClass *klass)
 }
 
 static void
+execute_release_closure (gpointer data)
+{
+  dataclient_release_closure *closure = data;
+  closure->release_callback (closure->release_data);
+  free (closure);
+}
+
+static void
 gzochid_data_client_init (GzochidDataClient *self)
 {
   self->responses = NULL;
   self->requested_keys = NULL;
-  self->requested_values = NULL;
+  self->released_keys = NULL;
   self->changesets = NULL;
   self->deferred_response_closures = NULL;
+  self->release_closures = g_hash_table_new_full
+    (g_str_hash, g_str_equal, g_free, execute_release_closure);
+}
+
+static dataclient_release_closure *
+create_release_closure (gzochid_dataclient_release_callback release_callback,
+			gpointer release_data)
+{
+  dataclient_release_closure *closure =
+    malloc (sizeof (dataclient_release_closure));
+
+  closure->release_callback = release_callback;
+  closure->release_data = release_data;
+  
+  return closure;
 }
 
 static gpointer
@@ -88,10 +126,28 @@ process_response_async (gpointer data)
   dataclient_storage_response_closure *closure = data;
 
   if (closure->response->success)
-    closure->success_callback (closure->response->data, closure->success_data);
-  else closure->failure_callback
+    {
+      closure->success_callback
+	(closure->response->data, closure->success_data);
+
+      if (! g_hash_table_contains
+	  (closure->client->release_closures, closure->qualified_key))
+
+	g_hash_table_insert
+	  (closure->client->release_closures, closure->qualified_key,
+	   create_release_closure (closure->release_callback,
+				   closure->release_data));
+
+      else g_free (closure->qualified_key);
+    }
+  else
+    {
+      closure->failure_callback
 	 (closure->response->timeout, closure->failure_data);
 
+      g_free (closure->qualified_key);
+    }
+      
   free (closure);
   return NULL;
 }
@@ -107,10 +163,12 @@ execute_deferred_closure (gpointer data)
 }
 
 static dataclient_storage_response_closure *
-create_closure
-(GzochidDataClient *client, dataclient_storage_response *response,
+create_response_closure
+(GzochidDataClient *client, gchar *qualified_key,
+ dataclient_storage_response *response,
  gzochid_dataclient_success_callback success_callback, gpointer success_data,
- gzochid_dataclient_failure_callback failure_callback, gpointer failure_data)
+ gzochid_dataclient_failure_callback failure_callback, gpointer failure_data,
+ gzochid_dataclient_release_callback release_callback, gpointer release_data)
 {
   dataclient_storage_response_closure *closure =
     malloc (sizeof (dataclient_storage_response_closure));
@@ -124,6 +182,10 @@ create_closure
   closure->failure_callback = failure_callback;
   closure->failure_data = failure_data;
 
+  closure->qualified_key = g_strdup (qualified_key);
+  closure->release_callback = release_callback;
+  closure->release_data = release_data;
+  
   return closure;
 }
 
@@ -162,9 +224,10 @@ free_response (dataclient_storage_response *response)
 
 static void
 process_response
-(GzochidDataClient *client,
+(GzochidDataClient *client, gchar *qualified_key,
  gzochid_dataclient_success_callback success_callback, gpointer success_data,
- gzochid_dataclient_failure_callback failure_callback, gpointer failure_data)
+ gzochid_dataclient_failure_callback failure_callback, gpointer failure_data,
+ gzochid_dataclient_release_callback release_callback, gpointer release_data)
 {
   dataclient_storage_response_closure *closure = NULL;
   dataclient_storage_response *response = NULL;
@@ -175,17 +238,71 @@ process_response
       client->responses = g_list_delete_link
 	(client->responses, client->responses);
       
-      closure = create_closure
-	(client, response, success_callback, success_data, failure_callback,
-	 failure_data);
+      closure = create_response_closure
+	(client, qualified_key, response, success_callback, success_data,
+	 failure_callback, failure_data, release_callback, release_data);
 
       g_thread_new ("test-response", process_response_async, closure);
     }
   else client->deferred_response_closures = g_list_append
 	 (client->deferred_response_closures,
-	  create_closure
-	  (client, create_failure_response ((struct timeval) { 0, 0 }),
-	   success_callback, success_data, failure_callback, failure_data));
+	  create_response_closure
+	  (client, qualified_key,
+	   create_failure_response ((struct timeval) { 0, 0 }),
+	   success_callback, success_data, failure_callback, failure_data,
+	   release_callback, release_data));
+}
+
+static const gchar *
+key_text (GBytes *key)
+{
+  size_t size = 0;
+  const char *ret = g_bytes_get_data (key, &size);
+  assert (index (ret, '/') == NULL);
+  return ret;
+}
+
+static gchar *
+create_qualified_key (char *app, char *store, GBytes *key)
+{
+  if (key == NULL)
+    return g_strdup_printf ("/%s/%s/", app, store);
+  else return g_strdup_printf ("/%s/%s/%s", app, store, key_text (key));
+}
+
+static gchar *
+create_qualified_key_range (char *app, char *store, GBytes *from, GBytes *to)
+{
+  if (from == NULL)
+    {
+      if (to == NULL)
+	return g_strdup_printf ("/%s/%s//", app, store);
+      else return g_strdup_printf ("/%s/%s//%s", app, store, key_text (to));
+    }
+  else if (to == NULL)
+    return g_strdup_printf ("/%s/%s/%s//", app, store, key_text (from));
+  else return g_strdup_printf
+	 ("/%s/%s/%s/%s", app, store, key_text (from), key_text (to));
+}
+
+static void
+release_key (GzochidDataClient *client, char *app, char *store, GBytes *key)
+{
+  gchar *release_closure_key = create_qualified_key (app, store, key);
+
+  g_hash_table_remove (client->release_closures, release_closure_key);
+  g_free (release_closure_key);
+}
+
+static void
+release_key_range (GzochidDataClient *client, char *app, char *store,
+		   GBytes *from, GBytes *to)
+{
+  gchar *release_closure_key =
+    create_qualified_key_range (app, store, from, to);
+
+  g_hash_table_remove (client->release_closures, release_closure_key);
+  g_free (release_closure_key);
 }
 
 void
@@ -196,11 +313,14 @@ gzochid_dataclient_request_value
  gpointer failure_data, gzochid_dataclient_release_callback release_callback,
  gpointer release_data)
 {
-  client->requested_values =
-    g_list_append (client->requested_values, g_bytes_ref (key));
-  
+  gchar *qualified_key = create_qualified_key (app, store, key);
+
+  client->requested_keys =
+    g_list_append (client->requested_keys, qualified_key);
+
   process_response
-    (client, success_callback, success_data, failure_callback, failure_data);
+    (client, qualified_key, success_callback, success_data, failure_callback,
+     failure_data, release_callback, release_data);
 }
 
 void
@@ -210,11 +330,15 @@ gzochid_dataclient_request_next_key
  gzochid_dataclient_failure_callback failure_callback, gpointer failure_data,
  gzochid_dataclient_release_callback release_callback, gpointer release_data)
 {
+  gchar *qualified_key_range =
+    create_qualified_key_range (app, store, key, NULL);
+  
   client->requested_keys = g_list_append
-    (client->requested_keys, key == NULL ? NULL : g_bytes_ref (key));
+    (client->requested_keys, qualified_key_range);
   
   process_response
-      (client, success_callback, success_data, failure_callback, failure_data);
+    (client, qualified_key_range, success_callback, success_data,
+     failure_callback, failure_data, release_callback, release_data);
 }
 
 void
@@ -229,12 +353,16 @@ void
 gzochid_dataclient_release_key (GzochidDataClient *client, char *app,
 				char *store, GBytes *key)
 {
+  client->released_keys = g_list_append
+    (client->released_keys, create_qualified_key (app, store, key));
 }
 
 void
 gzochid_dataclient_release_key_range (GzochidDataClient *client, char *app,
 				      char *store, GBytes *from, GBytes *to)
 {
+  client->released_keys = g_list_append
+    (client->released_keys, create_qualified_key_range (app, store, from, to));
 }
 
 struct _dataclient_storage_fixture
@@ -288,7 +416,6 @@ clear_changeset (gpointer data)
 	g_bytes_unref (change->data);
     }
   
-  
   g_array_unref (changes);
 }
 
@@ -298,11 +425,10 @@ dataclient_storage_fixture_teardown (dataclient_storage_fixture *fixture,
 {
   g_list_free_full
     (fixture->dataclient->deferred_response_closures, execute_deferred_closure);
-
-  g_list_free_full (fixture->dataclient->requested_keys, maybe_bytes_unref);
-  g_list_free_full
-    (fixture->dataclient->requested_values, (GDestroyNotify) g_bytes_unref);
+  g_list_free_full (fixture->dataclient->requested_keys, g_free);
+  g_list_free_full (fixture->dataclient->released_keys, g_free);
   g_list_free_full (fixture->dataclient->changesets, clear_changeset);
+  g_hash_table_destroy (fixture->dataclient->release_closures);
   
   g_object_unref (fixture->dataclient);
 
@@ -342,8 +468,7 @@ test_get_cached (dataclient_storage_fixture *fixture, gconstpointer user_data)
   
   fixture->iface->transaction_rollback (tx);
 
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -410,8 +535,7 @@ test_get_uncached_failure_success (dataclient_storage_fixture *fixture,
   
   fixture->iface->transaction_rollback (tx);
 
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 2);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 2);
 }
 
 static void
@@ -430,8 +554,7 @@ test_get_uncached_timeout (dataclient_storage_fixture *fixture,
   
   fixture->iface->transaction_rollback (tx);
 
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -469,8 +592,7 @@ test_get_for_update_cached (dataclient_storage_fixture *fixture,
   
   fixture->iface->transaction_rollback (tx);
 
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -511,8 +633,7 @@ test_get_for_update_cached_upgrade (dataclient_storage_fixture *fixture,
   
   fixture->iface->transaction_rollback (tx);
 
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 2);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 2);
 }
 
 static void
@@ -579,8 +700,7 @@ test_get_for_update_uncached_failure_success
   
   fixture->iface->transaction_rollback (tx);
 
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 2);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 2);
 }
 
 static void
@@ -600,9 +720,7 @@ test_get_for_update_uncached_timeout (dataclient_storage_fixture *fixture,
   
   fixture->iface->transaction_rollback (tx);
 
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
-
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -634,8 +752,7 @@ test_put_cached (dataclient_storage_fixture *fixture, gconstpointer user_data)
   free_response (response);
 
   g_assert_cmpint (g_list_length (fixture->dataclient->changesets), ==, 1);
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -672,8 +789,7 @@ test_put_cached_upgrade (dataclient_storage_fixture *fixture,
   free_response (response2);
 
   g_assert_cmpint (g_list_length (fixture->dataclient->changesets), ==, 1);
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 2);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 2);
 }
 
 static void
@@ -702,8 +818,7 @@ test_put_uncached_success (dataclient_storage_fixture *fixture,
   free_response (response);
   
   g_assert_cmpint (g_list_length (fixture->dataclient->changesets), ==, 1);
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -738,8 +853,7 @@ test_put_uncached_failure_success (dataclient_storage_fixture *fixture,
   free_response (response2);
   
   g_assert_cmpint (g_list_length (fixture->dataclient->changesets), ==, 1);
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 2);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 2);
 }
 
 static void
@@ -756,8 +870,7 @@ test_put_uncached_timeout (dataclient_storage_fixture *fixture,
   
   fixture->iface->transaction_rollback (tx);
 
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -793,8 +906,7 @@ test_delete_cached (dataclient_storage_fixture *fixture,
   free_response (response);
 
   g_assert_cmpint (g_list_length (fixture->dataclient->changesets), ==, 1);
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -834,8 +946,7 @@ test_delete_cached_upgrade (dataclient_storage_fixture *fixture,
   free_response (response2);
 
   g_assert_cmpint (g_list_length (fixture->dataclient->changesets), ==, 1);
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 2);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 2);
 }
 
 static void
@@ -865,8 +976,7 @@ test_delete_uncached_success (dataclient_storage_fixture *fixture,
   free_response (response);
   
   g_assert_cmpint (g_list_length (fixture->dataclient->changesets), ==, 1);
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -902,8 +1012,7 @@ test_delete_uncached_failure_success (dataclient_storage_fixture *fixture,
   free_response (response2);
   
   g_assert_cmpint (g_list_length (fixture->dataclient->changesets), ==, 1);
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 2);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 2);
 }
 
 static void
@@ -921,8 +1030,7 @@ test_delete_uncached_timeout (dataclient_storage_fixture *fixture,
   
   fixture->iface->transaction_rollback (tx);
 
-  g_assert_cmpint
-    (g_list_length (fixture->dataclient->requested_values), ==, 1);
+  g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
 static void
@@ -1166,6 +1274,64 @@ test_next_key_uncached_timeout (dataclient_storage_fixture *fixture,
   g_assert_cmpint (g_list_length (fixture->dataclient->requested_keys), ==, 1);
 }
 
+static void
+test_lock_release_eviction (dataclient_storage_fixture *fixture,
+			    gconstpointer user_data)
+{
+  GBytes *key_bytes = g_bytes_new_static ("foo", 4);
+  GBytes *value_bytes = g_bytes_new_static ("bar", 4);
+  dataclient_storage_response *response = create_success_response (value_bytes);
+  gzochid_storage_transaction *tx = fixture->iface->transaction_begin
+    (fixture->storage_context);
+  char *val = NULL;
+  
+  fixture->dataclient->responses = g_list_append
+    (fixture->dataclient->responses, response);
+
+  val = fixture->iface->transaction_get (tx, fixture->store, "foo", 4, NULL);  
+  release_key (fixture->dataclient, "test", "test", key_bytes);
+
+  g_assert_cmpint (g_list_length (fixture->dataclient->released_keys), ==, 0);
+
+  fixture->iface->transaction_rollback (tx);
+
+  g_assert_cmpint (g_list_length (fixture->dataclient->released_keys), ==, 1);
+
+  free (val);
+  
+  free_response (response);
+  g_bytes_unref (key_bytes);
+  g_bytes_unref (value_bytes);
+}
+
+static void
+test_range_lock_release_eviction (dataclient_storage_fixture *fixture,
+				  gconstpointer user_data)
+{
+  GBytes *key_bytes = g_bytes_new_static ("foo", 4);
+  dataclient_storage_response *response = create_success_response (key_bytes);
+  gzochid_storage_transaction *tx = fixture->iface->transaction_begin
+    (fixture->storage_context);
+  char *key = NULL;
+  
+  fixture->dataclient->responses = g_list_append
+    (fixture->dataclient->responses, response);
+
+  key = fixture->iface->transaction_first_key (tx, fixture->store, NULL);  
+  release_key_range (fixture->dataclient, "test", "test", NULL, NULL);
+  
+  g_assert_cmpint (g_list_length (fixture->dataclient->released_keys), ==, 0);
+
+  fixture->iface->transaction_rollback (tx);
+
+  g_assert_cmpint (g_list_length (fixture->dataclient->released_keys), ==, 1);
+
+  free (key);
+  
+  free_response (response);
+  g_bytes_unref (key_bytes);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -1295,5 +1461,14 @@ main (int argc, char *argv[])
      dataclient_storage_fixture, NULL, dataclient_storage_fixture_setup,
      test_next_key_uncached_timeout, dataclient_storage_fixture_teardown);
 
+  g_test_add
+    ("/storage-dataclient/lock-release/eviction", dataclient_storage_fixture,
+     NULL, dataclient_storage_fixture_setup, test_lock_release_eviction,
+     dataclient_storage_fixture_teardown);
+  g_test_add
+    ("/storage-dataclient/range-lock-release/eviction",
+     dataclient_storage_fixture, NULL, dataclient_storage_fixture_setup,
+     test_range_lock_release_eviction, dataclient_storage_fixture_teardown);
+  
   return g_test_run ();
 }

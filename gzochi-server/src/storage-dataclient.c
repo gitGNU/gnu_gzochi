@@ -177,6 +177,50 @@ struct _dataclient_range_lock_request
 
 typedef struct _dataclient_range_lock_request dataclient_range_lock_request;
 
+/*
+  Represents a key for which a release has been requested but which has not yet
+  actually been released via `gzochid_dataclient_release_key'. 
+
+  Locks on keys in this state are unavailable to transactions that aren't 
+  already using them, yet cannot safely be re-requested (via 
+  `gzochid_dataclient_request_value') until the last active user releases its 
+  reference. As such, this structure also serves as a "buffer" for requests for
+  locks on keys currently being evicted.
+*/
+
+struct _dataclient_evicted_key
+{
+  dataclient_qualified_key key; /* The key being evicted. */
+
+  /* The pending lock request, or `NULL'. */
+  
+  dataclient_lock_request *lock_request; 
+};
+
+typedef struct _dataclient_evicted_key dataclient_evicted_key;
+
+/*
+  Represents a key range for which a release has been requested but which has 
+  not yet actually been released via `gzochid_dataclient_release_key_range'. 
+
+  Locks on key ranges in this state are unavailable to transactions that aren't 
+  already using them, yet cannot safely be re-requested (via 
+  `gzochid_dataclient_request_next_key') until the last active user releases 
+  its reference. As such, this structure also serves as a "buffer" for requests
+  for locks on key ranges currently being evicted.
+*/
+
+struct _dataclient_evicted_key_range
+{
+  dataclient_qualified_key_range key_range; /* The key range being evicted. */
+
+  /* The pending range lock request, or `NULL'. */
+
+  dataclient_range_lock_request *range_lock_request;
+};
+
+typedef struct _dataclient_evicted_key_range dataclient_evicted_key_range;
+
 /* The storage environment structure for the dataclient storage engine. */
 
 struct _dataclient_environment
@@ -194,6 +238,14 @@ struct _dataclient_environment
      `gzochid_dataclient_storage_context_set_dataclient'. */
   
   GzochidDataClient *client;
+
+  GList *evicted_keys; /* List of `dataclient_evicted_key' structs. */
+
+  /* List of `dataclient_evicted_key_range' structs. */
+  
+  GList *evicted_key_ranges; 
+  
+  GMutex mutex; /* Protects the eviction lists. */
 };
 
 typedef struct _dataclient_environment dataclient_environment;
@@ -324,6 +376,21 @@ dataclient_qualified_key_equal (gconstpointer v1, gconstpointer v2)
   return strcmp (k1->store, k2->store) == 0 && g_bytes_equal (k1->key, k2->key);
 }
 
+/* Create and return a new `dataclient_qualified_key' structure with the 
+   specifed store name and key bytes. The memory used by this structure
+   should be freed via `dataclient_qualified_key_free' when no longer in use. */
+
+static dataclient_qualified_key *
+dataclient_qualified_key_new (const char *store, GBytes *key)
+{
+  dataclient_qualified_key *k = malloc (sizeof (dataclient_qualified_key));
+
+  k->store = strdup (store);
+  k->key = g_bytes_ref (key);
+  
+  return k;  
+}
+
 /* Frees the specified `dataclient_qualified_key'. Can be used as a 
    `GDestroyNotify' where appropriate. */
 
@@ -338,20 +405,6 @@ dataclient_qualified_key_free (gpointer data)
   free (key);
 }
 
-/* Create and return a new `dataclient_qualified_key' structure with the 
-   speciifed store name and key bytes. */
-
-static dataclient_qualified_key *
-dataclient_qualified_key_new (const char *store, GBytes *key)
-{
-  dataclient_qualified_key *k = malloc (sizeof (dataclient_qualified_key));
-
-  k->store = strdup (store);
-  k->key = g_bytes_ref (key);
-  
-  return k;  
-}
-
 /* Create and return a new `dataclient_qualified_key' structure with a store 
    name and key bytes equal to those of the specified qualified key. */
 
@@ -361,8 +414,22 @@ dataclient_qualified_key_copy (dataclient_qualified_key *k)
   return dataclient_qualified_key_new (k->store, k->key);
 }
 
+/* A `GCompareFunc' implementation for `dataclient_qualified_key' objects. */
+
+static gint dataclient_qualified_key_compare (gconstpointer a, gconstpointer b)
+{
+  const dataclient_qualified_key *key_a = a;
+  const dataclient_qualified_key *key_b = b;
+
+  gint ret = strcmp (key_a->store, key_b->store);
+
+  return ret == 0 ? g_bytes_compare (key_a->key, key_b->key) : ret;
+}
+
 /* Create and return a new `dataclient_qualified_key_range' structure with the 
-   speciifed store name and key range bytes. */
+   specifed store name and key range bytes. The memory used by this structure
+   should be freed via `dataclient_qualified_key_range_free' when no longer in
+   use. */
 
 static dataclient_qualified_key_range *
 dataclient_qualified_key_range_new (const char *store, GBytes *from, GBytes *to)
@@ -405,6 +472,76 @@ dataclient_qualified_key_range_copy (dataclient_qualified_key_range *k)
   return dataclient_qualified_key_range_new (k->store, k->from, k->to);
 }
 
+/* A `GCompareFunc' implementation for `dataclient_qualified_key_range' 
+   objects. */
+
+static gint dataclient_qualified_key_range_compare (gconstpointer a,
+						    gconstpointer b)
+{
+  const dataclient_qualified_key_range *key_range_a = a;
+  const dataclient_qualified_key_range *key_range_b = b;
+
+  gint ret = strcmp (key_range_a->store, key_range_b->store);
+
+  if (ret == 0)
+    ret = gzochid_util_bytes_compare_null_first
+      (key_range_a->from, key_range_b->from);
+
+  return ret == 0
+    ? gzochid_util_bytes_compare_null_last (key_range_a->to, key_range_b->to)
+    : ret;
+}
+
+/* Create and return a new `dataclient_evicted_key' structure with the specified
+   store name and key. The memory used by this structure should be freed via 
+   `dataclient_evicted_key_free' when no longer in use. */
+
+static dataclient_evicted_key *
+dataclient_evicted_key_new (const char *store, GBytes *key)
+{
+  dataclient_evicted_key *k = malloc (sizeof (dataclient_evicted_key));
+
+  k->key.store = strdup (store);
+  k->key.key = g_bytes_ref (key);
+  k->lock_request = NULL;
+
+  return k;
+}
+
+/* Frees the specified `dataclient_evicted_key'. */
+
+static void
+dataclient_evicted_key_free (dataclient_evicted_key *key)
+{
+  dataclient_qualified_key_free (&key->key);
+}
+
+/* Create and return a new `dataclient_evicted_key_range' structure with the 
+   specified store name and key. The memory used by this structure should be 
+   freed via `dataclient_evicted_key_range_free' when no longer in use. */
+
+static dataclient_evicted_key_range *
+dataclient_evicted_key_range_new (const char *store, GBytes *from, GBytes *to)
+{
+  dataclient_evicted_key_range *k =
+    malloc (sizeof (dataclient_evicted_key_range));
+
+  k->key_range.store = strdup (store);
+  k->key_range.from = from == NULL ? NULL : g_bytes_ref (from);
+  k->key_range.to = to == NULL ? NULL : g_bytes_ref (to);
+  k->range_lock_request = NULL;
+  
+  return k;
+}
+
+/* Frees the specified `dataclient_evicted_key_range'. */
+
+static void
+dataclient_evicted_key_range_free (dataclient_evicted_key_range *key_range)
+{
+  dataclient_qualified_key_range_free (&key_range->key_range);
+}
+
 /* Create and return a new point lock structure for the specified qualified key
    and with the specified access level. The memory used by this structure 
    should be freed via `free_lock' when no longer in use. */
@@ -443,6 +580,21 @@ lock_ref (dataclient_lock *lock)
   return lock;
 }
 
+/* Returns the evicted key record for the specified qualified key in the target
+   environment, or `NULL' if no such record exists. The environment's mutex 
+   must be held by the caller. */
+
+static dataclient_evicted_key *
+find_evicted_key (dataclient_environment *environment,
+		  dataclient_qualified_key *qualified_key)
+{
+  GList *evicted_key_link = g_list_find_custom
+    (environment->evicted_keys, qualified_key,
+     dataclient_qualified_key_compare);
+
+  return evicted_key_link != NULL ? evicted_key_link->data : NULL;
+}
+
 /*
   Decreases the reference count of the specified lock by one. Returns `TRUE' if
   the lock's updated reference count is reduced to zero or less, `FALSE' 
@@ -451,6 +603,9 @@ lock_ref (dataclient_lock *lock)
   Upon hitting zero, the data client for the specified environment is notified
   that the lock should be released. The lock itself is also freed, via 
   `free_lock'.
+
+  Because this function manipulates the eviction lists, the caller must hold
+  the environment's mutex.
 */
 
 static gboolean
@@ -458,11 +613,45 @@ lock_unref (dataclient_environment *environment, dataclient_lock *lock)
 {
   if (--lock->ref_count <= 0)
     {
+      dataclient_evicted_key *evicted_key =
+	find_evicted_key (environment, lock->key);
+	
       gzochid_dataclient_release_key
 	(environment->client, environment->app_name, lock->key->store,
 	 lock->key->key);
 
       free_lock (lock);
+
+      if (evicted_key != NULL)
+	{
+	  if (evicted_key->lock_request != NULL)
+	    {
+	      /* If this key was evicted and somebody tried to request it, 
+		 they're currently blocking on it being ready to submit the
+		 request to the data client. Setting its next request time to a
+		 real value will allow the request to be made. */
+	      
+	      dataclient_lock_request *lock_request =
+		evicted_key->lock_request;
+
+	      g_mutex_lock (&lock_request->mutex);
+
+	      lock_request->next_request_time = g_get_monotonic_time ();
+
+	      /* Wake up the waiter so they can actually request it. */
+	      
+	      g_cond_signal (&lock_request->cond);
+	      g_mutex_unlock (&lock_request->mutex);
+	    }
+
+	  /* Remove the key from the eviction list... */
+	  
+	  environment->evicted_keys = g_list_remove
+	    (environment->evicted_keys, evicted_key);
+	  
+	  dataclient_evicted_key_free (evicted_key); /* ...and free it. */
+	}
+
       return TRUE;
     }
   
@@ -506,6 +695,21 @@ range_lock_ref (dataclient_range_lock *range_lock)
   return range_lock;
 }
 
+/* Returns the evicted key range record for the specified qualified key range 
+   in the target environment, or `NULL' if no such record exists. The 
+   environment's mutex must be held by the caller. */
+
+static dataclient_evicted_key_range *
+find_evicted_key_range (dataclient_environment *environment,
+			dataclient_qualified_key_range *qualified_key_range)
+{
+  GList *evicted_key_range_link = g_list_find_custom
+    (environment->evicted_key_ranges, qualified_key_range,
+     dataclient_qualified_key_range_compare);
+
+  return evicted_key_range_link != NULL ? evicted_key_range_link->data : NULL;
+}
+
 /*
   Decreases the reference count of the specified range lock by one. Returns 
   `TRUE' if the range lock's updated reference count is reduced to zero or less,
@@ -514,6 +718,9 @@ range_lock_ref (dataclient_range_lock *range_lock)
   Upon hitting zero, the data client for the specified environment is notified
   that the range lock should be released. The range lock itself is also freed,
   via `free_range_lock'.
+
+  Because this function manipulates the eviction lists, the caller must hold
+  the environment's mutex.
 */
 
 static gboolean
@@ -522,12 +729,47 @@ range_lock_unref (dataclient_environment *environment,
 {
   if (--range_lock->ref_count <= 0)
     {
+      dataclient_evicted_key_range *evicted_key_range =
+	find_evicted_key_range (environment, range_lock->key_range);
+
       gzochid_dataclient_release_key_range
 	(environment->client, environment->app_name,
 	 range_lock->key_range->store, range_lock->key_range->from,
 	 range_lock->key_range->to);
 
       free_range_lock (range_lock);
+
+      if (evicted_key_range != NULL)
+	{
+	  if (evicted_key_range->range_lock_request != NULL)
+	    {
+	      /* If this key range was evicted and somebody tried to request it,
+		 they're currently blocking on it being ready to submit the
+		 request to the data client. Setting its next request time to a
+		 real value will allow the request to be made. */
+
+	      dataclient_range_lock_request *range_lock_request =
+		evicted_key_range->range_lock_request;
+
+	      g_mutex_lock (&range_lock_request->mutex);
+
+	      range_lock_request->next_request_time = g_get_monotonic_time ();
+
+	      /* Wake up the waiter so they can actually request it. */
+
+	      g_cond_signal (&range_lock_request->cond);
+	      g_mutex_unlock (&range_lock_request->mutex);
+	    }
+
+	  /* Remove the key range from the eviction list... */
+
+	  environment->evicted_key_ranges = g_list_remove
+	    (environment->evicted_key_ranges, evicted_key_range);
+
+	  /* ...and free it. */
+	  
+	  dataclient_evicted_key_range_free (evicted_key_range); 
+	}
 
       return TRUE;
     }
@@ -798,7 +1040,10 @@ lock_success_callback (GBytes *data, gpointer user_data)
   
   notify_waiters (database->read_lock_requests, callback_data->key);
   g_hash_table_remove (database->read_lock_requests, callback_data->key);
-  
+
+  /* The callback data doesn't need to be freed here; it'll be freed in the
+     release callback. */
+
   g_mutex_unlock (&database->mutex);
 }
 
@@ -851,31 +1096,71 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
       notify_waiters (database->read_lock_requests, callback_data->key);
     }
 
+  /* The release callback won't be called for this request, so free the callback
+     data here. */
+  
   callback_data_free (callback_data);
   
   g_mutex_unlock (&database->mutex);
 }
 
-/* Temporary stub implementation of a lock release callback function for point
-   locks. */
+/* The "release" callback for point locks. Removes a reference to the lock and
+   potentially adds the target key to the eviction list. */
 
 static void
 lock_release_callback (gpointer user_data)
 {
+  dataclient_lock *lock = NULL;
+  dataclient_callback_data *callback_data = user_data;
+  gzochid_storage_store *store = callback_data->store;
+  dataclient_environment *environment = store->context->environment;
+  dataclient_database *database = store->database;
+
+  /* Grab the environment's mutex before the store's mutex; important to always
+     take these in the same order. */
+  
+  g_mutex_lock (&environment->mutex);
+  g_mutex_lock (&database->mutex);
+  
+  lock = g_hash_table_lookup (database->locks, callback_data->key);
+
+  if (lock != NULL)
+    {
+      g_hash_table_remove (database->locks, callback_data->key);      
+
+      /* Are there additional references to this key? I.e., are there any 
+	 active transactions still using it? */
+      
+      if (! lock_unref (store->context->environment, lock))
+
+	/* If so, add the key to the list of in-progress evictions.  */
+	
+	environment->evicted_keys = g_list_prepend
+	  (environment->evicted_keys,
+	   dataclient_evicted_key_new (database->name, callback_data->key));
+    }
+
+  g_hash_table_remove (database->value_cache, callback_data->key);
+
+  callback_data_free (callback_data);
+
+  g_mutex_unlock (&database->mutex);
+  g_mutex_unlock (&environment->mutex);
 }
 
 /*
-  Increases the reference count of the specified lock request. 
+  Increases the reference count of the specified lock request and returns it. 
 
   For safety's sake, the mutex of the store that owns the lock request should be
   held by the caller of this function during the lookup of the request and for 
   the duration of this function.
 */
 
-static void
+static dataclient_lock_request *
 lock_request_ref (dataclient_lock_request *lock_request)
 {
   lock_request->ref_count++;
+  return lock_request;
 }
 
 /*
@@ -989,6 +1274,7 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	     char *key, size_t key_len, gboolean for_write)
 {
   dataclient_database *database = store->database;
+  dataclient_environment *environment = store->context->environment;
   dataclient_transaction *dataclient_tx = tx->txn;  
   GBytes *key_bytes = g_bytes_new (key, key_len);
 
@@ -997,8 +1283,9 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
   
   dataclient_lock *lock = g_hash_table_lookup
     (dataclient_tx->locks, &qualified_key);
+  dataclient_evicted_key *evicted_key = NULL;
   dataclient_lock_request *lock_request = NULL;
-
+  
   /* Doees the transaction already hold a matching lock? */
   
   if (lock != NULL && (!for_write || lock->for_write))
@@ -1007,6 +1294,7 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       return TRUE;
     }
 
+  g_mutex_lock (&environment->mutex);
   g_mutex_lock (&database->mutex);
 
   /* Make a synchronous attempt to seize a reference to the local cache / 
@@ -1016,37 +1304,94 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
     {
       g_bytes_unref (key_bytes);
       g_mutex_unlock (&database->mutex);
+      g_mutex_unlock (&environment->mutex);
       return TRUE;
     }
 
-  /* Is there a lock request in progress? */
-  
-  lock_request = g_hash_table_lookup
-    (for_write ? database->write_lock_requests : database->read_lock_requests,
-     key_bytes);
-  
-  if (lock_request != NULL)
-    {
-      g_mutex_lock (&lock_request->mutex);
-      lock_request_ref (lock_request);
-      g_mutex_unlock (&database->mutex);
-    }
-  else 
-    {
-      /* If not, create one. */
-      
-      lock_request = lock_request_new (database->name, key_bytes, for_write);
+  /* Is there a lock request in progress? It could be attached to a key in the
+     eviction list, so check there first. */
 
-      g_hash_table_insert
+  evicted_key = find_evicted_key (environment, &qualified_key);
+    
+  if (evicted_key != NULL)
+    {
+      if (evicted_key->lock_request == NULL)
+	{
+	  /* The key's being evicted, but no one else has requested it. Create
+	     a new lock request and add it to the eviction record and also
+	     insert it into the store's lock request table. */
+	  
+	  lock_request = lock_request_new
+	    (database->name, key_bytes, for_write);
+
+	  /* Can't be requested yet because it's in the eviction list. */
+	  
+	  lock_request->next_request_time = G_MAXINT64;
+	  
+	  evicted_key->lock_request = lock_request;
+	 
+	  g_hash_table_insert
+	    (for_write
+	     ? database->write_lock_requests
+	     : database->read_lock_requests,
+	     g_bytes_ref (key_bytes), lock_request);
+	  
+	  g_mutex_lock (&lock_request->mutex);
+	}
+      else
+	{
+	  /* The request must have already been added to the store's request
+	     table, so all we need to do here is increase its reference 
+	     count. */
+	  
+	  g_mutex_lock (&evicted_key->lock_request->mutex);
+	  lock_request = lock_request_ref (evicted_key->lock_request);
+	}
+
+      /* Once the request mutex is held it's safe to release these. */
+      
+      g_mutex_unlock (&database->mutex);
+      g_mutex_unlock (&environment->mutex);
+    }
+  else
+    {
+      /* Release the environment mutex, since we're done with the eviction
+	 list. */
+      
+      g_mutex_unlock (&environment->mutex);
+      
+      lock_request = g_hash_table_lookup
 	(for_write
 	 ? database->write_lock_requests
 	 : database->read_lock_requests,
-	 key_bytes, lock_request);
+	 key_bytes);
+
+      /* Is there a lock request in the store's request table? */
       
-      g_mutex_lock (&lock_request->mutex);
+      if (lock_request != NULL)
+	{
+	  g_mutex_lock (&lock_request->mutex);
+	  lock_request_ref (lock_request);
+	}
+      else 
+	{
+	  /* If not, create one. */
+	  
+	  lock_request = lock_request_new
+	    (database->name, key_bytes, for_write);
+
+	  g_hash_table_insert
+	    (for_write
+	     ? database->write_lock_requests
+	     : database->read_lock_requests,
+	     g_bytes_ref (key_bytes), lock_request);
+	  
+	  g_mutex_lock (&lock_request->mutex);
+	}
+
       g_mutex_unlock (&database->mutex);
     }
-
+  
   while (TRUE)
     {
       gboolean should_continue = TRUE;
@@ -1083,7 +1428,7 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 		     lock_request->key->key, lock_request->for_write,
 		     lock_success_callback, callback_data,
 		     lock_failure_callback, callback_data,
-		     lock_release_callback, NULL);
+		     lock_release_callback, callback_data);
 		  
 		  lock_request->requested = TRUE;
 		}
@@ -1121,7 +1466,11 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       if (acquired_lock || !should_continue)
 	{
 	  gboolean for_write = lock_request->for_write;
+
+	  /* Need to seize the environment's mutex because we're going to be
+	     manipulating the eviction list. */
 	  
+	  g_mutex_lock (&environment->mutex);
 	  g_mutex_lock (&database->mutex);
 	  g_mutex_unlock (&lock_request->mutex);
 
@@ -1137,10 +1486,16 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 		: database->read_lock_requests;
 
 	      g_hash_table_remove (table, key_bytes);
+
+	      evicted_key = find_evicted_key (environment, &qualified_key);
+
+	      if (evicted_key != NULL)
+		evicted_key->lock_request = NULL;
 	    }
 
 	  g_bytes_unref (key_bytes);
-	  g_mutex_unlock (&database->mutex);	  
+	  g_mutex_unlock (&database->mutex);
+	  g_mutex_unlock (&environment->mutex);
 
 	  return acquired_lock;
 	}
@@ -1198,8 +1553,6 @@ range_lock_success_callback (GBytes *key, gpointer user_data)
   gzochid_itree_remove
     (database->range_lock_requests, callback_data->key, NULL);
 
-  callback_data_free (callback_data);
-  
   g_mutex_unlock (&database->mutex);
 }
 
@@ -1244,12 +1597,89 @@ range_lock_failure_callback (struct timeval wait_time, gpointer user_data)
   callback_data_free (callback_data);
 }
 
-/* Temporary stub implementation of a lock release callback function for range
-   locks. */
+/* A `gzochid_itree_search_func' that returns `TRUE' on the first range lock it
+   finds that begins with the same key as the `from' field in the 
+   `dataclient_range_lock_search_context' struct passed via the user data 
+   pointer. */
+
+static gboolean
+find_range_lock_from (gpointer from, gpointer to, gpointer data,
+		      gpointer user_data)
+{
+  dataclient_range_lock_search_context *search_context = user_data;
+
+  if ((from == NULL && search_context->from == NULL)
+      || g_bytes_equal (from, search_context->from))
+    {
+      search_context->range_lock = data;
+      return TRUE;
+    }
+  else return FALSE;
+}
+
+/* The "release" callback for range locks. Removes a reference to the range 
+   lock and potentially adds the target key range to the eviction list. */
 
 static void
 range_lock_release_callback (gpointer user_data)
 {
+  dataclient_callback_data *callback_data = user_data;
+  gzochid_storage_store *store = callback_data->store;
+  dataclient_environment *environment = store->context->environment;
+  dataclient_database *database = store->database;
+  dataclient_range_lock_search_context search_context =
+    (dataclient_range_lock_search_context)
+    { database->name, callback_data->key, NULL, NULL };
+
+  /* Grab the environment's mutex before the store's mutex; important to always
+     take these in the same order. */
+
+  g_mutex_lock (&environment->mutex);
+  g_mutex_lock (&database->mutex);
+
+  /* This is a little hacky, but it lets us identify the actual range lock being
+     released (if any) under the assumption that in practice as a result of 
+     requesting "first key" or "next key" there can't be more than one range
+     lock with the same `from' key. */
+  
+  gzochid_itree_search_interval
+    (database->range_locks, callback_data->key, NULL, find_range_lock_from,
+     &search_context); 
+
+  if (search_context.range_lock != NULL)
+    {
+      /* We need to seize a references to the `from' key in the range (if it's 
+	 non-`NULL') because after unref'ing the lock below, its reference count
+	 will be decremented. */
+      
+      GBytes *from = search_context.range_lock->key_range->from == NULL
+	? NULL : g_bytes_ref (search_context.range_lock->key_range->from);
+
+      gzochid_itree_remove
+	(database->range_locks, from, search_context.range_lock->key_range->to);
+      
+      /* Are there additional references to this key range? I.e., are there any 
+	 active transactions still using it? */
+
+      if (! range_lock_unref
+	  (store->context->environment, search_context.range_lock))
+
+	/* If so, add the key range (or, at least, the `from' key) to the list 
+	   of in-progress evictions.  */
+
+	environment->evicted_key_ranges = g_list_prepend
+	  (environment->evicted_key_ranges,
+	   dataclient_evicted_key_range_new (database->name, from, NULL));
+
+      /* No longer needs to be kept alive here; the eviction range struct (if we
+	 created one) will take care of that. */
+      
+      if (from != NULL)
+	g_bytes_unref (from);
+    }
+  
+  g_mutex_unlock (&database->mutex);
+  g_mutex_unlock (&environment->mutex);
 }
 
 /*
@@ -1293,17 +1723,19 @@ check_and_set_range_lock (dataclient_transaction *tx,
 }
 
 /*
-  Increases the reference count of the specified range lock request. 
+  Increases the reference count of the specified range lock request and returns
+  it. 
 
   For safety's sake, the mutex of the store that owns the range lock request 
   should be held by the caller of this function during the lookup of the request
   and for the duration of this function.
 */
 
-static void
+static dataclient_range_lock_request *
 range_lock_request_ref (dataclient_range_lock_request *range_lock_request)
 {
   range_lock_request->ref_count++;
+  return range_lock_request;
 }
 
 /*
@@ -1384,6 +1816,7 @@ static gboolean
 ensure_range_lock (gzochid_storage_transaction *tx,
 		   gzochid_storage_store *store, char *key, size_t key_len)
 {
+  dataclient_environment *environment = store->context->environment;
   dataclient_database *database = store->database;
   dataclient_transaction *dataclient_tx = tx->txn;
 
@@ -1392,6 +1825,9 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 
   GBytes *key_bytes = key == NULL ? NULL : g_bytes_new (key, key_len);
 
+  dataclient_qualified_key_range qualified_key_range =
+    (dataclient_qualified_key_range) { database->name, key_bytes, NULL };
+  dataclient_evicted_key_range *evicted_key_range = NULL;
   dataclient_range_lock_request *range_lock_request = NULL;
 
   search_context.store = database->name;
@@ -1413,6 +1849,7 @@ ensure_range_lock (gzochid_storage_transaction *tx,
       return TRUE;
     }
   
+  g_mutex_lock (&environment->mutex);
   g_mutex_lock (&database->mutex);
   
   /* Make a synchronous attempt to seize a reference to the local cache / 
@@ -1424,38 +1861,92 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 	g_bytes_unref (key_bytes);
       
       g_mutex_unlock (&database->mutex);
+      g_mutex_unlock (&environment->mutex);
       return TRUE;
     }
 
-  request_search_context.store = database->name;
-  request_search_context.from = key_bytes;
-  request_search_context.to = NULL;
-  request_search_context.range_lock_request = NULL;
-
-  gzochid_itree_search
-    (database->range_lock_requests, key, find_covering_range_lock_request,
-     &request_search_context);
+  /* Is there a range lock request in progress? It could be attackedt o a key
+     range in the eviction list, so check there first. */
   
-  /* Is there a range lock request in progress? */
-
-  if (request_search_context.range_lock_request != NULL)
+  evicted_key_range = find_evicted_key_range
+    (environment, &qualified_key_range);
+    
+  if (evicted_key_range != NULL)
     {
-      g_mutex_lock (&request_search_context.range_lock_request->mutex);
-      range_lock_request_ref (request_search_context.range_lock_request);
-      g_mutex_unlock (&database->mutex);
-    }
-  else 
-    {
-      /* If not, create one. */
+      if (evicted_key_range->range_lock_request == NULL)
+	{
+	  /* The key range is being evicted, but no one else has requested it.
+	     Create a new range lock request and add it to the eviction record
+	     and also insert it into the store's range lock request tree. */
+	  
+	  range_lock_request = range_lock_request_new
+	    (database->name, key_bytes, NULL);
 
-      range_lock_request = range_lock_request_new
-	(database->name, key_bytes, NULL);
+	  /* Can't be requested yet because it's in the eviction list. */
+	  
+	  range_lock_request->next_request_time = G_MAXINT64;
+	  
+	  evicted_key_range->range_lock_request = range_lock_request;
+	 
+	  gzochid_itree_insert
+	    (database->range_lock_requests, key_bytes, NULL,
+	     range_lock_request);
 
-      gzochid_itree_insert
-	(database->range_lock_requests, key_bytes, NULL, range_lock_request);
+	  g_mutex_lock (&range_lock_request->mutex);
+	}
+      else
+	{
+	  /* The request must have already been added to the store's request
+	     tree, so all we need to do here is increase its reference count. */
+	  
+	  g_mutex_lock (&evicted_key_range->range_lock_request->mutex);
+	  range_lock_request = range_lock_request_ref
+	    (evicted_key_range->range_lock_request);
+	}
+
+      /* Once the request mutex is held it's safe to release these. */
       
-      g_mutex_lock (&range_lock_request->mutex);
       g_mutex_unlock (&database->mutex);
+      g_mutex_unlock (&environment->mutex);
+    }
+  else
+    {
+      /* Release the environment mutex, since we're done with the eviction 
+	 list. */
+      
+      g_mutex_unlock (&environment->mutex);
+      
+      request_search_context.store = database->name;
+      request_search_context.from = key_bytes;
+      request_search_context.to = NULL;
+      request_search_context.range_lock_request = NULL;
+      
+      gzochid_itree_search
+	(database->range_lock_requests, key, find_covering_range_lock_request,
+	 &request_search_context);
+  
+      /* Is there a range lock request in the store's request tree? */
+
+      if (request_search_context.range_lock_request != NULL)
+	{
+	  g_mutex_lock (&request_search_context.range_lock_request->mutex);
+	  range_lock_request_ref (request_search_context.range_lock_request);
+	  g_mutex_unlock (&database->mutex);
+	}
+      else 
+	{
+	  /* If not, create one. */
+	  
+	  range_lock_request = range_lock_request_new
+	    (database->name, key_bytes, NULL);
+	  
+	  gzochid_itree_insert
+	    (database->range_lock_requests, key_bytes, NULL,
+	     range_lock_request);
+	  
+	  g_mutex_lock (&range_lock_request->mutex);
+	  g_mutex_unlock (&database->mutex);
+	}
     }
 
   while (TRUE)
@@ -1493,7 +1984,7 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 		     range_lock_request->key_range->from,
 		     range_lock_success_callback, callback_data,
 		     range_lock_failure_callback, callback_data,
-		     range_lock_release_callback, NULL);
+		     range_lock_release_callback, callback_data);
 		  
 		  range_lock_request->requested = TRUE;
 		}
@@ -1533,7 +2024,11 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 	    ? NULL : g_bytes_ref (range_lock_request->key_range->from);
 	  GBytes *to = range_lock_request->key_range->to == NULL
 	    ? NULL : g_bytes_ref (range_lock_request->key_range->to);
+
+	  /* Need to seize the environment's mutex because we're going to be
+	     manipulating the eviction list. */
 	  
+	  g_mutex_lock (&environment->mutex);
 	  g_mutex_lock (&database->mutex);
 	  g_mutex_unlock (&range_lock_request->mutex);
 	  
@@ -1542,10 +2037,17 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 	     request. */
 
 	  if (range_lock_request_unref (range_lock_request))
-
-	    /* ...and if we were the last interested party, clean it up. */
+	    {
+	      /* ...and if we were the last interested party, clean it up. */
 	    
-	    gzochid_itree_remove (database->range_lock_requests, from, to);
+	      gzochid_itree_remove (database->range_lock_requests, from, to);
+
+	      evicted_key_range = find_evicted_key_range
+		(environment, &qualified_key_range);
+
+	      if (evicted_key_range != NULL)
+		evicted_key_range->range_lock_request = NULL;
+	    }
 
 	  if (from != NULL)
 	    g_bytes_unref (from);
@@ -1554,7 +2056,8 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 	  if (key_bytes != NULL)
 	    g_bytes_unref (key_bytes);
 	  
-	  g_mutex_unlock (&database->mutex);	  
+	  g_mutex_unlock (&database->mutex);
+	  g_mutex_unlock (&environment->mutex);
 	  return acquired_lock;
 	}
     }
@@ -1629,8 +2132,7 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
   /* The lock tables. */
 
   database->locks = g_hash_table_new_full
-    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref,
-     (GDestroyNotify) free_lock);
+    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref, NULL);
   database->range_locks = gzochid_itree_new
     (gzochid_util_bytes_compare_null_first,
      gzochid_util_bytes_compare_null_last);
