@@ -2650,10 +2650,11 @@ transaction_delete (gzochid_storage_transaction *tx,
 	  /* Enqueue the change for persistence on the meta server. */
 
 	  gzochid_data_change change;
-
+	  GBytes *key_bytes = g_bytes_new (key, key_len);
+	  
 	  change.store = strdup (database->name);
 	  change.delete = TRUE;
-	  change.key = g_bytes_new (key, key_len);
+	  change.key = g_bytes_ref (key_bytes);
 	  change.data = NULL;
 
 	  g_array_append_val (dataclient_tx->changeset, change);
@@ -2663,7 +2664,9 @@ transaction_delete (gzochid_storage_transaction *tx,
 	  
 	  dataclient_tx->deleted_keys = g_list_append
 	    (dataclient_tx->deleted_keys,
-	     create_callback_data (store, g_bytes_new (key, key_len), TRUE));
+	     create_callback_data (store, key_bytes, TRUE));
+
+	  g_bytes_unref (key_bytes);
 	}
 
       propagate_transaction_status (tx);
