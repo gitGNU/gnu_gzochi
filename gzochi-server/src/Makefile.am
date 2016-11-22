@@ -49,10 +49,11 @@ noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
 	descriptor.h durable-task.h event.h event-app.h event-meta.h \
 	fmemopen.h fsm.h game.h game-protocol.h guile.h gzochid.h httpd.h \
 	httpd-app.h httpd-meta.h io.h itree.h lifecycle.h lock.h log.h \
-	lrucache.h oids.h oids-dataclient.h oids-storage.h protocol.h queue.h \
-	reloc.h resolver.h schedule.h scheme.h scheme-task.h session.h \
-	socket.h stats.h storage.h storage-dataclient.h storage-mem.h task.h \
-	threads.h toollib.h tx.h txlog.h util.h
+	lrucache.h meta-protocol.h oids.h oids-dataclient.h oids-storage.h \
+	protocol.h queue.h reloc.h resolver.h schedule.h scheme.h \
+	scheme-task.h session.h socket.h stats.h storage.h \
+	storage-dataclient.h storage-mem.h task.h threads.h toollib.h tx.h \
+	txlog.h util.h
 
 noinst_LTLIBRARIES = libgzochid.la libgzochi-metad.la
 

@@ -37,6 +37,7 @@
 #include "event.h"
 #include "event-app.h"
 #include "httpd.h"
+#include "meta-protocol.h"
 #include "resolver.h"
 #include "socket.h"
 
@@ -678,7 +679,7 @@ handle_events (gpointer data)
 	      /* Prefix the message with its length and opcode. */
 	      
 	      login_message_bytes = format_message
-		(GZOCHID_DATA_PROTOCOL_LOGIN, login_message_payload,
+		(GZOCHID_META_PROTOCOL_LOGIN, login_message_payload,
 		 &login_message_len);
 
 	      /* Enqueue it to be sent; can't use `write_message' here because

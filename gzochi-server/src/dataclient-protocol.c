@@ -26,6 +26,7 @@
 #include "dataclient-protocol.h"
 #include "event.h"
 #include "event-app.h"
+#include "meta-protocol.h"
 #include "protocol.h"
 
 /*
@@ -71,7 +72,7 @@ read_str (const unsigned char *bytes, const size_t bytes_len, size_t *str_len)
 }
 
 /* Processes the message payload following the 
-   `GZOZCHID_DATA_PROTOCOL_LOGIN_RESPONSE' opcode. Returns `TRUE' if the 
+   `GZOZCHID_META_PROTOCOL_LOGIN_RESPONSE' opcode. Returns `TRUE' if the 
    message was successfully decoded and the data protocol version advertised by
    the meta server is supported by the client, `FALSE' otherwise. */
 
@@ -233,7 +234,7 @@ dispatch_message (GzochidDataClient *client, unsigned char *message,
   
   switch (opcode)
     {
-    case GZOCHID_DATA_PROTOCOL_LOGIN_RESPONSE:
+    case GZOCHID_META_PROTOCOL_LOGIN_RESPONSE:
       dispatch_login_response (client, payload, len);
       break;
     case GZOCHID_DATA_PROTOCOL_OIDS_RESPONSE:

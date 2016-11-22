@@ -26,6 +26,7 @@
 #include "dataserver-protocol.h"
 #include "event.h"
 #include "event-meta.h"
+#include "meta-protocol.h"
 #include "protocol.h"
 #include "socket.h"
 
@@ -138,7 +139,7 @@ read_bytes (const unsigned char *bytes, const size_t bytes_len)
   return g_bytes_new (bytes + 2, prefix);
 }
 
-/* Processes the message payload following the `GZOZCHID_DATA_PROTOCOL_LOGIN'
+/* Processes the message payload following the `GZOZCHID_META_PROTOCOL_LOGIN'
    opcode. Returns `TRUE' if the message was successfully decoded, `FALSE'
    otherwise. */
 
@@ -202,7 +203,7 @@ dispatch_login (gzochi_metad_dataserver_client *client, unsigned char *data,
       
       g_byte_array_append
 	(login_response_message,
-	 (unsigned char[]) { 0x00, 0x00, GZOCHID_DATA_PROTOCOL_LOGIN_RESPONSE,
+	 (unsigned char[]) { 0x00, 0x00, GZOCHID_META_PROTOCOL_LOGIN_RESPONSE,
 	    DATASERVER_PROTOCOL_VERSION }, 4);
 
       g_byte_array_append
@@ -594,7 +595,7 @@ dispatch_message (gzochi_metad_dataserver_client *client,
   
   switch (opcode)
     {
-    case GZOCHID_DATA_PROTOCOL_LOGIN:
+    case GZOCHID_META_PROTOCOL_LOGIN:
       dispatch_login (client, payload, len); break;
     case GZOCHID_DATA_PROTOCOL_REQUEST_OIDS:
       dispatch_request_oids (client, payload, len); break;
