@@ -225,7 +225,8 @@ gzochid_client_socket_new (GIOChannel *channel,
 			   gpointer protocol_data)
 {
   gzochid_client_socket *sock = malloc (sizeof (gzochid_client_socket));
-  
+
+  sock->server = NULL;
   sock->channel = channel;
   sock->connection_description = strdup (connection_description);
 
@@ -455,8 +456,11 @@ void
 gzochid_client_socket_write (gzochid_client_socket *sock, unsigned char *data,
 			     size_t len)
 {
+  assert (sock->server != NULL);
+  
   g_mutex_lock (&sock->sock_mutex);
   g_byte_array_append (sock->send_buffer, data, len);
+
   if (sock->write_source == NULL)
     {
       sock->write_source = g_io_create_watch (sock->channel, G_IO_OUT);
@@ -464,6 +468,7 @@ gzochid_client_socket_write (gzochid_client_socket *sock, unsigned char *data,
 	(sock->write_source, (GSourceFunc) dispatch_client_write, sock, NULL);
       g_source_attach (sock->write_source, sock->server->main_context);
     }
+
   g_mutex_unlock (&sock->sock_mutex);
 }
 
