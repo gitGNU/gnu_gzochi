@@ -263,6 +263,8 @@ metaserver_protocol_fixture_tear_down (metaserver_protocol_fixture *fixture,
   g_io_channel_unref (fixture->socket_channel);
 
   g_list_free_full (dataserver_messages, (GDestroyNotify) g_bytes_unref);
+  dataserver_messages = NULL;
+  
   dataserver_error_flag = FALSE;
 }
 
