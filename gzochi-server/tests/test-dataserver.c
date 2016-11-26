@@ -194,31 +194,6 @@ teardown_dataserver (dataserver_fixture *fixture, gconstpointer user_data)
 }
 
 static void
-test_start_simple (dataserver_fixture *fixture, gconstpointer user_data)
-{
-  char *admin_server_base_url = NULL;
-
-  g_object_get
-    (fixture->server, "admin-server-base-url", &admin_server_base_url, NULL);
-
-  g_assert_cmpstr (admin_server_base_url, ==, "");  
-  g_free (admin_server_base_url);
-}
-
-static void
-test_start_http_server_enabled (dataserver_fixture *fixture,
-				gconstpointer user_data)
-{
-  char *admin_server_base_url = NULL;
-
-  g_object_get
-    (fixture->server, "admin-server-base-url", &admin_server_base_url, NULL);
-
-  g_assert_cmpstr (admin_server_base_url, ==, "http://127.0.0.1/");  
-  g_free (admin_server_base_url);
-}
-
-static void
 test_reserve_oids (dataserver_fixture *fixture, gconstpointer user_data)
 {
   gzochid_data_reserve_oids_response *response =
@@ -651,11 +626,6 @@ main (int argc, char *argv[])
   gzochid_storage_engine_interface_mem.open = test_storage_open;
   gzochid_storage_engine_interface_mem.close_store = test_storage_close_store;
 
-  g_test_add ("/dataserver/start/simple", dataserver_fixture, NULL,
-	      setup_dataserver, test_start_simple, teardown_dataserver);
-  g_test_add ("/dataserver/start/http-server-enabled",
-	      dataserver_fixture, NULL, setup_dataserver_with_httpd,
-	      test_start_http_server_enabled, teardown_dataserver);
   g_test_add ("/dataserver/reserve-oids", dataserver_fixture, NULL,
 	      setup_dataserver, test_reserve_oids, teardown_dataserver);
   g_test_add ("/dataserver/request-value", dataserver_fixture, NULL,

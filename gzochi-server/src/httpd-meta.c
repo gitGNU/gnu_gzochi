@@ -20,12 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dataserver.h"
 #include "event.h"
 #include "event-meta.h"
 #include "httpd.h"
 #include "httpd-meta.h"
-#include "resolver.h"
 
 #define HEADER "  <head><title>gzochi-metad v" VERSION "</title></head>"
 
@@ -296,18 +294,10 @@ handle_client_event (GzochidEvent *event, gpointer user_data)
 
 void
 gzochid_httpd_meta_register_handlers (GzochidHttpServer *httpd_context,
-				      GzochidResolutionContext *res_context)
+				      gzochid_event_source *event_source)
 {
   gzochi_metad_server_state *state = gzochi_metad_server_state_new ();
-  GzochiMetadDataServer *data_server = gzochid_resolver_require_full
-    (res_context, GZOCHI_METAD_TYPE_DATA_SERVER, NULL);
-  gzochid_event_source *event_source = NULL;
   
-  g_object_get (data_server, "event-source", &event_source, NULL);
-  gzochid_event_attach (event_source, handle_client_event, state);
-  g_source_unref ((GSource *) event_source);
-
-  g_object_unref (data_server);
-  
+  gzochid_event_attach (event_source, handle_client_event, state);  
   gzochid_httpd_add_terminal (httpd_context, "/", hello_world, state);
 }

@@ -96,33 +96,15 @@ struct _GzochiMetadDataServer
   
   GzochidResolutionContext *resolution_context;
   
-  /* When the data server has been started, holds the base URL of the gzochid 
-     admin HTTP console, if available; otherwise, a heap-allocated empty 
-     string. */
-
-  char *admin_server_base_url;
-
   /* The socket server for the data server. */
   
   GzochidSocketServer *socket_server; 
 
-  /* An event source for client connect / disconnect events. */
-
-  gzochid_event_source *event_source; 
-  
   gzochid_storage_engine *storage_engine; /* The storage engine. */
 
   /* Mapping application name to `gzochi_metad_dataserver_application_store'. */
 
   GHashTable *application_stores; 
-
-  gzochid_server_socket *server_socket; /* The dataserver's server socket. */
-
-  /* The port on which the server listens. This may be zero to indicate the 
-     server should listen on any available port, and will be set to the port 
-     assigned by the operating system. */
-
-  guint port; 
 };
 
 #define STORAGE_INTERFACE(server) server->storage_engine->interface
@@ -134,9 +116,6 @@ enum gzochi_metad_data_server_properties
     PROP_CONFIGURATION = 1,
     PROP_RESOLUTION_CONTEXT,
     PROP_SOCKET_SERVER,
-    PROP_EVENT_LOOP,
-    PROP_EVENT_SOURCE,
-    PROP_ADMIN_SERVER_BASE_URL,
     N_PROPERTIES
   };
 
@@ -148,33 +127,7 @@ gzochi_metad_data_server_constructed (GObject *object)
   GzochiMetadDataServer *data_server = GZOCHI_METAD_DATA_SERVER (object);
 
   data_server->data_configuration = gzochid_configuration_extract_group
-    (data_server->configuration, "data");
-  
-  data_server->port = gzochid_config_to_int
-    (g_hash_table_lookup (data_server->data_configuration, "server.port"),
-     9001);
-}
-
-static void
-gzochi_metad_data_server_get_property (GObject *object, guint property_id,
-				       GValue *value, GParamSpec *pspec)
-{
-  GzochiMetadDataServer *data_server = GZOCHI_METAD_DATA_SERVER (object);
-
-  switch (property_id)
-    {
-    case PROP_EVENT_SOURCE:
-      g_value_set_boxed (value, data_server->event_source);
-      break;
-      
-    case PROP_ADMIN_SERVER_BASE_URL:
-      g_value_set_static_string (value, data_server->admin_server_base_url);
-      break;
-      
-    default:
-      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
-      break;
-    }
+    (data_server->configuration, "data");  
 }
 
 static void
@@ -197,15 +150,6 @@ gzochi_metad_data_server_set_property (GObject *object, guint property_id,
       self->socket_server = g_object_ref (g_value_get_object (value));
       break;
 
-    case PROP_EVENT_LOOP:
-
-      /* Don't need to store a reference to the event loop, just attach the
-	 event source to it. */
-
-      gzochid_event_source_attach
-	(g_value_get_object (value), self->event_source);
-      break;
-      
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -259,12 +203,6 @@ gzochi_metad_data_server_finalize (GObject *gobject)
 	
 	free (server->storage_engine);
     }
-
-  g_source_destroy ((GSource *) server->event_source);
-  g_source_unref ((GSource *) server->event_source);
-
-  if (server->admin_server_base_url != NULL)
-    free (server->admin_server_base_url);
 }
 
 static void
@@ -285,7 +223,6 @@ gzochi_metad_data_server_class_init (GzochiMetadDataServerClass *klass)
   object_class->constructed = gzochi_metad_data_server_constructed;
   object_class->dispose = gzochi_metad_data_server_dispose;
   object_class->finalize = gzochi_metad_data_server_finalize;
-  object_class->get_property = gzochi_metad_data_server_get_property;
   object_class->set_property = gzochi_metad_data_server_set_property;
 
   obj_properties[PROP_CONFIGURATION] = g_param_spec_object
@@ -303,19 +240,6 @@ gzochi_metad_data_server_class_init (GzochiMetadDataServerClass *klass)
      GZOCHID_TYPE_SOCKET_SERVER,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
-  obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
-    ("event-loop", "event-loop", "The global event loop",
-     GZOCHID_TYPE_EVENT_LOOP,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
-
-  obj_properties[PROP_EVENT_SOURCE] = g_param_spec_boxed
-    ("event-source", "event-source", "The data server event source",
-     G_TYPE_SOURCE, G_PARAM_READABLE);
-
-  obj_properties[PROP_ADMIN_SERVER_BASE_URL] = g_param_spec_string
-    ("admin-server-base-url", "base-url", "The admin server base URL", NULL,
-     G_PARAM_READABLE);
-  
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
 }
@@ -323,48 +247,8 @@ gzochi_metad_data_server_class_init (GzochiMetadDataServerClass *klass)
 static void
 gzochi_metad_data_server_init (GzochiMetadDataServer *self)
 {
-  self->event_source = gzochid_event_source_new ();
-  self->server_socket = gzochid_server_socket_new
-    ("Data server", gzochi_metad_dataserver_server_protocol, self);
   self->application_stores = g_hash_table_new_full
     (g_str_hash, g_str_equal, (GDestroyNotify) free, (GDestroyNotify) free);
-  self->port = 0;
-}
-
-/*
-  Set the admin server base URL; if the admin HTTP server is enabled, 
-  retrieve a handle to it and ask it what its base URL is. Otherwise, set the
-  admin server base URL to a zero-length string.
-
-  Note that the meta server's base URL is only available after it has been 
-  started. For the reason, the data server should be started after the HTTP 
-  server (if enabled). 
-*/
-
-static void
-init_admin_server_base_url (GzochiMetadDataServer *server)
-{
-  GHashTable *admin_configuration = gzochid_configuration_extract_group
-    (server->configuration, "admin");
-
-  if (gzochid_config_to_boolean
-      (g_hash_table_lookup (admin_configuration, "module.httpd.enabled"),
-       FALSE))
-    {
-      GzochidHttpServer *http_server = gzochid_resolver_require_full
-	(server->resolution_context, GZOCHID_TYPE_HTTP_SERVER, NULL);
-
-      /* Make a copy of the base URL; we're not holding a reference to the HTTP
-	 server, so it could be subsequently disposed / finalized. */
-
-      server->admin_server_base_url =
-	strdup (gzochid_http_server_get_base_url (http_server));
-
-      g_object_unref (http_server);
-    }
-  else server->admin_server_base_url = strdup ("");
-  
-  g_hash_table_destroy (admin_configuration);
 }
 
 void
@@ -399,11 +283,6 @@ FOR PRODUCTION USE.");
       self->storage_engine = calloc (1, sizeof (gzochid_storage_engine));
       self->storage_engine->interface = &gzochid_storage_engine_interface_mem;
     }
-  
-  init_admin_server_base_url (self);
-
-  gzochid_server_socket_listen
-    (self->socket_server, self->server_socket, self->port);
 }
 
 /* Switch on the specified store name to return either the oids store or the

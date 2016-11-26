@@ -18,26 +18,16 @@
 #include <assert.h>
 #include <glib.h>
 #include <gzochi-common.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "data-protocol.h"
 #include "dataserver.h"
 #include "dataserver-protocol.h"
-#include "event.h"
-#include "event-meta.h"
 #include "meta-protocol.h"
 #include "protocol.h"
 #include "socket.h"
-
-/* The version of the data protocol understood by the server. */
-
-#define DATASERVER_PROTOCOL_VERSION 0x02
-
-/* Local counter for assigning node ids. In the future, when there is more than
-   one metaserver, this will not be a reliable way to assign ids. */
-
-static volatile guint next_node_id = 0;
 
 /* Dataserver client struct. */
 
@@ -49,29 +39,28 @@ struct _gzochi_metad_dataserver_client
   gzochid_client_socket *sock; /* The client socket. */
 };
 
-static gzochid_client_socket *
-server_accept (GIOChannel *channel, const char *desc, gpointer data)
+gzochi_metad_dataserver_client *
+gzochi_metad_dataserver_client_new (GzochiMetadDataServer *dataserver,
+				    gzochid_client_socket *sock,
+				    unsigned int node_id)
 {
-  gzochi_metad_dataserver_client *client = calloc
-    (1, sizeof (gzochi_metad_dataserver_client));
-  gzochid_client_socket *sock = gzochid_client_socket_new
-    (channel, desc, gzochi_metad_dataserver_client_protocol, client);
+  gzochi_metad_dataserver_client *client = malloc
+    (sizeof (gzochi_metad_dataserver_client));
 
-  /* Assign the node id. */
-  
-  client->node_id = (guint) g_atomic_int_add (&next_node_id, 1);
-
+  client->dataserver = g_object_ref (dataserver);
   client->sock = sock;
-  client->dataserver = data;
-
-  g_message
-    ("Received connection from %s; assigning id %d", desc, client->node_id);
+  client->node_id = node_id;
   
-  return sock;
+  return client;
 }
 
-gzochid_server_protocol gzochi_metad_dataserver_server_protocol =
-  { server_accept };
+void
+gzochi_metad_dataserver_client_free (gzochi_metad_dataserver_client *client)
+{
+  g_object_unref (client->dataserver);
+  
+  free (client);
+}
 
 /*
   Returns `TRUE' if the specified buffer has a complete message that it is 
@@ -137,92 +126,6 @@ read_bytes (const unsigned char *bytes, const size_t bytes_len)
     return NULL;
 
   return g_bytes_new (bytes + 2, prefix);
-}
-
-/* Processes the message payload following the `GZOZCHID_META_PROTOCOL_LOGIN'
-   opcode. Returns `TRUE' if the message was successfully decoded, `FALSE'
-   otherwise. */
-
-static gboolean
-dispatch_login (gzochi_metad_dataserver_client *client, unsigned char *data,
-		unsigned short len)
-{
-  size_t str_len = 0;
-  unsigned char version = data[0];
-  char *client_admin_server_base_url = NULL;
-
-  if (version != DATASERVER_PROTOCOL_VERSION)
-    return FALSE;
-
-  client_admin_server_base_url = read_str (data + 1, len - 1, &str_len);
-
-  /* The admin server base URL can be empty, but not absent. */
-  
-  if (client_admin_server_base_url == NULL)
-    {
-      g_warning
-	("Received malformed 'LOGIN' message from node %d.", client->node_id);
-      return FALSE;
-    }
-  else
-    {
-      char *admin_server_base_url = NULL;
-      GByteArray *login_response_message = g_byte_array_new ();
-      
-      GzochiMetadClientEvent *event = NULL;
-      gzochid_event_source *event_source = NULL;
-      const char *conn_desc = gzochid_client_socket_get_connection_description
-	(client->sock);
-      
-      if (str_len > 1)
-	event = g_object_new
-	  (GZOCHI_METAD_TYPE_CLIENT_EVENT,
-	   "type", CLIENT_CONNECTED,
-	   "node-id", client->node_id,
-	   "connection-description", conn_desc,	 
-	   "admin-server-base-url", client_admin_server_base_url,
-	   NULL);
-      else event = g_object_new
-	     (GZOCHI_METAD_TYPE_CLIENT_EVENT,
-	      "type", CLIENT_CONNECTED,
-	      "node-id", client->node_id,
-	      "connection-description", conn_desc,	 
-	      NULL);
-      
-      g_object_get
-	(client->dataserver,
-	 "event-source", &event_source,
-	 "admin-server-base-url", &admin_server_base_url,
-	 NULL);
-      
-      gzochid_event_dispatch (event_source, GZOCHID_EVENT (event));
-      g_object_unref (event);
-       
-      /* Pad with two `NULL' bytes to leave space for the actual length to be 
-	 encoded. */
-      
-      g_byte_array_append
-	(login_response_message,
-	 (unsigned char[]) { 0x00, 0x00, GZOCHID_META_PROTOCOL_LOGIN_RESPONSE,
-	    DATASERVER_PROTOCOL_VERSION }, 4);
-
-      g_byte_array_append
-	(login_response_message, (unsigned char *) admin_server_base_url,
-	 strlen (admin_server_base_url) + 1);
-
-      gzochi_common_io_write_short
-	(login_response_message->len - 3, login_response_message->data, 0);
-
-      gzochid_client_socket_write
-	(client->sock, login_response_message->data,
-	 login_response_message->len);
-
-      g_byte_array_unref (login_response_message);
-      g_free (admin_server_base_url);
-      g_source_unref ((GSource *) event_source);
-      
-      return TRUE;
-    }  
 }
 
 /* Processes the message payload following the 
@@ -595,8 +498,6 @@ dispatch_message (gzochi_metad_dataserver_client *client,
   
   switch (opcode)
     {
-    case GZOCHID_META_PROTOCOL_LOGIN:
-      dispatch_login (client, payload, len); break;
     case GZOCHID_DATA_PROTOCOL_REQUEST_OIDS:
       dispatch_request_oids (client, payload, len); break;
     case GZOCHID_DATA_PROTOCOL_REQUEST_VALUE:
@@ -654,19 +555,6 @@ static void
 client_error (gpointer user_data)
 {
   gzochi_metad_dataserver_client *client = user_data;
-  gzochid_event_source *event_source = NULL;
-  GzochidEvent *event = GZOCHID_EVENT
-    (g_object_new (GZOCHI_METAD_TYPE_CLIENT_EVENT,
-		   "type", CLIENT_DISCONNECTED,
-		   "node-id", client->node_id,
-		   NULL));
-  
-  g_object_get (client->dataserver, "event-source", &event_source, NULL);
-  
-  gzochid_event_dispatch (event_source, event);
-  g_object_unref (event);
-  g_source_unref ((GSource *) event_source);
-  
   gzochi_metad_dataserver_release_all (client->dataserver, client->node_id);
 }
 
@@ -675,9 +563,7 @@ client_error (gpointer user_data)
 static void
 client_free (gpointer user_data)
 {
-  gzochi_metad_dataserver_client *client = user_data;
-
-  free (client);
+  gzochi_metad_dataserver_client_free (user_data);
 }
 
 gzochid_client_protocol gzochi_metad_dataserver_client_protocol =

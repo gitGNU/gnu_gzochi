@@ -18,13 +18,34 @@
 #ifndef GZOCHI_METAD_DATASERVER_PROTOCOL_H
 #define GZOCHI_METAD_DATASERVER_PROTOCOL_H
 
+#include "dataserver.h"
 #include "protocol.h"
+#include "socket.h"
 
 typedef struct _gzochi_metad_dataserver_client gzochi_metad_dataserver_client;
 
-/* A `gzochid_server_protocol' implementation for the dataserver protocol. */
+/*
+  Construct and return a new `gzochi_metad_dataserver_client' object with the
+  specified data server reference, connected client socket, and corresponding 
+  application server node id. 
 
-gzochid_server_protocol gzochi_metad_dataserver_server_protocol;
+  The memory associated with the returned pointer should be freed via 
+  `gzochi_metad_dataserver_client_free' when no longer in use. 
+*/
+
+gzochi_metad_dataserver_client *gzochi_metad_dataserver_client_new
+(GzochiMetadDataServer *, gzochid_client_socket *, unsigned int);
+
+/*
+  Releases the memory associated with the specified 
+  `gzochi_metad_dataserver_client' object. 
+
+  Note that in the course of normal operation, dataserver clients will be freed
+  automatically by the `free' callback of 
+  `gzochi_metad_dataserver_client_protocol.
+*/
+
+void gzochi_metad_dataserver_client_free (gzochi_metad_dataserver_client *);
 
 /* A `gzochid_client_protocol' implementation for the dataserver protocol. */
 

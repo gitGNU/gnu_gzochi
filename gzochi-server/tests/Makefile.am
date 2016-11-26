@@ -39,6 +39,7 @@ test_programs = \
 	test-itree \
 	test-lock-mem \
 	test-lrucache \
+	test-metaserver-protocol \
 	test-oids \
 	test-oids-dataclient \
 	test-oids-storage \
@@ -164,8 +165,6 @@ test_dataserver_protocol_SOURCES = test-dataserver-protocol.c
 test_dataserver_protocol_LDADD = \
 	$(top_builddir)/src/libgzochi_metad_la-dataserver-protocol.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
-	$(top_builddir)/src/libgzochid_la-event.o \
-	$(top_builddir)/src/libgzochi_metad_la-event-meta.o \
 	$(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
@@ -221,6 +220,18 @@ test_lock_mem_LDADD = $(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
 test_lrucache_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lrucache_SOURCES = test-lrucache.c
 test_lrucache_LDADD = $(top_builddir)/src/libgzochid_la-lrucache.o @GLIB_LIBS@
+
+test_metaserver_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
+	@GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+test_metaserver_protocol_SOURCES = test-metaserver-protocol.c
+test_metaserver_protocol_LDADD = \
+	$(top_builddir)/src/libgzochi_metad_la-metaserver-protocol.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochi_metad_la-event-meta.o \
+	$(top_builddir)/src/libgzochid_la-resolver.o \
+	$(top_builddir)/src/libgzochid_la-socket.o \
+	$(top_builddir)/src/libgzochid_la-util.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
 test_oids_CFLAGS = -I$(top_srcdir)/src @GZOCHI_COMMON_CFLAGS@ @GLIB_CFLAGS@
 test_oids_SOURCES = test-oids.c

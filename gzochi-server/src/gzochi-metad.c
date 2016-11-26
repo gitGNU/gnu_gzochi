@@ -32,6 +32,7 @@
 #include "httpd.h"
 #include "httpd-meta.h"
 #include "log.h"
+#include "metaserver-protocol.h"
 #include "resolver.h"
 #include "socket.h"
 
@@ -64,16 +65,35 @@ typedef struct _GzochiMetadRootContextClass GzochiMetadRootContextClass;
 
 struct _GzochiMetadRootContext
 {
-  GObject parent_intance;
+  GObject parent_instance;
 
+  GzochidConfiguration *configuration; /* The global configuration. */  
   GzochidHttpServer *http_server; /* The admin web console. */
+
+  /* When the data server has been started, holds the base URL of the gzochid 
+     admin HTTP console, if available; otherwise, a heap-allocated empty 
+     string. */
+
+  char *admin_server_base_url;
+  
   GzochidEventLoop *event_loop; /* The global event loop. */
+
+  /* An event source for client connect / disconnect events. */
+
+  gzochid_event_source *event_source; 
 
   /* The meta server global socket server. */
 
   GzochidSocketServer *socket_server;
-  
+
+  gzochid_server_socket *server_socket; /* The meta server's server socket. */
   GzochiMetadDataServer *data_server; /* The meta server data server. */
+
+  /* The port on which the server listens. This may be zero to indicate the 
+     server should listen on any available port, and will be set to the port 
+     assigned by the operating system. */
+  
+  int port;
 };
 
 typedef struct _GzochiMetadRootContext GzochiMetadRootContext;
@@ -89,14 +109,43 @@ G_DEFINE_TYPE (GzochiMetadRootContext, gzochi_metad_root_context,
 
 enum gzochi_metad_root_context_properties
   {
-    PROP_HTTP_SERVER = 1,
+    PROP_CONFIGURATION = 1,
+    PROP_HTTP_SERVER,
+    PROP_ADMIN_SERVER_BASE_URL,
     PROP_EVENT_LOOP,
+    PROP_EVENT_SOURCE,
     PROP_SOCKET_SERVER,
     PROP_DATA_SERVER,
     N_PROPERTIES
   };
 
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+root_context_get_property (GObject *object, guint property_id, GValue *value,
+			   GParamSpec *pspec)
+{
+  GzochiMetadRootContext *self = GZOCHI_METAD_ROOT_CONTEXT (object);
+
+  switch (property_id)
+    {
+    case PROP_ADMIN_SERVER_BASE_URL:
+      g_value_set_static_string (value, self->admin_server_base_url);
+      break;
+
+    case PROP_EVENT_SOURCE:
+      g_value_set_boxed (value, self->event_source);
+      break;
+      
+    case PROP_DATA_SERVER:
+      g_value_set_object (value, self->data_server);
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
 
 static void
 root_context_set_property (GObject *object, guint property_id,
@@ -106,6 +155,10 @@ root_context_set_property (GObject *object, guint property_id,
 
   switch (property_id)
     {
+    case PROP_CONFIGURATION:
+      self->configuration = g_object_ref (g_value_get_object (value));
+      break;
+      
     case PROP_HTTP_SERVER:
       self->http_server = g_object_ref (g_value_get_object (value));
       break;
@@ -129,20 +182,68 @@ root_context_set_property (GObject *object, guint property_id,
 }
 
 static void
+root_context_constructed (GObject *object)
+{
+  GzochiMetadRootContext *root_context = GZOCHI_METAD_ROOT_CONTEXT (object);
+  GHashTable *meta_configuration = gzochid_configuration_extract_group
+    (root_context->configuration, "meta");
+    
+  root_context->port = gzochid_config_to_int
+    (g_hash_table_lookup (meta_configuration, "server.port"), 9001);
+
+  g_hash_table_destroy (meta_configuration);
+}
+
+static void
+root_context_dispose (GObject *object)
+{
+  GzochiMetadRootContext *root_context = GZOCHI_METAD_ROOT_CONTEXT (object);
+
+  g_object_unref (root_context->configuration);
+}
+
+static void
+root_context_finalize (GObject *object)
+{
+  GzochiMetadRootContext *root_context = GZOCHI_METAD_ROOT_CONTEXT (object);
+  
+  g_source_destroy ((GSource *) root_context->event_source);
+  g_source_unref ((GSource *) root_context->event_source);
+}
+
+static void
 gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
+  object_class->constructed = root_context_constructed;
+  object_class->dispose = root_context_dispose;
+  object_class->finalize = root_context_finalize;
+  object_class->get_property = root_context_get_property;
   object_class->set_property = root_context_set_property;
+
+  obj_properties[PROP_CONFIGURATION] = g_param_spec_object
+    ("configuration", "config", "The global configuration object",
+     GZOCHID_TYPE_CONFIGURATION,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+  
   obj_properties[PROP_HTTP_SERVER] = g_param_spec_object
     ("http-server", "httpd", "The admin HTTP server", GZOCHID_TYPE_HTTP_SERVER,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
+  obj_properties[PROP_ADMIN_SERVER_BASE_URL] = g_param_spec_string
+    ("admin-server-base-url", "base-url", "The admin server base URL", NULL,
+     G_PARAM_READABLE);
+  
   obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
     ("event-loop", "event-loop", "The global event loop",
      GZOCHID_TYPE_EVENT_LOOP,
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
   
+  obj_properties[PROP_EVENT_SOURCE] = g_param_spec_boxed
+    ("event-source", "event-source", "The global event source",
+     G_TYPE_SOURCE, G_PARAM_READABLE);
+
   obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
     ("socket-server", "socket-server", "The global socket server",
      GZOCHID_TYPE_SOCKET_SERVER,
@@ -151,7 +252,7 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
   obj_properties[PROP_DATA_SERVER] = g_param_spec_object
     ("data-server", "data-server", "The data server",
      GZOCHI_METAD_TYPE_DATA_SERVER,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+     G_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
 
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
@@ -160,6 +261,10 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
 static void
 gzochi_metad_root_context_init (GzochiMetadRootContext *self)
 {
+  self->event_source = gzochid_event_source_new ();
+  self->server_socket = gzochid_server_socket_new
+    ("Meta server", gzochi_metad_metaserver_server_protocol, self);
+  self->port = 0;
 }
 
 static const struct option longopts[] =
@@ -254,8 +359,7 @@ initialize_logging (GKeyFile *key_file)
 
 static void
 initialize_httpd (GzochidHttpServer *http_server,
-		  GzochidResolutionContext *resolution_context,
-		  GKeyFile *key_file)
+		  gzochid_event_source *event_source, GKeyFile *key_file)
 {
   GHashTable *admin_config =
     gzochid_config_keyfile_extract_config (key_file, "admin");
@@ -266,7 +370,7 @@ initialize_httpd (GzochidHttpServer *http_server,
       int port = gzochid_config_to_int
 	(g_hash_table_lookup (admin_config, "module.httpd.port"), 8800);
 
-      gzochid_httpd_meta_register_handlers (http_server, resolution_context);
+      gzochid_httpd_meta_register_handlers (http_server, event_source);
       gzochid_http_server_start (http_server, port, NULL);
     }
   
@@ -351,8 +455,20 @@ main (int argc, char *argv[])
     }
 
   gzochid_event_loop_start (root_context->event_loop);
-  initialize_httpd (root_context->http_server, resolution_context, key_file);
+  initialize_httpd
+    (root_context->http_server, root_context->event_source, key_file);
+
+  if (root_context->http_server != NULL)
+    root_context->admin_server_base_url =
+      strdup (gzochid_http_server_get_base_url (root_context->http_server));
+  else root_context->admin_server_base_url = strdup ("");
+
   gzochi_metad_dataserver_start (root_context->data_server);
+  
+  gzochid_server_socket_listen
+    (root_context->socket_server, root_context->server_socket,
+     root_context->port);
+  
   g_main_loop_run (root_context->socket_server->main_loop);
   
   return 0;

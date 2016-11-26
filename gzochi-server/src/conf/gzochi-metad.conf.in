@@ -12,16 +12,19 @@
 module.httpd.enabled = true
 module.httpd.port = 8800
 
+# Global configuration for the meta server.
+
+[meta]
+
+# The port to listen on for connections to the meta server from gzochi game
+# application servers.
+
+server.port = 9001
 
 # Configuration for the "data" context, which governs the meta server's
 # data-serving functionality. 
 
 [data]
-
-# The port to listen on for connections to the data server from gzochi game
-# application servers.
-
-server.port = 9001
 
 # The root location for persistent game application data. See the manual
 # for more information.

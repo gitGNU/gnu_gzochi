@@ -1,4 +1,4 @@
-/* httpd-meta.h: Prototypes and declarations for httpd-meta.c
+/* metaserver-protocol.h: Prototypes and declarations for metaserver-protocol.c
  * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -15,26 +15,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef GZOCHID_HTTPD_META_H
-#define GZOCHID_HTTPD_META_H
+#ifndef GZOCHI_METAD_METASERVER_PROTOCOL_H
+#define GZOCHI_METAD_METASERVER_PROTOCOL_H
 
-#include "httpd.h"
-#include "event.h"
+#include "protocol.h"
 
-/*
-  Configure the specified HTTP server context with a RESTful hierarchy of 
-  handlers for providing feedback about the state of a running gzochi meta
-  server.
+typedef struct _gzochi_metad_metaserver_client gzochi_metad_metaserver_client;
 
-  The resource tree looks like:
+/* A `gzochid_server_protocol' implementation for the metaserver protocol. */
 
-  / - Server root
+gzochid_server_protocol gzochi_metad_metaserver_server_protocol;
 
-  The specified `GzochidResolutionContext' is used to resolve other parts of
-  the meta server's infrastructure. 
-*/
+/* A `gzochid_client_protocol' implementation for the metaserver protocol. */
 
-void gzochid_httpd_meta_register_handlers (GzochidHttpServer *,
-					   gzochid_event_source *);
+gzochid_client_protocol gzochi_metad_metaserver_client_protocol;
 
-#endif /* GZOCHID_HTTPD_META_H */
+#endif /* GZOCHI_METAD_METASERVER_PROTOCOL_H */
