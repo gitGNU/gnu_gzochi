@@ -484,3 +484,166 @@ gzochid_client_socket_free (gzochid_client_socket *sock)
     g_source_unref (sock->write_source);
   g_source_unref (sock->read_source);
 }
+
+/* A pair of lifecycle callbacks for a `gzochid_reconnectable_socket'. */
+
+struct _gzochid_reconnectable_socket_listener
+{
+  /* The "connected" callback. */
+
+  gzochid_reconnectable_socket_connected connected; 
+
+  gpointer connected_user_data; /* Closure data for the "conected" callback. */
+
+  /* The "connected" callback. */
+
+  gzochid_reconnectable_socket_disconnected disconnected;
+
+  /* Closure data for the "disconnected" callback. */
+
+  gpointer disconnected_user_data; 
+};
+
+typedef struct _gzochid_reconnectable_socket_listener
+gzochid_reconnectable_socket_listener;
+
+/* The reconnectable socket struct. */
+
+struct _gzochid_reconnectable_socket
+{
+  gzochid_client_socket *socket; /* The underlying connection, or `NULL'. */
+  GByteArray *outbound_messages; /* The outbound message buffer. */
+  GList *listeners; /* List of `gzochid_reconnectable_socket_listener'. */
+  
+  /* Protects the relationship between the `socket' and `outbound_messages'
+     fields. This is a recursive mutex to allow lifecycle listeners to call
+     `gzochid_reconnectable_socket_write without blocking. */
+
+  GRecMutex mutex;
+};
+
+gzochid_reconnectable_socket *
+gzochid_reconnectable_socket_new ()
+{
+  gzochid_reconnectable_socket *sock =
+    malloc (sizeof (gzochid_reconnectable_socket));
+
+  sock->socket = NULL;
+  sock->outbound_messages = g_byte_array_new ();
+  sock->listeners = NULL;
+  
+  g_rec_mutex_init (&sock->mutex);
+  
+  return sock;
+}
+
+void
+gzochid_reconnectable_socket_free (gzochid_reconnectable_socket *sock)
+{
+  g_byte_array_unref (sock->outbound_messages);
+  g_list_free_full (sock->listeners, free);
+  
+  g_rec_mutex_clear (&sock->mutex);
+  
+  free (sock);
+}
+
+void
+gzochid_reconnectable_socket_listen
+(gzochid_reconnectable_socket *sock,
+ gzochid_reconnectable_socket_connected connected, gpointer connected_user_data,
+ gzochid_reconnectable_socket_disconnected disconnected,
+ gpointer disconnected_user_data)
+{
+  gzochid_reconnectable_socket_listener *listener =
+    malloc (sizeof (gzochid_reconnectable_socket_listener));
+
+  listener->connected = connected;
+  listener->connected_user_data = connected_user_data;
+  listener->disconnected = disconnected;
+  listener->disconnected_user_data = disconnected_user_data;
+  
+  g_rec_mutex_lock (&sock->mutex);
+
+  sock->listeners = g_list_append (sock->listeners, listener);
+  
+  g_rec_mutex_unlock (&sock->mutex);
+}
+
+void
+gzochid_reconnectable_socket_write (gzochid_reconnectable_socket *sock,
+				    unsigned char *buf, size_t len)
+{
+  g_rec_mutex_lock (&sock->mutex);
+
+  if (sock->socket != NULL)
+
+    /* If the socket's connected, delegate to the regular socket API. */
+    
+    gzochid_client_socket_write (sock->socket, buf, len);
+
+  /* Otherise, enqueue it in the outbound buffer. */
+  
+  else g_byte_array_append (sock->outbound_messages, buf, len);
+  
+  g_rec_mutex_unlock (&sock->mutex);
+}
+
+void
+gzochid_reconnectable_socket_connect (gzochid_reconnectable_socket *sock,
+				      gzochid_client_socket *client_socket)
+{
+  GList *listener_ptr = NULL;
+  
+  g_rec_mutex_lock (&sock->mutex);
+
+  assert (sock->socket == NULL);
+  sock->socket = client_socket;
+
+  listener_ptr = sock->listeners;
+  
+  while (listener_ptr != NULL)
+    {
+      gzochid_reconnectable_socket_listener *listener = listener_ptr->data;
+
+      listener->connected (listener->connected_user_data);      
+      listener_ptr = listener_ptr->next;
+    }
+
+  if (sock->outbound_messages->len > 0)
+    {
+      /* Flush the outbound message buffer. */
+      
+      gzochid_client_socket_write
+	(sock->socket, sock->outbound_messages->data,
+	 sock->outbound_messages->len);
+
+      g_byte_array_remove_range
+	(sock->outbound_messages, 0, sock->outbound_messages->len);
+    }
+  
+  g_rec_mutex_unlock (&sock->mutex);
+}
+
+void
+gzochid_reconnectable_socket_disconnect (gzochid_reconnectable_socket *sock)
+{
+  GList *listener_ptr = NULL;
+
+  g_rec_mutex_lock (&sock->mutex);
+
+  assert (sock->socket != NULL);
+  sock->socket = NULL;
+
+  listener_ptr = sock->listeners;
+  
+  while (listener_ptr != NULL)
+    {
+      gzochid_reconnectable_socket_listener *listener = listener_ptr->data;
+
+      listener->disconnected (listener->disconnected_user_data);      
+      listener_ptr = listener_ptr->next;
+    }
+
+  g_rec_mutex_unlock (&sock->mutex);
+}

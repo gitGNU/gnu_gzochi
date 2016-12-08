@@ -214,6 +214,85 @@ test_socket_client_listen ()
   g_object_unref (socket_server);
 }
 
+static void
+test_reconnectable_socket_simple (test_socket_fixture *fixture,
+				  gconstpointer user_data)
+{
+  gzochid_reconnectable_socket *rsock = gzochid_reconnectable_socket_new ();
+
+  gzochid_reconnectable_socket_write (rsock, "foo", 4);
+  g_assert (!g_main_context_iteration
+	    (fixture->socket_server->main_context, FALSE));
+
+  gzochid_reconnectable_socket_connect (rsock, fixture->client_socket);
+  g_assert (g_main_context_iteration
+	    (fixture->socket_server->main_context, FALSE));
+
+  gzochid_reconnectable_socket_free (rsock);
+}
+
+struct _reconnectable_socket_callback_data
+{
+  gboolean connect_triggered;
+  gboolean disconnect_triggered;
+};
+
+typedef struct _reconnectable_socket_callback_data
+reconnectable_socket_callback_data;
+
+static void
+test_on_connect (gpointer user_data)
+{
+  reconnectable_socket_callback_data *callback_data = user_data;
+  callback_data->connect_triggered = TRUE;
+}
+
+static void
+test_on_disconnect (gpointer user_data)
+{
+  reconnectable_socket_callback_data *callback_data = user_data;
+  callback_data->disconnect_triggered = TRUE;
+}
+
+static void
+test_reconnectable_socket_on_connect (test_socket_fixture *fixture,
+				      gconstpointer user_data)
+{
+  gzochid_reconnectable_socket *rsock = gzochid_reconnectable_socket_new ();
+  reconnectable_socket_callback_data callback_data = { FALSE };
+  
+  gzochid_reconnectable_socket_listen
+    (rsock, test_on_connect, &callback_data, test_on_disconnect,
+     &callback_data);
+
+  gzochid_reconnectable_socket_connect (rsock, fixture->client_socket);
+
+  g_assert (callback_data.connect_triggered);
+  g_assert (!callback_data.disconnect_triggered);
+  
+  gzochid_reconnectable_socket_free (rsock);
+}
+
+static void
+test_reconnectable_socket_on_disconnect (test_socket_fixture *fixture,
+					 gconstpointer user_data)
+{
+  gzochid_reconnectable_socket *rsock = gzochid_reconnectable_socket_new ();
+  reconnectable_socket_callback_data callback_data = { FALSE };
+
+  gzochid_reconnectable_socket_connect (rsock, fixture->client_socket);
+  gzochid_reconnectable_socket_listen
+    (rsock, test_on_connect, &callback_data, test_on_disconnect,
+     &callback_data);
+
+  gzochid_reconnectable_socket_disconnect (rsock);
+  
+  g_assert (!callback_data.connect_triggered);
+  g_assert (callback_data.disconnect_triggered);
+
+  gzochid_reconnectable_socket_free (rsock);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -234,6 +313,19 @@ main (int argc, char *argv[])
      test_socket_fixture_set_up, test_socket_client_dispatch,
      test_socket_fixture_tear_down);
   g_test_add_func ("/socket/client/listen", test_socket_client_listen);
-    
+
+  g_test_add
+    ("/socket/reconnectable/simple", test_socket_fixture, NULL,
+     test_socket_fixture_set_up, test_reconnectable_socket_simple,
+     test_socket_fixture_tear_down);
+  g_test_add
+    ("/socket/reconnectable/on-connect", test_socket_fixture, NULL,
+     test_socket_fixture_set_up, test_reconnectable_socket_on_connect,
+     test_socket_fixture_tear_down);
+  g_test_add
+    ("/socket/reconnectable/on-disconnect", test_socket_fixture, NULL,
+     test_socket_fixture_set_up, test_reconnectable_socket_on_disconnect,
+     test_socket_fixture_tear_down);
+  
   return g_test_run ();
 }

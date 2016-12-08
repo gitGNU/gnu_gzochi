@@ -152,6 +152,92 @@ void gzochid_server_socket_free (gzochid_server_socket *);
 void gzochid_server_socket_listen
 (GzochidSocketServer *, gzochid_server_socket *, int);
 
+/*
+  The "reconnectable socket" API below provides an abstraction for buffering
+  outgoing messages on a logical connection (such as the one between the 
+  metaclient and metaserver) that may be periodically interrupted and 
+  re-established, and which is shared between several components.
+   
+  N.B. This initial implementation has some rough edges, esp. with respect to 
+  lifecycle management. Because they are not reference-counted, ownership of
+  reconnectable sockets must be explicit. Additionally, no delivery guarantees 
+  are provided with respect to buffered messages; they may be lost if they are
+  in transit during disconnection. (Note that this is true of outbound
+  `gzochid_client_socket' messages as well.)
+*/
+
+/* Typedef for reconnectable socket. */
+
+typedef struct _gzochid_reconnectable_socket gzochid_reconnectable_socket;
+
+/* Typedef for "connect" and "disconnect" event callback. */
+
+typedef void (*gzochid_reconnectable_socket_connected) (gpointer);
+typedef void (*gzochid_reconnectable_socket_disconnected) (gpointer);
+
+/* Construct and return a new reconnectable socket. The returned socket will
+   initially be in a disconnected state. The memory used by the returned socket
+   should be freed via `gzochid_reconnectable_socket_free' when no longer in 
+   use. */
+
+gzochid_reconnectable_socket *gzochid_reconnectable_socket_new ();
+
+/*
+  Frees the memory used by the specified reconnectable socket.
+  
+  This function has no effect on the `gzochid_client_socket' that the 
+  reconnectable socket may be wrapping.
+*/
+
+void gzochid_reconnectable_socket_free (gzochid_reconnectable_socket *);
+
+/* Adds the specified pair of callbacks and associated user data pointers to
+   the list of callbacks triggered on connect/disconnect. */
+
+void gzochid_reconnectable_socket_listen
+(gzochid_reconnectable_socket *,
+ gzochid_reconnectable_socket_connected, gpointer,
+ gzochid_reconnectable_socket_disconnected, gpointer);
+
+/* 
+   Puts the specified reconnectable socket into a connected state wrapping the
+   specified `gzochid_client_socket'.
+
+   Upon connect, all registered `gzochid_reconnectable_socket_connected' 
+   callbacks are first invoked (during which calls to 
+   `gzochid_reconnectable_socket_write' will not be buffered) following which 
+   the outbound message buffer is flushed.
+
+   It is a programming error to connect a reconnectable socket that is already 
+   in a connected state.
+*/
+
+void gzochid_reconnectable_socket_connect (gzochid_reconnectable_socket *,
+					   gzochid_client_socket *);
+
+/*
+  Puts the specified reconnectable socket into a disconnected state, 
+  invoking all registered `gzochid_reconnectable_socket_disconnected' callbacks
+  before returning. 
+
+  It is a programming error to disconnect a reconnectable socket that is already
+  in a disconnected state.
+*/
+
+void gzochid_reconnectable_socket_disconnect (gzochid_reconnectable_socket *);
+
+/*
+  Writes a message to the specified reconnectable socket. If the socket is
+  connected, this function delegates to a `gzochid_client_socket_write' call for
+  the wrapped socket; otherwise, the message is buffered to be sent pending a
+  call to `gzochid_reconnectable_socket_connect'.
+
+  N.B. There is no bound on the size of the outbound message buffer.
+*/
+
+void gzochid_reconnectable_socket_write (gzochid_reconnectable_socket *,
+					 unsigned char *, size_t);
+
 /* Private server socket API, visible for testing only. */
 
 /* Copies the actual socket address of the specified server socket to the 
