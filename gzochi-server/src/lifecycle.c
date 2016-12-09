@@ -136,9 +136,22 @@ initialize_data (int from_state, int to_state, gpointer user_data)
 
   if (iface == &gzochid_storage_engine_interface_dataclient)
     {
-      assert (game_context->root_context->data_client != NULL);
+      GzochidDataClient *dataclient = NULL;
+      
+      assert (game_context->root_context->meta_client != NULL);
+
+      /* Grab the metaclient's managed data client to inject it into storage
+	 context. */
+      
+      g_object_get
+	(game_context->root_context->meta_client,
+	 "data-client", &dataclient,
+	 NULL);
+      
       gzochid_dataclient_storage_context_set_dataclient
-	(storage_context, game_context->root_context->data_client);
+	(storage_context, dataclient);
+      
+      g_object_unref (dataclient);
     }
   
   app_context->storage_context = storage_context;
@@ -153,8 +166,22 @@ initialize_data (int from_state, int to_state, gpointer user_data)
      oid allocation strategy. */
   
   if (iface == &gzochid_storage_engine_interface_dataclient)
-    app_context->oid_strategy = gzochid_dataclient_oid_strategy_new
-      (game_context->root_context->data_client, app_context->descriptor->name);
+    {
+      GzochidDataClient *dataclient = NULL;
+
+      /* Grab the metaclient's managed data client to inject into the oid
+	 strategy. */
+      
+      g_object_get
+	(game_context->root_context->meta_client,
+	 "data-client", &dataclient,
+	 NULL);
+
+      app_context->oid_strategy = gzochid_dataclient_oid_strategy_new
+	(dataclient, app_context->descriptor->name);
+
+      g_object_unref (dataclient);
+    }
   else app_context->oid_strategy = gzochid_storage_oid_strategy_new
 	 (iface, app_context->storage_context, app_context->meta);
 

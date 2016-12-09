@@ -15,10 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <arpa/inet.h>
 #include <glib.h>
 #include <glib-object.h>
-#include <netinet/in.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,41 +24,15 @@
 
 #include "config.h"
 #include "dataclient.h"
-#include "event.h"
-#include "event-app.h"
-#include "httpd.h"
 #include "oids.h"
-#include "resolver.h"
 #include "socket.h"
-
-struct _GzochidHttpServer
-{
-  GObject parent_instance;
-};
-
-G_DEFINE_TYPE (GzochidHttpServer, gzochid_http_server, G_TYPE_OBJECT);
-
-static void gzochid_http_server_class_init (GzochidHttpServerClass *klass)
-{
-}
-
-static void gzochid_http_server_init (GzochidHttpServer *self)
-{
-}
-
-const char *
-gzochid_http_server_get_base_url (GzochidHttpServer *server)
-{
-  return "http://127.0.0.1/";
-}
 
 struct _dataclient_fixture
 {
-  GzochidResolutionContext *resolution_context;
+  gzochid_reconnectable_socket *socket;
+  GMainLoop *main_loop;
+  GMainContext *main_context;
   GzochidDataClient *dataclient;
-
-  GzochidSocketServer *socket_server;
-  gzochid_server_socket *server_socket;
 
   GByteArray *bytes_received;
 };
@@ -79,13 +51,35 @@ struct _dataclient_data_callback_data
   GBytes *value;
   struct timeval timeout;
 
+  dataclient_fixture *fixture;
   gboolean released;
-
-  GMutex mutex;
-  GCond cond;
 };
 
 typedef struct _dataclient_data_callback_data dataclient_data_callback_data;
+
+struct _gzochid_reconnectable_socket
+{
+  dataclient_fixture *fixture;
+};
+
+gzochid_reconnectable_socket *
+gzochid_reconnectable_socket_new ()
+{
+  return calloc (1, sizeof (gzochid_reconnectable_socket));
+}
+
+void
+gzochid_reconnectable_socket_free (gzochid_reconnectable_socket *sock)
+{
+  free (sock);
+}
+
+void
+gzochid_reconnectable_socket_write (gzochid_reconnectable_socket *sock,
+				    unsigned char *buf, size_t len)
+{
+  g_byte_array_append (sock->fixture->bytes_received, buf, len);
+}
 
 static gboolean
 ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
@@ -96,51 +90,6 @@ ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
     return FALSE;
   else return log_level & G_LOG_FLAG_FATAL;
 }
-
-static gboolean
-exit_loop (gpointer user_data)
-{
-  dataclient_fixture *fixture = user_data;
-  g_main_loop_quit (fixture->socket_server->main_loop);
-  return FALSE;
-}
-
-static gboolean
-can_dispatch (const GByteArray *buffer, gpointer user_data)
-{
-  return TRUE;
-}
-
-static unsigned int
-client_dispatch (const GByteArray *buffer, gpointer user_data)
-{
-  dataclient_fixture *fixture = user_data;
-
-  g_byte_array_append (fixture->bytes_received, buffer->data, buffer->len);
-  g_main_loop_quit (fixture->socket_server->main_loop);
-  return buffer->len;
-}
-
-static void
-client_error (gpointer user_data)
-{
-}
-
-static void
-client_free (gpointer user_data)
-{
-}
-
-gzochid_client_protocol test_client_protocol =
-  { can_dispatch, client_dispatch, client_error, client_free };
-
-static gzochid_client_socket *
-server_accept (GIOChannel *channel, const char *desc, gpointer data)
-{
-  return gzochid_client_socket_new (channel, desc, test_client_protocol, data);
-}
-
-gzochid_server_protocol test_server_protocol = { server_accept };
 
 static void
 oids_callback (gzochid_data_oids_block block, gpointer user_data)
@@ -169,104 +118,36 @@ static void
 release_callback (gpointer user_data)
 {
   dataclient_data_callback_data *callback_data = user_data;
-
-  g_mutex_lock (&callback_data->mutex);
-
+  g_main_loop_quit (callback_data->fixture->main_loop);
   callback_data->released = TRUE;
-  
-  g_cond_signal (&callback_data->cond);
-  g_mutex_unlock (&callback_data->mutex);
-}
-
-static void
-dataclient_fixture_setup_inner (dataclient_fixture *fixture, GKeyFile *key_file)
-{
-  GError *err = NULL;
-  GzochidConfiguration *configuration = g_object_new
-    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
-
-  gzochid_resolver_provide
-    (fixture->resolution_context, G_OBJECT (configuration), NULL);
-
-  g_object_unref (configuration);
-  
-  fixture->dataclient = gzochid_resolver_require_full
-    (fixture->resolution_context, GZOCHID_TYPE_DATA_CLIENT, &err);
-
-  g_assert_no_error (err);
-
-  fixture->bytes_received = g_byte_array_new ();
 }
 
 static void
 dataclient_fixture_setup (dataclient_fixture *fixture, gconstpointer user_data)
 {
   GKeyFile *key_file = g_key_file_new ();
-  fixture->resolution_context = g_object_new
-    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
-
-  dataclient_fixture_setup_inner (fixture, key_file);
-  g_key_file_unref (key_file);
-}
-
-static void
-dataclient_connected_fixture_setup_inner (dataclient_fixture *fixture,
-					  GKeyFile *key_file)
-{
-  struct sockaddr_in addr;
-  size_t addrlen = sizeof (struct sockaddr_in);
-  char *server_address = NULL;
-
-  fixture->resolution_context = g_object_new
-    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
-  fixture->socket_server = gzochid_resolver_require_full
-    (fixture->resolution_context, GZOCHID_TYPE_SOCKET_SERVER, NULL);
-  fixture->server_socket = gzochid_server_socket_new
-    ("test", test_server_protocol, fixture);
-
-  gzochid_server_socket_listen
-    (fixture->socket_server, fixture->server_socket, 0);
-  _gzochid_server_socket_getsockname
-    (fixture->server_socket, (struct sockaddr *) &addr, &addrlen);
-
-  server_address = g_strdup_printf 
-    ("%d.%d.%d.%d:%d",
-     addr.sin_addr.s_addr & 0xff,
-     (addr.sin_addr.s_addr & 0xff00) >> 8,
-     (addr.sin_addr.s_addr & 0xff0000) >> 16,
-     (addr.sin_addr.s_addr & 0xff000000) >> 24, htons (addr.sin_port));
-
-  g_key_file_set_value
-    (key_file, "metaserver", "server.address", server_address);
-
-  g_free (server_address);
-  
-  dataclient_fixture_setup_inner (fixture, key_file);  
-  gzochid_dataclient_start (fixture->dataclient, NULL);
-}
-
-static void
-dataclient_connected_fixture_setup (dataclient_fixture *fixture,
-				    gconstpointer user_data)
-{
-  GKeyFile *key_file = g_key_file_new ();
+  GzochidConfiguration *configuration = g_object_new
+    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
 
   g_key_file_set_value (key_file, "metaserver", "lock.release.msec", "10");
   g_key_file_set_value (key_file, "metaserver", "rangelock.release.msec", "10");
+
+  fixture->socket = gzochid_reconnectable_socket_new ();
+  fixture->socket->fixture = fixture;
+
+  fixture->main_context = g_main_context_new ();
+  fixture->main_loop = g_main_loop_new (fixture->main_context, FALSE);
   
-  dataclient_connected_fixture_setup_inner (fixture, key_file);
-  g_key_file_unref (key_file);  
-}
+  fixture->dataclient = g_object_new
+    (GZOCHID_TYPE_DATA_CLIENT,
+     "configuration", configuration,
+     "main-context", fixture->main_context,
+     "reconnectable-socket", fixture->socket,
+     NULL);
 
-static void
-dataclient_connected_fixture_with_httpd_setup (dataclient_fixture *fixture,
-					       gconstpointer user_data)
-{
-  GKeyFile *key_file = g_key_file_new ();
+  fixture->bytes_received = g_byte_array_new ();
 
-  g_key_file_set_value (key_file, "admin", "module.httpd.enabled", "true");
-
-  dataclient_connected_fixture_setup_inner (fixture, key_file);
+  g_object_unref (configuration);  
   g_key_file_unref (key_file);
 }
 
@@ -274,65 +155,21 @@ static void
 dataclient_fixture_teardown (dataclient_fixture *fixture,
 			     gconstpointer user_data)
 {
+  gzochid_reconnectable_socket_free (fixture->socket);
+
+  g_main_context_unref (fixture->main_context);
+  g_main_loop_unref (fixture->main_loop);
+
   g_object_unref (fixture->dataclient);
-  g_object_unref (fixture->resolution_context);  
   g_byte_array_unref (fixture->bytes_received);
-}
-
-static void
-dataclient_connected_fixture_teardown (dataclient_fixture *fixture,
-				       gconstpointer user_data)
-{
-  gzochid_dataclient_stop (fixture->dataclient);
-
-  dataclient_fixture_teardown (fixture, user_data);
-}
-
-static void
-ignore_login (dataclient_fixture *fixture)
-{
-  g_timeout_add (2000, exit_loop, fixture);
-  g_main_loop_run (fixture->socket_server->main_loop);
-
-  if (fixture->bytes_received->len > 0)
-    g_byte_array_remove_range
-      (fixture->bytes_received, 0, fixture->bytes_received->len);  
-}
-
-static void
-test_login_simple (dataclient_fixture *fixture, gconstpointer user_data)
-{
-  g_timeout_add (2000, exit_loop, fixture);
-  g_main_loop_run (fixture->socket_server->main_loop);
-
-  g_assert_cmpint (fixture->bytes_received->len, ==, 5);  
-  g_assert
-    (memcmp (fixture->bytes_received->data, "\x00\x02\x10\x02\x00", 5) == 0);
-}
-
-static void
-test_login_http_server_enabled (dataclient_fixture *fixture,
-				gconstpointer user_data)
-{
-  g_timeout_add (2000, exit_loop, fixture);
-  g_main_loop_run (fixture->socket_server->main_loop);
-
-  g_assert_cmpint (fixture->bytes_received->len, ==, 22);  
-  g_assert (memcmp (fixture->bytes_received->data,
-		    "\x00\x13\x10\x02http://127.0.0.1/\x00", 22) == 0);
 }
 
 static void
 test_reserve_oids_simple (dataclient_fixture *fixture, gconstpointer user_data)
 {
-  ignore_login (fixture);
-  
   gzochid_dataclient_reserve_oids
     (fixture->dataclient, "test", oids_callback, NULL);
 
-  g_timeout_add (2000, exit_loop, fixture);
-  g_main_loop_run (fixture->socket_server->main_loop);
-  
   g_assert_cmpint (fixture->bytes_received->len, ==, 8);  
   g_assert
     (memcmp (fixture->bytes_received->data, "\x00\x05\x20test\x00", 8) == 0);
@@ -365,21 +202,32 @@ test_request_value_simple (dataclient_fixture *fixture, gconstpointer user_data)
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
   
-  ignore_login (fixture);
-
   gzochid_dataclient_request_value
     (fixture->dataclient, "test", "oids", key, TRUE,
      success_callback, NULL, failure_callback, NULL, release_callback, NULL);
 
-  g_timeout_add (2000, exit_loop, fixture);
-  g_main_loop_run (fixture->socket_server->main_loop);
-  
   g_assert_cmpint (fixture->bytes_received->len, ==, 20);  
   g_assert
     (memcmp (fixture->bytes_received->data,
 	     "\x00\x11\x21test\x00oids\x00\x01\x00\x04""foo\x00", 20) == 0);
 
   g_bytes_unref (key);
+}
+
+static gboolean
+exit_loop (gpointer user_data)
+{
+  g_main_loop_quit (user_data);
+  return FALSE;
+}
+
+static void
+set_timeout (GMainLoop *main_loop, GMainContext *main_context)
+{
+  GSource *timeout = g_timeout_source_new (1000);
+
+  g_source_set_callback (timeout, exit_loop, main_loop, NULL);
+  g_source_attach (timeout, main_context);
 }
 
 static void
@@ -390,15 +238,12 @@ test_received_value_success (dataclient_fixture *fixture,
   dataclient_data_callback_data callback_data = { 0 };
   gzochid_data_response response;
 
-  g_mutex_init (&callback_data.mutex);
-  g_cond_init (&callback_data.cond);
-  
   response.app = "test";
   response.store = "oids";
   response.success = TRUE;
   response.data = g_bytes_new_static ("bar", 4);
 
-  g_mutex_lock (&callback_data.mutex);
+  callback_data.fixture = fixture;
   
   gzochid_dataclient_request_value
     (fixture->dataclient, "test", "oids", key, FALSE,
@@ -406,23 +251,14 @@ test_received_value_success (dataclient_fixture *fixture,
      release_callback, &callback_data);
 
   gzochid_dataclient_received_value (fixture->dataclient, &response);
+  set_timeout (fixture->main_loop, fixture->main_context);
+  g_main_loop_run (fixture->main_loop);
 
   g_assert (g_bytes_equal (response.data, callback_data.value));
-
-  g_assert (g_cond_wait_until
-	    (&callback_data.cond, &callback_data.mutex,
-	     g_get_monotonic_time () + 20000));
-
-  g_mutex_unlock (&callback_data.mutex);
-
   g_assert (callback_data.released);
   
   g_bytes_unref (response.data);
-  g_bytes_unref (callback_data.value);
-
-  g_mutex_clear (&callback_data.mutex);
-  g_cond_clear (&callback_data.cond);
-  
+  g_bytes_unref (callback_data.value);  
   g_bytes_unref (key);
 }
 
@@ -487,15 +323,10 @@ test_request_next_key_simple (dataclient_fixture *fixture,
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
   
-  ignore_login (fixture);
-
   gzochid_dataclient_request_next_key
     (fixture->dataclient, "test", "names", key,
      success_callback, NULL, failure_callback, NULL, release_callback, NULL);
 
-  g_timeout_add (2000, exit_loop, fixture);
-  g_main_loop_run (fixture->socket_server->main_loop);
-  
   g_assert_cmpint (fixture->bytes_received->len, ==, 20);  
   g_assert (memcmp (fixture->bytes_received->data,
 		    "\x00\x11\x22test\x00names\x00\x00\x04""foo\x00", 20) == 0);
@@ -511,15 +342,12 @@ test_received_next_key_success (dataclient_fixture *fixture,
   dataclient_data_callback_data callback_data = { 0 };
   gzochid_data_response response;
 
-  g_mutex_init (&callback_data.mutex);
-  g_cond_init (&callback_data.cond);
-  
   response.app = "test";
   response.store = "names";
   response.success = TRUE;
   response.data = g_bytes_new_static ("bar", 4);
   
-  g_mutex_lock (&callback_data.mutex);
+  callback_data.fixture = fixture;
 
   gzochid_dataclient_request_next_key
     (fixture->dataclient, "test", "names", key,
@@ -527,23 +355,14 @@ test_received_next_key_success (dataclient_fixture *fixture,
      release_callback, &callback_data);
 
   gzochid_dataclient_received_next_key (fixture->dataclient, &response);
+  set_timeout (fixture->main_loop, fixture->main_context);
+  g_main_loop_run (fixture->main_loop);
 
-  g_assert (g_bytes_equal (response.data, callback_data.value));
-  
-  g_assert (g_cond_wait_until
-	    (&callback_data.cond, &callback_data.mutex,
-	     g_get_monotonic_time () + 20000));
-
-  g_mutex_unlock (&callback_data.mutex);
-
+  g_assert (g_bytes_equal (response.data, callback_data.value));  
   g_assert (callback_data.released);
   
   g_bytes_unref (response.data);
   g_bytes_unref (callback_data.value);
-
-  g_mutex_clear (&callback_data.mutex);
-  g_cond_clear (&callback_data.cond);
-
   g_bytes_unref (key);
 }
 
@@ -616,8 +435,6 @@ test_submit_changeset_simple (dataclient_fixture *fixture,
   GBytes *expected_outbound_message = NULL, *actual_outbound_message = NULL;
   gzochid_data_changeset *changeset = NULL;
   
-  ignore_login (fixture);
-
   obj_change1.store = strdup ("oids");
   obj_change1.key = g_bytes_new_static ("1", 2);
   obj_change1.delete = FALSE;
@@ -651,9 +468,6 @@ test_submit_changeset_simple (dataclient_fixture *fixture,
   
   gzochid_dataclient_submit_changeset (fixture->dataclient, "test", changes);
   
-  g_timeout_add (2000, exit_loop, fixture);
-  g_main_loop_run (fixture->socket_server->main_loop);
-
   expected_outbound_message = g_byte_array_free_to_bytes
     (expected_outbound_message_array);
   actual_outbound_message = g_bytes_new
@@ -683,12 +497,7 @@ test_release_key_simple (dataclient_fixture *fixture, gconstpointer user_data)
 {
   GBytes *key = g_bytes_new_static ("foo", 4);
 
-  ignore_login (fixture);
-  
   gzochid_dataclient_release_key (fixture->dataclient, "test", "oids", key);
-  
-  g_timeout_add (2000, exit_loop, fixture);
-  g_main_loop_run (fixture->socket_server->main_loop);
   
   g_assert_cmpint (fixture->bytes_received->len, ==, 19);
   g_assert (memcmp (fixture->bytes_received->data,
@@ -704,14 +513,9 @@ test_release_key_range_simple (dataclient_fixture *fixture,
   GBytes *from = g_bytes_new_static ("bar", 4);
   GBytes *to = g_bytes_new_static ("foo", 4);
 
-  ignore_login (fixture);
-  
   gzochid_dataclient_release_key_range
     (fixture->dataclient, "test", "oids", from, to);
 
-  g_timeout_add (2000, exit_loop, fixture);
-  g_main_loop_run (fixture->socket_server->main_loop);
-  
   g_assert_cmpint (fixture->bytes_received->len, ==, 25);
   g_assert (memcmp (fixture->bytes_received->data,
 		    "\x00\x16\x42test\x00oids\x00\x00\x04""bar\x00\x00\x04"
@@ -719,70 +523,6 @@ test_release_key_range_simple (dataclient_fixture *fixture,
 
   g_bytes_unref (from);
   g_bytes_unref (to);
-}
-
-struct callback_data
-{
-  GMutex mutex;
-  GCond cond;
-
-  gboolean handled;
-};
-
-static void
-disconnected_event_handler (GzochidEvent *event, gpointer user_data)
-{
-  GzochidMetaServerEvent *metaserver_event = GZOCHID_META_SERVER_EVENT (event);
-  struct callback_data *callback_data = user_data;
-  gzochid_meta_server_event_type type;
-
-  g_mutex_lock (&callback_data->mutex);
-  
-  g_object_get (metaserver_event, "type", &type, NULL);
-  g_assert_cmpint (type, ==, META_SERVER_DISCONNECTED);
-  callback_data->handled = TRUE;
-
-  g_cond_signal (&callback_data->cond);
-  g_mutex_unlock (&callback_data->mutex);
-}
-
-static void
-test_nullify_connection (dataclient_fixture *fixture, gconstpointer user_data)
-{
-  gzochid_event_source *event_source = NULL;
-  GzochidEventLoop *event_loop = gzochid_resolver_require_full
-    (fixture->resolution_context, GZOCHID_TYPE_EVENT_LOOP, NULL);
-  struct callback_data callback_data;
-
-  g_object_get (fixture->dataclient, "event-source", &event_source, NULL);
-  gzochid_event_attach
-    (event_source, disconnected_event_handler, &callback_data);
-  g_source_unref ((GSource *) event_source);
-  
-  g_mutex_init (&callback_data.mutex);
-  g_cond_init (&callback_data.cond);
-  callback_data.handled = FALSE;
-  
-  gzochid_event_loop_start (event_loop);
-
-  g_mutex_lock (&callback_data.mutex);  
-  
-  gzochid_dataclient_nullify_connection (fixture->dataclient);
-
-  g_cond_wait_until
-    (&callback_data.cond, &callback_data.mutex,
-     g_get_monotonic_time () + 100000);
-
-  g_mutex_unlock (&callback_data.mutex);
-  
-  gzochid_event_loop_stop (event_loop);
-
-  g_assert (callback_data.handled);
-
-  g_mutex_clear (&callback_data.mutex);
-  g_cond_clear (&callback_data.cond);
-  
-  g_object_unref (event_loop);
 }
 
 int
@@ -797,18 +537,9 @@ main (int argc, char *argv[])
   g_test_init (&argc, &argv, NULL);
 
   g_test_add
-    ("/dataclient/login/simple", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_login_simple,
-     dataclient_connected_fixture_teardown);
-  g_test_add
-    ("/dataclient/login/http-server-enabled", dataclient_fixture, NULL,
-     dataclient_connected_fixture_with_httpd_setup,
-     test_login_http_server_enabled, dataclient_connected_fixture_teardown);
-  
-  g_test_add
     ("/dataclient/reserve-oids/simple", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_reserve_oids_simple,
-     dataclient_connected_fixture_teardown);
+     dataclient_fixture_setup, test_reserve_oids_simple,
+     dataclient_fixture_teardown);
   g_test_add
     ("/dataclient/received-oids/simple", dataclient_fixture, NULL,
      dataclient_fixture_setup, test_received_oids_simple,
@@ -816,13 +547,13 @@ main (int argc, char *argv[])
   
   g_test_add
     ("/dataclient/request-value/simple", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_request_value_simple,
-     dataclient_connected_fixture_teardown);
+     dataclient_fixture_setup, test_request_value_simple,
+     dataclient_fixture_teardown);
   
   g_test_add
     ("/dataclient/received-value/success", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_received_value_success,
-     dataclient_connected_fixture_teardown);
+     dataclient_fixture_setup, test_received_value_success,
+     dataclient_fixture_teardown);
   g_test_add
     ("/dataclient/received-value/failure", dataclient_fixture, NULL,
      dataclient_fixture_setup, test_received_value_failure,
@@ -834,13 +565,13 @@ main (int argc, char *argv[])
   
   g_test_add
     ("/dataclient/request-next-key/simple", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_request_next_key_simple,
-     dataclient_connected_fixture_teardown);
+     dataclient_fixture_setup, test_request_next_key_simple,
+     dataclient_fixture_teardown);
   
   g_test_add
     ("/dataclient/received-next-key/success", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_received_next_key_success,
-     dataclient_connected_fixture_teardown);
+     dataclient_fixture_setup, test_received_next_key_success,
+     dataclient_fixture_teardown);
   g_test_add
     ("/dataclient/received-next-key/failure", dataclient_fixture, NULL,
      dataclient_fixture_setup, test_received_next_key_failure,
@@ -852,23 +583,18 @@ main (int argc, char *argv[])
 
   g_test_add
     ("/dataclient/submit-changeset/simple", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_submit_changeset_simple,
-     dataclient_connected_fixture_teardown);
+     dataclient_fixture_setup, test_submit_changeset_simple,
+     dataclient_fixture_teardown);
 
   g_test_add
     ("/dataclient/release-key/simple", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_release_key_simple,
-     dataclient_connected_fixture_teardown);
+     dataclient_fixture_setup, test_release_key_simple,
+     dataclient_fixture_teardown);
 
   g_test_add
     ("/dataclient/release-key-range/simple", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_release_key_range_simple,
-     dataclient_connected_fixture_teardown);
-  
-  g_test_add
-    ("/dataclient/nullify-connection/simple", dataclient_fixture, NULL,
-     dataclient_connected_fixture_setup, test_nullify_connection,
-     dataclient_connected_fixture_teardown);
+     dataclient_fixture_setup, test_release_key_range_simple,
+     dataclient_fixture_teardown);
   
   return g_test_run ();
 }

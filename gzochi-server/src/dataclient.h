@@ -23,6 +23,7 @@
 #include <sys/time.h>
 
 #include "data-protocol.h"
+#include "socket.h"
 
 /* The core data client type definitions. */
 
@@ -50,43 +51,6 @@ GZOCHID_DATA_CLIENT (gconstpointer ptr)
 }
 
 /* End boilerplate. */
-
-enum
-  {
-    /* Indicates a failure to parse the meta server address. */
-    
-    GZOCHID_DATA_CLIENT_ERROR_ADDRESS,
-
-    /* Indicates a failure to create a socket. May indicate a resource
-       shortfall. */
-    
-    GZOCHID_DATA_CLIENT_ERROR_SOCKET, 
-
-    GZOCHID_DATA_CLIENT_ERROR_NETWORK, /* A network request failure. */    
-    GZOCHID_DATA_CLIENT_ERROR_FAILED /* Generic data client failure. */
-  };
-
-/* The data client error domain. */
-
-#define GZOCHID_DATA_CLIENT_ERROR gzochid_data_client_error_quark ()
-
-/* Starts the specified data client's connection maintenance thread and 
-   prepares it to begin servicing requests for data from the configured meta
-   server. */
-
-void gzochid_dataclient_start (GzochidDataClient *, GError **);
-
-/* Stops the specified client's connection maintenance thread, breaking the 
-   client's connection to the meta server and halting request processing. */
-
-void gzochid_dataclient_stop (GzochidDataClient *);
-
-/* Notifies the specified data client that its connection to the meta server is
-   no longer valid (because it has encountered an error, e.g.) and that it needs
-   to be re-established. Intended for use as a callback from the `error' handler
-   of the client protocol. */
-
-void gzochid_dataclient_nullify_connection (GzochidDataClient *);
 
 /* Function pointer typedef for a "success" callback to a request for a value or
    binding. The `GBytes' argument may be null if the request was successful
@@ -198,7 +162,5 @@ void gzochid_dataclient_received_value
 
 void gzochid_dataclient_received_next_key
 (GzochidDataClient *, gzochid_data_response *);
-
-GQuark gzochid_data_client_error_quark ();
 
 #endif /* GZOCHID_DATACLIENT_H */

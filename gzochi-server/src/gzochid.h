@@ -22,7 +22,7 @@
 #include <glib-object.h>
 
 #include "config.h"
-#include "dataclient.h"
+#include "metaclient.h"
 #include "event.h"
 #include "resolver.h"
 #include "socket.h"
@@ -62,10 +62,10 @@ struct _GzochidRootContext
 
   GzochidResolutionContext *resolution_context;
 
-  /* The meta server data client, if running in distributed mode; `NULL'
+  /* The meta server client, if running in distributed mode; `NULL' 
      otherwise. */
   
-  GzochidDataClient *data_client;
+  GzochidMetaClient *meta_client;
   
   /* Components that can't yet be auto-resolved. */
 

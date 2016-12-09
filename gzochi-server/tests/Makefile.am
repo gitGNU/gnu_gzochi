@@ -39,6 +39,8 @@ test_programs = \
 	test-itree \
 	test-lock-mem \
 	test-lrucache \
+	test-metaclient \
+	test-metaclient-protocol \
 	test-metaserver-protocol \
 	test-oids \
 	test-oids-dataclient \
@@ -122,10 +124,6 @@ test_dataclient_LDADD = \
 	$(top_builddir)/src/libgzochid_la-config.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
 	$(top_builddir)/src/libgzochid_la-dataclient.o \
-	$(top_builddir)/src/libgzochid_la-event.o \
-	$(top_builddir)/src/libgzochid_la-event-app.o \
-	$(top_builddir)/src/libgzochid_la-resolver.o \
-	$(top_builddir)/src/libgzochid_la-socket.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
@@ -220,6 +218,31 @@ test_lock_mem_LDADD = $(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
 test_lrucache_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
 test_lrucache_SOURCES = test-lrucache.c
 test_lrucache_LDADD = $(top_builddir)/src/libgzochid_la-lrucache.o @GLIB_LIBS@
+
+test_metaclient_CFLAGS = -I$(top_srcdir)/src \
+	@GLIB_CFLAGS@ @GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+test_metaclient_SOURCES = test-metaclient.c
+test_metaclient_LDADD = \
+	$(top_builddir)/src/libgzochid_la-config.o \
+	$(top_builddir)/src/libgzochid_la-data-protocol.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochid_la-event-app.o \
+	$(top_builddir)/src/libgzochid_la-metaclient.o \
+	$(top_builddir)/src/libgzochid_la-resolver.o \
+	$(top_builddir)/src/libgzochid_la-socket.o \
+	$(top_builddir)/src/libgzochid_la-util.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
+
+test_metaclient_protocol_CFLAGS = -I$(top_srcdir)/src \
+	@GLIB_CFLAGS@ @GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+test_metaclient_protocol_SOURCES = test-metaclient-protocol.c
+test_metaclient_protocol_LDADD = \
+	$(top_builddir)/src/libgzochid_la-data-protocol.o \
+	$(top_builddir)/src/libgzochid_la-metaclient-protocol.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
+	$(top_builddir)/src/libgzochid_la-event-app.o \
+	$(top_builddir)/src/libgzochid_la-util.o \
+	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
 test_metaserver_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
 	@GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@

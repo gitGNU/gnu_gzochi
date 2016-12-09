@@ -47,95 +47,6 @@ client_can_dispatch (const GByteArray *buffer, gpointer user_data)
     && buffer->len >= gzochi_common_io_read_short (buffer->data, 0) + 3;
 }
 
-/*
-  Finds the bounds of the `NULL'-terminated string that begins at `bytes', 
-  returning a pointer to that string and setting `str_len' appropriately.
-  Returns `NULL' if the string is not `NULL'-terminated. 
-  
-  TODO: This function duplicates a function in `data-protocol.c'. Consider 
-  making them available via a shared utility.
-*/
-
-static char *
-read_str (const unsigned char *bytes, const size_t bytes_len, size_t *str_len)
-{
-  unsigned char *end = memchr (bytes, 0, bytes_len);
-
-  if (end == NULL)
-    return NULL;
-  else
-    {
-      if (str_len != NULL)
-        *str_len = end - bytes + 1;
-      return (char *) bytes;
-    }
-}
-
-/* Processes the message payload following the 
-   `GZOZCHID_META_PROTOCOL_LOGIN_RESPONSE' opcode. Returns `TRUE' if the 
-   message was successfully decoded and the data protocol version advertised by
-   the meta server is supported by the client, `FALSE' otherwise. */
-
-static gboolean
-dispatch_login_response (GzochidDataClient *client, const unsigned char *data,
-			 unsigned short len)
-{
-  size_t url_len = 0;
-  unsigned char version = data[0];
-  char *admin_server_base_url = NULL;
-  
-  if (version != GZOCHID_DATACLIENT_PROTOCOL_VERSION)
-    return FALSE;
-
-  admin_server_base_url = read_str (data + 1, len - 1, &url_len);
-  
-  /* The admin server base URL can be empty, but not absent. */
-  
-  if (admin_server_base_url == NULL)
-    {
-      g_warning
-	("Received malformed 'LOGIN RESPONSE' message from metaserver.");
-      return FALSE;
-    }
-  else
-    {
-      GzochidMetaServerEvent *event = NULL;
-
-      gzochid_event_source *event_source = NULL;
-      char *conn_desc = NULL;
-
-      g_object_get
-	(client,
-	 "connection-description", &conn_desc,
-	 "event-source", &event_source,
-	 NULL);
-      
-      if (url_len > 0)
-	event = g_object_new
-	  (GZOCHID_TYPE_META_SERVER_EVENT,
-	   "type", META_SERVER_CONNECTED,
-	   "connection-description", conn_desc,	 
-	   "admin-server-base-url", admin_server_base_url,
-	   NULL);
-
-      /* When there's no admin console available, the base URL will be empty. */
-      
-      else event = g_object_new
-	     (GZOCHID_TYPE_META_SERVER_EVENT,
-	      "type", META_SERVER_CONNECTED,
-	      "connection-description", conn_desc,	 
-	      NULL);
-      
-      gzochid_event_dispatch (event_source, GZOCHID_EVENT (event));
-      g_object_unref (event);
-      
-      g_free (conn_desc);
-      g_source_unref ((GSource *) event_source);
-      
-      return TRUE;
-    }
-}
-
 /* Processes the message payload following the 
    `GZOZCHID_DATA_PROTOCOL_OIDS_RESPONSE' opcode. Returns `TRUE' if the 
    message was successfully decoded, `FALSE' otherwise. */
@@ -234,9 +145,6 @@ dispatch_message (GzochidDataClient *client, unsigned char *message,
   
   switch (opcode)
     {
-    case GZOCHID_META_PROTOCOL_LOGIN_RESPONSE:
-      dispatch_login_response (client, payload, len);
-      break;
     case GZOCHID_DATA_PROTOCOL_OIDS_RESPONSE:
       dispatch_oids_response (client, payload, len);
       break;      
@@ -285,13 +193,11 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
   return total;
 }
 
-/* The client error handler. Notifies the data client that its connection to the
-   meta server is no longer valid. */
+/* The client error handler. This is currently a no-op. */
 
 static void
 client_error (gpointer user_data)
 {
-  gzochid_dataclient_nullify_connection (user_data);
 }
 
 /*

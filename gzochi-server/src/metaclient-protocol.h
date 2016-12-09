@@ -1,4 +1,4 @@
-/* dataclient-protocol.h: Prototypes and declarations for dataclient-protocol.c
+/* metaclient-protocol.h: Prototypes and declarations for metaclient-protocol.c
  * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
@@ -15,13 +15,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef GZOCHID_DATACLIENT_PROTOCOL_H
-#define GZOCHID_DATACLIENT_PROTOCOL_H
+#ifndef GZOCHID_METACLIENT_PROTOCOL_H
+#define GZOCHID_METACLIENT_PROTOCOL_H
 
 #include "protocol.h"
 
-/* A `gzochid_client_protocol' implementation for the dataclient protocol. */
+/* The version of the data protocol understood by the client. */
 
-gzochid_client_protocol gzochid_dataclient_client_protocol;
+#define GZOCHID_METACLIENT_PROTOCOL_VERSION 0x02
 
-#endif /* GZOCHID_DATACLIENT_PROTOCOL_H */
+/* A `gzochid_client_protocol' implementation for the metaclient protocol. */
+
+gzochid_client_protocol gzochid_metaclient_client_protocol;
+
+#endif /* GZOCHID_METACLIENT_PROTOCOL_H */

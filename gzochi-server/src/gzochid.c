@@ -27,7 +27,7 @@
 
 #include "admin.h"
 #include "config.h"
-#include "dataclient.h"
+#include "metaclient.h"
 #include "event.h"
 #include "game.h"
 #include "guile.h"
@@ -244,16 +244,16 @@ root_context_start (GzochidRootContext *root_context)
 	(root_context->admin_context, GZOCHID_ADMIN_STATE_RUNNING);
     }
 
-  if (root_context->data_client != NULL)
+  if (root_context->meta_client != NULL)
     {
       GError *err = NULL;
       
-      gzochid_dataclient_start (root_context->data_client, &err);
+      gzochid_metaclient_start (root_context->meta_client, &err);
 
       if (err != NULL)
 	{
 	  g_critical
-	    ("Failed to start data client: %s; exiting...", err->message);
+	    ("Failed to start metaserver client: %s; exiting...", err->message);
 	  exit (EXIT_FAILURE);
 	}
     }
@@ -338,8 +338,8 @@ main (int argc, char *argv[])
 
   if (gzochid_config_to_boolean
       (g_hash_table_lookup (metaserver_config, "client.enabled"), FALSE))
-    root_context->data_client = gzochid_resolver_require_full
-      (root_context->resolution_context, GZOCHID_TYPE_DATA_CLIENT, NULL);
+    root_context->meta_client = gzochid_resolver_require_full
+      (root_context->resolution_context, GZOCHID_TYPE_META_CLIENT, NULL);
     
   if (err != NULL)
     {

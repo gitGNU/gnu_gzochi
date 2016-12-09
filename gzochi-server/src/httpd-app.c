@@ -712,15 +712,15 @@ attach_data_client_handler (GzochidResolutionContext *res_context,
 	 available. Require it and grab its event source to attach the handler
 	 for meta server events. */
       
-      GzochidDataClient *data_client = gzochid_resolver_require_full
-	(res_context, GZOCHID_TYPE_DATA_CLIENT, NULL);
+      GzochidMetaClient *meta_client = gzochid_resolver_require_full
+	(res_context, GZOCHID_TYPE_META_CLIENT, NULL);
       gzochid_event_source *event_source = NULL;
 
-      g_object_get (data_client, "event-source", &event_source, NULL);
+      g_object_get (meta_client, "event-source", &event_source, NULL);
       gzochid_event_attach (event_source, handle_metaserver_event, state);
       g_source_unref ((GSource *) event_source);
 
-      g_object_unref (data_client);
+      g_object_unref (meta_client);
     }
 
   g_hash_table_destroy (metaserver_config);
