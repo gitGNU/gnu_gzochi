@@ -42,6 +42,7 @@ test_programs = \
 	test-metaclient \
 	test-metaclient-protocol \
 	test-metaserver-protocol \
+	test-nodemap-mem \
 	test-oids \
 	test-oids-dataclient \
 	test-oids-storage \
@@ -255,6 +256,11 @@ test_metaserver_protocol_LDADD = \
 	$(top_builddir)/src/libgzochid_la-socket.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
+
+test_nodemap_mem_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_nodemap_mem_SOURCES = test-nodemap-mem.c
+test_nodemap_mem_LDADD = $(top_builddir)/src/libgzochi_metad_la-nodemap-mem.o \
+	@GLIB_LIBS@
 
 test_oids_CFLAGS = -I$(top_srcdir)/src @GZOCHI_COMMON_CFLAGS@ @GLIB_CFLAGS@
 test_oids_SOURCES = test-oids.c
