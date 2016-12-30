@@ -50,9 +50,10 @@ struct _gzochi_metad_nodemap_iface
   void (*map_session) (gzochi_metad_nodemap *, char *, guint64, int,
 		       GError **);
 
-  /* Removes the mapping for the specified session id. */
+  /* Removes the mapping for the specified session id. Signals an error if the
+     session is not currently mapped to a server. */
   
-  void (*unmap_session) (gzochi_metad_nodemap *, char *, guint64);
+  void (*unmap_session) (gzochi_metad_nodemap *, char *, guint64, GError **);
 
   /* Returns the application server node id to which the specified session is 
      currently mapped. Signals an error if the session is not currently mapped

@@ -61,7 +61,7 @@ test_nodemap_mem_unmap_simple ()
   gzochi_metad_nodemap_iface *iface = GZOCHI_METAD_NODEMAP_IFACE (nodemap);
 
   iface->map_session (nodemap, "foo", 1, 1, NULL);
-  iface->unmap_session (nodemap, "foo", 1);
+  iface->unmap_session (nodemap, "foo", 1, NULL);
   g_assert_cmpint (iface->lookup_session (nodemap, "foo", 1, &err), ==, 0);
   
   g_assert_error (err, GZOCHI_METAD_NODEMAP_ERROR,

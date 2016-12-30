@@ -180,7 +180,8 @@ map_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id,
    functional interface. */
 
 static void
-unmap_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id)
+unmap_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id,
+	       GError **err)
 {
   nodemap_qualified_key qualified_key = { app, session_id };
   gzochi_metad_nodemap_mem *nodemap_mem = (gzochi_metad_nodemap_mem *) nodemap;
@@ -204,6 +205,9 @@ unmap_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id)
 	
       g_hash_table_remove (nodemap_mem->session_to_node, &qualified_key);
     }
+  else g_set_error (err, GZOCHI_METAD_NODEMAP_ERROR,
+		    GZOCHI_METAD_NODEMAP_ERROR_NOT_MAPPED,
+		    "No mapping for session exists.");
 }
 
 /* The `lookup_session' implementation for the `gzochi_metad_nodemap_mem' 
@@ -223,10 +227,9 @@ lookup_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id,
 	(nodemap_mem->session_to_node, &qualified_key);
       ret = *ret_ptr;
     }
-  else g_set_error
-	 (err, GZOCHI_METAD_NODEMAP_ERROR,
-	  GZOCHI_METAD_NODEMAP_ERROR_NOT_MAPPED,
-	  "No mapping for session exists.");
+  else g_set_error (err, GZOCHI_METAD_NODEMAP_ERROR,
+		    GZOCHI_METAD_NODEMAP_ERROR_NOT_MAPPED,
+		    "No mapping for session exists.");
   
   return ret;
 }
