@@ -52,6 +52,7 @@ test_programs = \
 	test-scheme \
 	test-scheme-task \
 	test-session \
+	test-sessionserver \
 	test-socket \
 	test-storage-dataclient \
 	test-storage-mem \
@@ -338,6 +339,15 @@ test_session_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_session_SOURCES = test-session.c 
 test_session_LDADD = $(top_builddir)/src/libgzochid.la \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+test_sessionserver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
+	@GZOCHI_COMMON_CFLAGS@
+test_sessionserver_SOURCES = test-sessionserver.c
+test_sessionserver_LDADD = \
+	$(top_builddir)/src/libgzochi_metad_la-sessionserver.o \
+	$(top_builddir)/src/libgzochi_metad_la-nodemap-mem.o \
+	$(top_builddir)/src/libgzochid_la-resolver.o \
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_socket_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_socket_SOURCES = test-socket.c

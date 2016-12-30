@@ -137,4 +137,24 @@
 
 #define GZOCHID_DATA_PROTOCOL_NEXT_KEY_RESPONSE 0x52
 
+/* 
+  Directs the target server to disconnect the specified client session.
+   
+  `NULL'-terminated string: Name of the game application that owns the session
+  8 bytes: The big-endian encoding of the target session oid
+*/
+
+#define GZOCHID_SESSION_PROTOCOL_RELAY_DISCONNECT_TO 0x63
+
+/*
+  Relays a message to the session connected to the target server.
+  
+  `NULL'-terminated strng: Name of the game application that owns the session
+  8 bytes: The big-endian encoding of the target session oid
+  2 bytes: The big-endian encoding of the length of the key; the key bytes 
+    follow
+*/
+
+#define GZOCHID_SESSION_PROTOCOL_RELAY_MESSAGE_TO 0x65
+
 #endif /* GZOCHID_META_PROTOCOL_H */

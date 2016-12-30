@@ -52,9 +52,9 @@ noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
 	lrucache.h meta-protocol.h metaclient-protocol.h metaclient.h \
 	metaserver-protocol.h nodemap-mem.h nodemap.h oids.h oids-dataclient.h \
 	oids-storage.h protocol.h queue.h reloc.h resolver.h schedule.h \
-	scheme.h scheme-task.h session.h socket.h stats.h storage.h \
-	storage-dataclient.h storage-mem.h task.h threads.h toollib.h tx.h \
-	txlog.h util.h
+	scheme.h scheme-task.h session.h sessionserver.h socket.h stats.h \
+	storage.h storage-dataclient.h storage-mem.h task.h threads.h \
+	toollib.h tx.h txlog.h util.h
 
 noinst_LTLIBRARIES = libgzochid.la libgzochi-metad.la
 
@@ -119,7 +119,8 @@ libgzochi_metad_la_CFLAGS = @CFLAGS@ \
 libgzochi_metad_la_SOURCES = config.c data-protocol.c dataserver-protocol.c \
 	dataserver.c event.c event-meta.c httpd.c httpd-meta.c itree.c \
 	lock-mem.c log.c metaserver-protocol.c nodemap-mem.c oids.c \
-	oids-storage.c resolver.c socket.c storage.c storage-mem.c util.c
+	oids-storage.c resolver.c sessionserver.c socket.c storage.c \
+	storage-mem.c util.c
 libgzochi_metad_la_LIBADD = @GLIB_LIBS@ @GMODULE_LIBS@ @GTHREAD_LIBS@ \
 	@GOBJECT_LIBS@ @MICROHTTPD_LIBS@ @GZOCHI_COMMON_LIBS@
 
