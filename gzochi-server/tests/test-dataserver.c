@@ -26,30 +26,8 @@
 #include "data-protocol.h"
 #include "dataserver.h"
 #include "gzochid-storage.h"
-#include "httpd.h"
 #include "resolver.h"
 #include "storage-mem.h"
-
-struct _GzochidHttpServer
-{
-  GObject parent_instance;
-};
-
-G_DEFINE_TYPE (GzochidHttpServer, gzochid_http_server, G_TYPE_OBJECT);
-
-static void gzochid_http_server_class_init (GzochidHttpServerClass *klass)
-{
-}
-
-static void gzochid_http_server_init (GzochidHttpServer *self)
-{
-}
-
-const char *
-gzochid_http_server_get_base_url (GzochidHttpServer *server)
-{
-  return "http://127.0.0.1/";
-}
 
 static gzochid_storage_context *test_context = NULL;
 
@@ -141,10 +119,10 @@ put (gzochid_storage_store *store, char *key, size_t key_len, char *value,
 }
 
 static void
-setup_dataserver_inner (dataserver_fixture *fixture, gconstpointer user_data,
-			GKeyFile *key_file)
+setup_dataserver (dataserver_fixture *fixture, gconstpointer user_data)
 {
   GError *err = NULL;
+  GKeyFile *key_file = g_key_file_new ();
   GzochidConfiguration *configuration = g_object_new
     (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
   GzochidResolutionContext *resolution_context = g_object_new
@@ -163,26 +141,6 @@ setup_dataserver_inner (dataserver_fixture *fixture, gconstpointer user_data,
   g_object_unref (configuration);
   
   gzochi_metad_dataserver_start (fixture->server);
-}
-
-static void
-setup_dataserver (dataserver_fixture *fixture, gconstpointer user_data)
-{
-  GKeyFile *key_file = g_key_file_new ();
-
-  setup_dataserver_inner (fixture, user_data, key_file);
-  
-  g_key_file_unref (key_file);
-}
-
-static void
-setup_dataserver_with_httpd (dataserver_fixture *fixture,
-			     gconstpointer user_data)
-{
-  GKeyFile *key_file = g_key_file_new ();
-
-  g_key_file_set_value (key_file, "admin", "module.httpd.enabled", "true");  
-  setup_dataserver_inner (fixture, user_data, key_file);
   
   g_key_file_unref (key_file);
 }
