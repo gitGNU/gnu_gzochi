@@ -59,7 +59,7 @@ clear_activity_log ()
 
 gzochid_data_reserve_oids_response *
 gzochi_metad_dataserver_reserve_oids (GzochiMetadDataServer *dataserver,
-				      guint node_id, char *app)
+				      guint node_id, const char *app)
 {
   gzochid_data_oids_block block;
   gzochid_data_reserve_oids_response *response = NULL;
@@ -74,9 +74,9 @@ gzochi_metad_dataserver_reserve_oids (GzochiMetadDataServer *dataserver,
 
 gzochid_data_response *
 gzochi_metad_dataserver_request_value (GzochiMetadDataServer *dataserver,
-				       guint node_id, char *app, char *store,
-				       GBytes *key, gboolean for_write,
-				       GError **err)
+				       guint node_id, const char *app,
+				       const char *store, GBytes *key,
+				       gboolean for_write, GError **err)
 {
   GBytes *data = g_bytes_new_static ("foo", 4);
   gzochid_data_response *response =
@@ -88,8 +88,9 @@ gzochi_metad_dataserver_request_value (GzochiMetadDataServer *dataserver,
 
 gzochid_data_response *
 gzochi_metad_dataserver_request_next_key (GzochiMetadDataServer *dataserver,
-					  guint node_id, char *app, char *store,
-					  GBytes *key, GError **err)
+					  guint node_id, const char *app,
+					  const char *store, GBytes *key,
+					  GError **err)
 {
   GBytes *data = g_bytes_new_static ("foo1", 5);
   gzochid_data_response *response = gzochid_data_response_new
@@ -101,8 +102,8 @@ gzochi_metad_dataserver_request_next_key (GzochiMetadDataServer *dataserver,
 
 void
 gzochi_metad_dataserver_release_key (GzochiMetadDataServer *dataserver,
-				     guint node_id, char *app, char *store,
-				     GBytes *key)
+				     guint node_id, const char *app,
+				     const char *store, GBytes *key)
 {
   activity_log = g_list_append
     (activity_log, g_strdup_printf
@@ -112,8 +113,9 @@ gzochi_metad_dataserver_release_key (GzochiMetadDataServer *dataserver,
 
 void
 gzochi_metad_dataserver_release_range (GzochiMetadDataServer *dataserver,
-				       guint node_id, char *app, char *store,
-				       GBytes *from, GBytes *to)
+				       guint node_id, const char *app,
+				       const char *store, GBytes *from,
+				       GBytes *to)
 {
   activity_log = g_list_append
     (activity_log, g_strdup_printf

@@ -1,5 +1,5 @@
 /* data-protocol.c: Data structures, formats used by the gzochi meta dataserver
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,45 +23,8 @@
 
 #include "data-protocol.h"
 #include "oids.h"
+#include "protocol-common.h"
 #include "util.h"
-
-/* Finds the bounds of the `NULL'-terminated string that begins at `bytes', 
-   returning a pointer to that string and setting `str_len' appropriately.
-   Returns `NULL' if the string is not `NULL'-terminated. */
-
-static char *
-read_str (const unsigned char *bytes, const size_t bytes_len, size_t *str_len)
-{
-  unsigned char *end = memchr (bytes, 0, bytes_len);
-
-  if (end == NULL)
-    return NULL;
-  else
-    {
-      if (str_len != NULL)
-	*str_len = end - bytes + 1;
-      return (char *) bytes;
-    }
-}
-
-/* Reads the run length encoded (via a two-byte big-endian prefix) byte buffer
-   and returns it. */
-
-static GBytes *
-read_bytes (const unsigned char *bytes, const size_t bytes_len)
-{
-  short prefix = 0;
-  
-  if (bytes_len < 2)
-    return NULL;
-  
-  prefix = gzochi_common_io_read_short (bytes, 0);
-
-  if (prefix > bytes_len - 2)
-    return NULL;
-
-  return g_bytes_new (bytes + 2, prefix);
-}
 
 /* Serializes the specified byte buffer to the specified byte array, writing a
    two-byte big-endian prefix indicating the length of the buffer. */
@@ -123,7 +86,7 @@ write_timeval (const struct timeval *tv, GByteArray *arr)
 }
 
 gzochid_data_reserve_oids_response *
-gzochid_data_reserve_oids_response_new (char *app,
+gzochid_data_reserve_oids_response_new (const char *app,
 					gzochid_data_oids_block *block)
 {
   gzochid_data_reserve_oids_response *response =
@@ -193,7 +156,7 @@ gzochid_data_protocol_reserve_oids_response_read (GBytes *data)
 {
   size_t len = 0, str_len = 0, oid_len = 0;
   const unsigned char *bytes = g_bytes_get_data (data, &len);
-  char *app = read_str (bytes, len, &str_len);
+  const char *app = gzochid_protocol_read_str (bytes, len, &str_len);
   guint64 oid = 0;
   
   if (app == NULL || str_len == 0)
@@ -226,7 +189,7 @@ gzochid_data_protocol_reserve_oids_response_read (GBytes *data)
 }
 
 gzochid_data_response *
-gzochid_data_response_new (char *app, char *store, gboolean success,
+gzochid_data_response_new (const char *app, const char *store, gboolean success,
 			   GBytes *data)
 {
   gzochid_data_response *response = g_slice_alloc
@@ -287,8 +250,8 @@ gzochid_data_protocol_response_read (GBytes *data)
 {
   size_t len = 0, offset = 0, str_len = 0;
   const unsigned char *bytes = g_bytes_get_data (data, &len);
-  char *app = read_str (bytes, len, &str_len);
-  char *store = NULL;
+  const char *app = gzochid_protocol_read_str (bytes, len, &str_len);
+  const char *store = NULL;
   
   if (app == NULL || str_len == 0)
     return NULL;
@@ -296,7 +259,7 @@ gzochid_data_protocol_response_read (GBytes *data)
   len -= str_len;
   offset += str_len;
 
-  store = read_str (bytes + offset, len, &str_len);
+  store = gzochid_protocol_read_str (bytes + offset, len, &str_len);
 
   if (store == NULL || str_len == 0)
     return NULL;
@@ -309,7 +272,7 @@ gzochid_data_protocol_response_read (GBytes *data)
 
   if (bytes[offset])
     {
-      GBytes *obj_bytes = read_bytes (bytes + offset + 1, len);
+      GBytes *obj_bytes = gzochid_protocol_read_bytes (bytes + offset + 1, len);
       
       if (obj_bytes == NULL)
 	return NULL;
@@ -351,7 +314,7 @@ gzochid_data_protocol_response_read (GBytes *data)
 }
 
 gzochid_data_changeset *
-gzochid_data_changeset_new_with_free_func (char *app, GArray *changes,
+gzochid_data_changeset_new_with_free_func (const char *app, GArray *changes,
 					   GDestroyNotify free_func)
 {
   gzochid_data_changeset *changeset =
@@ -365,7 +328,7 @@ gzochid_data_changeset_new_with_free_func (char *app, GArray *changes,
 }
 
 gzochid_data_changeset *
-gzochid_data_changeset_new (char *app, GArray *changes)
+gzochid_data_changeset_new (const char *app, GArray *changes)
 {
   return gzochid_data_changeset_new_with_free_func (app, changes, NULL);
 }
@@ -423,7 +386,7 @@ change_read (const unsigned char *bytes, size_t len,
 	     gzochid_data_change *change, size_t *ret)
 {
   size_t size = 0, str_len = 0;
-  char *store = read_str (bytes, len, &str_len);
+  const char *store = gzochid_protocol_read_str (bytes, len, &str_len);
   GBytes *data = NULL;
   
   if (store == NULL || str_len <= 1)
@@ -434,7 +397,7 @@ change_read (const unsigned char *bytes, size_t len,
   len -= str_len;
   size += str_len;
 
-  change->key = read_bytes (bytes + size, len);
+  change->key = gzochid_protocol_read_bytes (bytes + size, len);
   if (change->key == NULL)
     {
       free (change->store);
@@ -455,7 +418,7 @@ change_read (const unsigned char *bytes, size_t len,
 	  size += key_size + 2;
 	  len -= key_size + 2;
 
-	  data = read_bytes (bytes + size, len);
+	  data = gzochid_protocol_read_bytes (bytes + size, len);
 
 	  if (data == NULL)
 	    {
@@ -536,7 +499,7 @@ gzochid_data_protocol_changeset_read (GBytes *data)
   GArray *changes = NULL;
   gzochid_data_changeset *changeset = NULL;
 
-  char *app = read_str (bytes, len, &offset);
+  const char *app = gzochid_protocol_read_str (bytes, len, &offset);
   
   if (app == NULL || offset == 0)
     return NULL;

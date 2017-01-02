@@ -109,7 +109,7 @@ void gzochi_metad_sessionserver_server_disconnected (GzochiMetadSessionServer *,
 */
 
 void gzochi_metad_sessionserver_session_connected (GzochiMetadSessionServer *,
-						   int, char *, guint64,
+						   int, const char *, guint64,
 						   GError **);
 
 /*
@@ -123,7 +123,7 @@ void gzochi_metad_sessionserver_session_connected (GzochiMetadSessionServer *,
 */
 
 void gzochi_metad_sessionserver_session_disconnected
-(GzochiMetadSessionServer *, char *, guint64, GError **);
+(GzochiMetadSessionServer *, const char *, guint64, GError **);
 
 /*
   Relays a "disconnect" signal to the specified client session (identified by 
@@ -135,7 +135,8 @@ void gzochi_metad_sessionserver_session_disconnected
 */
 
 void gzochi_metad_sessionserver_relay_disconnect (GzochiMetadSessionServer *,
-						  char *, guint64, GError **);
+						  const char *, guint64,
+						  GError **);
 
 /*
   Relays the specified message to the specified client session (identified by 
@@ -147,7 +148,7 @@ void gzochi_metad_sessionserver_relay_disconnect (GzochiMetadSessionServer *,
 */
 
 void gzochi_metad_sessionserver_relay_message (GzochiMetadSessionServer *,
-					       char *, guint64, GBytes *,
+					       const char *, guint64, GBytes *,
 					       GError **);
 
 #endif /* GZOCHI_METAD_SESSION_SERVER_H */

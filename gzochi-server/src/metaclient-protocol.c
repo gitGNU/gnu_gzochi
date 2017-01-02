@@ -1,5 +1,5 @@
 /* metaclient-protocol.c: Implementation of metaclient protocol.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,13 +20,14 @@
 #include <gzochi-common.h>
 #include <string.h>
 
-#include "dataclient.h"
 #include "dataclient-protocol.h"
-#include "event.h"
+#include "dataclient.h"
 #include "event-app.h"
+#include "event.h"
 #include "meta-protocol.h"
-#include "metaclient.h"
 #include "metaclient-protocol.h"
+#include "metaclient.h"
+#include "protocol-common.h"
 
 /* This protocol implementation is a "router" for segments of the meta protocol
    that correspond to more specific client components; overall connection
@@ -53,30 +54,6 @@ client_can_dispatch (const GByteArray *buffer, gpointer user_data)
     && buffer->len >= gzochi_common_io_read_short (buffer->data, 0) + 3;
 }
 
-/*
-  Finds the bounds of the `NULL'-terminated string that begins at `bytes', 
-  returning a pointer to that string and setting `str_len' appropriately.
-  Returns `NULL' if the string is not `NULL'-terminated. 
-  
-  TODO: This function duplicates a function in `data-protocol.c'. Consider 
-  making them available via a shared utility.
-*/
-
-static char *
-read_str (const unsigned char *bytes, const size_t bytes_len, size_t *str_len)
-{
-  unsigned char *end = memchr (bytes, 0, bytes_len);
-
-  if (end == NULL)
-    return NULL;
-  else
-    {
-      if (str_len != NULL)
-        *str_len = end - bytes + 1;
-      return (char *) bytes;
-    }
-}
-
 /* Processes the message payload following the 
    `GZOZCHID_META_PROTOCOL_LOGIN_RESPONSE' opcode. Returns `TRUE' if the 
    message was successfully decoded and the meta protocol version advertised by
@@ -88,12 +65,13 @@ dispatch_login_response (GzochidMetaClient *client, const unsigned char *data,
 {
   size_t url_len = 0;
   unsigned char version = data[0];
-  char *admin_server_base_url = NULL;
+  const char *admin_server_base_url = NULL;
   
   if (version != GZOCHID_METACLIENT_PROTOCOL_VERSION)
     return FALSE;
 
-  admin_server_base_url = read_str (data + 1, len - 1, &url_len);
+  admin_server_base_url =
+    gzochid_protocol_read_str (data + 1, len - 1, &url_len);
   
   /* The admin server base URL can be empty, but not absent. */
   

@@ -1,5 +1,5 @@
 /* nodemap.h: Generic interface for nodemap implementations
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -47,19 +47,21 @@ struct _gzochi_metad_nodemap_iface
   /* Map the specified session id to the specified application server node id.
      Signals an error if the session is already mapped to a server. */
   
-  void (*map_session) (gzochi_metad_nodemap *, char *, guint64, int,
+  void (*map_session) (gzochi_metad_nodemap *, const char *, guint64, int,
 		       GError **);
 
   /* Removes the mapping for the specified session id. Signals an error if the
      session is not currently mapped to a server. */
   
-  void (*unmap_session) (gzochi_metad_nodemap *, char *, guint64, GError **);
+  void (*unmap_session) (gzochi_metad_nodemap *, const char *, guint64,
+			 GError **);
 
   /* Returns the application server node id to which the specified session is 
      currently mapped. Signals an error if the session is not currently mapped
      to a server. */
   
-  int (*lookup_session) (gzochi_metad_nodemap *, char *, guint64, GError **);
+  int (*lookup_session) (gzochi_metad_nodemap *, const char *, guint64,
+			 GError **);
 
   /* Removes all client sessions mapped to the specified application server node
      id. */

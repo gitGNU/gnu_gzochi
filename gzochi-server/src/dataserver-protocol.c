@@ -1,5 +1,5 @@
 /* dataserver-protocol.c: Implementation of dataserver protocol.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,9 +23,10 @@
 #include <string.h>
 
 #include "data-protocol.h"
-#include "dataserver.h"
 #include "dataserver-protocol.h"
+#include "dataserver.h"
 #include "meta-protocol.h"
+#include "protocol-common.h"
 #include "protocol.h"
 #include "socket.h"
 
@@ -80,54 +81,6 @@ can_dispatch (const GByteArray *buffer, gpointer user_data)
     && buffer->len >= gzochi_common_io_read_short (buffer->data, 0) + 3;
 }
 
-/*
-  Finds the bounds of the `NULL'-terminated string that begins at `bytes', 
-  returning a pointer to that string and setting `str_len' appropriately.
-  Returns `NULL' if the string is not `NULL'-terminated. 
-  
-  TODO: This function duplicates a function in `data-protocol.c'. Consider 
-  making them available via a shared utility.
-*/
-
-static char *
-read_str (const unsigned char *bytes, const size_t bytes_len, size_t *str_len)
-{
-  unsigned char *end = memchr (bytes, 0, bytes_len);
-
-  if (end == NULL)
-    return NULL;
-  else
-    {
-      if (str_len != NULL)
-        *str_len = end - bytes + 1;
-      return (char *) bytes;
-    }
-}
-
-/*
-  Reads the run length encoded (via a two-byte big-endian prefix) byte buffer
-  and returns it. 
-
-  TODO: This function duplicates a function in `data-protocol.c'. Consider 
-  making them available via a shared utility.
-*/
-
-static GBytes *
-read_bytes (const unsigned char *bytes, const size_t bytes_len)
-{
-  short prefix = 0;
-  
-  if (bytes_len < 2)
-    return NULL;
-  
-  prefix = gzochi_common_io_read_short (bytes, 0);
-
-  if (prefix > bytes_len - 2)
-    return NULL;
-
-  return g_bytes_new (bytes + 2, prefix);
-}
-
 /* Processes the message payload following the 
    `GZOZCHID_DATA_PROTOCOL_REQUEST_OIDS' opcode. Returns `TRUE' if the message 
    was successfully decoded, `FALSE' otherwise. 
@@ -142,7 +95,7 @@ dispatch_request_oids (gzochi_metad_dataserver_client *client,
 		       unsigned char *data, unsigned short len)
 {
   size_t str_len = 0;
-  char *app = read_str (data, len, &str_len);
+  const char *app = gzochid_protocol_read_str (data, len, &str_len);
   gzochid_data_reserve_oids_response *response = NULL;
   GByteArray *bytes = NULL;
 
@@ -189,7 +142,8 @@ dispatch_request_value (gzochi_metad_dataserver_client *client,
 			unsigned char *data, unsigned short len)
 {
   size_t str_len = 0, offset = 0;
-  char *app = read_str (data, len, &str_len), *store = NULL;
+  const char *app = gzochid_protocol_read_str (data, len, &str_len),
+    *store = NULL;
   gboolean for_write = FALSE;
   GByteArray *bytes = NULL;
   GBytes *key = NULL;
@@ -208,7 +162,7 @@ dispatch_request_value (gzochi_metad_dataserver_client *client,
   len -= str_len;
   offset += str_len;
 
-  store = read_str (data + offset, len, &str_len);
+  store = gzochid_protocol_read_str (data + offset, len, &str_len);
 
   if (store == NULL || str_len <= 1)
     {
@@ -229,7 +183,7 @@ dispatch_request_value (gzochi_metad_dataserver_client *client,
   len--;
   offset++;
   
-  key = read_bytes (data + offset, len);
+  key = gzochid_protocol_read_bytes (data + offset, len);
 
   if (key == NULL)
     {
@@ -282,7 +236,8 @@ dispatch_request_next_key (gzochi_metad_dataserver_client *client,
 			   unsigned char *data, unsigned short len)
 {
   size_t str_len = 0, offset = 0;
-  char *app = read_str (data, len, &str_len), *store = NULL;
+  const char *app = gzochid_protocol_read_str (data, len, &str_len),
+    *store = NULL;
   GByteArray *bytes = NULL;
   GBytes *key = NULL; 
   GError *err = NULL;
@@ -300,7 +255,7 @@ dispatch_request_next_key (gzochi_metad_dataserver_client *client,
   len -= str_len;
   offset += str_len;
 
-  store = read_str (data + offset, len, &str_len);
+  store = gzochid_protocol_read_str (data + offset, len, &str_len);
 
   if (store == NULL || str_len <= 1)
     {
@@ -313,7 +268,7 @@ dispatch_request_next_key (gzochi_metad_dataserver_client *client,
   len -= str_len;
   offset += str_len;
 
-  key = read_bytes (data + offset, len);
+  key = gzochid_protocol_read_bytes (data + offset, len);
 
   if (key == NULL)
     {
@@ -404,7 +359,8 @@ dispatch_release_key (gzochi_metad_dataserver_client *client,
 		      unsigned char *data, unsigned short len)
 {
   size_t str_len = 0, offset = 0;
-  char *app = read_str (data, len, &str_len), *store = NULL;
+  const char *app = gzochid_protocol_read_str (data, len, &str_len),
+    *store = NULL;
   GBytes *key = NULL;
 
   if (app == NULL || str_len <= 1)
@@ -413,7 +369,7 @@ dispatch_release_key (gzochi_metad_dataserver_client *client,
   len -= str_len;
   offset += str_len;
 
-  store = read_str (data + offset, len, &str_len);
+  store = gzochid_protocol_read_str (data + offset, len, &str_len);
 
   if (store == NULL || str_len <= 1)
     return FALSE;
@@ -421,7 +377,7 @@ dispatch_release_key (gzochi_metad_dataserver_client *client,
   len -= str_len;
   offset += str_len;
 
-  key = read_bytes (data + offset, len);
+  key = gzochid_protocol_read_bytes (data + offset, len);
 
   if (key == NULL)
     return FALSE;
@@ -442,7 +398,8 @@ dispatch_release_key_range (gzochi_metad_dataserver_client *client,
 			    unsigned char *data, unsigned short len)
 {
   size_t str_len = 0, offset = 0;
-  char *app = read_str (data, len, &str_len), *store = NULL;
+  const char *app = gzochid_protocol_read_str (data, len, &str_len),
+    *store = NULL;
   GBytes *from_key = NULL, *to_key = NULL;
 
   if (app == NULL || str_len <= 1)
@@ -451,7 +408,7 @@ dispatch_release_key_range (gzochi_metad_dataserver_client *client,
   len -= str_len;
   offset += str_len;
 
-  store = read_str (data + offset, len, &str_len);
+  store = gzochid_protocol_read_str (data + offset, len, &str_len);
 
   if (store == NULL || str_len <= 1)
     return FALSE;
@@ -459,7 +416,7 @@ dispatch_release_key_range (gzochi_metad_dataserver_client *client,
   len -= str_len;
   offset += str_len;
 
-  from_key = read_bytes (data + offset, len);
+  from_key = gzochid_protocol_read_bytes (data + offset, len);
 
   if (from_key == NULL)
     return FALSE;
@@ -467,7 +424,7 @@ dispatch_release_key_range (gzochi_metad_dataserver_client *client,
   len -= 2 + g_bytes_get_size (from_key);
   offset += 2 + g_bytes_get_size (from_key);
   
-  to_key = read_bytes (data + offset, len);
+  to_key = gzochid_protocol_read_bytes (data + offset, len);
 
   if (to_key == NULL)
     {

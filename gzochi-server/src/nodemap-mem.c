@@ -1,5 +1,5 @@
 /* nodemap-mem.c: In-memory nodemap implementation for gzochi-metad
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -137,10 +137,10 @@ nodemap_qualified_key_compare_data_func (gconstpointer a, gconstpointer b,
    functional interface. */
 
 static void
-map_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id,
+map_session (gzochi_metad_nodemap *nodemap, const char *app, guint64 session_id,
 	     int node_id, GError **err)
 {
-  nodemap_qualified_key qualified_key = { app, session_id };
+  nodemap_qualified_key qualified_key = { (char *) app, session_id };
   gzochi_metad_nodemap_mem *nodemap_mem = (gzochi_metad_nodemap_mem *) nodemap;
   
   if (g_hash_table_contains (nodemap_mem->session_to_node, &qualified_key))
@@ -180,10 +180,10 @@ map_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id,
    functional interface. */
 
 static void
-unmap_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id,
-	       GError **err)
+unmap_session (gzochi_metad_nodemap *nodemap, const char *app,
+	       guint64 session_id, GError **err)
 {
-  nodemap_qualified_key qualified_key = { app, session_id };
+  nodemap_qualified_key qualified_key = { (char *) app, session_id };
   gzochi_metad_nodemap_mem *nodemap_mem = (gzochi_metad_nodemap_mem *) nodemap;
 
   if (g_hash_table_contains (nodemap_mem->session_to_node, &qualified_key))
@@ -214,11 +214,11 @@ unmap_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id,
    functional interface. */
 
 static int
-lookup_session (gzochi_metad_nodemap *nodemap, char *app, guint64 session_id,
-		GError **err)
+lookup_session (gzochi_metad_nodemap *nodemap, const char *app,
+		guint64 session_id, GError **err)
 {
   int ret = 0;
-  nodemap_qualified_key qualified_key = { app, session_id };
+  nodemap_qualified_key qualified_key = { (char *) app, session_id };
   gzochi_metad_nodemap_mem *nodemap_mem = (gzochi_metad_nodemap_mem *) nodemap;
 
   if (g_hash_table_contains (nodemap_mem->session_to_node, &qualified_key))

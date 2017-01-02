@@ -46,6 +46,7 @@ test_programs = \
 	test-oids \
 	test-oids-dataclient \
 	test-oids-storage \
+	test-protocol-common \
 	test-queue \
 	test-reloc \
 	test-resolver \
@@ -116,6 +117,7 @@ test_data_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
 test_data_protocol_SOURCES = test-data-protocol.c
 test_data_protocol_LDADD = \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GZOCHI_COMMON_LIBS@
 
@@ -126,6 +128,7 @@ test_dataclient_LDADD = \
 	$(top_builddir)/src/libgzochid_la-config.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
 	$(top_builddir)/src/libgzochid_la-dataclient.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
@@ -137,6 +140,7 @@ test_dataclient_protocol_LDADD = \
 	$(top_builddir)/src/libgzochid_la-dataclient-protocol.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-event-app.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
@@ -150,6 +154,7 @@ test_dataserver_LDADD = $(top_builddir)/src/libgzochi_metad_la-dataserver.o \
 	$(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
 	$(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-oids-storage.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
 	$(top_builddir)/src/libgzochid_la-storage.o \
@@ -164,6 +169,7 @@ test_dataserver_protocol_LDADD = \
 	$(top_builddir)/src/libgzochi_metad_la-dataserver-protocol.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
 	$(top_builddir)/src/libgzochid_la-oids.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
@@ -228,6 +234,7 @@ test_metaclient_LDADD = \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-event-app.o \
 	$(top_builddir)/src/libgzochid_la-metaclient.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
@@ -241,6 +248,7 @@ test_metaclient_protocol_LDADD = \
 	$(top_builddir)/src/libgzochid_la-metaclient-protocol.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-event-app.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
@@ -251,6 +259,7 @@ test_metaserver_protocol_LDADD = \
 	$(top_builddir)/src/libgzochi_metad_la-metaserver-protocol.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochi_metad_la-event-meta.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
@@ -280,6 +289,13 @@ test_oids_storage_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-oids-storage.o \
 	$(top_builddir)/src/libgzochid_la-storage-mem.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
+
+test_protocol_common_CFLAGS = -I$(top_srcdir)/src @GZOCHI_COMMON_CFLAGS@ \
+	@GLIB_CFLAGS@
+test_protocol_common_SOURCES = test-protocol-common.c
+test_protocol_common_LDADD = \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
 
 test_queue_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@

@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2016 Julian Graham
+# Copyright (C) 2017 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -43,18 +43,18 @@ conf/gzochid.conf: conf/gzochid.conf.in $(top_builddir)/config.status
 
 dist_include_HEADERS = gzochid-auth.h gzochid-storage.h
 
-noinst_HEADERS = admin.h app.h app-task.h auth_int.h callback.h channel.h \
-	config.h context.h data.h data-protocol.h dataclient.h \
-	dataclient-protocol.h dataserver.h dataserver-protocol.h debug.h \
-	descriptor.h durable-task.h event.h event-app.h event-meta.h \
-	fmemopen.h fsm.h game.h game-protocol.h guile.h gzochid.h httpd.h \
-	httpd-app.h httpd-meta.h io.h itree.h lifecycle.h lock.h log.h \
-	lrucache.h meta-protocol.h metaclient-protocol.h metaclient.h \
-	metaserver-protocol.h nodemap-mem.h nodemap.h oids.h oids-dataclient.h \
-	oids-storage.h protocol.h queue.h reloc.h resolver.h schedule.h \
-	scheme.h scheme-task.h session.h sessionserver.h socket.h stats.h \
-	storage.h storage-dataclient.h storage-mem.h task.h threads.h \
-	toollib.h tx.h txlog.h util.h
+noinst_HEADERS = admin.h app-task.h app.h auth_int.h callback.h channel.h \
+	config.h context.h data-protocol.h data.h dataclient-protocol.h \
+	dataclient.h dataserver-protocol.h dataserver.h debug.h \
+	descriptor.h durable-task.h event-app.h event-meta.h event.h \
+	fmemopen.h fsm.h game.h game-protocol.h guile.h gzochid.h httpd-app.h \
+	httpd-meta.h httpd.h io.h itree.h lifecycle.h lock.h log.h lrucache.h \
+	meta-protocol.h metaclient-protocol.h metaclient.h \
+	metaserver-protocol.h nodemap-mem.h nodemap.h oids-dataclient.h \
+	oids-storage.h oids.h protocol-common.h protocol.h queue.h reloc.h \
+	resolver.h schedule.h scheme.h scheme-task.h session.h \
+	sessionserver.h socket.h stats.h storage-dataclient.h storage-mem.h \
+	storage.h task.h threads.h toollib.h tx.h txlog.h util.h
 
 noinst_LTLIBRARIES = libgzochid.la libgzochi-metad.la
 
@@ -65,14 +65,14 @@ libgzochid_la_CFLAGS = @CFLAGS@ \
 	@MICROHTTPD_CFLAGS@ @ZLIB_CFLAGS@ @GZOCHI_COMMON_CFLAGS@ \
 	-Wall -Werror
 
-libgzochid_la_SOURCES = admin.c app.c app-task.c auth.c callback.c channel.c \
-	config.c context.c data.c data-protocol.c dataclient.c \
-	dataclient-protocol.c debug.c descriptor.c durable-task.c event.c \
-	event-app.c fmemopen.c fsm.c game.c game-protocol.c guile.c httpd.c \
-	httpd-app.c io.c itree.c lifecycle.c log.c lrucache.c metaclient.c \
-	metaclient-protocol.c oids.c oids-dataclient.c oids-storage.c queue.c \
-	reloc.c resolver.c schedule.c scheme.c scheme-task.c session.c \
-	socket.c stats.c storage.c storage-dataclient.c storage-mem.c task.c \
+libgzochid_la_SOURCES = admin.c app-task.c app.c auth.c callback.c channel.c \
+	config.c context.c data-protocol.c data.c dataclient-protocol.c \
+	dataclient.c debug.c descriptor.c durable-task.c event-app.c event.c \
+	fmemopen.c fsm.c game.c game-protocol.c guile.c httpd-app.c httpd.c \
+	io.c itree.c lifecycle.c log.c lrucache.c metaclient-protocol.c \
+	metaclient.c oids-dataclient.c oids-storage.c oids.c protocol-common.c \
+	queue.c reloc.c resolver.c schedule.c scheme.c scheme-task.c session.c \
+	socket.c stats.c storage-dataclient.c storage-mem.c storage.c task.c \
 	threads.c tx.c txlog.c util.c
 
 libgzochid_la_LIBADD = api/libgzochid-api.la @GZOCHI_COMMON_LIBS@ \
@@ -118,9 +118,9 @@ libgzochi_metad_la_CFLAGS = @CFLAGS@ \
 	-Wall -Werror
 libgzochi_metad_la_SOURCES = config.c data-protocol.c dataserver-protocol.c \
 	dataserver.c event.c event-meta.c httpd.c httpd-meta.c itree.c \
-	lock-mem.c log.c metaserver-protocol.c nodemap-mem.c oids.c \
-	oids-storage.c resolver.c sessionserver.c socket.c storage.c \
-	storage-mem.c util.c
+	lock-mem.c log.c metaserver-protocol.c nodemap-mem.c oids-storage.c \
+	oids.c protocol-common.c resolver.c sessionserver.c socket.c \
+	storage-mem.c storage.c util.c
 libgzochi_metad_la_LIBADD = @GLIB_LIBS@ @GMODULE_LIBS@ @GTHREAD_LIBS@ \
 	@GOBJECT_LIBS@ @MICROHTTPD_LIBS@ @GZOCHI_COMMON_LIBS@
 

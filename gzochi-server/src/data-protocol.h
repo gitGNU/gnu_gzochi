@@ -94,7 +94,7 @@ typedef struct _gzochid_data_changeset gzochid_data_changeset;
 */
 
 gzochid_data_reserve_oids_response *gzochid_data_reserve_oids_response_new
-(char *, gzochid_data_oids_block *);
+(const char *, gzochid_data_oids_block *);
 
 /* Free the specified oid reservation response. */
 
@@ -131,7 +131,7 @@ gzochid_data_protocol_reserve_oids_response_read (GBytes *);
 */
 
 gzochid_data_response *
-gzochid_data_response_new (char *, char *, gboolean, GBytes *);
+gzochid_data_response_new (const char *, const char *, gboolean, GBytes *);
 
 /* Free the specified response. */
 
@@ -165,7 +165,7 @@ gzochid_data_response *gzochid_data_protocol_response_read (GBytes *);
 /* Create and return a new changeset with the specified gzochi game application
    name and change array. */
 
-gzochid_data_changeset *gzochid_data_changeset_new (char *, GArray *);
+gzochid_data_changeset *gzochid_data_changeset_new (const char *, GArray *);
 
 /* Create and return a new changeset with the specified gzochi game application
    name and change array. The `GDestroyNotify' function, if provided, will be
@@ -173,7 +173,7 @@ gzochid_data_changeset *gzochid_data_changeset_new (char *, GArray *);
    `gzochid_data_changeset_free' is called.*/
 
 gzochid_data_changeset *gzochid_data_changeset_new_with_free_func
-(char *, GArray *, GDestroyNotify);
+(const char *, GArray *, GDestroyNotify);
 
 /* Free the specified changeset. */
 

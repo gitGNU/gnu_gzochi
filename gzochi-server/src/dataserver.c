@@ -1,5 +1,5 @@
 /* dataserver.c: Data server for gzochi-metad
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,18 +23,18 @@
 #include <string.h>
 
 #include "config.h"
-#include "dataserver.h"
 #include "dataserver-protocol.h"
+#include "dataserver.h"
 #include "event.h"
 #include "gzochid-storage.h"
 #include "httpd.h"
 #include "lock.h"
-#include "oids.h"
 #include "oids-storage.h"
+#include "oids.h"
 #include "resolver.h"
 #include "socket.h"
-#include "storage.h"
 #include "storage-mem.h"
+#include "storage.h"
 
 #ifndef GZOCHID_STORAGE_ENGINE_DIR
 #define GZOCHID_STORAGE_ENGINE_DIR "./storage"
@@ -291,7 +291,7 @@ FOR PRODUCTION USE.");
 
 static gzochi_metad_dataserver_lockable_store *
 get_lockable_store (gzochi_metad_dataserver_application_store *store,
-		    char *name, GError **err)
+		    const char *name, GError **err)
 {
   if (strcmp (name, "oids") == 0)
     return store->oids;
@@ -356,7 +356,7 @@ ensure_open_application_store (const GzochiMetadDataServer *server,
 
 gzochid_data_reserve_oids_response *
 gzochi_metad_dataserver_reserve_oids (GzochiMetadDataServer *server,
-				      guint node_id, char *app)
+				      guint node_id, const char *app)
 {
   gzochid_data_oids_block oids_block;
   gzochid_data_reserve_oids_response *response = NULL;
@@ -372,8 +372,8 @@ gzochi_metad_dataserver_reserve_oids (GzochiMetadDataServer *server,
 
 gzochid_data_response *
 gzochi_metad_dataserver_request_value (GzochiMetadDataServer *server,
-				       guint node_id, char *app,
-				       char *store_name, GBytes *key,
+				       guint node_id, const char *app,
+				       const char *store_name, GBytes *key,
 				       gboolean for_write, GError **err)
 {
   gzochid_data_response *response = NULL;
@@ -424,8 +424,8 @@ gzochi_metad_dataserver_request_value (GzochiMetadDataServer *server,
 
 gzochid_data_response *
 gzochi_metad_dataserver_request_next_key (GzochiMetadDataServer *server,
-					  guint node_id, char *app,
-					  char *store_name, GBytes *key,
+					  guint node_id, const char *app,
+					  const char *store_name, GBytes *key,
 					  GError **err)
 {
   gzochid_data_response *response = NULL;
@@ -559,8 +559,8 @@ gzochi_metad_dataserver_process_changeset (GzochiMetadDataServer *server,
 
 void
 gzochi_metad_dataserver_release_key (GzochiMetadDataServer *server,
-				     guint node_id, char *app, char *store_name,
-				     GBytes *key)
+				     guint node_id, const char *app,
+				     const char *store_name, GBytes *key)
 {
   gzochi_metad_dataserver_application_store *app_store =
     ensure_open_application_store (server, app);
@@ -582,9 +582,9 @@ gzochi_metad_dataserver_release_key (GzochiMetadDataServer *server,
 
 void
 gzochi_metad_dataserver_release_range (GzochiMetadDataServer *server,
-				       guint node_id, char *app,
-				       char *store_name, GBytes *first_key,
-				       GBytes *last_key)
+				       guint node_id, const char *app,
+				       const char *store_name,
+				       GBytes *first_key, GBytes *last_key)
 {
   gzochi_metad_dataserver_application_store *app_store =
     ensure_open_application_store (server, app);

@@ -155,7 +155,7 @@ propagate_nodemap_error (GError **err, GError *nodemap_err)
 
 void
 gzochi_metad_sessionserver_session_connected
-(GzochiMetadSessionServer *sessionserver, int node_id, char *app,
+(GzochiMetadSessionServer *sessionserver, int node_id, const char *app,
  guint64 session_id, GError **err)
 {
   if (g_hash_table_contains (sessionserver->connected_servers, &node_id))
@@ -177,7 +177,7 @@ gzochi_metad_sessionserver_session_connected
 
 void
 gzochi_metad_sessionserver_session_disconnected
-(GzochiMetadSessionServer *sessionserver, char *app, guint64 session_id,
+(GzochiMetadSessionServer *sessionserver, const char *app, guint64 session_id,
  GError **err)
 {
   GError *tmp_err = NULL;
@@ -192,7 +192,7 @@ gzochi_metad_sessionserver_session_disconnected
 
 void
 gzochi_metad_sessionserver_relay_disconnect
-(GzochiMetadSessionServer *sessionserver, char *app, guint64 session_id,
+(GzochiMetadSessionServer *sessionserver, const char *app, guint64 session_id,
  GError **err)
 {
   GError *tmp_err = NULL;
@@ -234,7 +234,7 @@ gzochi_metad_sessionserver_relay_disconnect
 
 void
 gzochi_metad_sessionserver_relay_message
-(GzochiMetadSessionServer *sessionserver, char *app, guint64 session_id,
+(GzochiMetadSessionServer *sessionserver, const char *app, guint64 session_id,
  GBytes *msg, GError **err)
 {
   GError *tmp_err = NULL;

@@ -1,5 +1,5 @@
-/* dataserver.c: Prototypes and declarations for dataserver.c
- * Copyright (C) 2016 Julian Graham
+/* dataserver.h: Prototypes and declarations for dataserver.c
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -86,7 +86,7 @@ void gzochi_metad_dataserver_stop (GzochiMetadDataServer *);
    describing the block. */
 
 gzochid_data_reserve_oids_response *gzochi_metad_dataserver_reserve_oids
-(GzochiMetadDataServer *, guint, char *);
+(GzochiMetadDataServer *, guint, const char *);
 
 /* Requests from the specified data server on behalf of the specified node id
    the value with the specified key in one of the specified application's 
@@ -96,7 +96,8 @@ gzochid_data_reserve_oids_response *gzochi_metad_dataserver_reserve_oids
    outcome of the request. */
 
 gzochid_data_response *gzochi_metad_dataserver_request_value
-(GzochiMetadDataServer *, guint, char *, char *, GBytes *, gboolean, GError **);
+(GzochiMetadDataServer *, guint, const char *, const char *, GBytes *, gboolean,
+ GError **);
 
 /* Requests from the specified data server on behalf of the specified node id
    the key that immediately follows the specified key in one of the specified 
@@ -105,13 +106,14 @@ gzochid_data_response *gzochi_metad_dataserver_request_value
    necessary) describing the outcome of the request. */
 
 gzochid_data_response *gzochi_metad_dataserver_request_next_key
-(GzochiMetadDataServer *, guint, char *, char *, GBytes *, GError **);
+(GzochiMetadDataServer *, guint, const char *, const char *, GBytes *,
+ GError **);
 
 /* Releases all locks held by the specified node id on the specified key
    within the specified data server, application, and store. */ 
 
 void gzochi_metad_dataserver_release_key
-(GzochiMetadDataServer *, guint, char *, char *, GBytes *);
+(GzochiMetadDataServer *, guint, const char *, const char *, GBytes *);
 
 /* Releases the range lock held by the specified node id on the specified 
    key interval (as established by a previous call to 
@@ -119,7 +121,8 @@ void gzochi_metad_dataserver_release_key
    application, and store. */ 
 
 void gzochi_metad_dataserver_release_range
-(GzochiMetadDataServer *, guint, char *, char *, GBytes *, GBytes *);
+(GzochiMetadDataServer *, guint, const char *, const char *, GBytes *,
+ GBytes *);
 
 /* Releases all locks (read / write / range) held by the specified node id 
    within the specified data server. */ 
