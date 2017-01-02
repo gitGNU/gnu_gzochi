@@ -1,5 +1,5 @@
 /* metaserver-protocol.c: Implementation of metaserver protocol.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -22,12 +22,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "dataserver.h"
 #include "dataserver-protocol.h"
-#include "event.h"
+#include "dataserver.h"
 #include "event-meta.h"
+#include "event.h"
 #include "meta-protocol.h"
 #include "metaserver-protocol.h"
+#include "protocol-common.h"
 #include "protocol.h"
 #include "resolver.h"
 
@@ -114,30 +115,6 @@ can_dispatch (const GByteArray *buffer, gpointer user_data)
     && buffer->len >= gzochi_common_io_read_short (buffer->data, 0) + 3;
 }
 
-/*
-  Finds the bounds of the `NULL'-terminated string that begins at `bytes', 
-  returning a pointer to that string and setting `str_len' appropriately.
-  Returns `NULL' if the string is not `NULL'-terminated. 
-  
-  TODO: This function duplicates a function in `data-protocol.c'. Consider 
-  making them available via a shared utility.
-*/
-
-static char *
-read_str (const unsigned char *bytes, const size_t bytes_len, size_t *str_len)
-{
-  unsigned char *end = memchr (bytes, 0, bytes_len);
-
-  if (end == NULL)
-    return NULL;
-  else
-    {
-      if (str_len != NULL)
-        *str_len = end - bytes + 1;
-      return (char *) bytes;
-    }
-}
-
 /* Processes the message payload following the `GZOZCHID_META_PROTOCOL_LOGIN'
    opcode. Returns `TRUE' if the message was successfully decoded, `FALSE'
    otherwise. */
@@ -148,12 +125,13 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
 {
   size_t str_len = 0;
   unsigned char version = data[0];
-  char *client_admin_server_base_url = NULL;
+  const char *client_admin_server_base_url = NULL;
 
   if (version != METASERVER_PROTOCOL_VERSION)
     return FALSE;
 
-  client_admin_server_base_url = read_str (data + 1, len - 1, &str_len);
+  client_admin_server_base_url =
+    gzochid_protocol_read_str (data + 1, len - 1, &str_len);
 
   /* The admin server base URL can be empty, but not absent. */
   

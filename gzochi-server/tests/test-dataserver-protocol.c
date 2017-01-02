@@ -442,7 +442,7 @@ main (int argc, char *argv[])
      dataserver_protocol_fixture_tear_down);
 
   g_test_add
-    ("/client/dispatch/release-range", dataserver_protocol_fixture, NULL,
+    ("/client/dispatch/one/release-range", dataserver_protocol_fixture, NULL,
      dataserver_protocol_fixture_set_up, test_client_dispatch_one_release_range,
      dataserver_protocol_fixture_tear_down);
 

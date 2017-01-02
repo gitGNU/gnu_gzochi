@@ -1,4 +1,4 @@
-/* dataclient.c: Prototypes and declarations for dataclient.c
+/* dataclient.h: Prototypes and declarations for dataclient.c
  * Copyright (C) 2016 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
