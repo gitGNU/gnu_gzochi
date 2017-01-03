@@ -31,6 +31,8 @@
 #include "protocol-common.h"
 #include "protocol.h"
 #include "resolver.h"
+#include "sessionserver-protocol.h"
+#include "sessionserver.h"
 
 /* This protocol implementation is a "router" for segments of the meta protocol
    that correspond to more specific server components; overall client lifecycle
@@ -60,6 +62,10 @@ struct _gzochi_metad_metaserver_client
   /* Delegate client for dataserver operations. */
   
   gzochi_metad_dataserver_client *dataserver_client;
+
+  /* Delegate client for sessionserver operations. */
+  
+  gzochi_metad_sessionserver_client *sessionserver_client;
 };
 
 static gzochid_client_socket *
@@ -71,10 +77,12 @@ server_accept (GIOChannel *channel, const char *desc, gpointer data)
   gzochid_client_socket *sock = gzochid_client_socket_new
     (channel, desc, gzochi_metad_metaserver_client_protocol, client);  
   GzochiMetadDataServer *dataserver = NULL;
+  GzochiMetadSessionServer *sessionserver = NULL;
 
   g_object_get
     (root_context,
      "data-server", &dataserver,
+     "session-server", &sessionserver,
      NULL);
 
   /* Generate the next node id. */
@@ -85,11 +93,14 @@ server_accept (GIOChannel *channel, const char *desc, gpointer data)
   
   client->dataserver_client = gzochi_metad_dataserver_client_new
     (dataserver, sock, client->node_id);
+  client->sessionserver_client = gzochi_metad_sessionserver_client_new
+    (sessionserver, sock, client->node_id);
 
   g_message
     ("Received connection from %s; assigning id %d", desc, client->node_id);
 
   g_object_unref (dataserver);
+  g_object_unref (sessionserver);
   
   return sock;
 }
@@ -147,6 +158,7 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
       GByteArray *login_response_message = g_byte_array_new ();
 
       GzochiMetadClientEvent *event = NULL;
+      GzochiMetadSessionServer *sessionserver = NULL;
       gzochid_event_source *event_source = NULL;
       const char *conn_desc = gzochid_client_socket_get_connection_description
 	(client->sock);
@@ -169,9 +181,18 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
       g_object_get
 	(client->root_context,
 	 "admin-server-base-url", &admin_server_base_url,
+	 "event-source", &event_source,
+	 "session-server", &sessionserver,
 	 NULL);
+
+      /* This is the first moment at which it's reasonable to let the session
+	 server know that there's a new application server node connected. 
+	 TODO: Add some actual error handling. */
       
-      g_object_get (client->root_context, "event-source", &event_source, NULL);
+      gzochid_sessionserver_server_connected
+	(sessionserver, client->node_id, client->sock, NULL);
+      g_object_unref (sessionserver);      
+      
       gzochid_event_dispatch (event_source, GZOCHID_EVENT (event));
       g_source_unref ((GSource *) event_source);
       g_object_unref (event);
@@ -253,7 +274,25 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
 	    
 	    break;
 	  }
-      
+
+	  /* Opcodes understood by the sessionserver protocol. */
+	  
+	case GZOCHID_SESSION_PROTOCOL_SESSION_CONNECTED:
+	case GZOCHID_SESSION_PROTOCOL_SESSION_DISCONNECTED:
+	case GZOCHID_SESSION_PROTOCOL_RELAY_DISCONNECT_FROM:
+	case GZOCHID_SESSION_PROTOCOL_RELAY_MESSAGE_FROM:
+	  {
+	    GByteArray *delegate_buffer = g_byte_array_sized_new (len);
+	    
+	    g_byte_array_append
+	      (delegate_buffer, buffer->data + offset - 2, len + 2);
+	    gzochi_metad_sessionserver_client_protocol.dispatch
+	      (delegate_buffer, client->sessionserver_client);
+	    g_byte_array_unref (delegate_buffer);
+	    
+	    break;
+	  }
+
 	default:
 	  g_warning ("Unexpected opcode %d received from client", opcode);
 	}
@@ -287,6 +326,8 @@ client_error (gpointer user_data)
   g_object_unref (event);
   
   gzochi_metad_dataserver_client_protocol.error (client->dataserver_client);
+  gzochi_metad_sessionserver_client_protocol.error
+    (client->sessionserver_client);
 }
 
 /* Client finalization callback. Invokes the associated protocol `free' callback
@@ -299,6 +340,9 @@ client_free (gpointer user_data)
   gzochi_metad_metaserver_client *client = user_data;
   
   gzochi_metad_dataserver_client_protocol.free (client->dataserver_client);
+  gzochi_metad_sessionserver_client_protocol.free
+    (client->sessionserver_client);
+
   free (client);
 }
 

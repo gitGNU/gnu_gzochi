@@ -1,5 +1,5 @@
 /* meta-protocol.h: Opcode definitions for the meta protocol.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -107,6 +107,46 @@
 
 #define GZOCHID_DATA_PROTOCOL_RELEASE_KEY_RANGE 0x42
 
+/*
+  Notify the meta server that a session has connected to an application server
+  node.
+
+  `NULL'-terminated string: Name of the game application that owns the session
+  8 bytes: The big-endian encoding of the target session oid
+*/
+
+#define GZOCHID_SESSION_PROTOCOL_SESSION_CONNECTED 0x60
+
+/*
+  Notify the meta server that a session has disconnected from an application 
+  server node.
+
+  `NULL'-terminated string: Name of the game application that owns the session
+  8 bytes: The big-endian encoding of the target session oid
+*/
+
+#define GZOCHID_SESSION_PROTOCOL_SESSION_DISCONNECTED 0x61
+
+/*
+  Relay a disconnect signal via the meta server for the target session.
+
+  `NULL'-terminated string: Name of the game application that owns the session
+  8 bytes: The big-endian encoding of the target session oid
+*/
+
+#define GZOCHID_SESSION_PROTOCOL_RELAY_DISCONNECT_FROM 0x62
+
+/*
+  Relay a message via the meta server for the target session.
+
+  `NULL'-terminated string: Name of the game application that owns the session
+  8 bytes: The big-endian encoding of the target session oid
+  2 bytes: The big-endian encoding of the length of the key; the key bytes 
+    follow
+*/
+
+#define GZOCHID_SESSION_PROTOCOL_RELAY_MESSAGE_FROM 0x64
+
 /* The following opcodes are for messages sent from the server to the client. */
 
 /*
@@ -149,7 +189,7 @@
 /*
   Relays a message to the session connected to the target server.
   
-  `NULL'-terminated strng: Name of the game application that owns the session
+  `NULL'-terminated string: Name of the game application that owns the session
   8 bytes: The big-endian encoding of the target session oid
   2 bytes: The big-endian encoding of the length of the key; the key bytes 
     follow

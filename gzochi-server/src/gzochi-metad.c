@@ -1,5 +1,5 @@
 /* gzochi-metad.c: Main server bootstrapping routines for gzochi-metad
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -29,11 +29,12 @@
 #include "config.h"
 #include "dataserver.h"
 #include "event.h"
-#include "httpd.h"
 #include "httpd-meta.h"
+#include "httpd.h"
 #include "log.h"
 #include "metaserver-protocol.h"
 #include "resolver.h"
+#include "sessionserver.h"
 #include "socket.h"
 
 #define _(String) gettext (String)
@@ -89,6 +90,10 @@ struct _GzochiMetadRootContext
   gzochid_server_socket *server_socket; /* The meta server's server socket. */
   GzochiMetadDataServer *data_server; /* The meta server data server. */
 
+  /* The meta server session server. */
+
+  GzochiMetadSessionServer *session_server; 
+
   /* The port on which the server listens. This may be zero to indicate the 
      server should listen on any available port, and will be set to the port 
      assigned by the operating system. */
@@ -116,6 +121,7 @@ enum gzochi_metad_root_context_properties
     PROP_EVENT_SOURCE,
     PROP_SOCKET_SERVER,
     PROP_DATA_SERVER,
+    PROP_SESSION_SERVER,
     N_PROPERTIES
   };
 
@@ -139,6 +145,10 @@ root_context_get_property (GObject *object, guint property_id, GValue *value,
       
     case PROP_DATA_SERVER:
       g_value_set_object (value, self->data_server);
+      break;
+
+    case PROP_SESSION_SERVER:
+      g_value_set_object (value, self->session_server);
       break;
 
     default:
@@ -174,7 +184,11 @@ root_context_set_property (GObject *object, guint property_id,
     case PROP_DATA_SERVER:
       self->data_server = g_object_ref (g_value_get_object (value));
       break;
-      
+
+    case PROP_SESSION_SERVER:
+      self->session_server = g_object_ref (g_value_get_object (value));
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -224,12 +238,11 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
 
   obj_properties[PROP_CONFIGURATION] = g_param_spec_object
     ("configuration", "config", "The global configuration object",
-     GZOCHID_TYPE_CONFIGURATION,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+     GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
   
   obj_properties[PROP_HTTP_SERVER] = g_param_spec_object
     ("http-server", "httpd", "The admin HTTP server", GZOCHID_TYPE_HTTP_SERVER,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
 
   obj_properties[PROP_ADMIN_SERVER_BASE_URL] = g_param_spec_string
     ("admin-server-base-url", "base-url", "The admin server base URL", NULL,
@@ -237,8 +250,7 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
   
   obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
     ("event-loop", "event-loop", "The global event loop",
-     GZOCHID_TYPE_EVENT_LOOP,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+     GZOCHID_TYPE_EVENT_LOOP, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
   
   obj_properties[PROP_EVENT_SOURCE] = g_param_spec_boxed
     ("event-source", "event-source", "The global event source",
@@ -246,13 +258,15 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
 
   obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
     ("socket-server", "socket-server", "The global socket server",
-     GZOCHID_TYPE_SOCKET_SERVER,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+     GZOCHID_TYPE_SOCKET_SERVER, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
 
   obj_properties[PROP_DATA_SERVER] = g_param_spec_object
     ("data-server", "data-server", "The data server",
-     GZOCHI_METAD_TYPE_DATA_SERVER,
-     G_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+     GZOCHI_METAD_TYPE_DATA_SERVER, G_PARAM_READWRITE | G_PARAM_CONSTRUCT);
+
+  obj_properties[PROP_SESSION_SERVER] = g_param_spec_object
+    ("session-server", "session-server", "The session server",
+     GZOCHI_METAD_TYPE_SESSION_SERVER, G_PARAM_READWRITE | G_PARAM_CONSTRUCT);
 
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
