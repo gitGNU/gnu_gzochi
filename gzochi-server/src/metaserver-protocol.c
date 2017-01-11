@@ -189,7 +189,7 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
 	 server know that there's a new application server node connected. 
 	 TODO: Add some actual error handling. */
       
-      gzochid_sessionserver_server_connected
+      gzochi_metad_sessionserver_server_connected
 	(sessionserver, client->node_id, client->sock, NULL);
       g_object_unref (sessionserver);      
       
