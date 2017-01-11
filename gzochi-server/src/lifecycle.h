@@ -1,5 +1,5 @@
 /* lifecycle.h: Prototypes and declarations for lifecycle.c
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,15 +19,11 @@
 #define GZOCHID_LIFECYCLE_H
 
 #include "app.h"
-#include "game-protocol.h"
+#include "context.h"
+#include "descriptor.h"
 
-void gzochid_application_client_logged_in (gzochid_application_context *, 
-					   gzochid_game_client *);
-
-void gzochid_application_client_disconnected (gzochid_application_context *, 
-					      gzochid_game_client *);
-
-void gzochid_application_session_received_message 
-(gzochid_application_context *, gzochid_game_client *, unsigned char *, short);
+void gzochid_application_context_init (gzochid_application_context *, 
+				       gzochid_context *, 
+				       gzochid_application_descriptor *);
 
 #endif /* GZOCHID_LIFECYCLE_H */

@@ -1,5 +1,5 @@
 /* game-protocol.h: Prototypes and declarations for game-protocol.c
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 
 #include "gzochid-auth.h"
 #include "protocol.h"
+#include "socket.h"
 
 /* A `gzochid_server_protocol' implementation for the gzochi game application
    protocol. */

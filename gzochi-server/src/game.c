@@ -1,5 +1,5 @@
 /* game.c: Game context management routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@
 #include "game-protocol.h"
 #include "gzochid.h"
 #include "gzochid-storage.h"
+#include "lifecycle.h"
 #include "resolver.h"
 #include "scheme.h"
 #include "scheme-task.h"

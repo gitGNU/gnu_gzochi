@@ -1,5 +1,5 @@
 /* game-protocol.c: Implementation of game application protocol.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017x Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,15 +21,20 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
 
 #include "app.h"
+#include "app-task.h"
 #include "event.h"
-#include "game.h"
 #include "game-protocol.h"
+#include "game.h"
 #include "gzochid-auth.h"
-#include "lifecycle.h"
 #include "protocol.h"
+#include "schedule.h"
+#include "scheme-task.h"
+#include "session.h"
 #include "socket.h"
+#include "task.h"
 
 struct _gzochid_game_client
 {
@@ -66,6 +71,124 @@ client_can_dispatch (const GByteArray *buffer, gpointer user_data)
 {
   return buffer->len >= 3
     && buffer->len >= gzochi_common_io_read_short (buffer->data, 0) + 3;
+}
+
+/* 
+   A `gzochid_application_worker' implementation intended for use as the "catch"
+   task worker for the transactional stage of the login process (see below). 
+
+   Removes any mapping that may exist for the target client in the application
+   context's session mapping table, and disconnects the actual client 
+   connection.
+*/
+
+static void
+login_catch_worker (gzochid_application_context *context,
+		    gzochid_auth_identity *identity, gpointer data)
+{
+  guint64 *session_oid = data;
+  gzochid_game_client *client = g_hash_table_lookup
+    (context->oids_to_clients, session_oid);
+
+  g_message
+    ("Disconnecting session '%" G_GUINT64_FORMAT "'; failed login transaction.",
+     *session_oid);
+
+  g_mutex_lock (&context->client_mapping_lock);
+  g_hash_table_remove (context->oids_to_clients, session_oid);
+  g_hash_table_remove (context->clients_to_oids, client);
+  g_mutex_unlock (&context->client_mapping_lock);
+
+  /* Disconnect the client. */
+  
+  gzochid_game_client_disconnect (client);
+
+  /* Run the Scheme disconnect callbacks. */
+  
+  gzochid_client_session_disconnected_worker (context, identity, session_oid);
+}
+
+/* The application task worker for the login event.  */
+
+static void
+logged_in_task (gzochid_application_context *context,
+		gzochid_auth_identity *identity, gpointer data)
+{
+  GError *err = NULL;
+  gzochid_game_client *client = data;
+  gzochid_client_session *session = gzochid_client_session_new (identity);
+  
+  guint64 *session_oid = malloc (sizeof (guint64));
+
+  gzochid_application_task *login_task = NULL;
+  gzochid_application_task *login_catch_task = NULL;
+  gzochid_application_task *application_task = NULL;
+  gzochid_transactional_application_task_execution *execution = NULL;    
+
+  gzochid_task task;
+  
+  gzochid_client_session_persist (context, session, session_oid, &err);
+
+  if (err != NULL)
+    {
+      g_warning
+	("Failed to bind session oid for identity '%s'; disconnecting: %s",
+	 gzochid_auth_identity_name (identity), err->message);
+
+      g_error_free (err);
+      free (session_oid);
+      
+      gzochid_game_client_disconnect (client);
+      return;
+    }
+
+  login_task = gzochid_application_task_new
+    (context, identity, gzochid_scheme_application_logged_in_worker,
+     session_oid);
+
+  login_catch_task = gzochid_application_task_new
+    (context, identity, login_catch_worker, session_oid);
+
+  execution = gzochid_transactional_application_task_timed_execution_new 
+    (login_task, login_catch_task, NULL, client->game_context->tx_timeout);
+
+  /* Not necessary to hold a ref to these, as we've transferred them to the
+     execution. */
+  
+  gzochid_application_task_unref (login_task);
+  gzochid_application_task_unref (login_catch_task);
+
+  g_mutex_lock (&context->client_mapping_lock);
+  g_hash_table_insert (context->oids_to_clients, session_oid, client);
+  g_hash_table_insert (context->clients_to_oids, client, session_oid);
+  g_mutex_unlock (&context->client_mapping_lock);
+
+  application_task = gzochid_application_task_new
+    (context, gzochid_game_client_get_identity (client), 
+     gzochid_application_reexecuting_transactional_task_worker, execution);
+     
+  task.worker = gzochid_application_task_thread_worker;
+  task.data = application_task;
+  gettimeofday (&task.target_execution_time, NULL);
+
+  gzochid_schedule_run_task (client->game_context->task_queue, &task);
+}
+
+/* Schedules the transactional stage of the login process. */
+
+static void 
+logged_in (gzochid_application_context *context, gzochid_game_client *client)
+{
+  gzochid_application_task *application_task = gzochid_application_task_new
+    (context, gzochid_game_client_get_identity (client), logged_in_task,
+     client);
+
+  gzochid_task *task = gzochid_task_immediate_new
+    (gzochid_application_task_thread_worker, application_task);
+
+  gzochid_schedule_submit_task (client->game_context->task_queue, task);
+
+  gzochid_task_free (task);
 }
 
 static void 
@@ -119,7 +242,66 @@ dispatch_login_request (gzochid_game_client *client, char *endpoint,
 	("Client at %s authenticated to endpoint %s as %s",
 	 gzochid_client_socket_get_connection_description (client->sock),
 	 endpoint, gzochid_auth_identity_name (client->identity));
-      gzochid_application_client_logged_in (client->app_context, client);
+      logged_in (client->app_context, client);
+    }
+}
+
+/* Schedules the transactional stage of the login process. */
+
+static void 
+disconnected (gzochid_application_context *context, gzochid_game_client *client)
+{
+  guint64 *session_oid = NULL;
+
+  g_mutex_lock (&context->client_mapping_lock);
+  session_oid = g_hash_table_lookup (context->clients_to_oids, client);
+  if (session_oid == NULL)
+    {
+      g_mutex_unlock (&context->client_mapping_lock);
+      return;
+    }
+  else 
+    {
+      gzochid_application_task *callback_task = 
+	gzochid_application_task_new
+	(context, gzochid_game_client_get_identity (client),
+	 gzochid_scheme_application_disconnected_worker, session_oid);
+      gzochid_application_task *catch_task =
+	gzochid_application_task_new
+	(context, gzochid_game_client_get_identity (client),
+	 gzochid_client_session_disconnected_worker, session_oid);
+      gzochid_application_task *cleanup_task = 
+	gzochid_application_task_new
+	(context, gzochid_game_client_get_identity (client), 
+	 gzochid_scheme_application_disconnected_cleanup_worker,
+	 session_oid);
+      gzochid_transactional_application_task_execution *execution = 
+	gzochid_transactional_application_task_timed_execution_new 
+	(callback_task, catch_task, cleanup_task,
+	 client->game_context->tx_timeout);
+      gzochid_application_task *application_task = gzochid_application_task_new 
+	(context, gzochid_game_client_get_identity (client),
+	 gzochid_application_resubmitting_transactional_task_worker, execution);
+
+      gzochid_task task;
+      
+      /* Not necessary to hold a ref to these, as we've transferred them to the
+	 execution. */
+  
+      gzochid_application_task_unref (callback_task);
+      gzochid_application_task_unref (catch_task);
+      gzochid_application_task_unref (cleanup_task);
+
+      task.worker = gzochid_application_task_thread_worker;
+      task.data = application_task;
+      gettimeofday (&task.target_execution_time, NULL);
+
+      g_hash_table_remove (context->clients_to_oids, client);
+      g_hash_table_remove (context->oids_to_clients, session_oid);
+      
+      gzochid_schedule_submit_task (client->game_context->task_queue, &task);
+
+      g_mutex_unlock (&context->client_mapping_lock);
     }
 }
 
@@ -130,7 +312,7 @@ dispatch_logout_request (gzochid_game_client *client)
     g_warning
       ("Received logout request from unauthenticated client at %s",
        gzochid_client_socket_get_connection_description (client->sock));
-  else gzochid_application_client_disconnected (client->app_context, client);
+  else disconnected (client->app_context, client);
 
   client->disconnected = TRUE;
 
@@ -139,6 +321,79 @@ dispatch_logout_request (gzochid_game_client *client)
   
   gzochid_client_socket_free (client->sock);
 
+}
+
+/* Cleanup handler for the received message event. */
+
+static void
+cleanup_received_message_arguments (gzochid_application_context *context,
+				    gzochid_auth_identity *identity,
+				    gpointer data)
+{
+  void **args = data;
+
+  /* The session oid (arg 0) comes from the client-session mapping table and
+     can't be freed here. */
+  
+  g_bytes_unref (args[1]);  
+  free (args);
+}
+
+/* Schedules the transactional stage of the "received message" process. */
+
+static void 
+received_message (gzochid_application_context *context,
+		  gzochid_game_client *client, unsigned char *msg, short len)
+{
+  guint64 *session_oid = NULL;
+
+  g_mutex_lock (&context->client_mapping_lock);
+  session_oid = g_hash_table_lookup (context->clients_to_oids, client);
+  g_mutex_unlock (&context->client_mapping_lock);
+
+  if (session_oid == NULL)
+    return;
+  else 
+    {
+      void **data = malloc (sizeof (void *) * 2);
+      
+      gzochid_application_task *transactional_task = NULL;
+      gzochid_application_task *cleanup_task = NULL;
+      gzochid_application_task *application_task = NULL;
+      gzochid_transactional_application_task_execution *execution = NULL;
+      gzochid_task task;
+
+      data[0] = session_oid;
+      data[1] = g_bytes_new (msg, len);
+      
+      transactional_task = gzochid_application_task_new
+	(context, gzochid_game_client_get_identity (client),
+	 gzochid_scheme_application_received_message_worker, data);
+
+      cleanup_task = gzochid_application_task_new
+	(context, gzochid_game_client_get_identity (client),
+	 cleanup_received_message_arguments, data);
+      
+      execution = gzochid_transactional_application_task_timed_execution_new
+	(transactional_task, NULL, cleanup_task,
+	 client->game_context->tx_timeout);
+
+      /* Not necessary to hold a ref to these, as we've transferred them to the
+	 execution. */
+  
+      gzochid_application_task_unref (transactional_task);
+      gzochid_application_task_unref (cleanup_task);
+      
+      application_task = gzochid_application_task_new
+	(context, gzochid_game_client_get_identity (client),
+	 gzochid_application_resubmitting_transactional_task_worker, execution);
+      
+      task.worker = gzochid_application_task_thread_worker;
+      task.data = application_task;
+      gettimeofday (&task.target_execution_time, NULL);
+
+      gzochid_schedule_submit_task (client->game_context->task_queue, &task);
+    }
 }
 
 static void 
@@ -156,8 +411,7 @@ dispatch_session_message (gzochid_game_client *client, unsigned char *msg,
       gzochid_event_dispatch(client->app_context->event_source, event);
       g_object_unref (event);
       
-      gzochid_application_session_received_message 
-	(client->app_context, client, msg, len);
+      received_message (client->app_context, client, msg, len);
     }
 }
 
@@ -245,7 +499,7 @@ client_error (gpointer data)
   if (!client->disconnected)
     {
       if (client->identity != NULL)
-	gzochid_application_client_disconnected (client->app_context, client);
+	disconnected (client->app_context, client);
       client->disconnected = TRUE;
 
       /* This will trigger the client's read source to be destroyed and 
