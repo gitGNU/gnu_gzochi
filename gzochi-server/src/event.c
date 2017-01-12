@@ -1,5 +1,5 @@
 /* event.c: Application event bus implementation for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -462,7 +462,7 @@ finalize (GSource *source)
   
   g_mutex_clear (&event_source->mutex);
   g_list_free_full (event_source->handlers, (GDestroyNotify) free);
-  g_queue_free (event_source->events);
+  g_queue_free_full (event_source->events, g_object_unref);
 }
 
 static GSourceFuncs event_funcs = { prepare, check, dispatch, finalize };

@@ -1,5 +1,5 @@
 /* event.h: Prototypes and declarations for event.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -189,7 +189,16 @@ void gzochid_event_loop_start (GzochidEventLoop *);
 
 void gzochid_event_loop_stop (GzochidEventLoop *);
 
+/* The event source struct typedef. An event source "inherits" from `GSource' 
+   and is the point of dispatch for events, as well as the point of
+   registration for handlers for those events. */
+
 typedef struct _gzochid_event_source gzochid_event_source;
+
+/* Construct and return a new `gzochid_event_source'. The lifecycle of the 
+   returned pointer should be managed the same way as a `GSource' - call
+   `g_source_ref' when assigning it, `g_source_unref' when a given reference is
+   no longer needed. */
 
 gzochid_event_source *gzochid_event_source_new (void);
 
