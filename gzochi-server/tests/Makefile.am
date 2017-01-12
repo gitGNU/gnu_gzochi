@@ -82,12 +82,9 @@ treefile_la_LDFLAGS = -module -avoid-version -rpath $(abs_srcdir)
 test_app_task_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
 	@GUILE_CFLAGS@
 test_app_task_SOURCES = test-app-task.c
-test_app_task_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
-	$(top_builddir)/src/libgzochid_la-app-task.o \
+test_app_task_LDADD = $(top_builddir)/src/libgzochid_la-app-task.o \
 	$(top_builddir)/src/libgzochid_la-auth.o \
-	$(top_builddir)/src/libgzochid_la-context.o \
 	$(top_builddir)/src/libgzochid_la-event.o \
-	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-task.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
@@ -309,15 +306,11 @@ test_queue_LDADD = $(top_builddir)/src/libgzochid_la-io.o \
 test_reloc_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@ \
 	@GOBJECT_CFLAGS@ @GUILE_CFLAGS@
 test_reloc_SOURCES = test-reloc.c
-test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
+test_reloc_LDADD = $(top_builddir)/src/libgzochid_la-reloc.o \
 	$(top_builddir)/src/libgzochid_la-auth.o \
-	$(top_builddir)/src/libgzochid_la-context.o \
-	$(top_builddir)/src/libgzochid_la-event.o \
-	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
-	$(top_builddir)/src/libgzochid_la-reloc.o \
 	$(top_builddir)/src/libgzochid_la-scheme.o \
 	$(top_builddir)/src/libgzochid_la-tx.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
@@ -332,11 +325,8 @@ test_resolver_LDADD = $(top_builddir)/src/libgzochid_la-resolver.o \
 test_scheme_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
 	@GUILE_CFLAGS@
 test_scheme_SOURCES = test-scheme.c mock-data.c
-test_scheme_LDADD = $(top_builddir)/src/libgzochid_la-app.o \
+test_scheme_LDADD = \
 	$(top_builddir)/src/libgzochid_la-auth.o \
-	$(top_builddir)/src/libgzochid_la-context.o \
-	$(top_builddir)/src/libgzochid_la-event.o \
-	$(top_builddir)/src/libgzochid_la-fsm.o \
 	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \

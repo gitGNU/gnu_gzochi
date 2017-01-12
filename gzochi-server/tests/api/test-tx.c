@@ -1,5 +1,5 @@
 /* api/test-tx.c: Test routines for api/tx.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -30,6 +30,42 @@
 
 #include "tx.h"
 #include "util.h"
+
+/* Fake implementations to avoid having to pull in `app.o'. */
+
+static gzochid_application_context *current_app_context = NULL;
+
+gzochid_application_context *
+gzochid_application_context_new ()
+{
+  return calloc (1, sizeof (gzochid_application_context));
+}
+
+void
+gzochid_application_context_free (gzochid_application_context *app_context)
+{
+  free (app_context);
+}
+
+void *
+gzochid_with_application_context (gzochid_application_context *app_context,
+				  gzochid_auth_identity *identity,
+				  void *(*worker) (gpointer), gpointer data)
+{
+  gpointer ret = NULL;
+  
+  current_app_context = app_context;
+  ret = worker (data);
+  current_app_context = NULL;
+  
+  return ret;
+}
+
+gzochid_application_context *
+gzochid_get_current_application_context ()
+{
+  return current_app_context;
+}
 
 /* Fake implementation to avoid having to pull in `channel.o'. */
 

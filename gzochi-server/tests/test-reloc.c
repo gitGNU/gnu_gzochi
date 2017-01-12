@@ -1,5 +1,5 @@
 /* test-reloc.c: Test routines for reloc.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 #include <glib.h>
 #include <libguile.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "app.h"
 #include "channel.h"
@@ -27,6 +28,36 @@
 #include "scheme.h"
 #include "session.h"
 #include "tx.h"
+
+/* Fake implementations to avoid having to pull in `app.o'. */
+
+static gzochid_application_context *current_app_context = NULL;
+
+gzochid_application_context *
+gzochid_application_context_new ()
+{
+  return calloc (1, sizeof (gzochid_application_context));
+}
+
+void
+gzochid_application_context_free (gzochid_application_context *app_context)
+{
+  free (app_context);
+}
+
+void *
+gzochid_with_application_context (gzochid_application_context *app_context,
+				  gzochid_auth_identity *identity,
+				  void *(*thunk) (gpointer), gpointer data)
+{
+  gpointer ret = NULL;
+  
+  current_app_context = app_context;
+  ret = thunk (data);
+  current_app_context = NULL;
+  
+  return ret;
+}
 
 /* Fake implementation to avoid having to pull in `channel.o'. */
 
@@ -81,6 +112,9 @@ test_deserializer_error_inner (gpointer data)
 
   gzochid_scm_location_aware_serialization.deserializer (context, str, NULL);
   g_assert (gzochid_transaction_rollback_only ());
+
+  gzochid_application_context_free (context);
+  g_byte_array_unref (str);
 }
 
 static void

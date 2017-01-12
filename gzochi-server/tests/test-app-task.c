@@ -1,5 +1,5 @@
 /* test-app-task.c: Test routines for app-task.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -21,11 +21,32 @@
 
 #include "app.h"
 #include "app-task.h"
+#include "event.h"
 #include "game.h"
 #include "gzochid-auth.h"
 #include "schedule.h"
 #include "task.h"
 #include "tx.h"
+
+/* Fake implementations to avoid having to pull in `app.o'. */
+
+gzochid_application_context *
+gzochid_application_context_new ()
+{
+  gzochid_application_context *app_context = calloc
+    (1, sizeof (gzochid_application_context));
+  
+  app_context->event_source = gzochid_event_source_new ();
+
+  return app_context;
+}
+
+void
+gzochid_application_context_free (gzochid_application_context *app_context)
+{
+  g_source_unref ((GSource *) app_context->event_source);
+  free (app_context);
+}
 
 static void
 null_worker (gzochid_application_context *context,
