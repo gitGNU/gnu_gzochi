@@ -36,7 +36,6 @@
 #include "game-protocol.h"
 #include "gzochid.h"
 #include "gzochid-storage.h"
-#include "lifecycle.h"
 #include "resolver.h"
 #include "scheme.h"
 #include "scheme-task.h"

@@ -1,5 +1,5 @@
 /* descriptor.h: Prototypes and declarations for descriptor.c
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,9 +18,29 @@
 #ifndef GZOCHID_DESCRIPTOR_H
 #define GZOCHID_DESCRIPTOR_H
 
+#include <glib.h>
 #include <stdio.h>
 
-#include "app.h"
+#include "callback.h"
+
+struct _gzochid_application_descriptor
+{
+  char *name;
+  char *description;
+
+  GList *load_paths; /* Descriptor-specified module load paths. */
+ 
+  gzochid_application_callback *initialized;
+  gzochid_application_callback *logged_in;
+  gzochid_application_callback *ready;
+
+  char *auth_type;
+  GHashTable *auth_properties;
+
+  GHashTable *properties;
+};
+
+typedef struct _gzochid_application_descriptor gzochid_application_descriptor;
 
 gzochid_application_descriptor *gzochid_config_parse_application_descriptor 
 (FILE *);

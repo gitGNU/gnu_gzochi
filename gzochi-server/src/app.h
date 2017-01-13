@@ -21,8 +21,8 @@
 #include <glib.h>
 
 #include "auth_int.h"
-#include "callback.h"
 #include "context.h"
+#include "descriptor.h"
 #include "event.h"
 #include "gzochid-auth.h"
 #include "gzochid-storage.h"
@@ -37,25 +37,6 @@ enum gzochid_application_state
     GZOCHID_APPLICATION_STATE_PAUSED,
     GZOCHID_APPLICATION_STATE_STOPPED
   };
-
-struct _gzochid_application_descriptor
-{
-  char *name;
-  char *description;
-
-  GList *load_paths; /* Descriptor-specified module load paths. */
- 
-  gzochid_application_callback *initialized;
-  gzochid_application_callback *logged_in;
-  gzochid_application_callback *ready;
-
-  char *auth_type;
-  GHashTable *auth_properties;
-
-  GHashTable *properties;
-};
-
-typedef struct _gzochid_application_descriptor gzochid_application_descriptor;
 
 struct _gzochid_application_context
 {
@@ -115,6 +96,10 @@ typedef struct _gzochid_application_context gzochid_application_context;
   ->storage_engine->interface
 
 gzochid_application_context *gzochid_application_context_new (void);
+
+void gzochid_application_context_init (gzochid_application_context *,
+				       gzochid_context *,
+				       gzochid_application_descriptor *);
 
 void gzochid_application_context_free (gzochid_application_context *);
 
