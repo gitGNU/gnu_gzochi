@@ -1,5 +1,5 @@
 /* test-storage-dataclient.c: Tests for storage-dataclient.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -71,6 +71,9 @@ struct _GzochidDataClient
 {
   GObject parent_instance;
 
+  GMutex process_response_mutex;
+  GCond process_response_cond;
+  
   GList *responses;
   GList *requested_keys;
   GList *released_keys;
@@ -82,9 +85,20 @@ struct _GzochidDataClient
 G_DEFINE_TYPE (GzochidDataClient, gzochid_data_client, G_TYPE_OBJECT);
 
 static void
+gzochid_data_client_finalize (GObject *object)
+{
+  GzochidDataClient *self = GZOCHID_DATA_CLIENT (object);
+
+  g_mutex_clear (&self->process_response_mutex);
+  g_cond_clear (&self->process_response_cond);
+}
+
+static void
 gzochid_data_client_class_init (GzochidDataClientClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->finalize = gzochid_data_client_finalize;
 }
 
 static void
@@ -98,6 +112,9 @@ execute_release_closure (gpointer data)
 static void
 gzochid_data_client_init (GzochidDataClient *self)
 {
+  g_mutex_init (&self->process_response_mutex);
+  g_cond_init (&self->process_response_cond);
+  
   self->responses = NULL;
   self->requested_keys = NULL;
   self->released_keys = NULL;
@@ -124,17 +141,18 @@ static gpointer
 process_response_async (gpointer data)
 {
   dataclient_storage_response_closure *closure = data;
-
+  GzochidDataClient *client = closure->client;
+  
   if (closure->response->success)
     {
       closure->success_callback
 	(closure->response->data, closure->success_data);
 
       if (! g_hash_table_contains
-	  (closure->client->release_closures, closure->qualified_key))
+	  (client->release_closures, closure->qualified_key))
 
 	g_hash_table_insert
-	  (closure->client->release_closures, closure->qualified_key,
+	  (client->release_closures, closure->qualified_key,
 	   create_release_closure (closure->release_callback,
 				   closure->release_data));
 
@@ -149,6 +167,11 @@ process_response_async (gpointer data)
     }
       
   free (closure);
+
+  g_mutex_lock (&client->process_response_mutex);  
+  g_cond_signal (&client->process_response_cond);
+  g_mutex_unlock (&client->process_response_mutex);
+  
   return NULL;
 }
 
@@ -1288,9 +1311,17 @@ test_lock_release_eviction (dataclient_storage_fixture *fixture,
   fixture->dataclient->responses = g_list_append
     (fixture->dataclient->responses, response);
 
+  g_mutex_lock (&fixture->dataclient->process_response_mutex);
+  
   val = fixture->iface->transaction_get (tx, fixture->store, "foo", 4, NULL);  
-  release_key (fixture->dataclient, "test", "test", key_bytes);
 
+  g_cond_wait (&fixture->dataclient->process_response_cond,
+	       &fixture->dataclient->process_response_mutex);
+
+  g_mutex_unlock (&fixture->dataclient->process_response_mutex);
+
+  release_key (fixture->dataclient, "test", "test", key_bytes);
+  
   g_assert_cmpint (g_list_length (fixture->dataclient->released_keys), ==, 0);
 
   fixture->iface->transaction_rollback (tx);
@@ -1317,9 +1348,17 @@ test_range_lock_release_eviction (dataclient_storage_fixture *fixture,
   fixture->dataclient->responses = g_list_append
     (fixture->dataclient->responses, response);
 
+  g_mutex_lock (&fixture->dataclient->process_response_mutex);
+
   key = fixture->iface->transaction_first_key (tx, fixture->store, NULL);  
-  release_key_range (fixture->dataclient, "test", "test", NULL, NULL);
   
+  g_cond_wait (&fixture->dataclient->process_response_cond,
+	       &fixture->dataclient->process_response_mutex);
+
+  g_mutex_unlock (&fixture->dataclient->process_response_mutex);
+  
+  release_key_range (fixture->dataclient, "test", "test", NULL, NULL);
+
   g_assert_cmpint (g_list_length (fixture->dataclient->released_keys), ==, 0);
 
   fixture->iface->transaction_rollback (tx);
