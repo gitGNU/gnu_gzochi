@@ -1,5 +1,5 @@
 /* app.c: Application context routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 
 #include <assert.h>
 #include <glib.h>
+#include <glib-object.h>
 #include <libguile.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -235,22 +236,25 @@ initialize_data (int from_state, int to_state, gpointer user_data)
 
   if (iface == &gzochid_storage_engine_interface_dataclient)
     {
+      GzochidMetaClient *metaclient = NULL;
       GzochidDataClient *dataclient = NULL;
+
+      g_object_get (game_context->root_context->metaclient_container,
+		    "metaclient", &metaclient,
+		    NULL);
       
-      assert (game_context->root_context->meta_client != NULL);
+      assert (metaclient != NULL);
 
       /* Grab the metaclient's managed data client to inject it into storage
 	 context. */
       
-      g_object_get
-	(game_context->root_context->meta_client,
-	 "data-client", &dataclient,
-	 NULL);
+      g_object_get (metaclient, "data-client", &dataclient, NULL);
       
       gzochid_dataclient_storage_context_set_dataclient
 	(storage_context, dataclient);
       
       g_object_unref (dataclient);
+      g_object_unref (metaclient);
     }
   
   app_context->storage_context = storage_context;
@@ -266,20 +270,25 @@ initialize_data (int from_state, int to_state, gpointer user_data)
   
   if (iface == &gzochid_storage_engine_interface_dataclient)
     {
+      GzochidMetaClient *metaclient = NULL;
       GzochidDataClient *dataclient = NULL;
 
+      g_object_get (game_context->root_context->metaclient_container,
+		    "metaclient", &metaclient,
+		    NULL);
+
+      assert (metaclient != NULL);
+      
       /* Grab the metaclient's managed data client to inject into the oid
 	 strategy. */
       
-      g_object_get
-	(game_context->root_context->meta_client,
-	 "data-client", &dataclient,
-	 NULL);
+      g_object_get (metaclient, "data-client", &dataclient, NULL);
 
       app_context->oid_strategy = gzochid_dataclient_oid_strategy_new
 	(dataclient, app_context->descriptor->name);
 
       g_object_unref (dataclient);
+      g_object_unref (metaclient);
     }
   else app_context->oid_strategy = gzochid_storage_oid_strategy_new
 	 (iface, app_context->storage_context, app_context->meta);

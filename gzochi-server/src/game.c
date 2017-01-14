@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <glib.h>
+#include <glib-object.h>
 #include <glib/gstdio.h>
 #include <libguile.h>
 #include <stdlib.h>
@@ -273,6 +274,7 @@ gzochid_game_context_init (gzochid_game_context *context,
     ("game", GZOCHID_GAME_STATE_INITIALIZING, "INITIALIZING");
   GHashTable *config = gzochid_configuration_extract_group
     (root_context->configuration, "game");
+  GzochidMetaClient *metaclient = NULL;
   
   context->root_context = g_object_ref (root_context);
   context->socket_server = gzochid_resolver_require_full
@@ -308,7 +310,11 @@ gzochid_game_context_init (gzochid_game_context *context,
       strdup (g_hash_table_lookup (config, "auth.plugin.dir"));
   else context->auth_plugin_dir = GZOCHID_AUTH_PLUGIN_DIR;
 
-  if (context->root_context->meta_client != NULL)
+  g_object_get (context->root_context->metaclient_container,
+		"metaclient", &metaclient,
+		NULL);
+
+  if (metaclient != NULL)
     {
       char *conf_storage_engine = g_hash_table_lookup
 	(config, "storage.engine");
@@ -325,6 +331,8 @@ gzochid_game_context_init (gzochid_game_context *context,
 
       context->storage_engine->interface = 
 	&gzochid_storage_engine_interface_dataclient;
+
+      g_object_unref (metaclient);
     }
   else if (g_hash_table_contains (config, "storage.engine"))
     {

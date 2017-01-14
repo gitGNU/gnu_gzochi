@@ -1,5 +1,5 @@
 /* gzochid.c: Main server bootstrapping routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 #include <config.h>
 #include <getopt.h>
 #include <glib.h>
+#include <glib-object.h>
 #include <locale.h>
 #include <libintl.h>
 #include <stdio.h>
@@ -49,9 +50,10 @@ G_DEFINE_TYPE (GzochidRootContext, gzochid_root_context, G_TYPE_OBJECT);
 enum gzochid_root_context_properties
   {
     PROP_CONFIGURATION = 1,
+    PROP_RESOLUTION_CONTEXT,
     PROP_EVENT_LOOP,
     PROP_SOCKET_SERVER,
-    PROP_RESOLUTION_CONTEXT,
+    PROP_META_CLIENT_CONTAINER,
     N_PROPERTIES
   };
 
@@ -69,6 +71,10 @@ root_context_set_property (GObject *object, guint property_id,
       self->configuration = g_object_ref (g_value_get_object (value));
       break;
 
+    case PROP_RESOLUTION_CONTEXT:
+      self->resolution_context = g_object_ref_sink (g_value_get_object (value));
+      break;
+
     case PROP_EVENT_LOOP:
       self->event_loop = g_object_ref (g_value_get_object (value));
       break;
@@ -77,8 +83,8 @@ root_context_set_property (GObject *object, guint property_id,
       self->socket_server = g_object_ref (g_value_get_object (value));
       break;
 
-    case PROP_RESOLUTION_CONTEXT:
-      self->resolution_context = g_object_ref_sink (g_value_get_object (value));
+    case PROP_META_CLIENT_CONTAINER:
+      self->metaclient_container = g_object_ref (g_value_get_object (value));
       break;
       
     default:
@@ -96,23 +102,24 @@ gzochid_root_context_class_init (GzochidRootContextClass *klass)
 
   obj_properties[PROP_CONFIGURATION] = g_param_spec_object
     ("configuration", "configuration", "The server configuration",
-     GZOCHID_TYPE_CONFIGURATION,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
-
-  obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
-    ("event-loop", "event-loop", "The global event loop",
-     GZOCHID_TYPE_EVENT_LOOP,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
-  
-  obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
-    ("socket-server", "socket-server", "The global socket server",
-     GZOCHID_TYPE_SOCKET_SERVER,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+     GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
 
   obj_properties[PROP_RESOLUTION_CONTEXT] = g_param_spec_object
     ("resolution-context", "resolutuon-context", "The root resolution context",
-     GZOCHID_TYPE_RESOLUTION_CONTEXT,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_PRIVATE);
+     GZOCHID_TYPE_RESOLUTION_CONTEXT, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+
+  obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
+    ("event-loop", "event-loop", "The global event loop",
+     GZOCHID_TYPE_EVENT_LOOP, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+  
+  obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
+    ("socket-server", "socket-server", "The global socket server",
+     GZOCHID_TYPE_SOCKET_SERVER, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+
+  obj_properties[PROP_META_CLIENT_CONTAINER] = g_param_spec_object
+    ("metaclient-container", "metaclient-container",
+     "The meta client container", GZOCHID_TYPE_META_CLIENT_CONTAINER,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
 
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
@@ -185,7 +192,7 @@ Copyright (C) %s Julian Graham\n\
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\
 This is free software: you are free to change and redistribute it.\n\
 There is NO WARRANTY, to the extent permitted by law.\n"),
-	  "2016");
+	  "2017");
 }
 
 /* Set the logging threshold. */
@@ -225,6 +232,7 @@ initialize_logging (GKeyFile *key_file)
 static void
 root_context_start (GzochidRootContext *root_context)
 {
+  GzochidMetaClient *metaclient = NULL;
   GHashTable *game_config = gzochid_configuration_extract_group
     (root_context->configuration, "game");
   
@@ -244,11 +252,15 @@ root_context_start (GzochidRootContext *root_context)
 	(root_context->admin_context, GZOCHID_ADMIN_STATE_RUNNING);
     }
 
-  if (root_context->meta_client != NULL)
+  g_object_get (root_context->metaclient_container,
+		"metaclient", &metaclient,
+		NULL);
+  
+  if (metaclient != NULL)
     {
       GError *err = NULL;
       
-      gzochid_metaclient_start (root_context->meta_client, &err);
+      gzochid_metaclient_start (metaclient, &err);
 
       if (err != NULL)
 	{
@@ -256,6 +268,8 @@ root_context_start (GzochidRootContext *root_context)
 	    ("Failed to start metaserver client: %s; exiting...", err->message);
 	  exit (EXIT_FAILURE);
 	}
+
+      g_object_unref (metaclient);
     }
 }
 
@@ -273,8 +287,6 @@ main (int argc, char *argv[])
   GzochidResolutionContext *resolution_context = NULL;
   GzochidRootContext *root_context = NULL;
 
-  GHashTable *metaserver_config = NULL;
-  
   setlocale (LC_ALL, "");
 
   while ((optc = getopt_long (argc, argv, "c:hv", longopts, NULL)) != -1)
@@ -333,14 +345,6 @@ main (int argc, char *argv[])
   root_context = gzochid_resolver_require_full
     (resolution_context, GZOCHID_TYPE_ROOT_CONTEXT, &err);
 
-  metaserver_config = gzochid_configuration_extract_group
-    (configuration, "metaserver");
-
-  if (gzochid_config_to_boolean
-      (g_hash_table_lookup (metaserver_config, "client.enabled"), FALSE))
-    root_context->meta_client = gzochid_resolver_require_full
-      (root_context->resolution_context, GZOCHID_TYPE_META_CLIENT, NULL);
-    
   if (err != NULL)
     {
       g_error ("Failed to bootstrap gzochid: %s", err->message);

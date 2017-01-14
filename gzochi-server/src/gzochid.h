@@ -1,5 +1,5 @@
 /* gzochid.h: Prototypes and declarations for gzochid.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -62,10 +62,7 @@ struct _GzochidRootContext
 
   GzochidResolutionContext *resolution_context;
 
-  /* The meta server client, if running in distributed mode; `NULL' 
-     otherwise. */
-  
-  GzochidMetaClient *meta_client;
+  GzochidMetaClient *metaclient_container; /* The metaclient container. */
   
   /* Components that can't yet be auto-resolved. */
 
