@@ -1,5 +1,5 @@
 /* metaclient.c: Metaserver client for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -360,6 +360,151 @@ gzochid_meta_client_init (GzochidMetaClient *self)
   self->running = FALSE;
 
   self->event_source = gzochid_event_source_new ();
+}
+
+struct _GzochidMetaClientContainer
+{
+  GObject parent_object;
+  
+  /* The global configuration, for detecting the enablement of the meta 
+     client. */
+
+  GzochidConfiguration *configuration;
+
+  /* The resolution context, for resolving the meta client. */
+  
+  GzochidResolutionContext *resolution_context; 
+
+  /* Whether an attempt has been made to fetch the meta client. */
+
+  gboolean metaclient_initialized;
+  
+  GzochidMetaClient *metaclient; /* The meta client instance, or `NULL'. */
+};
+
+G_DEFINE_TYPE (GzochidMetaClientContainer, gzochid_meta_client_container,
+	       G_TYPE_OBJECT);
+
+enum gzochid_meta_client_container_properties
+  {
+    CONTAINER_PROP_CONFIGURATION = 1,
+    CONTAINER_PROP_RESOLUTION_CONTEXT,
+    CONTAINER_PROP_META_CLIENT,
+    CONTAINER_N_PROPERTIES
+  };
+
+static GParamSpec *container_obj_properties[CONTAINER_N_PROPERTIES] = { NULL };
+
+static void
+gzochid_meta_client_container_dispose (GObject *object)
+{
+  GzochidMetaClientContainer *self = GZOCHID_META_CLIENT_CONTAINER (object);
+
+  g_object_unref (self->configuration);
+  g_object_unref (self->resolution_context);
+
+  if (self->metaclient_initialized && self->metaclient != NULL)
+    g_object_unref (self->metaclient);
+}
+
+static void
+gzochid_meta_client_container_set_property (GObject *object, guint property_id,
+					    const GValue *value,
+					    GParamSpec *pspec)
+{
+  GzochidMetaClientContainer *self = GZOCHID_META_CLIENT_CONTAINER (object);
+
+  switch (property_id)
+    {
+    case CONTAINER_PROP_CONFIGURATION:
+      self->configuration = g_object_ref (g_value_get_object (value));
+      break;
+
+    case CONTAINER_PROP_RESOLUTION_CONTEXT:
+      self->resolution_context = g_object_ref_sink (g_value_get_object (value));
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+/* A lazy accessor function that creates the actual meta client instance. This
+   can't been done during the require / instantiation process (e.g., during
+   `construct') because the resolver will leak a reference to itself. */
+
+static GzochidMetaClient *
+lazy_init_metaclient (GzochidMetaClientContainer *self)
+{
+  if (!self->metaclient_initialized)
+    {
+      GHashTable *metaserver_config = gzochid_configuration_extract_group
+	(self->configuration, "metaserver");
+
+      if (gzochid_config_to_boolean
+	  (g_hash_table_lookup (metaserver_config, "client.enabled"), FALSE))
+	self->metaclient = gzochid_resolver_require_full
+	  (self->resolution_context, GZOCHID_TYPE_META_CLIENT, NULL);
+      
+      g_hash_table_destroy (metaserver_config);
+
+      self->metaclient_initialized = TRUE;
+    }
+
+  return self->metaclient;
+}
+
+static void
+gzochid_meta_client_container_get_property (GObject *object, guint property_id,
+					    GValue *value, GParamSpec *pspec)
+{
+  GzochidMetaClientContainer *self = GZOCHID_META_CLIENT_CONTAINER (object);
+
+  switch (property_id)
+    {
+    case CONTAINER_PROP_META_CLIENT:
+      g_value_set_object (value, lazy_init_metaclient (self));
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+gzochid_meta_client_container_class_init
+(GzochidMetaClientContainerClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = gzochid_meta_client_container_dispose;
+  object_class->get_property = gzochid_meta_client_container_get_property;
+  object_class->set_property = gzochid_meta_client_container_set_property;
+
+  container_obj_properties[CONTAINER_PROP_CONFIGURATION] = g_param_spec_object
+    ("configuration", "config", "The global configuration object",
+     GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+
+  container_obj_properties[CONTAINER_PROP_RESOLUTION_CONTEXT] =
+    g_param_spec_object ("resolution-context", "resolution-context",
+			 "The global resolution context",
+			 GZOCHID_TYPE_RESOLUTION_CONTEXT,
+			 G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+
+  container_obj_properties[CONTAINER_PROP_META_CLIENT] = g_param_spec_object
+    ("metaclient", "meta-client", "The metaclient, if configured",
+     GZOCHID_TYPE_META_CLIENT, G_PARAM_READABLE);
+
+  g_object_class_install_properties
+    (object_class, CONTAINER_N_PROPERTIES, container_obj_properties);
+}
+
+static void
+gzochid_meta_client_container_init (GzochidMetaClientContainer *self)
+{
+  self->metaclient_initialized = FALSE;
 }
 
 /* End boilerplate. */

@@ -1,5 +1,5 @@
 /* metaclient.h: Prototypes and declarations for metaclient.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -30,6 +30,17 @@
 
 GType gzochid_meta_client_get_type (void);
 
+/*
+  The meta client is the root of the hierarchy of components that allow the
+  server to communicate with other servers when running in distributed mode. It
+  has the following readable properties:
+  
+  - "dataclient" returns a reference to a GzochidDataClient
+  
+  The meta client is not eligible for injection as a dependency by 
+  `gzochid_resolver_require'.
+*/
+
 typedef struct _GzochidMetaClient GzochidMetaClient;
 
 struct _GzochidMetaClientClass
@@ -44,6 +55,39 @@ GZOCHID_META_CLIENT (gconstpointer ptr)
 {
   return G_TYPE_CHECK_INSTANCE_CAST
     (ptr, gzochid_meta_client_get_type (), GzochidMetaClient);
+}
+
+/* The core meta client container type definitions. */
+
+#define GZOCHID_TYPE_META_CLIENT_CONTAINER \
+  gzochid_meta_client_container_get_type ()
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_meta_client_container_get_type (void);
+
+/* The meta client container is a "holder" type for the gzochi meta client that
+   is eligible for injection as a dependency by `gzochid_resolver_require' and
+   which has a single readable property: "metaclient" which returns a reference
+   to the meta client if the server is running in distributed mode, and `NULL'
+   otherwise. */
+
+typedef struct _GzochidMetaClientContainer GzochidMetaClientContainer;
+
+struct _GzochidMetaClientContainerClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _GzochidMetaClientContainerClass GzochidMetaClientContainerClass;
+
+static inline GzochidMetaClientContainer *
+GZOCHID_META_CLIENT_CONTAINER (gconstpointer ptr)
+{
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_meta_client_container_get_type (),
+     GzochidMetaClientContainer);
 }
 
 /* End boilerplate. */

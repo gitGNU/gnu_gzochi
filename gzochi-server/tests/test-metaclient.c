@@ -1,5 +1,5 @@
 /* test-metaclient.c: Tests for metaclient.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -349,6 +349,69 @@ test_nullify_connection (metaclient_fixture *fixture, gconstpointer user_data)
   g_object_unref (event_loop);
 }
 
+static void
+test_metaclient_container_present ()
+{
+  GError *err = NULL;
+  GKeyFile *key_file = g_key_file_new ();
+
+  GzochidConfiguration *configuration = g_object_new
+    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
+  GzochidResolutionContext *resolution_context = g_object_new
+    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+  GzochidMetaClientContainer *container = NULL;
+  GzochidMetaClient *metaclient = NULL;
+
+  g_key_file_set_boolean (key_file, "metaserver", "client.enabled", TRUE);
+  
+  gzochid_resolver_provide (resolution_context, G_OBJECT (configuration), NULL);
+  container = gzochid_resolver_require_full
+    (resolution_context, GZOCHID_TYPE_META_CLIENT_CONTAINER, &err);
+  
+  g_assert_no_error (err);
+
+  g_object_get (container, "metaclient", &metaclient, NULL);
+
+  g_assert (metaclient != NULL);
+
+  g_object_unref (metaclient);
+  g_object_unref (container);
+  g_object_unref (resolution_context);
+  g_object_unref (configuration);
+  
+  g_key_file_unref (key_file);
+}
+
+static void
+test_metaclient_container_absent ()
+{
+  GError *err = NULL;
+  GKeyFile *key_file = g_key_file_new ();
+
+  GzochidConfiguration *configuration = g_object_new
+    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
+  GzochidResolutionContext *resolution_context = g_object_new
+    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+  GzochidMetaClientContainer *container = NULL;
+  GzochidMetaClient *metaclient = NULL;
+
+  gzochid_resolver_provide (resolution_context, G_OBJECT (configuration), NULL);
+  container = gzochid_resolver_require_full
+    (resolution_context, GZOCHID_TYPE_META_CLIENT_CONTAINER, &err);
+  
+  g_assert_no_error (err);
+
+  g_object_get (container, "metaclient", &metaclient, NULL);
+
+  g_assert (metaclient == NULL);
+
+  g_object_unref (container);
+  g_object_unref (resolution_context);
+  g_object_unref (configuration);
+  
+  g_key_file_unref (key_file);
+}
+
 int
 main (int argc, char *argv[])
 {  
@@ -372,6 +435,11 @@ main (int argc, char *argv[])
     ("/metaclient/nullify-connection/simple", metaclient_fixture, NULL,
      metaclient_fixture_setup, test_nullify_connection,
      metaclient_fixture_teardown);
+
+  g_test_add_func ("/metaclient/container/present",
+		   test_metaclient_container_present);
+  g_test_add_func ("/metaclient/container/absent",
+		   test_metaclient_container_absent);
 
   return g_test_run ();
 }
