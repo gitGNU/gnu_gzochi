@@ -1,5 +1,5 @@
 /* auth.c: Authorization management routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <gmodule.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -24,13 +25,98 @@
 
 #include "app.h"
 #include "auth_int.h"
+#include "config.h"
 #include "game.h"
 #include "gzochid-auth.h"
 #include "util.h"
 
 #define PLUGIN_INFO_FUNCTION "gzochid_auth_init_plugin"
 
+/* The authentication plugin registry encapsulates the module-loading bootstrap
+   process for the gzochid authentication system, and provides a plugin lookup
+   API for the application bootstrap process. */
+
+struct _GzochidAuthPluginRegistry
+{
+  GObject parent_instance;
+
+  GzochidConfiguration *configuration; /* The global configuration object. */
+  
+  GHashTable *auth_plugins; /* Mapping of `char *' to `gzochid_auth_plugin'. */
+};
+
+/* Boilerplate setup for the data client object. */
+
+G_DEFINE_TYPE (GzochidAuthPluginRegistry, gzochid_auth_plugin_registry,
+	       G_TYPE_OBJECT);
+
+enum gzochid_auth_plugin_registry_properties
+  {
+    PROP_CONFIGURATION = 1,
+    N_PROPERTIES
+  };
+
+static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+gzochid_auth_plugin_registry_set_property (GObject *object, guint property_id,
+					   const GValue *value,
+					   GParamSpec *pspec)
+{
+  GzochidAuthPluginRegistry *self = GZOCHID_AUTH_PLUGIN_REGISTRY (object);
+
+  switch (property_id)
+    {
+    case PROP_CONFIGURATION:
+      self->configuration = g_object_ref (g_value_get_object (value));
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+gzochid_auth_plugin_registry_dispose (GObject *object)
+{
+  GzochidAuthPluginRegistry *registry = GZOCHID_AUTH_PLUGIN_REGISTRY (object);
+
+  g_object_unref (registry->configuration);
+}
+
+static void
+gzochid_auth_plugin_registry_finalize (GObject *object)
+{
+  GzochidAuthPluginRegistry *registry = GZOCHID_AUTH_PLUGIN_REGISTRY (object);
+
+  g_hash_table_destroy (registry->auth_plugins);
+}
+
 #define GZOCHID_AUTH_IDENTITY_CACHE_DEFAULT_MAX_SIZE 1024
+static void
+gzochid_auth_plugin_registry_class_init (GzochidAuthPluginRegistryClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = gzochid_auth_plugin_registry_dispose;
+  object_class->finalize = gzochid_auth_plugin_registry_finalize;
+  object_class->set_property = gzochid_auth_plugin_registry_set_property;
+
+  obj_properties[PROP_CONFIGURATION] = g_param_spec_object
+    ("configuration", "config", "The global configuration object",
+     GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+  
+  g_object_class_install_properties
+    (object_class, N_PROPERTIES, obj_properties);
+}
+
+static void
+gzochid_auth_plugin_registry_init (GzochidAuthPluginRegistry *self)
+{
+  self->auth_plugins = g_hash_table_new_full
+    (g_str_hash, g_str_equal, NULL, (GDestroyNotify) free);
+}
 
 struct _gzochid_auth_identity
 {
@@ -88,6 +174,13 @@ gzochid_auth_function_pass_thru (unsigned char *cred, short cred_len,
   free (name);
 
   return identity;
+}
+
+gzochid_auth_plugin *
+gzochid_auth_plugin_registry_lookup (GzochidAuthPluginRegistry *registry,
+				     const char *name)
+{
+  return g_hash_table_lookup (registry->auth_plugins, name);
 }
 
 void 

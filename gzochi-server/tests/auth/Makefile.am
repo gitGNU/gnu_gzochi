@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2014 Julian Graham
+# Copyright (C) 2017 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,29 +26,39 @@ test_programs += test-krb5
 endif
 
 check_PROGRAMS = $(test_programs)
+check_LTLIBRARIES = secret.la
 
 dist_noinst_DATA = passwords.txt
 
 TESTS = $(test_programs)
 
+secret_la_SOURCES = secret.c
+secret_la_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ -Wall -Werror
+secret_la_LIBADD = @GLIB_LIBS@
+secret_la_LDFLAGS = -module -avoid-version -rpath $(abs_srcdir)
+
 test_krb5_CFLAGS = -I$(top_srcdir)/src \
-	@CFLAGS@ @GLIB_CFLAGS@ @GMODULE_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+	@CFLAGS@ @GLIB_CFLAGS@ @GMODULE_CFLAGS@ @GOBJECT_CFLAGS@ \
+	@GZOCHI_COMMON_CFLAGS@
 test_krb5_SOURCES = test-krb5.c mock-krb5.c
 test_krb5_LDADD = $(top_builddir)/src/auth/krb5.la \
 	$(top_builddir)/src/libgzochid_la-auth.o \
+	$(top_builddir)/src/libgzochid_la-config.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	@GLIB_LIBS@ @GMODULE_LIBS@ @GZOCHI_COMMON_LIBS@
+	@GLIB_LIBS@ @GMODULE_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
 test_password_file_CFLAGS = -DPASSWORDS_TXT_PATH="$(srcdir)/passwords.txt" \
 	-I$(top_srcdir)/src \
-	@CFLAGS@ @GLIB_CFLAGS@ @GMODULE_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+	@CFLAGS@ @GLIB_CFLAGS@ @GMODULE_CFLAGS@ @GOBJECT_CFLAGS@ \
+	@GZOCHI_COMMON_CFLAGS@
 test_password_file_SOURCES = test-password_file.c
 test_password_file_LDADD = $(top_builddir)/src/auth/password_file.la \
 	$(top_builddir)/src/libgzochid_la-auth.o \
+	$(top_builddir)/src/libgzochid_la-config.o \
 	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	@GLIB_LIBS@ @GMODULE_LIBS@ @GZOCHI_COMMON_LIBS@
+	@GLIB_LIBS@ @GMODULE_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 

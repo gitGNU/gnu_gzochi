@@ -1,5 +1,5 @@
 /* auth_int.h: Internal API and prototypes for auth.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,11 +19,46 @@
 #define GZOCHID_AUTH_INT_H
 
 #include <glib.h>
+#include <glib-object.h>
 
 #include "gzochid-auth.h"
 #include "lrucache.h"
 
+/* The core auth plugin registry type definitions. */
+
+#define GZOCHID_TYPE_AUTH_PLUGIN_REGISTRY \
+  gzochid_auth_plugin_registry_get_type ()
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_auth_plugin_registry_get_type (void);
+
+typedef struct _GzochidAuthPluginRegistry GzochidAuthPluginRegistry;
+
+struct _GzochidAuthPluginRegistryClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _GzochidAuthPluginRegistryClass GzochidAuthPluginRegistryClass;
+
+static inline GzochidAuthPluginRegistry *
+GZOCHID_AUTH_PLUGIN_REGISTRY (gconstpointer ptr)
+{
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_auth_plugin_registry_get_type (), GzochidAuthPluginRegistry);
+}
+
+/* End boilerplate. */
+
 struct _gzochid_application_context;
+
+/* Returns the `gzochid_auth_plugin' registered under the specified name in the
+   specified `GzochidAuthPluginRegistry', or `NULL' if no such plugin exists. */
+
+gzochid_auth_plugin *gzochid_auth_plugin_registry_lookup
+(GzochidAuthPluginRegistry *, const char *);
 struct _gzochid_game_context;
 
 void gzochid_auth_identity_serializer 

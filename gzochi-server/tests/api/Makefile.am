@@ -33,6 +33,7 @@ test_tx_LDADD = $(top_builddir)/src/api/tx.o \
 	$(top_builddir)/src/api/util.o \
 	\
 	$(top_builddir)/src/libgzochid_la-auth.o \
+	$(top_builddir)/src/libgzochid_la-config.o \
 	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-reloc.o \
