@@ -1,5 +1,5 @@
 /* resolver.h: Prototypes and declarations for resolver.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -91,11 +91,13 @@ enum GzochidResolutionError
 
 #define GZOCHID_RESOLUTION_ERROR gzochid_resolution_error_quark ()
 
-/* Construct and return an object of the specified type, recursively 
-   constructing and injecting any eligible dependencies as necessary.
-
-   This function creates a "single use" resolution context and then delegates to
-   `gzochid_resolver_require_full' below. */
+/*
+  Construct and return an object of the specified type, recursively 
+  constructing and injecting any eligible dependencies as necessary.
+  
+  This function creates a "single use" resolution context and then delegates to
+  `gzochid_resolver_require_full' below. 
+*/
 
 gpointer gzochid_resolver_require (GType, GError **);
 
@@ -106,15 +108,30 @@ gpointer gzochid_resolver_require (GType, GError **);
 gpointer gzochid_resolver_require_full
 (GzochidResolutionContext *, GType, GError **);
 
-/* Adds the specified object to the specified resolution context, registering it
-   as its most specified concrete type. Sets the specified `GError' if an 
-   instance is already registered for this type.
-
-   Use this function to inject types that would otherwise be unconstructable 
-   (because they have non-injectable arguments, e.g.). */
+/*
+  Adds the specified object to the specified resolution context, registering it
+  as its most specified concrete type. Sets the specified `GError' if an 
+  instance is already registered for this type.
+  
+  Use this function to inject types that would otherwise be unconstructable 
+  (because they have non-injectable arguments, e.g.). 
+*/
 
 void gzochid_resolver_provide (GzochidResolutionContext *, GObject *,
 			       GError **);
+
+/*
+  Creates a "sandboxed" clone of the specified resolution context, such that
+  the returned context includes references to all of the objects in the source
+  context. Changes to the returned context - object instances created passively
+  via `gzochid_resolver_require' and instances explicitly pushed to the context
+  via `gzochid_resolver_provide' - have no effect on the source context. 
+
+  The returned context should be released via `g_object_unref' when no longer in
+  use.
+*/
+
+GzochidResolutionContext *gzochid_resolver_clone (GzochidResolutionContext *);
 
 GQuark gzochid_resolution_error_quark ();
 

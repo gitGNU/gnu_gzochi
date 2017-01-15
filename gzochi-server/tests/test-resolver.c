@@ -1,5 +1,5 @@
 /* test-resolver.c: Test routines for resolver.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -631,6 +631,32 @@ test_provide ()
   g_object_unref (g);
 }
 
+static void
+test_clone ()
+{
+  GError *err = NULL;
+  GzochidResolutionContext *src_context = g_object_new
+    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+  TestObjectA *a = gzochid_resolver_require_full
+    (src_context, TEST_TYPE_OBJECT_A, NULL);
+  GzochidResolutionContext *dst_context = gzochid_resolver_clone (src_context);
+  TestObjectB *b = gzochid_resolver_require_full
+    (dst_context, TEST_TYPE_OBJECT_B, NULL);
+
+  g_assert (b->a == a);
+  
+  gzochid_resolver_provide (src_context, G_OBJECT (b), &err);
+
+  /* This asserts that the original resolution context is unmodified. */
+  
+  g_assert_no_error (err);
+
+  g_object_unref (a);
+  g_object_unref (b);
+  g_object_unref (src_context);
+  g_object_unref (dst_context);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -649,6 +675,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/resolver/require/circular", test_require_circular);
   g_test_add_func
     ("/resolver/require/resolution_context", test_require_resolution_context);
+  g_test_add_func ("/resolver/clone", test_clone);
 
   return g_test_run ();
 }

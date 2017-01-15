@@ -1,5 +1,5 @@
 /* resolver.c: Minimal dependency injection framework for gzochid components
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -535,4 +535,36 @@ gzochid_resolver_provide (GzochidResolutionContext *context, GObject *obj,
 	  GZOCHID_RESOLUTION_ERROR_DUPLICATE_TYPE,
 	  "Type '%s' already present in resolution context.",
 	  g_type_name (type));
+}
+
+/* A `GHFunc' implementation to insert all objects in the source instance cache
+   (with the exceptioon of the source resolution context itself) into the
+   destination resolution context instant cache. As part of this process the 
+   "copied" objects have their reference counts increased. */
+
+static void
+copy_ref (gpointer key, gpointer value, gpointer user_data)
+{
+  GType *src_type = key;
+
+  if (*src_type != GZOCHID_TYPE_RESOLUTION_CONTEXT)
+    {
+      GType *dst_type = malloc (sizeof (GType));
+      GzochidResolutionContext *dst = user_data;
+
+      *dst_type = *src_type;
+      
+      g_hash_table_insert (dst->instances, dst_type, g_object_ref (value));
+    }
+}
+
+GzochidResolutionContext *
+gzochid_resolver_clone (GzochidResolutionContext *src)
+{
+  GzochidResolutionContext *dst = g_object_new
+    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+
+  g_hash_table_foreach (src->instances, copy_ref, dst);
+  
+  return dst;
 }
