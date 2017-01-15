@@ -59,7 +59,6 @@ struct _gzochid_application_context;
 
 gzochid_auth_plugin *gzochid_auth_plugin_registry_lookup
 (GzochidAuthPluginRegistry *, const char *);
-struct _gzochid_game_context;
 
 void gzochid_auth_identity_serializer 
 (struct _gzochid_application_context *, void *, GByteArray *, GError **);
@@ -101,7 +100,5 @@ void gzochid_auth_identity_cache_destroy (gzochid_auth_identity_cache *);
 
 gzochid_auth_identity *gzochid_auth_identity_from_name
 (gzochid_auth_identity_cache *, char *);
-
-void gzochid_auth_init (struct _gzochid_game_context *);
 
 #endif /* GZOCHID_AUTH_INT_H */

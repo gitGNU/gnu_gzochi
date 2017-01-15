@@ -150,12 +150,13 @@ initialize_auth (int from_state, int to_state, gpointer user_data)
   
   if (app_context->descriptor->auth_type != NULL)
     {
-      if (g_hash_table_contains 
-	  (game_context->auth_plugins, app_context->descriptor->auth_type))
+      gzochid_auth_plugin *plugin = gzochid_auth_plugin_registry_lookup
+	(game_context->auth_plugin_registry,
+	 app_context->descriptor->auth_type);
+
+      if (plugin != NULL)
 	{
 	  GError *error = NULL;
-	  gzochid_auth_plugin *plugin = g_hash_table_lookup 
-	    (game_context->auth_plugins, app_context->descriptor->auth_type);
 
 	  g_debug 
 	    ("Initializing auth plugin '%s' for application '%s'.",

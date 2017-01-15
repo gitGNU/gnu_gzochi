@@ -26,9 +26,14 @@
 #include "app.h"
 #include "auth_int.h"
 #include "config.h"
-#include "game.h"
 #include "gzochid-auth.h"
 #include "util.h"
+
+#define GZOCHID_AUTH_IDENTITY_CACHE_DEFAULT_MAX_SIZE 1024
+
+#ifndef GZOCHID_AUTH_PLUGIN_DIR
+#define GZOCHID_AUTH_PLUGIN_DIR "./auth"
+#endif /* GZOCHID_AUTH_PLUGIN_DIR */
 
 #define PLUGIN_INFO_FUNCTION "gzochid_auth_init_plugin"
 
@@ -93,7 +98,123 @@ gzochid_auth_plugin_registry_finalize (GObject *object)
   g_hash_table_destroy (registry->auth_plugins);
 }
 
-#define GZOCHID_AUTH_IDENTITY_CACHE_DEFAULT_MAX_SIZE 1024
+static void
+probe_auth_plugin (gpointer data, gpointer user_data)
+{
+  const gchar *path = data;
+  GzochidAuthPluginRegistry *registry = user_data;
+  GModule *plugin_handle =
+    g_module_open (path, G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL);
+  int (*plugin_info) (gzochid_auth_plugin *);
+
+  if (plugin_handle == NULL)
+    g_warning
+      ("Failed to load auth plugin at '%s': %s", path, g_module_error ());
+  else if (!g_module_symbol 
+      (plugin_handle, PLUGIN_INFO_FUNCTION, (gpointer *) &plugin_info))
+    {
+      g_warning ("Missing plugin info at '%s': %s", path, g_module_error ());
+      g_module_close (plugin_handle);
+    }
+  else 
+    {
+      gzochid_auth_plugin *plugin = malloc (sizeof (gzochid_auth_plugin));
+      if (plugin_info (plugin) != 0)
+	{
+	  g_warning ("Failed to introspect plugin at '%s'.", path);
+
+	  free (plugin);
+	  g_module_close (plugin_handle);
+	}
+      else 
+	{
+	  g_message ("Loaded auth plugin '%s'", plugin->info->name);
+	  g_hash_table_insert
+	    (registry->auth_plugins, plugin->info->name, plugin);
+	  plugin->handle = plugin_handle;
+	}
+    }
+}
+
+static gchar *
+remove_extension (const gchar *filename)
+{
+  char *dot = rindex (filename, '.');
+
+  if (dot == NULL)
+    return g_strdup (filename);
+  else return g_strndup (filename, dot - filename);
+}
+
+static void
+probe_auth_plugins (GzochidAuthPluginRegistry *registry,
+		    const char *search_path)
+{
+  GDir *plugin_dir = g_dir_open (search_path, 0, NULL);
+  const gchar *file = NULL;
+
+  if (plugin_dir != NULL)
+    {
+      GSequence *plugin_queue = g_sequence_new (free);
+      while ((file = g_dir_read_name (plugin_dir)) != NULL)
+	{
+	  char *stripped_file = NULL;
+	  gchar *path = g_build_filename (search_path, file, NULL);
+
+	  /* Make a reasonable attempt to ignore non-regular files, like
+	     directories. This test is obviously not synchronous, which means
+	     that it could be "fooled" by a file that is removed or replaced
+	     with some other entity; the consequence is warning downstream. */
+
+	  if (!g_file_test (path, G_FILE_TEST_IS_REGULAR))
+	    {
+	      g_free (path);
+	      continue;
+	    }
+
+	  g_free (path);
+	  stripped_file = remove_extension (file);
+	  path = g_build_filename (search_path, stripped_file, NULL);
+
+	  free (stripped_file);
+
+	  if (g_sequence_lookup 
+	      (plugin_queue, path, gzochid_util_string_data_compare, NULL) 
+	      == NULL)
+	    g_sequence_insert_sorted 
+	      (plugin_queue, path, gzochid_util_string_data_compare, NULL);
+	  else g_free (path);
+	}
+      
+      g_sequence_foreach (plugin_queue, probe_auth_plugin, registry);
+      g_sequence_free (plugin_queue);
+
+      g_dir_close (plugin_dir);
+    }
+}
+
+static void
+gzochid_auth_plugin_registry_constructed (GObject *object)
+{
+  GzochidAuthPluginRegistry *registry = GZOCHID_AUTH_PLUGIN_REGISTRY (object);
+
+  if (g_module_supported ())
+    {
+      GHashTable *config = gzochid_configuration_extract_group
+	(registry->configuration, "game");
+      const char *auth_plugin_dir = NULL;
+  
+      if (g_hash_table_contains (config, "auth.plugin.dir"))
+	auth_plugin_dir = g_hash_table_lookup (config, "auth.plugin.dir");
+      else auth_plugin_dir = GZOCHID_AUTH_PLUGIN_DIR;
+      
+      probe_auth_plugins (registry, auth_plugin_dir);
+
+      g_hash_table_destroy (config);
+    }
+  else g_message ("Plugins not supported; skipping auth plugin probe.");
+}
+
 static void
 gzochid_auth_plugin_registry_class_init (GzochidAuthPluginRegistryClass *klass)
 {
@@ -101,6 +222,7 @@ gzochid_auth_plugin_registry_class_init (GzochidAuthPluginRegistryClass *klass)
 
   object_class->dispose = gzochid_auth_plugin_registry_dispose;
   object_class->finalize = gzochid_auth_plugin_registry_finalize;
+  object_class->constructed = gzochid_auth_plugin_registry_constructed;
   object_class->set_property = gzochid_auth_plugin_registry_set_property;
 
   obj_properties[PROP_CONFIGURATION] = g_param_spec_object
@@ -280,106 +402,4 @@ gzochid_auth_identity_unref (gzochid_auth_identity *identity)
     free (identity->name);
     free (identity);
   }
-}
-
-static gchar *
-remove_extension (const gchar *filename)
-{
-  char *dot = rindex (filename, '.');
-
-  if (dot == NULL)
-    return g_strdup (filename);
-  else return g_strndup (filename, dot - filename);
-}
-
-static void
-probe_auth_plugin (gpointer data, gpointer user_data)
-{
-  const gchar *path = (const gchar *) data;
-  gzochid_game_context *context = (gzochid_game_context *) user_data;
-  GModule *plugin_handle = 
-    g_module_open (path, G_MODULE_BIND_LAZY | G_MODULE_BIND_LOCAL);
-  int (*plugin_info) (gzochid_auth_plugin *);
-
-  if (plugin_handle == NULL)
-    g_warning
-      ("Failed to load auth plugin at '%s': %s", path, g_module_error ());
-  else if (!g_module_symbol 
-      (plugin_handle, PLUGIN_INFO_FUNCTION, (gpointer *) &plugin_info))
-    {
-      g_warning ("Missing plugin info at '%s': %s", path, g_module_error ());
-      g_module_close (plugin_handle);
-    }
-  else 
-    {
-      gzochid_auth_plugin *plugin = malloc (sizeof (gzochid_auth_plugin));
-      if (plugin_info (plugin) != 0)
-	{
-	  g_warning ("Failed to introspect plugin at '%s'.", path);
-
-	  free (plugin);
-	  g_module_close (plugin_handle);
-	}
-      else 
-	{
-	  g_message ("Loaded auth plugin '%s'", plugin->info->name);
-	  g_hash_table_insert 
-	    (context->auth_plugins, plugin->info->name, plugin);
-	  plugin->handle = plugin_handle;
-	}
-    }
-}
-
-static void
-probe_auth_plugins (gzochid_game_context *context, const char *search_path)
-{
-  GDir *plugin_dir = g_dir_open (search_path, 0, NULL);
-  const gchar *file = NULL;
-
-  if (plugin_dir != NULL)
-    {
-      GSequence *plugin_queue = g_sequence_new (free);
-      while ((file = g_dir_read_name (plugin_dir)) != NULL)
-	{
-	  char *stripped_file = NULL;
-	  gchar *path = g_build_filename (search_path, file, NULL);
-
-	  /* Make a reasonable attempt to ignore non-regular files, like
-	     directories. This test is obviously not synchronous, which means
-	     that it could be "fooled" by a file that is removed or replaced
-	     with some other entity; the consequence is warning downstream. */
-
-	  if (!g_file_test (path, G_FILE_TEST_IS_REGULAR))
-	    {
-	      g_free (path);
-	      continue;
-	    }
-
-	  g_free (path);
-	  stripped_file = remove_extension (file);
-	  path = g_build_filename (search_path, stripped_file, NULL);
-
-	  free (stripped_file);
-
-	  if (g_sequence_lookup 
-	      (plugin_queue, path, gzochid_util_string_data_compare, NULL) 
-	      == NULL)
-	    g_sequence_insert_sorted 
-	      (plugin_queue, path, gzochid_util_string_data_compare, NULL);
-	  else g_free (path);
-	}
-      
-      g_sequence_foreach (plugin_queue, probe_auth_plugin, context);
-      g_sequence_free (plugin_queue);
-
-      g_dir_close (plugin_dir);
-    }
-}
-
-void
-gzochid_auth_init (gzochid_game_context *context)
-{
-  if (g_module_supported ())
-    probe_auth_plugins (context, context->auth_plugin_dir);
-  else g_message ("Plugins not supported; skipping auth plugin probe.");
 }

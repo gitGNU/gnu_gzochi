@@ -1,5 +1,5 @@
 /* test-auth.c: Test routines for auth.c in gzochid.
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,9 +16,11 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <stddef.h>
 
 #include "auth_int.h"
+#include "config.h"
 #include "gzochid-auth.h"
 
 static void
@@ -54,6 +56,43 @@ test_identity_system ()
   g_assert_cmpstr ("[SYSTEM]", ==, gzochid_auth_identity_name (identity));
 }
 
+static gboolean
+ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
+                 const gchar *message, gpointer user_data)
+{
+  if (log_level & G_LOG_LEVEL_CRITICAL
+      || log_level & G_LOG_LEVEL_WARNING)
+    return FALSE;
+  else return log_level & G_LOG_FLAG_FATAL;
+}
+
+static void
+test_registry_probe ()
+{
+  gchar *cwd = g_get_current_dir ();
+  gchar *auth_dir = g_build_filename (cwd, "auth", NULL);
+  GKeyFile *key_file = g_key_file_new ();
+  GzochidConfiguration *configuration = g_object_new
+    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
+  GzochidAuthPluginRegistry *registry = NULL;
+
+  g_key_file_set_value (key_file, "game", "auth.plugin.dir", auth_dir);
+  
+  g_test_log_set_fatal_handler (ignore_warnings, NULL);
+
+  registry = g_object_new
+    (GZOCHID_TYPE_AUTH_PLUGIN_REGISTRY, "configuration", configuration, NULL);
+
+  g_assert (gzochid_auth_plugin_registry_lookup (registry, "secret") != NULL);
+  
+  g_object_unref (registry);
+  g_object_unref (configuration);
+  g_key_file_unref (key_file);
+
+  g_free (auth_dir);
+  g_free (cwd);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -63,6 +102,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/auth/identity/cache/lookup", test_identity_cache_lookup);
   g_test_add_func ("/auth/identity/system", test_identity_system);
 
+  g_test_add_func ("/auth/registry/probe", test_registry_probe);
   
   return g_test_run ();
 }

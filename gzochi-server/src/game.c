@@ -54,10 +54,6 @@
 #define SERVER_FS_APPS_DEFAULT "/var/gzochid/deploy"
 #define SERVER_FS_DATA_DEFAULT "/var/gzochid/data"
 
-#ifndef GZOCHID_AUTH_PLUGIN_DIR
-#define GZOCHID_AUTH_PLUGIN_DIR "./auth"
-#endif /* GZOCHID_AUTH_PLUGIN_DIR */
-
 #ifndef GZOCHID_STORAGE_ENGINE_DIR
 #define GZOCHID_STORAGE_ENGINE_DIR "./storage"
 #endif /* GZOCHID_STORAGE_ENGINE_DIR */
@@ -152,7 +148,11 @@ scan_apps_dir (gzochid_game_context *context)
 static void 
 initialize_auth (int from_state, int to_state, gpointer user_data)
 {
-  gzochid_auth_init (user_data);
+  gzochid_game_context *context = user_data;
+
+  context->auth_plugin_registry = g_object_new
+    (GZOCHID_TYPE_AUTH_PLUGIN_REGISTRY, "configuration",
+     context->root_context->configuration, NULL);
 }
 
 static void 
@@ -242,8 +242,7 @@ gzochid_game_context_new ()
   gzochid_game_context *context = calloc (1, sizeof (gzochid_game_context));
 
   context->applications = g_hash_table_new (g_str_hash, g_str_equal);
-  context->auth_plugins = g_hash_table_new (g_str_hash, g_str_equal);
-
+  
   return context;
 }
 
@@ -253,8 +252,9 @@ gzochid_game_context_free (gzochid_game_context *context)
   gzochid_context_free ((gzochid_context *) context);
 
   g_hash_table_destroy (context->applications);
-  g_hash_table_destroy (context->auth_plugins);
 
+  if (context->auth_plugin_registry != NULL)
+    g_object_unref (context->auth_plugin_registry);
   if (context->root_context != NULL)
     g_object_unref (context->root_context);
   if (context->socket_server != NULL)
@@ -304,11 +304,6 @@ gzochid_game_context_init (gzochid_game_context *context,
   if (g_hash_table_contains (config, "server.fs.data"))
     context->work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
   else context->work_dir = strdup (SERVER_FS_DATA_DEFAULT);
-
-  if (g_hash_table_contains (config, "auth.plugin.dir"))
-    context->auth_plugin_dir = 
-      strdup (g_hash_table_lookup (config, "auth.plugin.dir"));
-  else context->auth_plugin_dir = GZOCHID_AUTH_PLUGIN_DIR;
 
   g_object_get (context->root_context->metaclient_container,
 		"metaclient", &metaclient,
