@@ -460,7 +460,7 @@ update_stats (GzochidEvent *event, gpointer data)
 void 
 gzochid_application_context_init (gzochid_application_context *context, 
 				  gzochid_context *parent, 
-				  gzochid_application_descriptor *descriptor)
+				  GzochidApplicationDescriptor *descriptor)
 {
   char *fsm_name = g_strconcat ("app/", descriptor->name, NULL);
   gzochid_fsm *fsm = gzochid_fsm_new 
@@ -499,7 +499,7 @@ gzochid_application_context_init (gzochid_application_context *context,
   gzochid_fsm_on_enter (fsm, GZOCHID_APPLICATION_STATE_STOPPED, stop, context);
 
   context->authenticator = gzochid_auth_function_pass_thru;
-  context->descriptor = descriptor;
+  context->descriptor = g_object_ref (descriptor);
   
   gzochid_event_attach (context->event_source, update_stats, context->stats);
 

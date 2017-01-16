@@ -60,7 +60,7 @@
 
 static void 
 initialize_application (gzochid_game_context *context, const char *dir,
-			gzochid_application_descriptor *descriptor)
+			GzochidApplicationDescriptor *descriptor)
 {
   gzochid_application_context *application_context =
     gzochid_application_context_new ();
@@ -81,7 +81,7 @@ scan_app_dir (gzochid_game_context *context, const char *dir)
   FILE *descriptor_file = NULL;
   char *descriptor_filename = g_strconcat (dir, "/", GAME_DESCRIPTOR_XML, NULL);
 
-  gzochid_application_descriptor *descriptor = NULL;
+  GzochidApplicationDescriptor *descriptor = NULL;
 
   if (!g_file_test (descriptor_filename, G_FILE_TEST_IS_REGULAR))
     {

@@ -46,7 +46,7 @@ struct _gzochid_application_context
      relative load paths. */
 
   char *deployment_root;
-  gzochid_application_descriptor *descriptor;  
+  GzochidApplicationDescriptor *descriptor;
 
   GList *load_paths; /* Complete set of module load paths. */
 
@@ -99,7 +99,7 @@ gzochid_application_context *gzochid_application_context_new (void);
 
 void gzochid_application_context_init (gzochid_application_context *,
 				       gzochid_context *,
-				       gzochid_application_descriptor *);
+				       GzochidApplicationDescriptor *);
 
 void gzochid_application_context_free (gzochid_application_context *);
 

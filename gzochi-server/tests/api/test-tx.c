@@ -23,6 +23,7 @@
 #include "../app.h"
 #include "../channel.h"
 #include "../context.h"
+#include "../descriptor.h"
 #include "../guile.h"
 #include "../gzochid-auth.h"
 #include "../session.h"
@@ -384,8 +385,8 @@ inner_main (void *data, int argc, char *argv[])
   
   t.app_context = gzochid_application_context_new ();
   t.app_context->identity_cache = gzochid_auth_identity_cache_new ();
-  t.app_context->descriptor = 
-    calloc (1, sizeof (gzochid_application_descriptor));
+  t.app_context->descriptor =
+    g_object_new (GZOCHID_TYPE_APPLICATION_DESCRIPTOR, NULL);
   t.app_context->deployment_root = "";
 
   application_context_init (t.app_context);
@@ -405,7 +406,7 @@ inner_main (void *data, int argc, char *argv[])
   g_test_run ();
 
   gzochid_auth_identity_unref (t.identity);
-  free (t.app_context->descriptor);
+  g_object_unref (t.app_context->descriptor);
   gzochid_auth_identity_cache_destroy (t.app_context->identity_cache);
   gzochid_application_context_free (t.app_context);
 }

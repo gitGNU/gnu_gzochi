@@ -176,13 +176,13 @@ test_dataserver_protocol_LDADD = \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
-test_descriptor_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@
+test_descriptor_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_descriptor_SOURCES = test-descriptor.c
 test_descriptor_LDADD = $(top_builddir)/src/libgzochid_la-callback.o \
 	$(top_builddir)/src/libgzochid_la-descriptor.o \
 	$(top_builddir)/src/libgzochid_la-fmemopen.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
-	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_durable_task_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GMODULE_CFLAGS@
 test_durable_task_SOURCES = test-durable-task.c
@@ -331,7 +331,9 @@ test_scheme_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
 test_scheme_SOURCES = test-scheme.c mock-data.c
 test_scheme_LDADD = \
 	$(top_builddir)/src/libgzochid_la-auth.o \
+	$(top_builddir)/src/libgzochid_la-callback.o \
 	$(top_builddir)/src/libgzochid_la-config.o \
+	$(top_builddir)/src/libgzochid_la-descriptor.o \
 	$(top_builddir)/src/libgzochid_la-guile.o \
 	$(top_builddir)/src/libgzochid_la-io.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \

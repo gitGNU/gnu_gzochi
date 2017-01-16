@@ -1,5 +1,5 @@
 /* test-scheme-task.c: Test routines for scheme-task.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <libguile.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -23,6 +24,7 @@
 #include "app.h"
 #include "app-task.h"
 #include "context.h"
+#include "descriptor.h"
 #include "game.h"
 #include "guile.h"
 #include "gzochid-auth.h"
@@ -63,8 +65,8 @@ test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
 
   fixture->context = gzochid_application_context_new ();
   fixture->context->deployment_root = "/tmp";
-  fixture->context->descriptor = 
-    calloc (1, sizeof (gzochid_application_descriptor));
+  fixture->context->descriptor = g_object_new
+    (GZOCHID_TYPE_APPLICATION_DESCRIPTOR, NULL);
   fixture->context->identity_cache = gzochid_auth_identity_cache_new ();
 
   fixture->identity = gzochid_auth_identity_new ("[TEST]");
@@ -101,7 +103,7 @@ test_scheme_task_fixture_teardown (struct test_scheme_task_fixture *fixture,
   gzochid_game_context *game_context = (gzochid_game_context *)
     ((gzochid_context *) fixture->context)->parent;
     
-  free (fixture->context->descriptor);
+  g_object_unref (fixture->context->descriptor);
   gzochid_auth_identity_cache_destroy (fixture->context->identity_cache);
 
   fixture->storage_interface->close_store (fixture->context->meta);
@@ -272,8 +274,8 @@ static void
 test_ready_throws_exception ()
 {
   gzochid_application_context *context = gzochid_application_context_new ();
-  gzochid_application_descriptor *descriptor = 
-    calloc (1, sizeof (gzochid_application_descriptor));
+  GzochidApplicationDescriptor *descriptor = g_object_new
+    (GZOCHID_TYPE_APPLICATION_DESCRIPTOR, NULL);
   gzochid_auth_identity *identity = gzochid_auth_identity_new ("[TEST]");
   
   SCM module = scm_c_resolve_module ("test");
@@ -286,7 +288,6 @@ test_ready_throws_exception ()
   
   scm_c_module_define (module, "ready", ready);
 
-  descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);
   descriptor->ready = make_callback ("ready", test_module);
 
   context->deployment_root = "/";
@@ -299,8 +300,7 @@ test_ready_throws_exception ()
   g_error_free (tmp_err);
   g_list_free (test_module);
   gzochid_auth_identity_unref (identity);
-  g_hash_table_destroy (descriptor->properties);
-  free (descriptor);
+  g_object_unref (descriptor);
   gzochid_application_context_free (context);
 }
 

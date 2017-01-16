@@ -1,5 +1,5 @@
 /* descriptor.c: Game application descriptor parsing routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 struct _descriptor_builder_context
 {
   GList *hierarchy;
-  gzochid_application_descriptor *descriptor;
+  GzochidApplicationDescriptor *descriptor;
 };
 
 typedef struct _descriptor_builder_context  descriptor_builder_context;
@@ -73,7 +73,7 @@ descriptor_start_element (GMarkupParseContext *context,
 			  const gchar **attribute_values, gpointer user_data,
 			  GError **error)
 {
-  gzochid_application_descriptor *descriptor = user_data;
+  GzochidApplicationDescriptor *descriptor = user_data;
   const GSList *stack = g_markup_parse_context_get_element_stack (context);
   char *parent = stack->next == NULL ? NULL : stack->next->data;
 
@@ -199,7 +199,7 @@ static void
 descriptor_end_element (GMarkupParseContext *context, const gchar *element_name,
 			gpointer user_data, GError **error)
 {
-  gzochid_application_descriptor *descriptor = user_data;
+  GzochidApplicationDescriptor *descriptor = user_data;
 
   if (strcmp (element_name, "game") == 0)
     {
@@ -239,7 +239,7 @@ static void
 descriptor_text (GMarkupParseContext *context, const gchar *text,
 		 gsize text_len, gpointer user_data, GError **error)
 {
-  gzochid_application_descriptor *descriptor = user_data;
+  GzochidApplicationDescriptor *descriptor = user_data;
   const GSList *stack = g_markup_parse_context_get_element_stack (context);
   char *parent = stack->data;
 
@@ -259,38 +259,68 @@ GMarkupParser descriptor_parser =
     NULL
   };
 
-static gzochid_application_descriptor *
-descriptor_new ()
+/* Boilerplate setup for the application descriptor object. */
+
+G_DEFINE_TYPE (GzochidApplicationDescriptor, gzochid_application_descriptor,
+	       G_TYPE_OBJECT);
+
+static void
+application_descriptor_finalize (GObject *object)
 {
-  gzochid_application_descriptor *descriptor =
-    calloc (1, sizeof (gzochid_application_descriptor));
+  GzochidApplicationDescriptor *self = GZOCHID_APPLICATION_DESCRIPTOR (object);
 
-  descriptor->properties = g_hash_table_new (g_str_hash, g_str_equal);
-  descriptor->auth_properties = g_hash_table_new (g_str_hash, g_str_equal);
+  if (self->name != NULL)
+    free (self->name);
+  if (self->description != NULL)
+    free (self->description);
 
-  return descriptor;
+  g_list_free_full (self->load_paths, (GDestroyNotify) free);
+
+  if (self->initialized != NULL)
+    gzochid_application_callback_free (self->initialized);
+  if (self->logged_in != NULL)
+    gzochid_application_callback_free (self->logged_in);
+  if (self->ready != NULL)
+    gzochid_application_callback_free (self->ready);
+
+  if (self->auth_type != NULL)
+    free (self->auth_type);
+  
+  g_hash_table_destroy (self->properties);
+  g_hash_table_destroy (self->auth_properties);  
 }
 
 static void
-descriptor_free (gzochid_application_descriptor *descriptor)
+gzochid_application_descriptor_class_init
+(GzochidApplicationDescriptorClass *klass)
 {
-  g_hash_table_destroy (descriptor->properties);
-  g_hash_table_destroy (descriptor->auth_properties);
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-  free (descriptor);
+  object_class->finalize = application_descriptor_finalize;
 }
 
-gzochid_application_descriptor *
+static void
+gzochid_application_descriptor_init (GzochidApplicationDescriptor *self)
+{
+  self->properties = g_hash_table_new_full
+    (g_str_hash, g_str_equal, (GDestroyNotify) free, (GDestroyNotify) free);
+  self->auth_properties = g_hash_table_new_full
+    (g_str_hash, g_str_equal, (GDestroyNotify) free, (GDestroyNotify) free);
+}
+
+/* End boilerplate. */
+
+GzochidApplicationDescriptor *
 gzochid_config_parse_application_descriptor (FILE *file)
 {
-  gzochid_application_descriptor *descriptor = NULL;  
+  GzochidApplicationDescriptor *descriptor = g_object_new
+    (GZOCHID_TYPE_APPLICATION_DESCRIPTOR, NULL);
   GMarkupParseContext *context = NULL; 
   GError *err = NULL;
   
   char buf[1024];
   int bytes_read = 0;
 
-  descriptor = descriptor_new ();
   context = g_markup_parse_context_new 
     (&descriptor_parser, 0, descriptor, NULL);
  
@@ -308,8 +338,8 @@ gzochid_config_parse_application_descriptor (FILE *file)
     {
       g_warning ("%s", err->message);      
       g_error_free (err);
-      
-      descriptor_free (descriptor);
+
+      g_object_unref (descriptor);
       descriptor = NULL;
     }
   

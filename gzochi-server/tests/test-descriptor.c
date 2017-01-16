@@ -70,7 +70,7 @@ test_descriptor_parse_ready ()
 
   FILE *descriptor_file = 
     fmemopen (descriptor_text, strlen (descriptor_text), "r");
-  gzochid_application_descriptor *descriptor =
+  GzochidApplicationDescriptor *descriptor =
     gzochid_config_parse_application_descriptor (descriptor_file);
   GList *module = g_list_append (NULL, "test");
 
@@ -81,6 +81,7 @@ test_descriptor_parse_ready ()
 
   g_list_free (module);
   fclose (descriptor_file);
+  g_object_unref (descriptor);
 }
 
 static void 

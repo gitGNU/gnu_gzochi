@@ -22,6 +22,7 @@
 
 #include "app.h"
 #include "channel.h"
+#include "descriptor.h"
 #include "guile.h"
 #include "gzochid-auth.h"
 #include "scheme.h"
@@ -81,7 +82,8 @@ test_serialization_exception ()
   GByteArray *str = g_byte_array_new ();
   GError *err = NULL;
 
-  context->descriptor = calloc (1, sizeof (gzochid_application_descriptor));
+  context->descriptor = g_object_new
+    (GZOCHID_TYPE_APPLICATION_DESCRIPTOR, NULL);
   context->deployment_root = "/";
   g_mutex_init (&((gzochid_context *) context)->mutex);
   
@@ -94,7 +96,7 @@ test_serialization_exception ()
   g_assert_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_FAILED);
   g_clear_error (&err);
 
-  free (context->descriptor);
+  g_object_unref (context->descriptor);
   gzochid_application_context_free (context);
   g_byte_array_unref (str);
 }
@@ -116,7 +118,6 @@ test_serialization_corrupt ()
   g_assert_error (err, GZOCHID_SCHEME_ERROR, GZOCHID_SCHEME_ERROR_SERIAL);
   g_clear_error (&err);
 
-  free (context->descriptor);
   gzochid_application_context_free (context);
   g_byte_array_unref (str);
 }

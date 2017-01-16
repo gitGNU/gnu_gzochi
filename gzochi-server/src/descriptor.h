@@ -19,12 +19,24 @@
 #define GZOCHID_DESCRIPTOR_H
 
 #include <glib.h>
+#include <glib-object.h>
 #include <stdio.h>
 
 #include "callback.h"
 
-struct _gzochid_application_descriptor
+/* The core application descriptor type definitions. */
+
+#define GZOCHID_TYPE_APPLICATION_DESCRIPTOR	\
+  gzochid_application_descriptor_get_type ()
+
+GType gzochid_application_descriptor_get_type (void);
+
+/* The gzochid application descriptor struct. */
+
+struct _GzochidApplicationDescriptor
 {
+  GObject parent_object;
+  
   char *name;
   char *description;
 
@@ -40,9 +52,32 @@ struct _gzochid_application_descriptor
   GHashTable *properties;
 };
 
-typedef struct _gzochid_application_descriptor gzochid_application_descriptor;
+typedef struct _GzochidApplicationDescriptor GzochidApplicationDescriptor;
 
-gzochid_application_descriptor *gzochid_config_parse_application_descriptor 
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_application_descriptor_get_type (void);
+
+struct _GzochidApplicationDescriptorClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _GzochidApplicationDescriptorClass
+GzochidApplicationDescriptorClass;
+
+static inline GzochidApplicationDescriptor *
+GZOCHID_APPLICATION_DESCRIPTOR (gconstpointer ptr)
+{
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_application_descriptor_get_type (),
+     GzochidApplicationDescriptor);
+}
+
+/* End boilerplate. */
+
+GzochidApplicationDescriptor *gzochid_config_parse_application_descriptor 
 (FILE *);
 
 #endif /* GZOCHID_DESCRIPTOR_H */
