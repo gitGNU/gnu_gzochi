@@ -1,5 +1,5 @@
 /* callback.c: Constructors and serialization routines for application callbacks
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,7 +16,9 @@
  */
 
 #include <glib.h>
+#include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "app.h"
 #include "callback.h"
@@ -55,27 +57,29 @@ deserialize_callback (gzochid_application_context *context, GByteArray *in,
 static void
 finalize_callback (gzochid_application_context *context, gpointer data)
 {
-  gzochid_application_callback *callback = data;
-
-  free (callback->procedure);
-  g_list_free_full (callback->module, free);
-
-  free (callback);
+  gzochid_application_callback_free (data);
 }
 
 gzochid_io_serialization 
 gzochid_application_callback_serialization = 
   { serialize_callback, deserialize_callback, finalize_callback };
 
+static gpointer
+strdup_copy_func (gconstpointer src, gpointer data)
+{
+  return strdup (src);
+}
+
 gzochid_application_callback *
-gzochid_application_callback_new (char *procedure, GList *module,
+gzochid_application_callback_new (const char *procedure, const GList *module,
 				  guint64 scm_oid)
 {
   gzochid_application_callback *callback = calloc
     (1, sizeof (gzochid_application_callback));
 
-  callback->module = module;
-  callback->procedure = procedure;
+  callback->module = g_list_copy_deep
+    ((GList *) module, strdup_copy_func, NULL);
+  callback->procedure = strdup (procedure);
   callback->scm_oid = scm_oid;
 
   return callback;
@@ -84,6 +88,8 @@ gzochid_application_callback_new (char *procedure, GList *module,
 void 
 gzochid_application_callback_free (gzochid_application_callback *callback)
 {
+  free (callback->procedure);
+  g_list_free_full (callback->module, free);
+
   free (callback);
 }
-

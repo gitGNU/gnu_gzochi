@@ -155,16 +155,18 @@ descriptor_start_element (GMarkupParseContext *context,
 
 	  if (strcmp (parent, "initialized") == 0)
 	    descriptor->initialized = gzochid_application_callback_new 
-	      (strdup (procedure), module_name, 0);
+	      (procedure, module_name, 0);
 	  else if (strcmp (parent, "logged-in") == 0)
 	    descriptor->logged_in = gzochid_application_callback_new 
-	      (strdup (procedure), module_name, 0);
+	      (procedure, module_name, 0);
 	  else if (strcmp (parent, "ready") == 0)
 	    descriptor->ready = gzochid_application_callback_new
-	      (strdup (procedure), module_name, 0);
+	      (procedure, module_name, 0);
 	  else *error = g_error_new 
 		 (G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, 
 		  "Invalid position for 'callback' element.");
+
+	  g_list_free_full (module_name, (GDestroyNotify) free);
 	}
       else;
     }

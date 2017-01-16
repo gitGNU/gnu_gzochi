@@ -1,5 +1,5 @@
 /* callback.h: Prototypes and declarations for callback.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ typedef struct _gzochid_application_callback gzochid_application_callback;
 extern gzochid_io_serialization gzochid_application_callback_serialization;
 
 gzochid_application_callback *gzochid_application_callback_new 
-(char *, GList *, guint64);
+(const char *, const GList *, guint64);
 void gzochid_application_callback_free (gzochid_application_callback *);
 
 #endif /* GZOCHID_CALLBACK_H */

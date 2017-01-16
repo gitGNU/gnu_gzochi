@@ -216,7 +216,6 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
     (fixture->context, fixture->identity, "1");
 
   g_list_free (test_module);
-  gzochid_application_callback_free (fixture->context->descriptor->logged_in);
 }
 
 static void 
@@ -253,7 +252,6 @@ test_logged_in_worker_returns_unspecified_inner (gpointer data)
     (fixture->context, fixture->identity, "1");
 
   g_list_free (test_module);
-  gzochid_application_callback_free (fixture->context->descriptor->logged_in);
 }
 
 static void 
@@ -300,7 +298,6 @@ test_ready_throws_exception ()
 
   g_error_free (tmp_err);
   g_list_free (test_module);
-  gzochid_application_callback_free (descriptor->ready);
   gzochid_auth_identity_unref (identity);
   g_hash_table_destroy (descriptor->properties);
   free (descriptor);

@@ -1,5 +1,5 @@
 /* test-descriptor.c: Test routines for descriptor.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -79,6 +79,7 @@ test_descriptor_parse_ready ()
   g_assert (list_equal (module, descriptor->ready->module, 
 			(GCompareFunc) strcmp));
 
+  g_list_free (module);
   fclose (descriptor_file);
 }
 
