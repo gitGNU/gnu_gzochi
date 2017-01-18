@@ -1,5 +1,5 @@
 /* gzochid-migrate.c: Utility for migrating game data schema
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -434,7 +434,7 @@ create_migration (gzochid_application_context *context,
   m->pending_oids = g_queue_new ();
   
   m->visited_oids = create_oid_scratch_storage 
-    (APP_STORAGE_INTERFACE (context), scratch_dir);
+    (context->storage_engine_interface, scratch_dir);
   m->visited_oids_path = scratch_dir;
 
   m->callback = resolve_or_die (md->callback_module, md->callback_name);
@@ -467,11 +467,9 @@ create_migration (gzochid_application_context *context,
 static void 
 cleanup_application_context (gzochid_application_context *context)
 {
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (context);
-
-  iface->close_store (context->meta);
-  iface->close_store (context->names);
-  iface->close_store (context->oids);
+  context->storage_engine_interface->close_store (context->meta);
+  context->storage_engine_interface->close_store (context->names);
+  context->storage_engine_interface->close_store (context->oids);
 
   gzochid_application_context_free (context);
 }
@@ -480,7 +478,8 @@ static void
 cleanup_migration (struct migration *m)
 {
   cleanup_oids_scratch_storage 
-    (APP_STORAGE_INTERFACE (m->context), m->visited_oids, m->visited_oids_path);
+    (m->context->storage_engine_interface, m->visited_oids,
+     m->visited_oids_path);
   cleanup_application_context (m->context);
 
   free (m->visited_oids_path);
@@ -501,7 +500,7 @@ open_store (gzochid_application_context *context, char *path, char *db)
 {
   gchar *filename = g_strconcat (path, "/", db, NULL);
   gzochid_storage_store *store = gzochid_tool_open_store 
-    (APP_STORAGE_INTERFACE (context), context->storage_context, filename);
+    (context->storage_engine_interface, context->storage_context, filename);
 
   g_free (filename);
   return store;
@@ -592,8 +591,9 @@ create_application_context (char *path, char *app)
     gzochid_tool_probe_storage_engine (config, storage_engine);
   ((gzochid_context *) context)->parent = (gzochid_context *) parent;  
 
-  context->storage_context = 
-    APP_STORAGE_INTERFACE (context)->initialize (data_dir);
+  context->storage_engine_interface = parent->storage_engine->interface;
+  context->storage_context = context->storage_engine_interface
+    ->initialize (data_dir);
 
   if (context->storage_context == NULL)
     {
@@ -754,16 +754,15 @@ migrate_object (struct migration *m, guint64 oid)
   args[0] = m;
   args[1] = &oid;
 
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (m->context);
-  gzochid_storage_transaction *tx = iface->transaction_begin
-    (m->context->storage_context);
+  gzochid_storage_transaction *tx = m->context->storage_engine_interface
+    ->transaction_begin (m->context->storage_context);
   guint64 encoded_oid = gzochid_util_encode_oid (oid);
-  char *val = iface->transaction_get
+  char *val = m->context->storage_engine_interface->transaction_get
     (tx, m->visited_oids, (char *) &encoded_oid, sizeof (guint64), NULL);
       
   if (val == NULL)
     {
-      iface->transaction_put
+      m->context->storage_engine_interface->transaction_put
 	(tx, m->visited_oids, (char *) &encoded_oid, sizeof (guint64), "", 1);
       if (gzochid_transaction_execute (migrate_object_tx, args) 
 	  != GZOCHID_TRANSACTION_SUCCESS && !m->explicit_rollback)
@@ -774,8 +773,8 @@ migrate_object (struct migration *m, guint64 oid)
     }
   else free (val);
 
-  iface->transaction_prepare (tx);
-  iface->transaction_commit (tx);
+  m->context->storage_engine_interface->transaction_prepare (tx);
+  m->context->storage_engine_interface->transaction_commit (tx);
 }
 
 struct datum
@@ -788,18 +787,17 @@ static struct datum
 next_key (struct migration *m, struct datum last_key)
 {
   struct datum key = { NULL, 0 };
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (m->context);
-  gzochid_storage_transaction *tx = iface->transaction_begin
-    (m->context->storage_context);
+  gzochid_storage_transaction *tx = m->context->storage_engine_interface
+    ->transaction_begin (m->context->storage_context);
   
   if (last_key.data == NULL)
-    key.data = iface->transaction_next_key
-      (tx, m->context->names, "o.", 2, &key.data_len);
-  else key.data = iface->transaction_next_key 
-	 (tx, m->context->names, last_key.data, last_key.data_len,
-	  &key.data_len);
+    key.data = m->context->storage_engine_interface
+      ->transaction_next_key (tx, m->context->names, "o.", 2, &key.data_len);
+  else key.data = m->context->storage_engine_interface
+	 ->transaction_next_key (tx, m->context->names, last_key.data,
+				 last_key.data_len, &key.data_len);
 
-  iface->transaction_rollback (tx);
+  m->context->storage_engine_interface->transaction_rollback (tx);
   
   if (key.data != NULL && strncmp ("o.", key.data, 2) != 0)
     {
@@ -832,16 +830,15 @@ run_migration (struct migration *m)
 	    break;
 	  else
 	    {
-	      gzochid_storage_engine_interface *iface =
-		APP_STORAGE_INTERFACE (m->context);
-	      gzochid_storage_transaction *tx = iface->transaction_begin
+	      gzochid_storage_transaction *tx =
+		m->context->storage_engine_interface->transaction_begin
 		(m->context->storage_context);
 
 	      size_t oid_len = 0;
 	      char *oid_bytes = NULL;
 	      guint64 encoded_oid = 0;
 	      
-	      oid_bytes = iface->transaction_get 
+	      oid_bytes = m->context->storage_engine_interface->transaction_get 
 		(tx, m->context->names, key.data, key.data_len, &oid_len);
 
 	      assert (oid_len == sizeof (guint64));
@@ -851,7 +848,7 @@ run_migration (struct migration *m)
 	      oid = malloc (sizeof (guint64));
 	      *oid = gzochid_util_decode_oid (encoded_oid);
 	      
-	      iface->transaction_rollback (tx);
+	      m->context->storage_engine_interface->transaction_rollback (tx);
 	    }
 	}
       

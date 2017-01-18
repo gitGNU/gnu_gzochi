@@ -1,5 +1,5 @@
 /* test-session.c: Test routines for session.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -84,6 +84,7 @@ application_context_init (gzochid_application_context *context)
 
   context->deployment_root = "/";
   
+  context->storage_engine_interface = &gzochid_storage_engine_interface_mem;
   context->storage_context = 
     gzochid_storage_engine_interface_mem.initialize ("/dev/null");
   context->meta = gzochid_storage_engine_interface_mem.open

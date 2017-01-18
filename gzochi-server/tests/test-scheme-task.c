@@ -82,6 +82,7 @@ test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
   
   fixture->storage_interface = storage_engine->interface;
   
+  fixture->context->storage_engine_interface = fixture->storage_interface;
   fixture->context->storage_context =
     fixture->storage_interface->initialize ("/tmp");
   fixture->context->meta = fixture->storage_interface->open

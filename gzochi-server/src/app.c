@@ -206,7 +206,6 @@ initialize_data (int from_state, int to_state, gpointer user_data)
   char *names_db = g_strconcat (data_dir, "/names", NULL);
 
   gzochid_storage_context *storage_context = NULL;
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
 
   if (game_context->storage_engine->handle != NULL)
     {
@@ -227,7 +226,8 @@ initialize_data (int from_state, int to_state, gpointer user_data)
 	}
     }
   
-  storage_context = iface->initialize (data_dir);
+  storage_context = app_context->storage_engine_interface
+    ->initialize (data_dir);
 
   if (storage_context == NULL)
     {
@@ -235,7 +235,8 @@ initialize_data (int from_state, int to_state, gpointer user_data)
       exit (EXIT_FAILURE);
     }
 
-  if (iface == &gzochid_storage_engine_interface_dataclient)
+  if (app_context->storage_engine_interface ==
+      &gzochid_storage_engine_interface_dataclient)
     {
       GzochidMetaClient *metaclient = NULL;
       GzochidDataClient *dataclient = NULL;
@@ -259,17 +260,18 @@ initialize_data (int from_state, int to_state, gpointer user_data)
     }
   
   app_context->storage_context = storage_context;
-  app_context->meta = iface->open 
+  app_context->meta = app_context->storage_engine_interface->open 
     (storage_context, meta_db, GZOCHID_STORAGE_CREATE);
-  app_context->oids = iface->open 
+  app_context->oids = app_context->storage_engine_interface->open 
     (storage_context, oids_db, GZOCHID_STORAGE_CREATE);
-  app_context->names = iface->open 
+  app_context->names = app_context->storage_engine_interface->open 
     (storage_context, names_db, GZOCHID_STORAGE_CREATE);
 
   /* If we're using the dataclient storage engine, we need to use the dataclient
      oid allocation strategy. */
   
-  if (iface == &gzochid_storage_engine_interface_dataclient)
+  if (app_context->storage_engine_interface ==
+      &gzochid_storage_engine_interface_dataclient)
     {
       GzochidMetaClient *metaclient = NULL;
       GzochidDataClient *dataclient = NULL;
@@ -292,7 +294,8 @@ initialize_data (int from_state, int to_state, gpointer user_data)
       g_object_unref (metaclient);
     }
   else app_context->oid_strategy = gzochid_storage_oid_strategy_new
-	 (iface, app_context->storage_context, app_context->meta);
+	 (app_context->storage_engine_interface, app_context->storage_context,
+	  app_context->meta);
 
   free (data_dir);
   free (meta_db);
@@ -441,14 +444,13 @@ static void
 stop (int from_state, int to_state, gpointer user_data)
 {
   gzochid_application_context *context = user_data;
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (context);
 
   if (context->meta != NULL)
-    iface->close_store (context->meta);
+    context->storage_engine_interface->close_store (context->meta);
   if (context->oids != NULL)
-    iface->close_store (context->oids);
+    context->storage_engine_interface->close_store (context->oids);
   if (context->names != NULL)
-    iface->close_store (context->names);  
+    context->storage_engine_interface->close_store (context->names);  
 }
 
 static void 
@@ -460,7 +462,8 @@ update_stats (GzochidEvent *event, gpointer data)
 void 
 gzochid_application_context_init (gzochid_application_context *context, 
 				  gzochid_context *parent, 
-				  GzochidApplicationDescriptor *descriptor)
+				  GzochidApplicationDescriptor *descriptor,
+				  gzochid_storage_engine_interface *iface)
 {
   char *fsm_name = g_strconcat ("app/", descriptor->name, NULL);
   gzochid_fsm *fsm = gzochid_fsm_new 
@@ -500,6 +503,7 @@ gzochid_application_context_init (gzochid_application_context *context,
 
   context->authenticator = gzochid_auth_function_pass_thru;
   context->descriptor = g_object_ref (descriptor);
+  context->storage_engine_interface = iface;
   
   gzochid_event_attach (context->event_source, update_stats, context->stats);
 

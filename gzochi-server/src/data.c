@@ -1,5 +1,5 @@
 /* data.c: Application data management routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -89,9 +89,9 @@ create_transaction_context (gzochid_application_context *app_context,
   tx_context->context = app_context;
 
   if (timeout != NULL)
-    tx_context->transaction = APP_STORAGE_INTERFACE (app_context)
+    tx_context->transaction = app_context->storage_engine_interface
       ->transaction_begin_timed (app_context->storage_context, *timeout);
-  else tx_context->transaction = APP_STORAGE_INTERFACE (app_context)
+  else tx_context->transaction = app_context->storage_engine_interface
 	 ->transaction_begin (app_context->storage_context);
 
   tx_context->oids_to_references = g_hash_table_new_full 
@@ -164,7 +164,7 @@ flush_reference (gzochid_data_managed_reference *reference,
 	  return FALSE;
 	}
 
-      APP_STORAGE_INTERFACE (context->context)->transaction_put
+      context->context->storage_engine_interface->transaction_put
 	(context->transaction, context->context->oids,
 	 (char *) &encoded_oid, sizeof (guint64),
 	 (char *) out->data, out->len);
@@ -198,8 +198,6 @@ data_prepare (gpointer data)
   GList *references = g_hash_table_get_values (context->oids_to_references);
   GList *reference_ptr = references;
   gboolean flush_failed = FALSE;
-  gzochid_storage_engine_interface *iface = 
-    APP_STORAGE_INTERFACE (context->context);
 
   while (reference_ptr != NULL)
     {
@@ -216,7 +214,9 @@ data_prepare (gpointer data)
   if (flush_failed)
     return FALSE;
 
-  iface->transaction_prepare (context->transaction);
+  context->context->storage_engine_interface
+    ->transaction_prepare (context->transaction);
+
   if (context->transaction->rollback)
     return FALSE;
 
@@ -249,10 +249,10 @@ static void
 data_commit (gpointer data)
 {
   gzochid_data_transaction_context *context = data;
-  gzochid_storage_engine_interface *iface = 
-    APP_STORAGE_INTERFACE (context->context);
 
-  iface->transaction_commit (context->transaction);
+  context->context->storage_engine_interface
+    ->transaction_commit (context->transaction);
+
   finalize_references (context);
   transaction_context_free (context);
 }
@@ -268,10 +268,9 @@ data_rollback (gpointer data)
 
   if (context != NULL)
     {
-      gzochid_storage_engine_interface *iface = 
-	APP_STORAGE_INTERFACE (context->context);
+      context->context->storage_engine_interface
+	->transaction_rollback (context->transaction);
 
-      iface->transaction_rollback (context->transaction);
       finalize_references (context);
       transaction_context_free (context);
     }
@@ -312,7 +311,7 @@ get_binding (gzochid_data_transaction_context *context, char *name,
 	     GError **err)
 {
   size_t oid_bytes_len = 0;
-  char *oid_bytes = APP_STORAGE_INTERFACE (context->context)->transaction_get 
+  char *oid_bytes = context->context->storage_engine_interface->transaction_get 
     (context->transaction, context->context->names, name, strlen (name) + 1, 
      &oid_bytes_len);
 
@@ -354,7 +353,7 @@ set_binding (gzochid_data_transaction_context *context, char *name, guint64 oid,
 {
   guint64 encoded_oid = gzochid_util_encode_oid (oid);
   
-  APP_STORAGE_INTERFACE (context->context)->transaction_put 
+  context->context->storage_engine_interface->transaction_put 
     (context->transaction, context->context->names, name, strlen (name) + 1, 
      (char *) &encoded_oid, sizeof (guint64));
 
@@ -430,7 +429,7 @@ create_new_reference (gzochid_application_context *context, void *ptr,
     {
       guint64 encoded_oid = gzochid_util_encode_oid (reference->oid);
       
-      APP_STORAGE_INTERFACE (context)->transaction_get_for_update
+      context->storage_engine_interface->transaction_get_for_update
 	(tx_context->transaction, tx_context->context->oids,
 	 (char *) &encoded_oid, sizeof (guint64), NULL);
     }
@@ -529,10 +528,11 @@ dereference (gzochid_data_transaction_context *context,
   encoded_oid = gzochid_util_encode_oid (reference->oid);
   
   if (for_update)
-    data = APP_STORAGE_INTERFACE (context->context)->transaction_get_for_update
+    data = context->context->storage_engine_interface
+      ->transaction_get_for_update
       (context->transaction, context->context->oids, (char *) &encoded_oid,
        sizeof (guint64), &data_len);
-  else data = APP_STORAGE_INTERFACE (context->context)->transaction_get
+  else data = context->context->storage_engine_interface->transaction_get
 	 (context->transaction, context->context->oids, (char *) &encoded_oid, 
 	  sizeof (guint64), &data_len);
 
@@ -598,7 +598,7 @@ remove_object (gzochid_data_transaction_context *context, guint64 oid,
   guint64 encoded_oid = gzochid_util_encode_oid (oid);
   
   g_debug ("Removing reference '%" G_GUINT64_FORMAT "'.", oid);
-  ret = APP_STORAGE_INTERFACE (context->context)->transaction_delete 
+  ret = context->context->storage_engine_interface->transaction_delete 
     (context->transaction, context->context->oids, (char *) &encoded_oid, 
      sizeof (guint64));
 
@@ -724,7 +724,6 @@ gzochid_data_next_binding_oid (gzochid_application_context *context, char *key,
   GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
     join_transaction (context, &local_err);
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (context);
 
   if (local_err != NULL)
     {
@@ -732,7 +731,7 @@ gzochid_data_next_binding_oid (gzochid_application_context *context, char *key,
       return NULL;
     }
 
-  next_key = iface->transaction_next_key 
+  next_key = context->storage_engine_interface->transaction_next_key 
     (tx_context->transaction, tx_context->context->names, key, 
      strlen (key) + 1, NULL);
   if (tx_context->transaction->rollback)
@@ -794,7 +793,7 @@ gzochid_data_remove_binding (gzochid_application_context *context, char *name,
       return;
     }
 
-  ret = APP_STORAGE_INTERFACE (context)->transaction_delete 
+  ret = context->storage_engine_interface->transaction_delete 
     (tx_context->transaction, tx_context->context->names, name, 
      strlen (name) + 1);
 
@@ -944,7 +943,7 @@ gzochid_data_mark (gzochid_application_context *context,
       g_debug ("Marking reference '%" G_GUINT64_FORMAT "' for update.",
 	       reference->oid);
 
-      data = APP_STORAGE_INTERFACE (context)->transaction_get_for_update
+      data = context->storage_engine_interface->transaction_get_for_update
 	(tx_context->transaction, tx_context->context->oids,
 	 (char *) &encoded_oid, sizeof (guint64), NULL);
    

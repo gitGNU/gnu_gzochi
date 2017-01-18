@@ -1,5 +1,5 @@
 /* test-durable-task.c: Test routines for durable-task.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -48,10 +48,7 @@ application_context_init (gzochid_application_context *context)
   gzochid_game_context *game_context = gzochid_game_context_new (NULL);
   base->parent = (gzochid_context *) game_context;
 
-  game_context->storage_engine = malloc (sizeof (gzochid_storage_engine));
-  game_context->storage_engine->interface = 
-    &gzochid_storage_engine_interface_mem;
-
+  context->storage_engine_interface = &gzochid_storage_engine_interface_mem;
   context->storage_context = 
     gzochid_storage_engine_interface_mem.initialize ("/dev/null");
   context->meta = gzochid_storage_engine_interface_mem.open
@@ -62,7 +59,7 @@ application_context_init (gzochid_application_context *context)
     (context->storage_context, "/dev/null", 0);
 
   context->oid_strategy = gzochid_storage_oid_strategy_new
-    (game_context->storage_engine->interface, context->storage_context,
+    (context->storage_engine_interface, context->storage_context,
      context->meta);
 
   context->identity_cache = gzochid_auth_identity_cache_new ();

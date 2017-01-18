@@ -70,7 +70,8 @@ initialize_application (gzochid_game_context *context, const char *dir,
     (g_list_copy (descriptor->load_paths), strdup (dir));
 
   gzochid_application_context_init
-    (application_context, (gzochid_context *) context, descriptor);
+    (application_context, (gzochid_context *) context, descriptor,
+     context->storage_engine->interface);
   gzochid_event_source_attach
     (context->event_loop, application_context->event_source);
 }

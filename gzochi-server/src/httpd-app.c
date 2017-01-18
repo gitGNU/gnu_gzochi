@@ -1,5 +1,5 @@
 /* httpd-app.c: Handler implementations for the gzochid admin web console
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -498,12 +498,12 @@ list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   GString *response_str = g_string_new (NULL);
   
   size_t klen = 0;
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
-  gzochid_storage_transaction *tx = iface->transaction_begin
-    (app_context->storage_context);
-  char *k = iface->transaction_first_key (tx, app_context->oids, &klen);
+  gzochid_storage_transaction *tx = app_context->storage_engine_interface
+    ->transaction_begin (app_context->storage_context);
+  char *k = app_context->storage_engine_interface
+    ->transaction_first_key (tx, app_context->oids, &klen);
 
-  iface->transaction_rollback (tx);
+  app_context->storage_engine_interface->transaction_rollback (tx);
 
   assert (klen == sizeof (guint64));  
 
@@ -529,10 +529,11 @@ list_oids (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	 gzochid_util_decode_oid (encoded_oid));
       g_string_append (response_str, "</a></li>\n");
 
-      tx = iface->transaction_begin (app_context->storage_context);      
-      next_k = iface->transaction_next_key
+      tx = app_context->storage_engine_interface
+	->transaction_begin (app_context->storage_context);      
+      next_k = app_context->storage_engine_interface->transaction_next_key
 	(tx, app_context->oids, k, klen, &klen);
-      iface->transaction_rollback (tx);
+      app_context->storage_engine_interface->transaction_rollback (tx);
       
       free (k);
       k = next_k;
@@ -554,14 +555,13 @@ render_oid (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   size_t data_length = 0;
   char *oid_str = g_match_info_fetch (match_info, 1);
   gzochid_application_context *app_context = request_context;
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
-  gzochid_storage_transaction *tx = iface->transaction_begin
-    (app_context->storage_context);
+  gzochid_storage_transaction *tx = app_context->storage_engine_interface
+    ->transaction_begin (app_context->storage_context);
   guint64 oid = gzochid_util_encode_oid (g_ascii_strtoull (oid_str, NULL, 16)); 
-  char *data = iface->transaction_get
+  char *data = app_context->storage_engine_interface->transaction_get
     (tx, app_context->oids, (char *) &oid, sizeof (guint64), &data_length);
   
-  iface->transaction_rollback (tx);
+  app_context->storage_engine_interface->transaction_rollback (tx);
   
   free (oid_str);
 
@@ -594,12 +594,12 @@ list_names (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
   
   size_t klen = 0;
   gzochid_application_context *app_context = request_context;
-  gzochid_storage_engine_interface *iface = APP_STORAGE_INTERFACE (app_context);
-  gzochid_storage_transaction *tx = iface->transaction_begin
-    (app_context->storage_context);
-  char *k = iface->transaction_first_key (tx, app_context->names, &klen);
+  gzochid_storage_transaction *tx = app_context->storage_engine_interface
+    ->transaction_begin (app_context->storage_context);
+  char *k = app_context->storage_engine_interface
+    ->transaction_first_key (tx, app_context->names, &klen);
 
-  iface->transaction_rollback (tx);
+  app_context->storage_engine_interface->transaction_rollback (tx);
 
   append_header (response_str);
   g_string_append_printf 
@@ -614,10 +614,11 @@ list_names (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
       g_string_append_len (response_str, k, klen);
       g_string_append (response_str, "</li>\n");
 
-      tx = iface->transaction_begin (app_context->storage_context);      
-      next_k = iface->transaction_next_key
+      tx = app_context->storage_engine_interface
+	->transaction_begin (app_context->storage_context);      
+      next_k = app_context->storage_engine_interface->transaction_next_key
 	(tx, app_context->names, k, klen, &klen);
-      iface->transaction_rollback (tx);
+      app_context->storage_engine_interface->transaction_rollback (tx);
       
       free (k);
       k = next_k;
