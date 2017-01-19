@@ -26,7 +26,6 @@
 #include "auth_int.h"
 #include "data.h"
 #include "event.h"
-#include "game.h"
 #include "game-protocol.h"
 #include "gzochid-auth.h"
 #include "io.h"
@@ -733,14 +732,12 @@ gzochid_client_session_persist (gzochid_application_context *context,
 				gzochid_client_session *session, guint64 *oid,
 				GError **err)
 {
-  gzochid_game_context *game_context = 
-    (gzochid_game_context *) ((gzochid_context *) context)->parent;
   gzochid_oid_holder *holder = gzochid_oid_holder_new ();
   gzochid_task *task = gzochid_data_persistence_task_new
     (context, session->identity, &gzochid_client_session_serialization, session,
      holder, SESSION_PREFIX);
 
-  gzochid_schedule_run_task (game_context->task_queue, task);  
+  gzochid_schedule_run_task (context->task_queue, task);  
   gzochid_task_free (task);
 
   if (holder->err != NULL)

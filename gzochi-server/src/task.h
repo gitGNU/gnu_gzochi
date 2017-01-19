@@ -21,10 +21,6 @@
 #include <glib.h>
 #include <sys/time.h>
 
-#include "app.h"
-#include "data.h"
-#include "gzochid-auth.h"
-#include "io.h"
 #include "threads.h"
 
 struct _gzochid_task

@@ -255,6 +255,8 @@ test_task_chain_simple ()
   game_context->tx_timeout = (struct timeval) { INT_MAX, INT_MAX };
   gzochid_schedule_task_queue_start (game_context->task_queue);  
 
+  app_context->task_queue = game_context->task_queue;
+  
   context.app_context = app_context;
   context.identity = identity;
   context.handle_oid = 0;

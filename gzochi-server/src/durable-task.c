@@ -1,5 +1,5 @@
 /* durable-task.c: Persistent task management routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 
 #include "app.h"
 #include "auth_int.h"
+#include "data.h"
 #include "durable-task.h"
 #include "gzochid-auth.h"
 #include "game.h"
@@ -91,10 +92,8 @@ commit_scheduled_task (gpointer task, gpointer user_data)
 {
   gzochid_task_transaction_context *tx_context = user_data;
   gzochid_application_context *context = tx_context->context;
-  gzochid_game_context *game_context = (gzochid_game_context *)
-    ((gzochid_context *) context)->parent;
 
-  gzochid_schedule_submit_task (game_context->task_queue, task);
+  gzochid_schedule_submit_task (context->task_queue, task);
 }
 
 static void 

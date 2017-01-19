@@ -463,7 +463,8 @@ void
 gzochid_application_context_init (gzochid_application_context *context, 
 				  gzochid_context *parent, 
 				  GzochidApplicationDescriptor *descriptor,
-				  gzochid_storage_engine_interface *iface)
+				  gzochid_storage_engine_interface *iface,
+				  gzochid_task_queue *task_queue)
 {
   char *fsm_name = g_strconcat ("app/", descriptor->name, NULL);
   gzochid_fsm *fsm = gzochid_fsm_new 
@@ -504,6 +505,7 @@ gzochid_application_context_init (gzochid_application_context *context,
   context->authenticator = gzochid_auth_function_pass_thru;
   context->descriptor = g_object_ref (descriptor);
   context->storage_engine_interface = iface;
+  context->task_queue = task_queue;
   
   gzochid_event_attach (context->event_source, update_stats, context->stats);
 

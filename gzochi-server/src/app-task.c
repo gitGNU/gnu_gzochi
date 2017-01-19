@@ -325,10 +325,6 @@ gzochid_application_resubmitting_transactional_task_worker
 {
   gboolean resubmitting_execution = FALSE;
   gzochid_application_task *application_task = NULL;
-
-  gzochid_context *context = (gzochid_context *) app_context;
-  gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
-
   gzochid_transactional_application_task_execution *execution = data;
 
   gzochid_application_transactional_task_worker 
@@ -375,7 +371,7 @@ gzochid_application_resubmitting_transactional_task_worker
       task.data = application_task;
       gettimeofday (&task.target_execution_time, NULL);
       
-      gzochid_schedule_submit_task (game_context->task_queue, &task);
+      gzochid_schedule_submit_task (app_context->task_queue, &task);
     }
 }
 

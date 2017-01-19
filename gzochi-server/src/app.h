@@ -27,6 +27,7 @@
 #include "gzochid-auth.h"
 #include "gzochid-storage.h"
 #include "oids.h"
+#include "schedule.h"
 #include "stats.h"
 #include "tx.h"
 
@@ -67,6 +68,8 @@ struct _gzochid_application_context
   gzochid_storage_store *names;
 
   gzochid_oid_allocation_strategy *oid_strategy;
+
+  gzochid_task_queue *task_queue;
   
   GHashTable *oids_to_clients;
   GHashTable *clients_to_oids;
@@ -89,7 +92,8 @@ gzochid_application_context *gzochid_application_context_new (void);
 void gzochid_application_context_init (gzochid_application_context *,
 				       gzochid_context *,
 				       GzochidApplicationDescriptor *,
-				       gzochid_storage_engine_interface *);
+				       gzochid_storage_engine_interface *,
+				       gzochid_task_queue *);
 
 void gzochid_application_context_free (gzochid_application_context *);
 
