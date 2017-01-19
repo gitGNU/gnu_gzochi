@@ -331,20 +331,6 @@ initialize_load_paths (int from_state, int to_state, gpointer user_data)
 }
 
 static void 
-initialize_complete (int from_state, int to_state, gpointer user_data)
-{
-  gzochid_context *context = user_data;
-  gzochid_application_context *app_context = 
-    (gzochid_application_context *) context;
-  gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
-
-  gzochid_game_context_register_application 
-    (game_context, app_context->descriptor->name, app_context);
-
-  gzochid_fsm_to_state (context->fsm, GZOCHID_APPLICATION_STATE_RUNNING);
-}
-
-static void 
 initialize_async_transactional (gpointer data)
 {
   GError *err = NULL;
@@ -498,9 +484,6 @@ gzochid_application_context_init (gzochid_application_context *context,
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_data, context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_load_paths, 
-     context);
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_complete, 
      context);
   gzochid_fsm_on_enter (fsm, GZOCHID_APPLICATION_STATE_RUNNING, run, context);
   gzochid_fsm_on_enter (fsm, GZOCHID_APPLICATION_STATE_STOPPED, stop, context);
