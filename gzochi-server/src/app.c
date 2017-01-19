@@ -456,7 +456,7 @@ gzochid_application_context_init
  GzochidMetaClientContainer *metaclient_container,
  GzochidAuthPluginRegistry *auth_plugin_registry,
  gzochid_storage_engine_interface *iface, const char *work_dir,
- gzochid_task_queue *task_queue)
+ gzochid_task_queue *task_queue, struct timeval tx_timeout)
 {
   char *fsm_name = g_strconcat ("app/", descriptor->name, NULL);
   gzochid_fsm *fsm = gzochid_fsm_new 
@@ -491,7 +491,8 @@ gzochid_application_context_init
   context->descriptor = g_object_ref (descriptor);
   context->storage_engine_interface = iface;
   context->task_queue = task_queue;
-
+  context->tx_timeout = tx_timeout;
+  
   initialize_auth (context, auth_plugin_registry);
   initialize_data (context, work_dir, metaclient_container);
   

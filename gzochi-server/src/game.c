@@ -73,7 +73,7 @@ initialize_application (gzochid_game_context *context, const char *dir,
     (application_context, (gzochid_context *) context, descriptor,
      context->root_context->metaclient_container, context->auth_plugin_registry,
      context->storage_engine->interface, context->work_dir,
-     context->task_queue);
+     context->task_queue, context->tx_timeout);
   gzochid_game_context_register_application
     (context, descriptor->name, application_context);
   gzochid_event_source_attach

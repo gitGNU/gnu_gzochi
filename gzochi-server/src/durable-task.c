@@ -27,7 +27,6 @@
 #include "data.h"
 #include "durable-task.h"
 #include "gzochid-auth.h"
-#include "game.h"
 #include "txlog.h"
 #include "util.h"
 
@@ -614,8 +613,6 @@ void gzochid_schedule_durable_task_handle
   guint64 *oid = NULL;
   GError *local_err = NULL;
 
-  gzochid_game_context *game_context = (gzochid_game_context *) 
-    ((gzochid_context *) app_context)->parent;
   gzochid_auth_identity *cloned_identity = NULL;
 
   gzochid_application_task *transactional_task = NULL;
@@ -678,7 +675,7 @@ void gzochid_schedule_durable_task_handle
   cleanup_task = gzochid_application_task_new
     (app_context, cloned_identity, durable_task_cleanup_worker, oid);
   execution = gzochid_transactional_application_task_timed_execution_new 
-    (transactional_task, catch_task, cleanup_task, game_context->tx_timeout);
+    (transactional_task, catch_task, cleanup_task, app_context->tx_timeout);
 
   /* Not necessary to hold a ref to these, as we've transferred them to the
      execution. */
@@ -1039,9 +1036,6 @@ schedule_coordinator_task (gzochid_application_context *app_context,
   gzochid_task_transaction_context *tx_context =
     join_transaction (app_context);
 
-  gzochid_game_context *game_context = (gzochid_game_context *)
-    ((gzochid_context *) app_context)->parent;
-
   gzochid_data_managed_reference *chain_context_ref =
     gzochid_data_create_reference
     (app_context, &task_chain_context_serialization, chain_context, &err);
@@ -1079,7 +1073,7 @@ schedule_coordinator_task (gzochid_application_context *app_context,
   coordinator_execution =
     gzochid_transactional_application_task_timed_execution_new
     (coordinator_main_task, coordinator_catch_task, coordinator_cleanup_task,
-     game_context->tx_timeout);
+     app_context->tx_timeout);
 
   /* Not necessary to hold a ref to these, as we've transferred them to the
      execution. */

@@ -71,6 +71,7 @@ struct _gzochid_application_context
   gzochid_oid_allocation_strategy *oid_strategy;
 
   gzochid_task_queue *task_queue;
+  struct timeval tx_timeout;
   
   GHashTable *oids_to_clients;
   GHashTable *clients_to_oids;
@@ -96,7 +97,8 @@ void gzochid_application_context_init (gzochid_application_context *,
 				       GzochidMetaClientContainer *,
 				       GzochidAuthPluginRegistry *,
 				       gzochid_storage_engine_interface *,
-				       const char *, gzochid_task_queue *);
+				       const char *, gzochid_task_queue *,
+				       struct timeval);
 
 void gzochid_application_context_free (gzochid_application_context *);
 
