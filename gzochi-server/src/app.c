@@ -21,6 +21,7 @@
 #include <libguile.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "app.h"
 #include "app-task.h"
@@ -432,12 +433,14 @@ run (int from_state, int to_state, gpointer user_data)
   gzochid_context *context = user_data;
   gzochid_application_context *app_context = 
     (gzochid_application_context *) context;
-  gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
+  gzochid_task task = { run_async, app_context, { 0 } };
 
+  gettimeofday (&task.target_execution_time, NULL);
+  
   if (from_state != GZOCHID_APPLICATION_STATE_INITIALIZING)
     return;
 
-  gzochid_thread_pool_push (game_context->pool, run_async, app_context, NULL);
+  gzochid_schedule_submit_task (app_context->task_queue, &task);
 }
 
 static void 
