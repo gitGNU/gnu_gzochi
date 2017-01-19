@@ -26,6 +26,7 @@
 #include "event.h"
 #include "gzochid-auth.h"
 #include "gzochid-storage.h"
+#include "metaclient.h"
 #include "oids.h"
 #include "schedule.h"
 #include "stats.h"
@@ -92,9 +93,10 @@ gzochid_application_context *gzochid_application_context_new (void);
 void gzochid_application_context_init (gzochid_application_context *,
 				       gzochid_context *,
 				       GzochidApplicationDescriptor *,
+				       GzochidMetaClientContainer *,
 				       GzochidAuthPluginRegistry *,
 				       gzochid_storage_engine_interface *,
-				       gzochid_task_queue *);
+				       const char *, gzochid_task_queue *);
 
 void gzochid_application_context_free (gzochid_application_context *);
 

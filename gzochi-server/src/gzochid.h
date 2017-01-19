@@ -62,7 +62,9 @@ struct _GzochidRootContext
 
   GzochidResolutionContext *resolution_context;
 
-  GzochidMetaClient *metaclient_container; /* The metaclient container. */
+  /* The metaclient container. */
+
+  GzochidMetaClientContainer *metaclient_container; 
   
   /* Components that can't yet be auto-resolved. */
 

@@ -26,15 +26,18 @@
 #include "app.h"
 #include "app-task.h"
 #include "context.h"
+#include "dataclient.h"
 #include "event.h"
 #include "game.h"
 #include "guile.h"
 #include "gzochid-auth.h"
+#include "metaclient.h"
 #include "oids-dataclient.h"
 #include "oids-storage.h"
 #include "scheme-task.h"
 #include "session.h"
 #include "storage-dataclient.h"
+#include "storage-mem.h"
 
 static GPrivate thread_application_context_key;
 static GPrivate thread_identity_key;
@@ -187,23 +190,30 @@ initialize_auth (gzochid_application_context *app_context,
     }
 }
 
-static void 
-initialize_data (int from_state, int to_state, gpointer user_data)
-{
-  gzochid_context *context = user_data;
-  gzochid_application_context *app_context = 
-    (gzochid_application_context *) context;
-  gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
+/* Returns `TRUE' if the specified `gzochid_storage_engine_interface' is 
+   "normal" - i.e., not the in-memory storage engine or the distributed storage
+   engine - `FALSE' otherwise. */
 
-  char *data_dir = g_strconcat 
-    (game_context->work_dir, "/", app_context->descriptor->name, NULL);
+static gboolean
+needs_durable_storage (gzochid_storage_engine_interface *iface)
+{
+  return iface != &gzochid_storage_engine_interface_mem
+    && iface != &gzochid_storage_engine_interface_dataclient;
+}
+
+static void 
+initialize_data (gzochid_application_context *app_context, const char *work_dir,
+		 GzochidMetaClientContainer *metaclient_container)
+{
+  char *data_dir = g_strconcat
+    (work_dir, "/", app_context->descriptor->name, NULL);
   char *meta_db = g_strconcat (data_dir, "/meta", NULL);
   char *oids_db = g_strconcat (data_dir, "/oids", NULL);
   char *names_db = g_strconcat (data_dir, "/names", NULL);
 
   gzochid_storage_context *storage_context = NULL;
 
-  if (game_context->storage_engine->handle != NULL)
+  if (needs_durable_storage (app_context->storage_engine_interface))
     {
       if (!g_file_test (data_dir, G_FILE_TEST_EXISTS))
 	{
@@ -237,9 +247,7 @@ initialize_data (int from_state, int to_state, gpointer user_data)
       GzochidMetaClient *metaclient = NULL;
       GzochidDataClient *dataclient = NULL;
 
-      g_object_get (game_context->root_context->metaclient_container,
-		    "metaclient", &metaclient,
-		    NULL);
+      g_object_get (metaclient_container, "metaclient", &metaclient, NULL);
       
       assert (metaclient != NULL);
 
@@ -272,9 +280,7 @@ initialize_data (int from_state, int to_state, gpointer user_data)
       GzochidMetaClient *metaclient = NULL;
       GzochidDataClient *dataclient = NULL;
 
-      g_object_get (game_context->root_context->metaclient_container,
-		    "metaclient", &metaclient,
-		    NULL);
+      g_object_get (metaclient_container, "metaclient", &metaclient, NULL);
 
       assert (metaclient != NULL);
       
@@ -447,8 +453,10 @@ void
 gzochid_application_context_init
 (gzochid_application_context *context, gzochid_context *parent, 
  GzochidApplicationDescriptor *descriptor,
+ GzochidMetaClientContainer *metaclient_container,
  GzochidAuthPluginRegistry *auth_plugin_registry,
- gzochid_storage_engine_interface *iface, gzochid_task_queue *task_queue)
+ gzochid_storage_engine_interface *iface, const char *work_dir,
+ gzochid_task_queue *task_queue)
 {
   char *fsm_name = g_strconcat ("app/", descriptor->name, NULL);
   gzochid_fsm *fsm = gzochid_fsm_new 
@@ -474,8 +482,6 @@ gzochid_application_context_init
     (fsm, GZOCHID_APPLICATION_STATE_PAUSED, GZOCHID_APPLICATION_STATE_STOPPED);
 
   gzochid_fsm_on_enter 
-    (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_data, context);
-  gzochid_fsm_on_enter 
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_load_paths, 
      context);
   gzochid_fsm_on_enter (fsm, GZOCHID_APPLICATION_STATE_RUNNING, run, context);
@@ -487,6 +493,7 @@ gzochid_application_context_init
   context->task_queue = task_queue;
 
   initialize_auth (context, auth_plugin_registry);
+  initialize_data (context, work_dir, metaclient_container);
   
   gzochid_event_attach (context->event_source, update_stats, context->stats);
 
