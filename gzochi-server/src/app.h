@@ -92,6 +92,7 @@ gzochid_application_context *gzochid_application_context_new (void);
 void gzochid_application_context_init (gzochid_application_context *,
 				       gzochid_context *,
 				       GzochidApplicationDescriptor *,
+				       GzochidAuthPluginRegistry *,
 				       gzochid_storage_engine_interface *,
 				       gzochid_task_queue *);
 

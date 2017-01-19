@@ -140,20 +140,15 @@ gzochid_get_current_identity (void)
 G_LOCK_DEFINE_STATIC (load_path);
 
 static void 
-initialize_auth (int from_state, int to_state, gpointer user_data)
+initialize_auth (gzochid_application_context *app_context,
+		 GzochidAuthPluginRegistry *auth_plugin_registry)
 {
-  gzochid_context *context = user_data;
-  gzochid_application_context *app_context = 
-    (gzochid_application_context *) context;
-  gzochid_game_context *game_context = (gzochid_game_context *) context->parent;
-
   app_context->identity_cache = gzochid_auth_identity_cache_new ();
   
   if (app_context->descriptor->auth_type != NULL)
     {
       gzochid_auth_plugin *plugin = gzochid_auth_plugin_registry_lookup
-	(game_context->auth_plugin_registry,
-	 app_context->descriptor->auth_type);
+	(auth_plugin_registry, app_context->descriptor->auth_type);
 
       if (plugin != NULL)
 	{
@@ -449,11 +444,11 @@ update_stats (GzochidEvent *event, gpointer data)
 }
 
 void 
-gzochid_application_context_init (gzochid_application_context *context, 
-				  gzochid_context *parent, 
-				  GzochidApplicationDescriptor *descriptor,
-				  gzochid_storage_engine_interface *iface,
-				  gzochid_task_queue *task_queue)
+gzochid_application_context_init
+(gzochid_application_context *context, gzochid_context *parent, 
+ GzochidApplicationDescriptor *descriptor,
+ GzochidAuthPluginRegistry *auth_plugin_registry,
+ gzochid_storage_engine_interface *iface, gzochid_task_queue *task_queue)
 {
   char *fsm_name = g_strconcat ("app/", descriptor->name, NULL);
   gzochid_fsm *fsm = gzochid_fsm_new 
@@ -479,8 +474,6 @@ gzochid_application_context_init (gzochid_application_context *context,
     (fsm, GZOCHID_APPLICATION_STATE_PAUSED, GZOCHID_APPLICATION_STATE_STOPPED);
 
   gzochid_fsm_on_enter 
-    (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_auth, context);
-  gzochid_fsm_on_enter 
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_data, context);
   gzochid_fsm_on_enter 
     (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_load_paths, 
@@ -492,6 +485,8 @@ gzochid_application_context_init (gzochid_application_context *context,
   context->descriptor = g_object_ref (descriptor);
   context->storage_engine_interface = iface;
   context->task_queue = task_queue;
+
+  initialize_auth (context, auth_plugin_registry);
   
   gzochid_event_attach (context->event_source, update_stats, context->stats);
 
