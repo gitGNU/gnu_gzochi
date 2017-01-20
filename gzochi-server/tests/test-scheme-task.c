@@ -23,7 +23,6 @@
 
 #include "app.h"
 #include "app-task.h"
-#include "context.h"
 #include "descriptor.h"
 #include "game.h"
 #include "guile.h"
@@ -39,7 +38,8 @@
 
 struct test_scheme_task_fixture
 {
-  gzochid_application_context *context;
+  gzochid_game_context *game_context;
+  gzochid_application_context *app_context;
   gzochid_auth_identity *identity;
   gzochid_storage_engine_interface *storage_interface;
 };
@@ -58,65 +58,60 @@ static void
 test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
 				gconstpointer user_data)
 {
-  gzochid_context *base_context = NULL;
-  gzochid_game_context *game_context = gzochid_game_context_new (NULL);
   gzochid_storage_engine *storage_engine = 
     malloc (sizeof (gzochid_storage_engine));
 
-  fixture->context = gzochid_application_context_new ();
-  fixture->context->deployment_root = "/tmp";
-  fixture->context->descriptor = g_object_new
+  fixture->app_context = gzochid_application_context_new ();
+  fixture->app_context->deployment_root = "/tmp";
+  fixture->app_context->descriptor = g_object_new
     (GZOCHID_TYPE_APPLICATION_DESCRIPTOR, NULL);
-  fixture->context->identity_cache = gzochid_auth_identity_cache_new ();
+  fixture->app_context->identity_cache = gzochid_auth_identity_cache_new ();
 
   fixture->identity = gzochid_auth_identity_new ("[TEST]");
-  
-  base_context = (gzochid_context *) fixture->context;
-  base_context->parent = (gzochid_context *) game_context;
 
-  g_mutex_init (&base_context->mutex);
-  g_mutex_init (&base_context->parent->mutex);
+  fixture->game_context = gzochid_game_context_new (NULL);
+  fixture->game_context->storage_engine = storage_engine;
   
-  game_context->storage_engine = storage_engine;
   storage_engine->interface = &gzochid_storage_engine_interface_mem;
   
   fixture->storage_interface = storage_engine->interface;
   
-  fixture->context->storage_engine_interface = fixture->storage_interface;
-  fixture->context->storage_context =
+  fixture->app_context->storage_engine_interface = fixture->storage_interface;
+  fixture->app_context->storage_context =
     fixture->storage_interface->initialize ("/tmp");
-  fixture->context->meta = fixture->storage_interface->open
-    (fixture->context->storage_context, "/tmp/meta", GZOCHID_STORAGE_CREATE);
-  fixture->context->oids = fixture->storage_interface->open
-    (fixture->context->storage_context, "/tmp/oids", GZOCHID_STORAGE_CREATE);
-  fixture->context->names = fixture->storage_interface->open
-    (fixture->context->storage_context, "/tmp/names", GZOCHID_STORAGE_CREATE);
+  fixture->app_context->meta = fixture->storage_interface->open
+    (fixture->app_context->storage_context, "/tmp/meta",
+     GZOCHID_STORAGE_CREATE);
+  fixture->app_context->oids = fixture->storage_interface->open
+    (fixture->app_context->storage_context, "/tmp/oids",
+     GZOCHID_STORAGE_CREATE);
+  fixture->app_context->names = fixture->storage_interface->open
+    (fixture->app_context->storage_context, "/tmp/names",
+     GZOCHID_STORAGE_CREATE);
 
-  fixture->context->oid_strategy = gzochid_storage_oid_strategy_new
-    (fixture->storage_interface, fixture->context->storage_context,
-     fixture->context->meta);
+  fixture->app_context->oid_strategy = gzochid_storage_oid_strategy_new
+    (fixture->storage_interface, fixture->app_context->storage_context,
+     fixture->app_context->meta);
 }
 
 static void
 test_scheme_task_fixture_teardown (struct test_scheme_task_fixture *fixture,
 				   gconstpointer user_data)
 {
-  gzochid_game_context *game_context = (gzochid_game_context *)
-    ((gzochid_context *) fixture->context)->parent;
-    
-  g_object_unref (fixture->context->descriptor);
-  gzochid_auth_identity_cache_destroy (fixture->context->identity_cache);
+  g_object_unref (fixture->app_context->descriptor);
+  gzochid_auth_identity_cache_destroy (fixture->app_context->identity_cache);
 
-  fixture->storage_interface->close_store (fixture->context->meta);
-  fixture->storage_interface->close_store (fixture->context->oids);
-  fixture->storage_interface->close_store (fixture->context->names);
-  fixture->storage_interface->close_context (fixture->context->storage_context);
+  fixture->storage_interface->close_store (fixture->app_context->meta);
+  fixture->storage_interface->close_store (fixture->app_context->oids);
+  fixture->storage_interface->close_store (fixture->app_context->names);
+  fixture->storage_interface->close_context
+    (fixture->app_context->storage_context);
 
-  gzochid_oid_allocation_strategy_free (fixture->context->oid_strategy);
+  gzochid_oid_allocation_strategy_free (fixture->app_context->oid_strategy);
   
-  free (game_context->storage_engine);
-  gzochid_game_context_free (game_context);
-  gzochid_application_context_free (fixture->context);
+  free (fixture->game_context->storage_engine);
+  gzochid_game_context_free (fixture->game_context);
+  gzochid_application_context_free (fixture->app_context);
   gzochid_auth_identity_unref (fixture->identity);
 }
 
@@ -127,15 +122,15 @@ persist_client_session (struct test_scheme_task_fixture *fixture,
   GByteArray *out = g_byte_array_new ();
 
   gzochid_storage_transaction *tx = fixture->storage_interface
-    ->transaction_begin (fixture->context->storage_context);
+    ->transaction_begin (fixture->app_context->storage_context);
   
   gzochid_client_session_serialization.serializer 
-    (fixture->context, session, out, NULL);
+    (fixture->app_context, session, out, NULL);
   
   fixture->storage_interface->transaction_put
-    (tx, fixture->context->oids, "1", 2, out->data, out->len);
+    (tx, fixture->app_context->oids, "1", 2, out->data, out->len);
   fixture->storage_interface->transaction_put
-    (tx, fixture->context->names, "s.session.1", 12, "1", 2);
+    (tx, fixture->app_context->names, "s.session.1", 12, "1", 2);
 
   fixture->storage_interface->transaction_prepare (tx);
   fixture->storage_interface->transaction_commit (tx);
@@ -151,7 +146,7 @@ test_disconnected_worker_no_handler_inner (gpointer data)
   g_test_log_set_fatal_handler (ignore_warnings, NULL);
   
   gzochid_scheme_application_disconnected_worker
-    (fixture->context, fixture->identity, "1");
+    (fixture->app_context, fixture->identity, "1");
 }
 
 static void 
@@ -169,11 +164,11 @@ test_disconnected_worker_no_handler (struct test_scheme_task_fixture *fixture,
     (test_disconnected_worker_no_handler_inner, fixture);
 
   tx = fixture->storage_interface->transaction_begin
-    (fixture->context->storage_context);
+    (fixture->app_context->storage_context);
 
   g_assert
     (fixture->storage_interface->transaction_get
-     (tx, fixture->context->oids, (char *) &one, sizeof (guint64), NULL) ==
+     (tx, fixture->app_context->oids, (char *) &one, sizeof (guint64), NULL) ==
      NULL);
 
   fixture->storage_interface->transaction_rollback (tx);
@@ -212,11 +207,11 @@ test_logged_in_worker_throws_exception_inner (gpointer data)
 
   scm_c_module_define (module, "logged-in-exception", logged_in);
 
-  fixture->context->descriptor->logged_in = make_callback 
+  fixture->app_context->descriptor->logged_in = make_callback 
     ("logged-in-exception", test_module);
   
   gzochid_scheme_application_logged_in_worker
-    (fixture->context, fixture->identity, "1");
+    (fixture->app_context, fixture->identity, "1");
 
   g_list_free (test_module);
 }
@@ -248,11 +243,11 @@ test_logged_in_worker_returns_unspecified_inner (gpointer data)
 
   scm_c_module_define (module, "logged-in-unspecified", logged_in);
 
-  fixture->context->descriptor->logged_in = make_callback 
+  fixture->app_context->descriptor->logged_in = make_callback 
     ("logged-in-unspecified", test_module);
 
   gzochid_scheme_application_logged_in_worker
-    (fixture->context, fixture->identity, "1");
+    (fixture->app_context, fixture->identity, "1");
 
   g_list_free (test_module);
 }

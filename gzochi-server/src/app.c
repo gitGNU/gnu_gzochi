@@ -25,10 +25,8 @@
 
 #include "app.h"
 #include "app-task.h"
-#include "context.h"
 #include "dataclient.h"
 #include "event.h"
-#include "game.h"
 #include "guile.h"
 #include "gzochid-auth.h"
 #include "metaclient.h"
@@ -67,9 +65,6 @@ gzochid_application_context_new (void)
 void 
 gzochid_application_context_free (gzochid_application_context *app_context)
 {
-  gzochid_context *context = (gzochid_context *) app_context;
-  gzochid_context_free (context);
-
   g_hash_table_destroy (app_context->oids_to_clients);
   g_hash_table_destroy (app_context->clients_to_oids);
   
@@ -84,9 +79,9 @@ gzochid_application_context_free (gzochid_application_context *app_context)
 
   g_source_destroy ((GSource *) app_context->event_source);
   g_source_unref ((GSource *) app_context->event_source);
-  free (app_context->stats);
 
-  free (context);
+  free (app_context->stats);
+  free (app_context);
 }
 
 void *
@@ -320,12 +315,8 @@ initialize_load_paths_guile_worker (void *data)
 }
 
 static void 
-initialize_load_paths (int from_state, int to_state, gpointer user_data)
+initialize_load_paths (gzochid_application_context *app_context)
 {
-  gzochid_context *context = user_data;
-  gzochid_application_context *app_context = 
-    (gzochid_application_context *) context;
-  
   G_LOCK (load_path);
   scm_with_guile (initialize_load_paths_guile_worker, app_context->load_paths);
   G_UNLOCK (load_path);
@@ -370,10 +361,6 @@ initialize_async_transactional (gpointer data)
 	     context->descriptor->name, err->message);
 	  
 	  g_error_free (err);
-	  
-	  gzochid_fsm_to_state
-	    (((gzochid_context *) context)->fsm,
-	     GZOCHID_APPLICATION_STATE_STOPPED);
 	}
       else gzochid_restart_tasks (context);
     }
@@ -415,32 +402,13 @@ run_async (gpointer data, gpointer user_data)
 }
 
 static void 
-run (int from_state, int to_state, gpointer user_data)
+run (gzochid_application_context *app_context)
 {
-  gzochid_context *context = user_data;
-  gzochid_application_context *app_context = 
-    (gzochid_application_context *) context;
   gzochid_task task = { run_async, app_context, { 0 } };
 
   gettimeofday (&task.target_execution_time, NULL);
   
-  if (from_state != GZOCHID_APPLICATION_STATE_INITIALIZING)
-    return;
-
   gzochid_schedule_submit_task (app_context->task_queue, &task);
-}
-
-static void 
-stop (int from_state, int to_state, gpointer user_data)
-{
-  gzochid_application_context *context = user_data;
-
-  if (context->meta != NULL)
-    context->storage_engine_interface->close_store (context->meta);
-  if (context->oids != NULL)
-    context->storage_engine_interface->close_store (context->oids);
-  if (context->names != NULL)
-    context->storage_engine_interface->close_store (context->names);  
 }
 
 static void 
@@ -451,42 +419,12 @@ update_stats (GzochidEvent *event, gpointer data)
 
 void 
 gzochid_application_context_init
-(gzochid_application_context *context, gzochid_context *parent, 
- GzochidApplicationDescriptor *descriptor,
+(gzochid_application_context *context, GzochidApplicationDescriptor *descriptor,
  GzochidMetaClientContainer *metaclient_container,
  GzochidAuthPluginRegistry *auth_plugin_registry,
  gzochid_storage_engine_interface *iface, const char *work_dir,
  gzochid_task_queue *task_queue, struct timeval tx_timeout)
 {
-  char *fsm_name = g_strconcat ("app/", descriptor->name, NULL);
-  gzochid_fsm *fsm = gzochid_fsm_new 
-    (fsm_name, GZOCHID_APPLICATION_STATE_INITIALIZING, "INITIALIZING");
-
-  free (fsm_name);
-  
-  gzochid_fsm_add_state (fsm, GZOCHID_APPLICATION_STATE_PAUSED, "PAUSED");
-  gzochid_fsm_add_state (fsm, GZOCHID_APPLICATION_STATE_RUNNING, "RUNNING");
-  gzochid_fsm_add_state (fsm, GZOCHID_APPLICATION_STATE_STOPPED, "STOPPED");
-
-  gzochid_fsm_add_transition 
-    (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, 
-     GZOCHID_APPLICATION_STATE_RUNNING);
-  gzochid_fsm_add_transition
-    (fsm, GZOCHID_APPLICATION_STATE_RUNNING, 
-     GZOCHID_APPLICATION_STATE_STOPPED);
-  gzochid_fsm_add_transition
-    (fsm, GZOCHID_APPLICATION_STATE_RUNNING, GZOCHID_APPLICATION_STATE_PAUSED);
-  gzochid_fsm_add_transition
-    (fsm, GZOCHID_APPLICATION_STATE_PAUSED, GZOCHID_APPLICATION_STATE_RUNNING);
-  gzochid_fsm_add_transition
-    (fsm, GZOCHID_APPLICATION_STATE_PAUSED, GZOCHID_APPLICATION_STATE_STOPPED);
-
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_APPLICATION_STATE_INITIALIZING, initialize_load_paths, 
-     context);
-  gzochid_fsm_on_enter (fsm, GZOCHID_APPLICATION_STATE_RUNNING, run, context);
-  gzochid_fsm_on_enter (fsm, GZOCHID_APPLICATION_STATE_STOPPED, stop, context);
-
   context->authenticator = gzochid_auth_function_pass_thru;
   context->descriptor = g_object_ref (descriptor);
   context->storage_engine_interface = iface;
@@ -495,8 +433,9 @@ gzochid_application_context_init
   
   initialize_auth (context, auth_plugin_registry);
   initialize_data (context, work_dir, metaclient_container);
+  initialize_load_paths (context);
   
   gzochid_event_attach (context->event_source, update_stats, context->stats);
 
-  gzochid_context_init ((gzochid_context *) context, parent, fsm);
+  run (context);
 }

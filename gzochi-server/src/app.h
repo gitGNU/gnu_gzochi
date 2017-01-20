@@ -21,7 +21,6 @@
 #include <glib.h>
 
 #include "auth_int.h"
-#include "context.h"
 #include "descriptor.h"
 #include "event.h"
 #include "gzochid-auth.h"
@@ -32,18 +31,8 @@
 #include "stats.h"
 #include "tx.h"
 
-enum gzochid_application_state 
-  {
-    GZOCHID_APPLICATION_STATE_INITIALIZING,
-    GZOCHID_APPLICATION_STATE_RUNNING,
-    GZOCHID_APPLICATION_STATE_PAUSED,
-    GZOCHID_APPLICATION_STATE_STOPPED
-  };
-
 struct _gzochid_application_context
 {
-  gzochid_context base;
-
   /* The directory containing the application descriptor. Used to resolve
      relative load paths. */
 
@@ -92,7 +81,6 @@ typedef struct _gzochid_application_context gzochid_application_context;
 gzochid_application_context *gzochid_application_context_new (void);
 
 void gzochid_application_context_init (gzochid_application_context *,
-				       gzochid_context *,
 				       GzochidApplicationDescriptor *,
 				       GzochidMetaClientContainer *,
 				       GzochidAuthPluginRegistry *,

@@ -70,7 +70,7 @@ initialize_application (gzochid_game_context *context, const char *dir,
     (g_list_copy (descriptor->load_paths), strdup (dir));
 
   gzochid_application_context_init
-    (application_context, (gzochid_context *) context, descriptor,
+    (application_context, descriptor,
      context->root_context->metaclient_container, context->auth_plugin_registry,
      context->storage_engine->interface, context->work_dir,
      context->task_queue, context->tx_timeout);
