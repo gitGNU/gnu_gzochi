@@ -63,6 +63,15 @@ scm_push_type_registry_x = SCM_BOOL_F;
 static SCM 
 scm_pop_type_registry_x = SCM_BOOL_F;
 
+/* TODO: Remove temporary, fake definition of `GZOCHID_TYPE_ROOT_CONTEXT' as
+   soon as the root context is decoupled from the game server. */
+
+int
+gzochid_root_context_get_type ()
+{
+  return g_object_get_type ();
+}
+
 struct migration 
 {
   gzochid_application_context *context;
@@ -584,12 +593,8 @@ create_application_context (char *path, char *app)
       exit (EXIT_FAILURE);
     }
 
-  g_mutex_init (&((gzochid_context *) context)->mutex);
-  g_mutex_init (&((gzochid_context *) parent)->mutex);
-  
   parent->storage_engine =
     gzochid_tool_probe_storage_engine (config, storage_engine);
-  ((gzochid_context *) context)->parent = (gzochid_context *) parent;  
 
   context->storage_engine_interface = parent->storage_engine->interface;
   context->storage_context = context->storage_engine_interface

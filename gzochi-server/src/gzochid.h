@@ -22,10 +22,16 @@
 #include <glib-object.h>
 
 #include "config.h"
+#include "context.h"
+#include "game.h"
 #include "metaclient.h"
 #include "event.h"
 #include "resolver.h"
 #include "socket.h"
+
+/* Temporary forward declaration for game context struct. */
+
+struct _gzochid_game_context;
 
 #define GZOCHID_TYPE_ROOT_CONTEXT gzochid_root_context_get_type ()
 
@@ -69,7 +75,7 @@ struct _GzochidRootContext
   /* Components that can't yet be auto-resolved. */
 
   gzochid_context *admin_context; /* The admin service context. */
-  gzochid_context *game_server; /* The game server context. */
+  struct _gzochid_game_context *game_server; /* The game server context. */
 };
 
 typedef struct _GzochidRootContext GzochidRootContext;

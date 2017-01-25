@@ -29,10 +29,8 @@
 #include "auth_int.h"
 #include "channel.h"
 #include "config.h"
-#include "context.h"
 #include "descriptor.h"
 #include "durable-task.h"
-#include "fsm.h"
 #include "game.h"
 #include "game-protocol.h"
 #include "gzochid.h"
@@ -62,18 +60,20 @@ static void
 initialize_application (gzochid_game_context *context, const char *dir,
 			GzochidApplicationDescriptor *descriptor)
 {
+  GzochidRootContext *root_context =
+    GZOCHID_ROOT_CONTEXT (context->root_context);
   gzochid_application_context *application_context =
     gzochid_application_context_new ();
   
   application_context->deployment_root = strdup (dir);
   application_context->load_paths = g_list_prepend 
     (g_list_copy (descriptor->load_paths), strdup (dir));
-
+  
   gzochid_application_context_init
-    (application_context, descriptor,
-     context->root_context->metaclient_container, context->auth_plugin_registry,
-     context->storage_engine->interface, context->work_dir,
-     context->task_queue, context->tx_timeout);
+    (application_context, descriptor, root_context->metaclient_container,
+     context->auth_plugin_registry, context->storage_engine->interface,
+     context->work_dir, context->task_queue, context->tx_timeout);
+
   gzochid_game_context_register_application
     (context, descriptor->name, application_context);
   gzochid_event_source_attach
@@ -120,8 +120,9 @@ qualify_apps_dir (gzochid_game_context *context)
     return g_strdup (context->apps_dir);
   else
     {
-      gchar *basedir = g_path_get_dirname
-	(context->root_context->gzochid_conf_path);
+      GzochidRootContext *root_context =
+	GZOCHID_ROOT_CONTEXT (context->root_context);
+      gchar *basedir = g_path_get_dirname (root_context->gzochid_conf_path);
       gchar *path = g_strconcat (basedir, "/", context->apps_dir, NULL);
       
       g_free (basedir);
@@ -151,20 +152,8 @@ scan_apps_dir (gzochid_game_context *context)
 }
 
 static void 
-initialize_auth (int from_state, int to_state, gpointer user_data)
+initialize_server (gzochid_game_context *game_context)
 {
-  gzochid_game_context *context = user_data;
-
-  context->auth_plugin_registry = g_object_new
-    (GZOCHID_TYPE_AUTH_PLUGIN_REGISTRY, "configuration",
-     context->root_context->configuration, NULL);
-}
-
-static void 
-initialize_server (int from_state, int to_state, gpointer user_data)
-{
-  gzochid_game_context *game_context = user_data;
-
   game_context->server_socket = gzochid_server_socket_new
     ("Game server", gzochid_game_server_protocol, game_context);
   gzochid_server_socket_listen
@@ -175,10 +164,8 @@ initialize_server (int from_state, int to_state, gpointer user_data)
 }
 
 static void 
-initialize_apps (int from_state, int to_state, gpointer user_data)
+initialize_apps (gzochid_game_context *context)
 {
-  gzochid_game_context *context = user_data;
-  
   if (!g_file_test (context->work_dir, G_FILE_TEST_EXISTS))
     {
       g_message 
@@ -212,16 +199,8 @@ initialize_apps (int from_state, int to_state, gpointer user_data)
   scan_apps_dir (context);
 }
 
-static void
-initialize_scheme_api (int from_state, int to_state, gpointer user_data)
-{
-  gzochid_scheme_initialize_bindings ();
-  gzochid_scheme_task_initialize_bindings ();
-}
-
 static void 
-initialize_application_task_serializations (int from_state, int to_state, 
-					    gpointer user_data)
+initialize_application_task_serializations ()
 {
   gzochid_task_initialize_serialization_registry ();
 
@@ -232,13 +211,6 @@ initialize_application_task_serializations (int from_state, int to_state,
     (&gzochid_channel_operation_task_serialization);
   gzochid_task_register_serialization
     (&gzochid_task_chain_bootstrap_task_serialization);
-}
-
-static void 
-initialize_complete (int from_state, int to_state, gpointer user_data)
-{
-  gzochid_context *context = user_data;
-  gzochid_fsm_to_state (context->fsm, GZOCHID_GAME_STATE_RUNNING);
 }
 
 gzochid_game_context *
@@ -271,12 +243,10 @@ gzochid_game_context_free (gzochid_game_context *context)
 } 
 
 void 
-gzochid_game_context_init (gzochid_game_context *context,
-			   GzochidRootContext *root_context)
+gzochid_game_context_init (gzochid_game_context *context, GObject *root_obj)
 {
   long tx_timeout_ms = 0;
-  gzochid_fsm *fsm = gzochid_fsm_new 
-    ("game", GZOCHID_GAME_STATE_INITIALIZING, "INITIALIZING");
+  GzochidRootContext *root_context = GZOCHID_ROOT_CONTEXT (root_obj); 
   GHashTable *config = gzochid_configuration_extract_group
     (root_context->configuration, "game");
   GzochidMetaClient *metaclient = NULL;
@@ -293,9 +263,6 @@ gzochid_game_context_init (gzochid_game_context *context,
      (g_hash_table_lookup (config, "thread_pool.max_threads"), 4), 
      TRUE, NULL);
   
-  gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_RUNNING, "RUNNING");
-  gzochid_fsm_add_state (fsm, GZOCHID_GAME_STATE_STOPPED, "STOPPED");
-
   context->task_queue = gzochid_schedule_task_queue_new (context->pool);
   gzochid_schedule_task_queue_start (context->task_queue);
 
@@ -310,9 +277,8 @@ gzochid_game_context_init (gzochid_game_context *context,
     context->work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
   else context->work_dir = strdup (SERVER_FS_DATA_DEFAULT);
 
-  g_object_get (context->root_context->metaclient_container,
-		"metaclient", &metaclient,
-		NULL);
+  g_object_get
+    (root_context->metaclient_container, "metaclient", &metaclient, NULL);
 
   if (metaclient != NULL)
     {
@@ -370,27 +336,18 @@ gzochid_game_context_init (gzochid_game_context *context,
   context->tx_timeout.tv_sec = tx_timeout_ms / 1000;
   context->tx_timeout.tv_usec = (tx_timeout_ms % 1000) * 1000;
 
-  gzochid_fsm_add_transition 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, GZOCHID_GAME_STATE_RUNNING);
-  gzochid_fsm_add_transition
-    (fsm, GZOCHID_GAME_STATE_RUNNING, GZOCHID_GAME_STATE_STOPPED);
-
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_server, context);
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_scheme_api, context);
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING,
-     initialize_application_task_serializations, context);
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_auth, context);
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_apps, context);
-  gzochid_fsm_on_enter 
-    (fsm, GZOCHID_GAME_STATE_INITIALIZING, initialize_complete, context);
+  initialize_server (context);
   
-  gzochid_context_init ((gzochid_context *) context, NULL, fsm);
-
+  gzochid_scheme_initialize_bindings ();
+  gzochid_scheme_task_initialize_bindings ();
+  initialize_application_task_serializations ();
+  
+  context->auth_plugin_registry = g_object_new
+    (GZOCHID_TYPE_AUTH_PLUGIN_REGISTRY, "configuration",
+     root_context->configuration, NULL);
+  
+  initialize_apps (context);
+  
   g_hash_table_destroy (config);
 }
 

@@ -32,6 +32,15 @@ static gboolean serialized = FALSE;
 static gboolean deserialized = FALSE;
 static gboolean finalized = FALSE;
 
+/* TODO: Remove temporary, fake definition of `GZOCHID_TYPE_ROOT_CONTEXT' as
+   soon as the root context is decoupled from the game server. */
+
+int
+gzochid_root_context_get_type ()
+{
+  return g_object_get_type ();
+}
+
 static void 
 test_serializer 
 (gzochid_application_context *context, void *ptr, GByteArray *out, GError **err)
@@ -87,14 +96,6 @@ fetch_reference (gpointer data)
 static void 
 application_context_init (gzochid_application_context *context)
 {
-  gzochid_context *base = (gzochid_context *) context;
-  gzochid_game_context *game_context = gzochid_game_context_new (NULL);
-
-  base->parent = (gzochid_context *) game_context;
-
-  g_mutex_init (&base->mutex);
-  g_mutex_init (&base->parent->mutex);
-  
   context->storage_engine_interface = &gzochid_storage_engine_interface_mem;
   context->storage_context = 
     gzochid_storage_engine_interface_mem.initialize ("/dev/null");
@@ -112,19 +113,13 @@ application_context_init (gzochid_application_context *context)
 
 static void
 application_context_shutdown (gzochid_application_context *context)
-{
-  gzochid_context *base = (gzochid_context *) context;
-  gzochid_game_context *game_context = (gzochid_game_context *) base->parent;
-
-  free (game_context->storage_engine);
+{ 
   gzochid_storage_engine_interface_mem.close_store (context->meta);
   gzochid_storage_engine_interface_mem.close_store (context->oids);
   gzochid_storage_engine_interface_mem.close_store (context->names);
   gzochid_storage_engine_interface_mem.close_context (context->storage_context);
 
   gzochid_oid_allocation_strategy_free (context->oid_strategy);
-  
-  gzochid_game_context_free (game_context);
 }
 
 static void test_data_reference_finalize ()

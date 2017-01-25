@@ -129,7 +129,7 @@ static void
 gzochid_root_context_init (GzochidRootContext *self)
 {
   self->admin_context = (gzochid_context *) gzochid_admin_context_new ();
-  self->game_server = (gzochid_context *) gzochid_game_context_new ();
+  self->game_server = gzochid_game_context_new ();
 }
 
 static const struct option longopts[] =
@@ -236,9 +236,8 @@ root_context_start (GzochidRootContext *root_context)
   GHashTable *game_config = gzochid_configuration_extract_group
     (root_context->configuration, "game");
   
-  gzochid_game_context_init 
-    ((gzochid_game_context *) root_context->game_server, root_context);
-  gzochid_context_until (root_context->game_server, GZOCHID_GAME_STATE_RUNNING);
+  gzochid_game_context_init
+    (root_context->game_server, G_OBJECT (root_context));
 
   g_hash_table_unref (game_config);
   

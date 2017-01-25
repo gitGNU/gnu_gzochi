@@ -1,5 +1,5 @@
 /* game.h: Prototypes and declarations for game.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,27 +19,18 @@
 #define GZOCHID_GAME_H
 
 #include <glib.h>
+#include <glib-object.h>
 #include <sys/time.h>
 
 #include "app.h"
-#include "context.h"
 #include "event.h"
-#include "gzochid.h"
 #include "gzochid-storage.h"
 #include "schedule.h"
 #include "socket.h"
 
-enum gzochid_game_state 
-  {
-    GZOCHID_GAME_STATE_INITIALIZING,
-    GZOCHID_GAME_STATE_RUNNING,
-    GZOCHID_GAME_STATE_STOPPED
-  };
-
 struct _gzochid_game_context 
 {
-  gzochid_context base;
-  GzochidRootContext *root_context;
+  GObject *root_context;
   GThreadPool *pool;
   gzochid_task_queue *task_queue;
   
@@ -68,7 +59,7 @@ typedef struct _gzochid_game_context gzochid_game_context;
 
 gzochid_game_context *gzochid_game_context_new ();
 void gzochid_game_context_free (gzochid_game_context *);
-void gzochid_game_context_init (gzochid_game_context *, GzochidRootContext *);
+void gzochid_game_context_init (gzochid_game_context *, GObject *);
 
 void gzochid_game_context_register_application (gzochid_game_context *, char *,
 						gzochid_application_context *);

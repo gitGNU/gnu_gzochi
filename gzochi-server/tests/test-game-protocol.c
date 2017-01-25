@@ -1,5 +1,5 @@
 /* test-game-protocol.c: Test routines for game-protocol.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -36,6 +36,15 @@ struct _game_protocol_fixture
 
 typedef struct _game_protocol_fixture game_protocol_fixture;
 
+/* TODO: Remove temporary, fake definition of `GZOCHID_TYPE_ROOT_CONTEXT' as
+   soon as the root context is decoupled from the game server. */
+
+int
+gzochid_root_context_get_type ()
+{
+  return g_object_get_type ();
+}
+
 static gboolean
 ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
 		 const gchar *message, gpointer user_data)
@@ -71,8 +80,6 @@ game_protocol_fixture_set_up (game_protocol_fixture *fixture,
   g_test_log_set_fatal_handler (ignore_warnings, NULL);
   
   fixture->game_context = gzochid_game_context_new ();
-  g_mutex_init (&((gzochid_context *) fixture->game_context)->mutex);
-  
   fixture->game_context->socket_server = g_object_new
     (GZOCHID_TYPE_SOCKET_SERVER, NULL);
   fixture->server_socket = gzochid_server_socket_new

@@ -44,6 +44,15 @@ struct test_scheme_task_fixture
   gzochid_storage_engine_interface *storage_interface;
 };
 
+/* TODO: Remove temporary, fake definition of `GZOCHID_TYPE_ROOT_CONTEXT' as
+   soon as the root context is decoupled from the game server. */
+
+int
+gzochid_root_context_get_type ()
+{
+  return g_object_get_type ();
+}
+
 static gboolean
 ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
 		 const gchar *message, gpointer user_data)
@@ -280,8 +289,6 @@ test_ready_throws_exception ()
 
   GError *tmp_err = NULL;
 
-  g_mutex_init (&((gzochid_context *) context)->mutex);
-  
   scm_c_module_define (module, "ready", ready);
 
   descriptor->ready = make_callback ("ready", test_module);

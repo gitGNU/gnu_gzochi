@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include "app.h"
+#include "config.h"
 #include "event.h"
 #include "event-app.h"
 #include "game.h"

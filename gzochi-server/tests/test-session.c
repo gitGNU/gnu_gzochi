@@ -21,7 +21,6 @@
 #include <stdlib.h>
 
 #include "app.h"
-#include "game.h"
 #include "guile.h"
 #include "scheme.h"
 #include "scheme-task.h"
@@ -29,6 +28,15 @@
 #include "storage-mem.h"
 #include "tx.h"
 #include "util.h"
+
+/* TODO: Remove temporary, fake definition of `GZOCHID_TYPE_ROOT_CONTEXT' as
+   soon as the root context is decoupled from the game server. */
+
+int
+gzochid_root_context_get_type ()
+{
+  return g_object_get_type ();
+}
 
 static int
 prepare (gpointer data)
@@ -71,17 +79,6 @@ create_session_handlers (void *arg)
 static void
 application_context_init (gzochid_application_context *context)
 {
-  gzochid_context *base = (gzochid_context *) context;
-  gzochid_game_context *game_context = gzochid_game_context_new (NULL);
-  base->parent = (gzochid_context *) game_context;
-
-  g_mutex_init (&base->mutex);
-  g_mutex_init (&base->parent->mutex);
-  
-  game_context->storage_engine = malloc (sizeof (gzochid_storage_engine));
-  game_context->storage_engine->interface = 
-    &gzochid_storage_engine_interface_mem;
-
   context->deployment_root = "/";
   
   context->storage_engine_interface = &gzochid_storage_engine_interface_mem;
@@ -100,17 +97,12 @@ application_context_init (gzochid_application_context *context)
 static void
 application_context_clear (gzochid_application_context *context)
 {
-  gzochid_context *base = (gzochid_context *) context;
-  gzochid_game_context *game_context = (gzochid_game_context *) base->parent;
-
   gzochid_storage_engine_interface_mem.close_store (context->meta);
   gzochid_storage_engine_interface_mem.close_store (context->oids);
   gzochid_storage_engine_interface_mem.close_store (context->names);
 
   gzochid_storage_engine_interface_mem.close_context (context->storage_context);
 
-  free (game_context->storage_engine);
-  gzochid_game_context_free (game_context);
   gzochid_auth_identity_cache_destroy (context->identity_cache);
 }
 

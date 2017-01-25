@@ -41,13 +41,18 @@ struct _test_context
 
 typedef struct _test_context test_context;
 
+/* TODO: Remove temporary, fake definition of `GZOCHID_TYPE_ROOT_CONTEXT' as
+   soon as the root context is decoupled from the game server. */
+
+int
+gzochid_root_context_get_type ()
+{
+  return g_object_get_type ();
+}
+
 static void 
 application_context_init (gzochid_application_context *context)
 {
-  gzochid_context *base = (gzochid_context *) context;
-  gzochid_game_context *game_context = gzochid_game_context_new (NULL);
-  base->parent = (gzochid_context *) game_context;
-
   context->storage_engine_interface = &gzochid_storage_engine_interface_mem;
   context->storage_context = 
     gzochid_storage_engine_interface_mem.initialize ("/dev/null");
@@ -238,26 +243,17 @@ test_task_chain_simple ()
   test_context context;
   gboolean submitted = FALSE, done = FALSE;
 
-  gzochid_game_context *game_context = NULL;
   gzochid_application_context *app_context = 
     gzochid_application_context_new ();
   gzochid_auth_identity *identity = gzochid_auth_identity_new ("test");
-  GThreadPool *pool = NULL;
+  GThreadPool *pool = gzochid_thread_pool_new (NULL, 1, TRUE, NULL);
 
   application_context_init (app_context);
-
-  game_context = (gzochid_game_context *) 
-    ((gzochid_context *) app_context)->parent;
-
-  pool = gzochid_thread_pool_new (game_context, 1, TRUE, NULL);
-
-  game_context->task_queue = gzochid_schedule_task_queue_new (pool);
-  game_context->tx_timeout = (struct timeval) { INT_MAX, INT_MAX };
   app_context->tx_timeout = (struct timeval) { INT_MAX, INT_MAX };
-  gzochid_schedule_task_queue_start (game_context->task_queue);  
+  app_context->task_queue = gzochid_schedule_task_queue_new (pool);
 
-  app_context->task_queue = game_context->task_queue;
-  
+  gzochid_schedule_task_queue_start (app_context->task_queue);    
+
   context.app_context = app_context;
   context.identity = identity;
   context.handle_oid = 0;
@@ -271,8 +267,11 @@ test_task_chain_simple ()
 
   g_assert_cmpstr (test_worker_string->str, ==, "abc");  
 
-  gzochid_schedule_task_queue_stop (game_context->task_queue);
+  gzochid_schedule_task_queue_stop (app_context->task_queue);
+
   g_thread_pool_free (pool, TRUE, TRUE);
+  gzochid_application_context_free (app_context);
+  gzochid_auth_identity_unref (identity);
 }
 
 int

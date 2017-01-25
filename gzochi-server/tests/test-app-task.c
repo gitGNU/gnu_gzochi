@@ -62,8 +62,6 @@ test_application_task_ref ()
   gzochid_application_task *task =
     gzochid_application_task_new (context, identity, null_worker, NULL);
 
-  g_mutex_init (&((gzochid_context *) context)->mutex);
-  
   g_assert (task == gzochid_application_task_ref (task));
 
   gzochid_application_task_unref (task);
@@ -163,8 +161,6 @@ cleanup (gzochid_application_context *context, gzochid_auth_identity *identity,
 static void
 app_task_fixture_set_up (app_task_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_context *base = NULL;
-  
   fixture->task_attempts = 0;
   fixture->catch_invocations = 0;
   fixture->cleanup_invocations = 0;
@@ -180,25 +176,17 @@ app_task_fixture_set_up (app_task_fixture *fixture, gconstpointer user_data)
     (fixture->context, fixture->identity, catch, fixture);
   fixture->cleanup_task = gzochid_application_task_new
     (fixture->context, fixture->identity, cleanup, fixture);
-
-  base = (gzochid_context *) fixture->context;
-  base->parent = calloc (1, sizeof (gzochid_game_context));
-
-  g_mutex_init (&base->mutex);
 }
 
 static void
 app_task_fixture_tear_down (app_task_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_context *base = (gzochid_context *) fixture->context;
-
   gzochid_application_task_free (fixture->success_task);
   gzochid_application_task_free (fixture->failure_task);
   gzochid_application_task_free (fixture->catch_task);
   gzochid_application_task_free (fixture->cleanup_task);
 
   gzochid_auth_identity_unref (fixture->identity);
-  free (base->parent);
   gzochid_application_context_free (fixture->context);
 }
 
