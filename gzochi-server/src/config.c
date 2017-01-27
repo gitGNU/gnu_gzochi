@@ -1,5 +1,5 @@
 /* config.c: Configuration management routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -30,6 +30,11 @@ struct _GzochidConfiguration
   GObject parent_instance;
   
   GKeyFile *key_file; /* Ref to the configuration key file. */
+
+  /* The path from which the configuration was loaded, or `NULL' if the 
+     configuration didn't come from a file. */
+
+  char *path; 
 };
 
 G_DEFINE_TYPE (GzochidConfiguration, gzochid_configuration, G_TYPE_OBJECT);
@@ -37,6 +42,7 @@ G_DEFINE_TYPE (GzochidConfiguration, gzochid_configuration, G_TYPE_OBJECT);
 enum gzochid_configuration_properties
   {
     PROP_KEY_FILE = 1,
+    PROP_PATH,
     N_PROPERTIES
   };
 
@@ -46,11 +52,33 @@ gzochid_configuration_finalize (GObject *gobject)
   GzochidConfiguration *configuration = GZOCHID_CONFIGURATION (gobject);
 
   g_key_file_unref (configuration->key_file);
+
+  if (configuration->path != NULL)
+    free (configuration->path);
   
   G_OBJECT_CLASS (gzochid_configuration_parent_class)->finalize (gobject);
 }
 
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+gzochid_configuration_get_property (GObject *object, guint property_id,
+				    GValue *value, GParamSpec *pspec)
+{
+  GzochidConfiguration *self = GZOCHID_CONFIGURATION (object);
+
+  switch (property_id)
+    {
+    case PROP_PATH:
+      if (self->path != NULL)
+	g_value_set_string (value, self->path);
+      break;
+      
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
 
 static void
 gzochid_configuration_set_property (GObject *object, guint property_id,
@@ -64,6 +92,11 @@ gzochid_configuration_set_property (GObject *object, guint property_id,
       self->key_file = g_key_file_ref (g_value_get_pointer (value));
       break;
 
+    case PROP_PATH:
+      if (g_value_get_string (value) != NULL)
+	self->path = strdup (g_value_get_string (value));
+      break;
+      
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -76,12 +109,17 @@ gzochid_configuration_class_init (GzochidConfigurationClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
   
   object_class->finalize = gzochid_configuration_finalize;
+  object_class->get_property = gzochid_configuration_get_property;
   object_class->set_property = gzochid_configuration_set_property;
 
   obj_properties[PROP_KEY_FILE] = g_param_spec_pointer
-    ("key_file", "Configuration key file", "Set the configuration key file",
+    ("key_file", "Configuration key file", "The configuration key file",
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
 
+  obj_properties[PROP_PATH] = g_param_spec_string
+    ("path", "path", "The path to the configration file on disk", NULL,
+     G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+  
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
 }

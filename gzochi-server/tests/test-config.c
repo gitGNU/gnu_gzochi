@@ -1,5 +1,5 @@
 /* test-config.c: Test routines for config.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@
 #include <glib.h>
 #include <glib-object.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "config.h"
 
@@ -46,6 +47,26 @@ test_config_extract_group ()
   g_key_file_unref (key_file);
 }
 
+static void
+test_config_path ()
+{
+  char *path = NULL;
+  GKeyFile *key_file = g_key_file_new ();
+  GzochidConfiguration *config = g_object_new
+    (GZOCHID_TYPE_CONFIGURATION,
+     "key_file", key_file,
+     "path", "/tmp/gzochid.conf",
+     NULL);
+
+  g_object_get (config, "path", &path, NULL);
+
+  g_assert_cmpstr (path, ==, "/tmp/gzochid.conf");
+
+  free (path);
+  g_object_unref (config);
+  g_key_file_unref (key_file);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -58,6 +79,7 @@ main (int argc, char *argv[])
   g_test_init (&argc, &argv, NULL);
 
   g_test_add_func ("/config/extract-group", test_config_extract_group);
+  g_test_add_func ("/config/path", test_config_path);
   
   return g_test_run ();
 }

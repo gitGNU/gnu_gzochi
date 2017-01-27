@@ -1,5 +1,5 @@
 /* config.h: Prototypes and declarations for config.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -37,12 +37,20 @@ struct _GzochidConfigurationClass
   GObjectClass parent_class;
 };
 
-/* Construct a new instance of a `GzochidConfiguration' via 
-   `g_object_new', passing a `GKeyFile' for the "key_file" property. Note that
-   because this property is not injectable, `GzochidConfiguration' instances
-   cannot be constructed by the resolver, but an explicitly-constructed
-   `GzochidConfiguration' can be added to a require resolution context via
-   `gzochid_resolver_provide'. */
+/*
+  `GzochidConfiguration' is the global configuration object for gzochid. New
+  instances may be constructed by `g_object_new', with the following 
+  properties:
+
+  - "key_file": The `GKeyFile' on which to base the configuration. Required.
+  - "path": The location of the key file on disk, if this configuration is disk-
+    backed / non-synthetic. Optional. This property is readable.
+
+  Note that because neither of these properties is injectable, 
+  `GzochidConfiguration' instances cannot be constructed by the resolver, but 
+  an explicitly-constructed `GzochidConfiguration' can be added to a require 
+  resolution context via `gzochid_resolver_provide'. 
+*/
 
 typedef struct _GzochidConfigurationClass GzochidConfigurationClass;
 
