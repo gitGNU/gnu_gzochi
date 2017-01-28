@@ -72,6 +72,33 @@ TEST_OBJECT_B (gconstpointer ptr) {
 
 G_DEFINE_TYPE (TestObjectB, test_object_b, G_TYPE_OBJECT);
 
+#define TEST_TYPE_OBJECT_BB test_object_bb_get_type ()
+GType test_object_bb_get_type (void);
+
+struct _TestObjectBb
+{
+  GObject parent_instance;
+
+  TestObjectA *a;
+};
+
+typedef struct _TestObjectBb TestObjectBb;
+
+struct _TestObjectBbClass
+{
+  GObjectClass parent_class;
+};
+
+typedef struct _TestObjectBbClass TestObjectBbClass;
+
+static inline TestObjectBb *
+TEST_OBJECT_BB (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, test_object_bb_get_type (), TestObjectBb);
+}
+
+G_DEFINE_TYPE (TestObjectBb, test_object_bb, G_TYPE_OBJECT);
+
 #define TEST_TYPE_OBJECT_C test_object_c_get_type ()
 GType test_object_c_get_type (void);
 
@@ -270,6 +297,60 @@ test_object_b_class_init (TestObjectBClass *klass)
 
 static void
 test_object_b_init (TestObjectB *self)
+{
+}
+
+enum
+  {
+    TEST_OBJECT_BB_PROP_A = 1,
+    TEST_OBJECT_BB_N_PROPERTIES
+  };
+
+static GParamSpec *obj_bb_properties[TEST_OBJECT_BB_N_PROPERTIES] = { NULL };
+
+static void
+test_object_bb_dispose (GObject *object)
+{
+  TestObjectBb *self = TEST_OBJECT_BB (object);
+  g_object_unref (self->a);
+}
+
+static void
+test_object_bb_set_property (GObject *object, guint property_id,
+			     const GValue *value, GParamSpec *pspec)
+{
+  TestObjectBb *self = TEST_OBJECT_BB (object);
+
+  switch (property_id)
+    {
+    case TEST_OBJECT_BB_PROP_A:
+      self->a = g_object_ref (g_value_get_object (value));
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+test_object_bb_class_init (TestObjectBbClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = test_object_bb_dispose;
+  object_class->set_property = test_object_bb_set_property;
+
+  obj_bb_properties[TEST_OBJECT_BB_PROP_A] = g_param_spec_object
+    ("a", "A", "Set A", TEST_TYPE_OBJECT_A,
+     G_PARAM_CONSTRUCT_ONLY | G_PARAM_WRITABLE);
+
+  g_object_class_install_properties
+    (object_class, TEST_OBJECT_BB_N_PROPERTIES, obj_bb_properties);
+}
+
+static void
+test_object_bb_init (TestObjectBb *self)
 {
 }
 
@@ -584,6 +665,18 @@ test_require_circular ()
 }
 
 static void
+test_require_construct_only ()
+{
+  GError *err = NULL;
+  TestObjectBb *bb = gzochid_resolver_require (TEST_TYPE_OBJECT_BB, &err);
+  
+  g_assert_no_error (err);
+  g_assert (bb->a != NULL);
+
+  g_object_unref (bb);  
+}
+
+static void
 test_require_resolution_context ()
 {
   GError *err = NULL;
@@ -674,7 +767,9 @@ main (int argc, char *argv[])
     ("/resolver/require/bad-constructor", test_require_bad_constructor);
   g_test_add_func ("/resolver/require/circular", test_require_circular);
   g_test_add_func
-    ("/resolver/require/resolution_context", test_require_resolution_context);
+    ("/resolver/require/construct-only", test_require_construct_only);
+  g_test_add_func
+    ("/resolver/require/resolution-context", test_require_resolution_context);
   g_test_add_func ("/resolver/clone", test_clone);
 
   return g_test_run ();

@@ -123,7 +123,8 @@ is_injectable (const GParamSpec *pspec)
 {
   return g_type_is_a (pspec->value_type, G_TYPE_OBJECT)
     && pspec->flags & G_PARAM_WRITABLE
-    && pspec->flags & G_PARAM_CONSTRUCT;
+    && (pspec->flags & G_PARAM_CONSTRUCT
+	|| pspec->flags & G_PARAM_CONSTRUCT_ONLY);
 }
 
 static constructor *
