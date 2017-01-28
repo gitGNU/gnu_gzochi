@@ -337,7 +337,7 @@ main (int argc, char *argv[])
 
   resolution_context = g_object_new (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
   configuration = g_object_new
-    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
+    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, "path", conf_path, NULL);
   gzochid_resolver_provide (resolution_context, G_OBJECT (configuration), NULL);
   
   initialize_guile ();
