@@ -338,8 +338,8 @@ static void
 list_apps (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	   gpointer request_context, gpointer user_data)
 {
-  gzochid_game_context *game_context = user_data;
-  GList *apps = gzochid_game_context_get_applications (game_context);
+  GzochidGameServer *game_server = user_data;
+  GList *apps = gzochid_game_server_get_applications (game_server);
 
   if (apps == NULL)
     gzochid_http_write_response
@@ -380,9 +380,9 @@ bind_app (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 	  gpointer request_context, gpointer user_data)
 {
   gchar *app = g_match_info_fetch (match_info, 1);
-  gzochid_game_context *game_context = user_data;
+  GzochidGameServer *game_server = user_data;
   gzochid_application_context *app_context =
-    gzochid_game_context_lookup_application (game_context, app);
+    gzochid_game_server_lookup_application (game_server, app);
 
   g_free (app);
   
@@ -731,7 +731,7 @@ attach_data_client_handler (GzochidResolutionContext *res_context,
 
 void
 gzochid_httpd_app_register_handlers (GzochidHttpServer *http_server,
-				     gzochid_game_context *game_context,
+				     GzochidGameServer *game_server,
 				     GzochidResolutionContext *res_context)
 {
   gzochid_httpd_partial *apps_root = NULL;
@@ -742,10 +742,10 @@ gzochid_httpd_app_register_handlers (GzochidHttpServer *http_server,
   attach_data_client_handler (res_context, state);
   
   gzochid_httpd_add_terminal (http_server, "/", hello_world, state);
-  gzochid_httpd_add_terminal (http_server, "/app/", list_apps, game_context);
+  gzochid_httpd_add_terminal (http_server, "/app/", list_apps, game_server);
 
   apps_root = gzochid_httpd_add_continuation
-    (http_server, "/app/([^/]+)", bind_app, game_context);
+    (http_server, "/app/([^/]+)", bind_app, game_server);
 
   gzochid_httpd_append_terminal (apps_root, "/?", app_info, NULL);
   gzochid_httpd_append_terminal (apps_root, "/oids/", list_oids, NULL);

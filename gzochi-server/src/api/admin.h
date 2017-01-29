@@ -1,5 +1,5 @@
 /* admin.h: Prototypes and declarations for admin.c
- * Copyright (C) 2012 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -20,6 +20,6 @@
 
 #include "../game.h"
 
-void gzochid_api_admin_init (gzochid_game_context *);
+void gzochid_api_admin_init (GzochidGameServer *);
 
 #endif /* GZOCHID_API_ADMIN_H */

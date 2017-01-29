@@ -23,12 +23,14 @@
 
 #include "app.h"
 #include "app-task.h"
+#include "config.h"
 #include "descriptor.h"
 #include "game.h"
 #include "guile.h"
 #include "gzochid-auth.h"
 #include "oids.h"
 #include "oids-storage.h"
+#include "resolver.h"
 #include "scheme.h"
 #include "scheme-task.h"
 #include "storage-mem.h"
@@ -38,20 +40,13 @@
 
 struct test_scheme_task_fixture
 {
-  gzochid_game_context *game_context;
+  GzochidResolutionContext *resolution_context;
+  GzochidGameServer *game_server;
+  
   gzochid_application_context *app_context;
   gzochid_auth_identity *identity;
   gzochid_storage_engine_interface *storage_interface;
 };
-
-/* TODO: Remove temporary, fake definition of `GZOCHID_TYPE_ROOT_CONTEXT' as
-   soon as the root context is decoupled from the game server. */
-
-int
-gzochid_root_context_get_type ()
-{
-  return g_object_get_type ();
-}
 
 static gboolean
 ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
@@ -67,8 +62,9 @@ static void
 test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
 				gconstpointer user_data)
 {
-  gzochid_storage_engine *storage_engine = 
-    malloc (sizeof (gzochid_storage_engine));
+  GKeyFile *key_file = g_key_file_new ();
+  GzochidConfiguration *configuration = g_object_new
+    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
 
   fixture->app_context = gzochid_application_context_new ();
   fixture->app_context->deployment_root = "/tmp";
@@ -78,12 +74,16 @@ test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
 
   fixture->identity = gzochid_auth_identity_new ("[TEST]");
 
-  fixture->game_context = gzochid_game_context_new (NULL);
-  fixture->game_context->storage_engine = storage_engine;
+  fixture->resolution_context = g_object_new
+    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+
+  gzochid_resolver_provide
+    (fixture->resolution_context, G_OBJECT (configuration), NULL);
+
+  fixture->game_server = gzochid_resolver_require_full
+    (fixture->resolution_context, GZOCHID_TYPE_GAME_SERVER, NULL);
   
-  storage_engine->interface = &gzochid_storage_engine_interface_mem;
-  
-  fixture->storage_interface = storage_engine->interface;
+  fixture->storage_interface = &gzochid_storage_engine_interface_mem;
   
   fixture->app_context->storage_engine_interface = fixture->storage_interface;
   fixture->app_context->storage_context =
@@ -101,6 +101,9 @@ test_scheme_task_fixture_setup (struct test_scheme_task_fixture *fixture,
   fixture->app_context->oid_strategy = gzochid_storage_oid_strategy_new
     (fixture->storage_interface, fixture->app_context->storage_context,
      fixture->app_context->meta);
+
+  g_key_file_unref (key_file);
+  g_object_unref (configuration);
 }
 
 static void
@@ -117,9 +120,10 @@ test_scheme_task_fixture_teardown (struct test_scheme_task_fixture *fixture,
     (fixture->app_context->storage_context);
 
   gzochid_oid_allocation_strategy_free (fixture->app_context->oid_strategy);
-  
-  free (fixture->game_context->storage_engine);
-  gzochid_game_context_free (fixture->game_context);
+
+  g_object_unref (fixture->game_server);
+  g_object_unref (fixture->resolution_context);
+
   gzochid_application_context_free (fixture->app_context);
   gzochid_auth_identity_unref (fixture->identity);
 }

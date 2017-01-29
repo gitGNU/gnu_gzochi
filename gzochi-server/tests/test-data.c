@@ -32,15 +32,6 @@ static gboolean serialized = FALSE;
 static gboolean deserialized = FALSE;
 static gboolean finalized = FALSE;
 
-/* TODO: Remove temporary, fake definition of `GZOCHID_TYPE_ROOT_CONTEXT' as
-   soon as the root context is decoupled from the game server. */
-
-int
-gzochid_root_context_get_type ()
-{
-  return g_object_get_type ();
-}
-
 static void 
 test_serializer 
 (gzochid_application_context *context, void *ptr, GByteArray *out, GError **err)

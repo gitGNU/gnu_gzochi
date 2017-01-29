@@ -1,5 +1,5 @@
 /* game-protocol.c: Implementation of game application protocol.
- * Copyright (C) 2017x Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 
 #include <assert.h>
 #include <glib.h>
+#include <glib-object.h>
 #include <gzochi-common.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -36,21 +37,55 @@
 #include "socket.h"
 #include "task.h"
 
+/* The `gzochid_game_protocol_closure' struct definition. */
+
+struct _gzochid_game_protocol_closure
+{
+  GzochidGameServer *game_server; /* Reference to the game server. */
+  gzochid_task_queue *task_queue; /* The game server's task queue. */
+  struct timeval tx_timeout; /* The default task execution timeout. */
+};
+
+gzochid_game_protocol_closure *
+gzochid_game_protocol_create_closure (GzochidGameServer *game_server,
+				      gzochid_task_queue *task_queue,
+				      struct timeval tx_timeout)
+{
+  gzochid_game_protocol_closure *closure =
+    malloc (sizeof (gzochid_game_protocol_closure));
+
+  closure->game_server = g_object_ref (game_server);
+  closure->task_queue = task_queue;
+  closure->tx_timeout = tx_timeout;
+  
+  return closure;
+}
+
+/* The client struct for the game client protocol. */
+
 struct _gzochid_game_client
 {
-  gzochid_game_context *game_context;
+  gzochid_game_protocol_closure *closure; /* The game protocol closure. */
+
+  /* The client application context; `NULL' until login has completed. */
   
-  gzochid_application_context *app_context;
-  gzochid_auth_identity *identity;
+  gzochid_application_context *app_context; 
   
-  gboolean disconnected;
-  gzochid_client_socket *sock;
+  /* The client's identity. `NULL' until login has completed. */
+
+  gzochid_auth_identity *identity; 
+  
+  /* Whether the client is in the process of disconnecting. */
+
+  gboolean disconnected; 
+
+  gzochid_client_socket *sock; /* The client socket, for writes. */
 };
 
 static gzochid_client_socket *
 server_accept (GIOChannel *channel, const char *desc, gpointer data)
 {
-  gzochid_game_context *game_context = data;
+  gzochid_game_protocol_closure *closure = data;
   gzochid_game_client *client = calloc (1, sizeof (gzochid_game_client));
   gzochid_client_socket *sock = gzochid_client_socket_new
     (channel, desc, gzochid_game_client_protocol, client);
@@ -58,7 +93,7 @@ server_accept (GIOChannel *channel, const char *desc, gpointer data)
   /* This is the initial bootstrap context for the client. Once they 
      authenticate, we'll assign them a real application context. */
   
-  client->game_context = game_context;
+  client->closure = closure;
   client->sock = sock;
   
   return sock;
@@ -150,7 +185,7 @@ logged_in_task (gzochid_application_context *context,
     (context, identity, login_catch_worker, session_oid);
 
   execution = gzochid_transactional_application_task_timed_execution_new 
-    (login_task, login_catch_task, NULL, client->game_context->tx_timeout);
+    (login_task, login_catch_task, NULL, client->closure->tx_timeout);
 
   /* Not necessary to hold a ref to these, as we've transferred them to the
      execution. */
@@ -171,7 +206,7 @@ logged_in_task (gzochid_application_context *context,
   task.data = application_task;
   gettimeofday (&task.target_execution_time, NULL);
 
-  gzochid_schedule_run_task (client->game_context->task_queue, &task);
+  gzochid_schedule_run_task (client->closure->task_queue, &task);
 }
 
 /* Schedules the transactional stage of the login process. */
@@ -186,7 +221,7 @@ logged_in (gzochid_application_context *context, gzochid_game_client *client)
   gzochid_task *task = gzochid_task_immediate_new
     (gzochid_application_task_thread_worker, application_task);
 
-  gzochid_schedule_submit_task (client->game_context->task_queue, task);
+  gzochid_schedule_submit_task (client->closure->task_queue, task);
 
   gzochid_task_free (task);
 }
@@ -205,8 +240,8 @@ dispatch_login_request (gzochid_game_client *client, char *endpoint,
       return;
     }
 
-  client->app_context = gzochid_game_context_lookup_application
-    (client->game_context, endpoint);
+  client->app_context = gzochid_game_server_lookup_application
+    (client->closure->game_server, endpoint);
   if (client->app_context == NULL)
     {
       g_warning
@@ -278,7 +313,7 @@ disconnected (gzochid_application_context *context, gzochid_game_client *client)
       gzochid_transactional_application_task_execution *execution = 
 	gzochid_transactional_application_task_timed_execution_new 
 	(callback_task, catch_task, cleanup_task,
-	 client->game_context->tx_timeout);
+	 client->closure->tx_timeout);
       gzochid_application_task *application_task = gzochid_application_task_new 
 	(context, gzochid_game_client_get_identity (client),
 	 gzochid_application_resubmitting_transactional_task_worker, execution);
@@ -299,7 +334,7 @@ disconnected (gzochid_application_context *context, gzochid_game_client *client)
       g_hash_table_remove (context->clients_to_oids, client);
       g_hash_table_remove (context->oids_to_clients, session_oid);
       
-      gzochid_schedule_submit_task (client->game_context->task_queue, &task);
+      gzochid_schedule_submit_task (client->closure->task_queue, &task);
 
       g_mutex_unlock (&context->client_mapping_lock);
     }
@@ -376,7 +411,7 @@ received_message (gzochid_application_context *context,
       
       execution = gzochid_transactional_application_task_timed_execution_new
 	(transactional_task, NULL, cleanup_task,
-	 client->game_context->tx_timeout);
+	 client->closure->tx_timeout);
 
       /* Not necessary to hold a ref to these, as we've transferred them to the
 	 execution. */
@@ -392,7 +427,7 @@ received_message (gzochid_application_context *context,
       task.data = application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
-      gzochid_schedule_submit_task (client->game_context->task_queue, &task);
+      gzochid_schedule_submit_task (client->closure->task_queue, &task);
     }
 }
 

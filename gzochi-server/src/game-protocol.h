@@ -18,9 +18,13 @@
 #ifndef GZOCHID_GAME_PROTOCOL_H
 #define GZOCHID_GAME_PROTOCOL_H
 
+#include <sys/time.h>
+
+#include "game.h"
 #include "gzochid-auth.h"
 #include "protocol.h"
 #include "socket.h"
+#include "schedule.h"
 
 /* A `gzochid_server_protocol' implementation for the gzochi game application
    protocol. */
@@ -31,6 +35,19 @@ extern gzochid_server_protocol gzochid_game_server_protocol;
    protocol. */
 
 extern gzochid_client_protocol gzochid_game_client_protocol;
+
+/* Holds data that the game protocol flow needs in the course of request 
+   handling; in particular, bits of the game server that aren't otherwise
+   public. */
+
+typedef struct _gzochid_game_protocol_closure gzochid_game_protocol_closure;
+
+/* Construct and return a new `gzochid_game_protocol_closure' around the 
+   specified `GzochidGameServer', `gzochid_task_queue', and task execution 
+   timeout value. */   
+
+gzochid_game_protocol_closure *gzochid_game_protocol_create_closure
+(GzochidGameServer *, gzochid_task_queue *, struct timeval);
 
 /* A struct representing a connected gzochi game application client. 
    `gzochid_game_client' instances are created and managed by the protocol. */

@@ -20,53 +20,53 @@
 
 #include <glib.h>
 #include <glib-object.h>
-#include <sys/time.h>
 
 #include "app.h"
-#include "event.h"
-#include "gzochid-storage.h"
-#include "schedule.h"
-#include "socket.h"
 
-struct _gzochid_game_context 
+/* The core game server type definitions. */
+
+#define GZOCHID_TYPE_GAME_SERVER gzochid_game_server_get_type ()
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochid_game_server_get_type (void);
+
+typedef struct _GzochidGameServer GzochidGameServer;
+
+struct _GzochidGameServerClass
 {
-  GObject *root_context;
-  GThreadPool *pool;
-  gzochid_task_queue *task_queue;
-  
-  int port;
-  char *apps_dir;
-  char *work_dir;
-  struct timeval tx_timeout;
-
-  GHashTable *applications;
-  GzochidAuthPluginRegistry *auth_plugin_registry;
-  
-  /* The storage engine loaded by the game manager. */
-
-  gzochid_storage_engine *storage_engine; 
-
-  gzochid_server_socket *server_socket; /* The game protocol server socket. */
-  GzochidSocketServer *socket_server; /* The game server socket server. */
-  GzochidEventLoop *event_loop;
+  GObjectClass parent_class;
 };
 
-typedef struct _gzochid_game_context gzochid_game_context;
+typedef struct _GzochidGameServerClass GzochidGameServerClass;
 
-/* Create a new game application server context that uses the specified socket
-   context to listen for and dispatch messages from client connections. This
-   may be `NULL' if no connnections are expected. */
+static inline GzochidGameServer *
+GZOCHID_GAME_SERVER (gconstpointer ptr)
+{
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochid_game_server_get_type (), GzochidGameServer);
+}
 
-gzochid_game_context *gzochid_game_context_new ();
-void gzochid_game_context_free (gzochid_game_context *);
-void gzochid_game_context_init (gzochid_game_context *, GObject *);
+/* End boilerplate. */
 
-void gzochid_game_context_register_application (gzochid_game_context *, char *,
-						gzochid_application_context *);
-void gzochid_game_context_unregister_application (gzochid_game_context *, 
-						  char *);
-gzochid_application_context *gzochid_game_context_lookup_application
-(gzochid_game_context *, char *);
-GList *gzochid_game_context_get_applications (gzochid_game_context *);
+/*
+  Starts the specified game server, preparing it to begin servicing requests 
+  from clients. The sides effects of this process include:
+
+  - The server binds itself to the configured `server.port' and begins listening
+  for connections.
+
+  - The application deployment directory is scanned for applications, and
+  any applications discovered will be bootstrapped. 
+
+  An error is signaled if the server cannot be started.
+*/
+
+void gzochid_game_server_start (GzochidGameServer *, GError **);
+
+gzochid_application_context *gzochid_game_server_lookup_application
+(GzochidGameServer *, const char *);
+GList *gzochid_game_server_get_applications (GzochidGameServer *);
 
 #endif /* GZOCHID_GAME_H */

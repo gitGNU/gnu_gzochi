@@ -21,6 +21,7 @@
 #include <glib-object.h>
 #include <glib/gstdio.h>
 #include <libguile.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -35,7 +36,7 @@
 #include "game-protocol.h"
 #include "gzochid.h"
 #include "gzochid-storage.h"
-#include "resolver.h"
+#include "metaclient.h"
 #include "scheme.h"
 #include "scheme-task.h"
 #include "socket.h"
@@ -56,12 +57,282 @@
 #define GZOCHID_STORAGE_ENGINE_DIR "./storage"
 #endif /* GZOCHID_STORAGE_ENGINE_DIR */
 
+/* Boilerplate setup for the game server object. */
+
+/* The game server object. */
+
+struct _GzochidGameServer
+{
+  GObject parent_instance; /* The parent struct, for casting. */
+  
+  GThreadPool *pool; /* Thread pool for task queue. */
+
+  /* Non-durable queue of tasks pending execution on behalf of running 
+     applications. */
+
+  gzochid_task_queue *task_queue; 
+  
+  int port; /* Port on which the game server listens for connections. */
+  char *apps_dir; /* Directory to scan for application deployments. */
+
+  /* Directory to provide to durable storage engine bootstrap. */
+
+  char *work_dir;
+  
+  struct timeval tx_timeout; /* The default timeout for transactional tasks. */
+
+  /* Map of application name to `gzochid_application_context'. */
+
+  GHashTable *applications; 
+
+  /* The storage engine loaded by the game manager. */
+
+  gzochid_storage_engine *storage_engine; 
+
+  gzochid_server_socket *server_socket; /* The game protocol server socket. */
+
+  /* Components that are injected by the type resolver. */
+
+  GzochidConfiguration *configuration; /* The global configuration object. */
+  
+  /* The authentication plugin registry. */
+
+  GzochidAuthPluginRegistry *auth_plugin_registry; 
+
+  /* The metaclient container. */
+
+  GzochidMetaClientContainer *metaclient_container;
+
+  GzochidSocketServer *socket_server; /* The game server socket server. */
+  GzochidEventLoop *event_loop; /* The global event loop. */
+};
+
+G_DEFINE_TYPE (GzochidGameServer, gzochid_game_server, G_TYPE_OBJECT);
+
+enum gzochid_game_server_properties
+  {
+    PROP_CONFIGURATION = 1,
+    PROP_SOCKET_SERVER,
+    PROP_EVENT_LOOP,
+    PROP_META_CLIENT_CONTAINER,
+    PROP_AUTH_PLUGIN_REGISTRY,
+    N_PROPERTIES
+  };
+
+static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+game_server_constructed (GObject *obj)
+{
+  GzochidGameServer *self = GZOCHID_GAME_SERVER (obj);
+
+  GHashTable *config = gzochid_configuration_extract_group
+    (self->configuration, "game");
+  int max_threads = gzochid_config_to_int 
+    (g_hash_table_lookup (config, "thread_pool.max_threads"), 4);
+  long tx_timeout_ms = gzochid_config_to_long 
+    (g_hash_table_lookup (config, "tx.timeout"), DEFAULT_TX_TIMEOUT_MS);
+       
+  self->pool = gzochid_thread_pool_new (self, max_threads, TRUE, NULL);
+  self->task_queue = gzochid_schedule_task_queue_new (self->pool);
+
+  self->port = gzochid_config_to_int
+    (g_hash_table_lookup (config, "server.port"), 8001);
+
+  if (g_hash_table_contains (config, "server.fs.apps"))
+    self->apps_dir = strdup (g_hash_table_lookup (config, "server.fs.apps"));
+  else self->apps_dir = strdup (SERVER_FS_APPS_DEFAULT);
+
+  if (g_hash_table_contains (config, "server.fs.data"))
+    self->work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
+  else self->work_dir = strdup (SERVER_FS_DATA_DEFAULT);
+
+  self->tx_timeout.tv_sec = tx_timeout_ms / 1000;
+  self->tx_timeout.tv_usec = (tx_timeout_ms % 1000) * 1000;
+
+  g_hash_table_destroy (config);
+}
+
+static void
+game_server_dispose (GObject *obj)
+{
+  GzochidGameServer *self = GZOCHID_GAME_SERVER (obj);
+
+  g_object_unref (self->auth_plugin_registry);
+  g_object_unref (self->configuration);
+  g_object_unref (self->event_loop);
+  g_object_unref (self->socket_server);
+}
+
+static void
+game_server_finalize (GObject *obj)
+{
+  GzochidGameServer *self = GZOCHID_GAME_SERVER (obj);
+
+  g_hash_table_destroy (self->applications);
+}
+
+static void
+game_server_set_property (GObject *obj, guint property_id, const GValue *value,
+			  GParamSpec *pspec)
+{
+  GzochidGameServer *self = GZOCHID_GAME_SERVER (obj);
+
+  switch (property_id)
+    {
+    case PROP_CONFIGURATION:
+      self->configuration = g_object_ref (g_value_get_object (value));
+      break;
+      
+    case PROP_SOCKET_SERVER:
+      self->socket_server = g_object_ref (g_value_get_object (value));
+      break;
+
+    case PROP_EVENT_LOOP:
+      self->event_loop = g_object_ref (g_value_get_object (value));
+      break;
+
+    case PROP_META_CLIENT_CONTAINER:
+      self->metaclient_container = g_object_ref (g_value_get_object (value));
+      break;
+
+    case PROP_AUTH_PLUGIN_REGISTRY:
+      self->auth_plugin_registry = g_object_ref (g_value_get_object (value));
+      break;
+    }
+}
+
+static void
+gzochid_game_server_class_init (GzochidGameServerClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->constructed = game_server_constructed;
+  object_class->dispose = game_server_dispose;
+  object_class->finalize = game_server_finalize;
+  object_class->set_property = game_server_set_property;
+
+  obj_properties[PROP_CONFIGURATION] = g_param_spec_object
+    ("configuration", "config", "The global configuration object",
+     GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
+
+  obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
+    ("socket-server", "socket-server", "The client-facing socket server",
+     GZOCHID_TYPE_SOCKET_SERVER, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
+
+  obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
+    ("event-loop", "event-loop", "The global event loop",
+     GZOCHID_TYPE_EVENT_LOOP, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
+
+  obj_properties[PROP_META_CLIENT_CONTAINER] = g_param_spec_object
+    ("metaclient-container", "metaclient-container", "The metaclient container",
+     GZOCHID_TYPE_META_CLIENT_CONTAINER,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
+
+  obj_properties[PROP_AUTH_PLUGIN_REGISTRY] = g_param_spec_object
+    ("auth-plugin-registry", "plugin-registry",
+     "The authentication plugin registry", GZOCHID_TYPE_AUTH_PLUGIN_REGISTRY,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
+
+  g_object_class_install_properties
+    (object_class, N_PROPERTIES, obj_properties);
+}
+
+void
+gzochid_game_server_init (GzochidGameServer *self)
+{
+  self->applications = g_hash_table_new (g_str_hash, g_str_equal);
+}
+
+/* Bootstrap the storage engine to be used by all hosted applications. If the
+   gzochid application server is running in distributed mode, the "dataclient"
+   storage engine is used; otherwise the engine named in the `gzochid.conf' file
+   is loaded. If the requested storage engine cannot be loaded, the server will
+   fall back to a non-durable "in-memory" storage engine. */
+
+static void
+initialize_storage (GzochidGameServer *server)
+{
+  GHashTable *config = gzochid_configuration_extract_group
+    (server->configuration, "game");
+
+  GzochidMetaClient *metaclient = NULL;
+  
+  g_object_get (server->metaclient_container, "metaclient", &metaclient, NULL);
+
+  if (metaclient != NULL)
+    {
+      char *conf_storage_engine = g_hash_table_lookup
+	(config, "storage.engine");
+
+      if (conf_storage_engine != NULL)
+	g_message
+	  ("Meta server client configuration detected; ignoring configured "
+	   "storage engine '%s'.", conf_storage_engine);
+      else g_message
+	     ("Meta server client configuration detected; using data client "
+	      "storage engine.");
+
+      server->storage_engine = calloc (1, sizeof (gzochid_storage_engine));
+      server->storage_engine->interface =
+	&gzochid_storage_engine_interface_dataclient;
+
+      g_object_unref (metaclient);
+    }
+  else if (g_hash_table_contains (config, "storage.engine"))
+    {
+      char *dir = NULL;
+      char *env = getenv ("GZOCHID_STORAGE_ENGINE_DIR");
+      
+      if (env != NULL)
+	dir = env;
+      else 
+	{
+	  char *conf_dir = g_hash_table_lookup (config, "storage.engine.dir");
+	  dir = conf_dir == NULL ? GZOCHID_STORAGE_ENGINE_DIR : conf_dir;
+	}
+
+      server->storage_engine = gzochid_storage_load_engine 
+	(dir, g_hash_table_lookup (config, "storage.engine"));
+    }
+  else g_message 
+	 ("No durable storage engine configured; memory engine will be used.");
+
+  if (server->storage_engine == NULL)
+    {
+      g_message
+	("Using in-memory storage for application data. THIS CONFIGURATION IS "
+	 "NOT SAFE FOR PRODUCTION USE.");
+
+      server->storage_engine = calloc (1, sizeof (gzochid_storage_engine));
+      server->storage_engine->interface = &gzochid_storage_engine_interface_mem;
+    }
+}
+
+/* Adds a few core `gzochid_application_task_serialization' objects to the 
+   global task serialization registry. */
+
 static void 
-initialize_application (gzochid_game_context *context, const char *dir,
+initialize_application_task_serializations ()
+{
+  gzochid_task_initialize_serialization_registry ();
+
+  gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
+  gzochid_task_register_serialization
+    (&gzochid_client_received_message_task_serialization);
+  gzochid_task_register_serialization
+    (&gzochid_channel_operation_task_serialization);
+  gzochid_task_register_serialization
+    (&gzochid_task_chain_bootstrap_task_serialization);
+}
+
+/* Initialize the application corresponding to the specified 
+   `GzochidApplicationDescriptor'. */
+
+static void 
+initialize_application (GzochidGameServer *server, const char *dir,
 			GzochidApplicationDescriptor *descriptor)
 {
-  GzochidRootContext *root_context =
-    GZOCHID_ROOT_CONTEXT (context->root_context);
   gzochid_application_context *application_context =
     gzochid_application_context_new ();
   
@@ -70,18 +341,23 @@ initialize_application (gzochid_game_context *context, const char *dir,
     (g_list_copy (descriptor->load_paths), strdup (dir));
   
   gzochid_application_context_init
-    (application_context, descriptor, root_context->metaclient_container,
-     context->auth_plugin_registry, context->storage_engine->interface,
-     context->work_dir, context->task_queue, context->tx_timeout);
+    (application_context, descriptor, server->metaclient_container,
+     server->auth_plugin_registry, server->storage_engine->interface,
+     server->work_dir, server->task_queue, server->tx_timeout);
 
-  gzochid_game_context_register_application
-    (context, descriptor->name, application_context);
+  g_hash_table_insert
+    (server->applications, descriptor->name, application_context);
+
   gzochid_event_source_attach
-    (context->event_loop, application_context->event_source);
+    (server->event_loop, application_context->event_source);
 }
 
+/* Attempt to bootstrap an application from the specified directory by searching
+   it for a game descriptor file. If one is found, load it for use with 
+   `initialize_application'. */
+
 static void 
-scan_app_dir (gzochid_game_context *context, const char *dir)
+scan_app_dir (GzochidGameServer *server, const char *dir)
 {
   FILE *descriptor_file = NULL;
   char *descriptor_filename = g_strconcat (dir, "/", GAME_DESCRIPTOR_XML, NULL);
@@ -104,36 +380,52 @@ scan_app_dir (gzochid_game_context *context, const char *dir)
     g_warning
       ("Failed to parse application descriptor %s; skipping.",
        descriptor_filename);
-  else if (g_hash_table_contains (context->applications, descriptor->name))
+  else if (g_hash_table_contains (server->applications, descriptor->name))
     g_warning
       ("Application in %s with name '%s' already exists; skipping.", 
        descriptor_filename, descriptor->name);
-  else initialize_application (context, dir, descriptor);
+  else initialize_application (server, dir, descriptor);
 
   g_free (descriptor_filename);
 }
 
+/*
+  Returns the absolute path to the application deployment directory. If the
+  directory name specified in `gzochid.conf' is already absolute, return it;
+  else return the relative path qualified by the directory containing 
+  `gzochid.conf' itself.
+
+  The returned string should be freed via `g_free' when no longer needed.
+ */
+
 static gchar *
-qualify_apps_dir (gzochid_game_context *context)
+qualify_apps_dir (GzochidGameServer *server)
 {
-  if (g_path_is_absolute (context->apps_dir))
-    return g_strdup (context->apps_dir);
+  if (g_path_is_absolute (server->apps_dir))
+    return g_strdup (server->apps_dir);
   else
     {
-      GzochidRootContext *root_context =
-	GZOCHID_ROOT_CONTEXT (context->root_context);
-      gchar *basedir = g_path_get_dirname (root_context->gzochid_conf_path);
-      gchar *path = g_strconcat (basedir, "/", context->apps_dir, NULL);
+      gchar *basedir = NULL, *conf_path = NULL, *path = NULL;
+
+      g_object_get (server->configuration, "path", &conf_path, NULL);
+
+      basedir = g_path_get_dirname (conf_path);
+      path = g_strconcat (basedir, "/", server->apps_dir, NULL);;
       
       g_free (basedir);
+      g_free (conf_path);
+      
       return path;
     }
 }
 
+/* Searches the application directory for folders containing game application 
+   descriptor files, bootstrapping any discovered applications. */
+
 static void 
-scan_apps_dir (gzochid_game_context *context)
+scan_apps_dir (GzochidGameServer *server)
 {
-  char *apps_dir = qualify_apps_dir (context);
+  char *apps_dir = qualify_apps_dir (server);
   GDir *dir = g_dir_open (apps_dir, O_RDONLY, NULL);
   const char *name = g_dir_read_name (dir);
 
@@ -141,7 +433,7 @@ scan_apps_dir (gzochid_game_context *context)
     {
       char *qname = g_strconcat (apps_dir, "/", name, NULL);
       if (g_file_test (qname, G_FILE_TEST_IS_DIR))
-	scan_app_dir (context, qname);
+	scan_app_dir (server, qname);
       free (qname);
 
       name = g_dir_read_name (dir);
@@ -151,230 +443,73 @@ scan_apps_dir (gzochid_game_context *context)
   g_free (apps_dir);
 }
 
-static void 
-initialize_server (gzochid_game_context *game_context)
-{
-  game_context->server_socket = gzochid_server_socket_new
-    ("Game server", gzochid_game_server_protocol, game_context);
-  gzochid_server_socket_listen
-    (game_context->socket_server, game_context->server_socket,
-     game_context->port);
-
-  gzochid_socket_server_start (game_context->socket_server);
-}
+/* Bootstrap all applications that can be found as subfolders of the configured
+   application deployment directory. */
 
 static void 
-initialize_apps (gzochid_game_context *context)
+initialize_apps (GzochidGameServer *server)
 {
-  if (!g_file_test (context->work_dir, G_FILE_TEST_EXISTS))
+  if (!g_file_test (server->work_dir, G_FILE_TEST_EXISTS))
     {
       g_message 
-	("Work directory %s does not exist; creating...", 
-	 context->work_dir);
-      if (g_mkdir_with_parents (context->work_dir, 493) != 0)
+	("Work directory %s does not exist; creating...", server->work_dir);
+      if (g_mkdir_with_parents (server->work_dir, 493) != 0)
 	{
-	  g_critical
-	    ("Unable to create work directory %s.", context->work_dir);
+	  g_critical ("Unable to create work directory %s.", server->work_dir);
 	  exit (EXIT_FAILURE);
 	}
     }
-  else if (!g_file_test (context->work_dir, G_FILE_TEST_IS_DIR))
+  else if (!g_file_test (server->work_dir, G_FILE_TEST_IS_DIR))
     {
-      g_critical ("%s is not a directory.", context->work_dir);
+      g_critical ("%s is not a directory.", server->work_dir);
       exit (EXIT_FAILURE);
     }
   
-  if (!g_file_test (context->apps_dir, G_FILE_TEST_EXISTS))
+  if (!g_file_test (server->apps_dir, G_FILE_TEST_EXISTS))
     {
-      g_critical 
-	("Application directory %s does not exist.", context->apps_dir);
+      g_critical ("Application directory %s does not exist.", server->apps_dir);
       exit (EXIT_FAILURE);
     }
-  else if (!g_file_test (context->apps_dir, G_FILE_TEST_IS_DIR))
+  else if (!g_file_test (server->apps_dir, G_FILE_TEST_IS_DIR))
     {
-      g_critical ("%s is not a directory.", context->apps_dir);
+      g_critical ("%s is not a directory.", server->apps_dir);
       exit (EXIT_FAILURE);
     }
 
-  scan_apps_dir (context);
+  scan_apps_dir (server);
 }
 
-static void 
-initialize_application_task_serializations ()
+void
+gzochid_game_server_start (GzochidGameServer *server, GError **err)
 {
-  gzochid_task_initialize_serialization_registry ();
-
-  gzochid_task_register_serialization (&gzochid_scheme_task_serialization);
-  gzochid_task_register_serialization
-    (&gzochid_client_received_message_task_serialization);
-  gzochid_task_register_serialization
-    (&gzochid_channel_operation_task_serialization);
-  gzochid_task_register_serialization
-    (&gzochid_task_chain_bootstrap_task_serialization);
-}
-
-gzochid_game_context *
-gzochid_game_context_new ()
-{
-  gzochid_game_context *context = calloc (1, sizeof (gzochid_game_context));
-
-  context->applications = g_hash_table_new (g_str_hash, g_str_equal);
-  
-  return context;
-}
-
-void 
-gzochid_game_context_free (gzochid_game_context *context)
-{
-  gzochid_context_free ((gzochid_context *) context);
-
-  g_hash_table_destroy (context->applications);
-
-  if (context->auth_plugin_registry != NULL)
-    g_object_unref (context->auth_plugin_registry);
-  if (context->root_context != NULL)
-    g_object_unref (context->root_context);
-  if (context->socket_server != NULL)
-    g_object_unref (context->socket_server);
-  if (context->event_loop != NULL)
-    g_object_unref (context->event_loop);
-  
-  free (context);
-} 
-
-void 
-gzochid_game_context_init (gzochid_game_context *context, GObject *root_obj)
-{
-  long tx_timeout_ms = 0;
-  GzochidRootContext *root_context = GZOCHID_ROOT_CONTEXT (root_obj); 
-  GHashTable *config = gzochid_configuration_extract_group
-    (root_context->configuration, "game");
-  GzochidMetaClient *metaclient = NULL;
-  
-  context->root_context = g_object_ref (root_context);
-  context->socket_server = gzochid_resolver_require_full
-    (root_context->resolution_context, GZOCHID_TYPE_SOCKET_SERVER, NULL);
-  context->event_loop = gzochid_resolver_require_full
-    (root_context->resolution_context, GZOCHID_TYPE_EVENT_LOOP, NULL);
-  
-  context->pool = gzochid_thread_pool_new 
-    (context, 
-     gzochid_config_to_int 
-     (g_hash_table_lookup (config, "thread_pool.max_threads"), 4), 
-     TRUE, NULL);
-  
-  context->task_queue = gzochid_schedule_task_queue_new (context->pool);
-  gzochid_schedule_task_queue_start (context->task_queue);
-
-  context->port = gzochid_config_to_int
-    (g_hash_table_lookup (config, "server.port"), 8001);
-
-  if (g_hash_table_contains (config, "server.fs.apps"))
-    context->apps_dir = strdup (g_hash_table_lookup (config, "server.fs.apps"));
-  else context->apps_dir = strdup (SERVER_FS_APPS_DEFAULT);
-
-  if (g_hash_table_contains (config, "server.fs.data"))
-    context->work_dir = strdup (g_hash_table_lookup (config, "server.fs.data"));
-  else context->work_dir = strdup (SERVER_FS_DATA_DEFAULT);
-
-  g_object_get
-    (root_context->metaclient_container, "metaclient", &metaclient, NULL);
-
-  if (metaclient != NULL)
-    {
-      char *conf_storage_engine = g_hash_table_lookup
-	(config, "storage.engine");
-
-      if (conf_storage_engine != NULL)
-	g_message
-	  ("Meta server client configuration detected; ignoring configured "
-	   "storage engine '%s'.", conf_storage_engine);
-      else g_message
-	     ("Meta server client configuration detected; using data client "
-	      "storage engine.");
-
-      context->storage_engine = calloc (1, sizeof (gzochid_storage_engine));
-
-      context->storage_engine->interface = 
-	&gzochid_storage_engine_interface_dataclient;
-
-      g_object_unref (metaclient);
-    }
-  else if (g_hash_table_contains (config, "storage.engine"))
-    {
-      char *dir = NULL;
-      char *env = getenv ("GZOCHID_STORAGE_ENGINE_DIR");
-      
-      if (env != NULL)
-	dir = env;
-      else 
-	{
-	  char *conf_dir = g_hash_table_lookup 
-	    (config, "storage.engine.dir");
-	  dir = conf_dir == NULL ? GZOCHID_STORAGE_ENGINE_DIR : conf_dir;
-	}
-
-      context->storage_engine = gzochid_storage_load_engine 
-	(dir, g_hash_table_lookup (config, "storage.engine"));
-    }
-  else g_message 
-	 ("No durable storage engine configured; memory engine will be used.");
-
-  if (context->storage_engine == NULL)
-    {
-      g_message
-	("Using in-memory storage for application data. THIS CONFIGURATION IS "
-	 "NOT SAFE FOR PRODUCTION USE.");
-
-      context->storage_engine = calloc (1, sizeof (gzochid_storage_engine));
-      context->storage_engine->interface = 
-	&gzochid_storage_engine_interface_mem;
-    }
-
-  tx_timeout_ms = gzochid_config_to_long 
-    (g_hash_table_lookup (config, "tx.timeout"), DEFAULT_TX_TIMEOUT_MS);
-  context->tx_timeout.tv_sec = tx_timeout_ms / 1000;
-  context->tx_timeout.tv_usec = (tx_timeout_ms % 1000) * 1000;
-
-  initialize_server (context);
-  
   gzochid_scheme_initialize_bindings ();
   gzochid_scheme_task_initialize_bindings ();
+
   initialize_application_task_serializations ();
-  
-  context->auth_plugin_registry = g_object_new
-    (GZOCHID_TYPE_AUTH_PLUGIN_REGISTRY, "configuration",
-     root_context->configuration, NULL);
-  
-  initialize_apps (context);
-  
-  g_hash_table_destroy (config);
-}
 
-void 
-gzochid_game_context_register_application (gzochid_game_context *context, 
-					   char *name, 
-					   gzochid_application_context *app)
-{
-  g_hash_table_insert (context->applications, name, app);
-}
+  gzochid_schedule_task_queue_start (server->task_queue);
 
-void 
-gzochid_game_context_unregister_application (gzochid_game_context *context, 
-					     char *name)
-{
-  g_hash_table_remove (context->applications, name);
+  initialize_storage (server);
+  initialize_apps (server);
+  
+  server->server_socket = gzochid_server_socket_new
+    ("Game server", gzochid_game_server_protocol,
+     gzochid_game_protocol_create_closure
+     (server, server->task_queue, server->tx_timeout));
+
+  gzochid_server_socket_listen
+    (server->socket_server, server->server_socket, server->port);
 }
 
 gzochid_application_context *
-gzochid_game_context_lookup_application (gzochid_game_context *context, 
-					 char *name)
+gzochid_game_server_lookup_application (GzochidGameServer *server,
+					const char *name)
 {
-  return g_hash_table_lookup (context->applications, name);
+  return g_hash_table_lookup (server->applications, name);
 }
 
 GList *
-gzochid_game_context_get_applications (gzochid_game_context *context)
+gzochid_game_server_get_applications (GzochidGameServer *server)
 {
-  return g_hash_table_get_values (context->applications);
+  return g_hash_table_get_values (server->applications);
 }

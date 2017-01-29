@@ -32,7 +32,6 @@
 #include "config.h"
 #include "data.h"
 #include "descriptor.h"
-#include "game.h"
 #include "guile.h"
 #include "gzochid-storage.h"
 #include "reloc.h"
@@ -524,10 +523,10 @@ create_application_context (char *path, char *app)
   const char *env = getenv ("GZOCHID_CONF_LOCATION");
   const char *gzochid_conf = NULL;
 
-  gzochid_game_context *parent = gzochid_game_context_new (NULL);
+  gzochid_storage_engine *storage_engine = NULL;
   gzochid_application_context *context = gzochid_application_context_new ();
   char *work_dir = NULL, *data_dir = NULL, *apps_dir = NULL,
-    *descriptor_path = NULL, *storage_engine = NULL;
+    *descriptor_path = NULL, *engine_name = NULL;
 
   if (path != NULL)
     gzochid_conf = path;
@@ -586,17 +585,16 @@ create_application_context (char *path, char *app)
      strdup (context->deployment_root));
 
   if (g_hash_table_contains (config, "storage.engine"))
-    storage_engine = strdup (g_hash_table_lookup (config, "storage.engine"));
+    engine_name = strdup (g_hash_table_lookup (config, "storage.engine"));
   else
     {
       g_critical ("storage.engine is required.");
       exit (EXIT_FAILURE);
     }
 
-  parent->storage_engine =
-    gzochid_tool_probe_storage_engine (config, storage_engine);
+  storage_engine = gzochid_tool_probe_storage_engine (config, engine_name);
 
-  context->storage_engine_interface = parent->storage_engine->interface;
+  context->storage_engine_interface = storage_engine->interface;
   context->storage_context = context->storage_engine_interface
     ->initialize (data_dir);
 
@@ -614,7 +612,7 @@ create_application_context (char *path, char *app)
   free (data_dir);
   free (apps_dir);
   free (descriptor_path);
-  free (storage_engine);
+  free (engine_name);
 
   return context;
 }

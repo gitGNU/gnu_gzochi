@@ -72,10 +72,11 @@ struct _GzochidRootContext
 
   GzochidMetaClientContainer *metaclient_container; 
   
+  GzochidGameServer *game_server; /* The game server. */
+
   /* Components that can't yet be auto-resolved. */
 
   gzochid_context *admin_context; /* The admin service context. */
-  struct _gzochid_game_context *game_server; /* The game server context. */
 };
 
 typedef struct _GzochidRootContext GzochidRootContext;

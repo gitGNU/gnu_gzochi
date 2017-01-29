@@ -1,5 +1,5 @@
 /* admin.c: Primitive functions for gzochi admin API
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -16,7 +16,9 @@
  */
 
 #include <glib.h>
+#include <glib-object.h>
 #include <libguile.h>
+#include <stddef.h>
 #include <stdlib.h>
 
 #include "../app.h"
@@ -29,7 +31,7 @@
 #include "task.h"
 #include "util.h"
 
-static gzochid_game_context *game_context;
+static GzochidGameServer *game_server;
 
 static SCM scm_application_context_name;
 static SCM scm_make_application_context;
@@ -38,14 +40,13 @@ SCM_DEFINE (primitive_applications, "primitive-applications", 0, 0, 0,
 	    (), "List the current active applications.")
 {
   SCM ret = SCM_EOL;
-  GList *applications = gzochid_game_context_get_applications (game_context);
+  GList *applications = gzochid_game_server_get_applications (game_server);
   GList *applications_ptr = applications;
   
   while (applications_ptr != NULL)
     {
-      gzochid_application_context *app_context = 
-	(gzochid_application_context *) applications_ptr->data;
-      SCM application_record = scm_call_1 
+      gzochid_application_context *app_context = applications_ptr->data;
+      SCM application_record = scm_call_1
 	(scm_make_application_context, 
 	 scm_from_locale_string (app_context->descriptor->name));
 
@@ -88,7 +89,7 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
   char *name = scm_to_locale_string 
     (scm_call_1 (scm_application_context_name, context));
   gzochid_application_context *app_context = 
-    gzochid_game_context_lookup_application (game_context, name);
+    gzochid_game_server_lookup_application (game_server, name);
   gzochid_auth_identity *debug_identity =
     gzochid_auth_identity_from_name (app_context->identity_cache, "[DEBUG]");
   gzochid_transaction_timing timing;
@@ -120,7 +121,7 @@ SCM_DEFINE (primitive_with_application, "primitive-with-application",
 }
 
 void 
-gzochid_api_admin_init (gzochid_game_context *context)
+gzochid_api_admin_init (GzochidGameServer *server)
 {
   SCM current_module = scm_current_module ();
   SCM gzochi_admin = scm_c_resolve_module ("gzochi admin");
@@ -138,7 +139,7 @@ gzochid_api_admin_init (gzochid_game_context *context)
     scm_variable_ref (application_context_name_var);
   scm_gc_protect_object (scm_application_context_name);
 
-  game_context = context;
+  game_server = g_object_ref (server);
   scm_set_current_module (gzochi_admin);
 
   #include "admin.x"

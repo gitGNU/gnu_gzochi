@@ -22,28 +22,23 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include "config.h"
 #include "game.h"
 #include "game-protocol.h"
+#include "resolver.h"
 #include "socket.h"
 
 struct _game_protocol_fixture
 {
-  gzochid_game_context *game_context;
+  GzochidResolutionContext *resolution_context;
+  GzochidGameServer *game_server;
+  GzochidSocketServer *socket_server;
 
   gzochid_client_socket *client_socket;
   gzochid_server_socket *server_socket;
 };
 
 typedef struct _game_protocol_fixture game_protocol_fixture;
-
-/* TODO: Remove temporary, fake definition of `GZOCHID_TYPE_ROOT_CONTEXT' as
-   soon as the root context is decoupled from the game server. */
-
-int
-gzochid_root_context_get_type ()
-{
-  return g_object_get_type ();
-}
 
 static gboolean
 ignore_warnings (const gchar *log_domain, GLogLevelFlags log_level,
@@ -60,7 +55,7 @@ server_accept_wrapper (GIOChannel *channel, const char *desc, gpointer data)
 {
   game_protocol_fixture *fixture = data;
   gzochid_client_socket *ret = gzochid_game_server_protocol.accept
-    (channel, desc, fixture->game_context);
+    (channel, desc, fixture->game_server);
 
   fixture->client_socket = ret;
   return ret;
@@ -76,25 +71,38 @@ game_protocol_fixture_set_up (game_protocol_fixture *fixture,
   struct sockaddr addr;
   size_t addrlen = sizeof (struct sockaddr);
   int socket_fd = socket (AF_INET, SOCK_STREAM, 0);
-
+  GKeyFile *key_file = g_key_file_new ();
+  GzochidConfiguration *configuration = g_object_new
+    (GZOCHID_TYPE_CONFIGURATION, "key_file", key_file, NULL);
+  
   g_test_log_set_fatal_handler (ignore_warnings, NULL);
   
-  fixture->game_context = gzochid_game_context_new ();
-  fixture->game_context->socket_server = g_object_new
-    (GZOCHID_TYPE_SOCKET_SERVER, NULL);
+  fixture->resolution_context = g_object_new
+    (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+
+  gzochid_resolver_provide
+    (fixture->resolution_context, G_OBJECT (configuration), NULL);
+  
+  fixture->game_server = gzochid_resolver_require_full
+    (fixture->resolution_context, GZOCHID_TYPE_GAME_SERVER, NULL);
+  fixture->socket_server = gzochid_resolver_require_full
+    (fixture->resolution_context, GZOCHID_TYPE_SOCKET_SERVER, NULL);
+  
   fixture->server_socket = gzochid_server_socket_new
     ("test", game_server_wrapper_protocol, fixture);
   
   gzochid_server_socket_listen
-    (fixture->game_context->socket_server, fixture->server_socket, 0);
+    (fixture->socket_server, fixture->server_socket, 0);
   _gzochid_server_socket_getsockname (fixture->server_socket, &addr, &addrlen);
   connect (socket_fd, &addr, addrlen);
 
-  g_assert
-    (g_main_context_iteration
-     (fixture->game_context->socket_server->main_context, FALSE));
+  g_assert (g_main_context_iteration
+	    (fixture->socket_server->main_context, FALSE));
 
   g_assert (fixture->client_socket != NULL);
+
+  g_key_file_unref (key_file);
+  g_object_unref (configuration);
 }
 
 static void
@@ -102,18 +110,18 @@ game_protocol_fixture_tear_down (game_protocol_fixture *fixture,
 				 gconstpointer user_data)
 {
   GSource *server_source = g_main_context_find_source_by_user_data
-    (fixture->game_context->socket_server->main_context,
-     fixture->server_socket);
+    (fixture->socket_server->main_context, fixture->server_socket);
   GSource *client_source = g_main_context_find_source_by_user_data
-    (fixture->game_context->socket_server->main_context,
-     fixture->client_socket);
+    (fixture->socket_server->main_context, fixture->client_socket);
 
   g_source_unref (server_source);
   
   if (client_source != NULL)
     g_source_unref (client_source);
-  
-  gzochid_game_context_free (fixture->game_context);
+
+  g_object_unref (fixture->game_server);
+  g_object_unref (fixture->resolution_context);
+  g_object_unref (fixture->socket_server);
 }
 
 static void
@@ -208,8 +216,7 @@ static void
 test_client_error (game_protocol_fixture *fixture, gconstpointer user_data)
 {
   GSource *source = g_main_context_find_source_by_user_data
-    (fixture->game_context->socket_server->main_context,
-     fixture->client_socket);
+    (fixture->socket_server->main_context, fixture->client_socket);
   gzochid_game_client *client = _gzochid_client_socket_get_protocol_data
     (fixture->client_socket);
 

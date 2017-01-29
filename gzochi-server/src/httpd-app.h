@@ -1,5 +1,5 @@
 /* httpd-app.h: Prototypes and declarations for httpd-app.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -35,11 +35,11 @@
          /oids/ - List of object ids
 	   [oid] - Object contents, in hex dump format.
 
-  The specified `gzochid_game_context' and `GzochidResolutionContext' are used
+  The specified `GzochidGameServer' and `GzochidResolutionContext' are used
   to resolve application name references and other parts of the container 
   infrastructure. */
 
 void gzochid_httpd_app_register_handlers
-(GzochidHttpServer *, gzochid_game_context *, GzochidResolutionContext *);
+(GzochidHttpServer *, GzochidGameServer *, GzochidResolutionContext *);
 
 #endif /* GZOCHID_HTTPD_APP_H */

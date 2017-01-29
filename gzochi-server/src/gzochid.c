@@ -54,6 +54,7 @@ enum gzochid_root_context_properties
     PROP_EVENT_LOOP,
     PROP_SOCKET_SERVER,
     PROP_META_CLIENT_CONTAINER,
+    PROP_GAME_SERVER,
     N_PROPERTIES
   };
 
@@ -86,6 +87,10 @@ root_context_set_property (GObject *object, guint property_id,
     case PROP_META_CLIENT_CONTAINER:
       self->metaclient_container = g_object_ref (g_value_get_object (value));
       break;
+
+    case PROP_GAME_SERVER:
+      self->game_server = g_object_ref (g_value_get_object (value));
+      break;
       
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -102,24 +107,29 @@ gzochid_root_context_class_init (GzochidRootContextClass *klass)
 
   obj_properties[PROP_CONFIGURATION] = g_param_spec_object
     ("configuration", "configuration", "The server configuration",
-     GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+     GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
 
   obj_properties[PROP_RESOLUTION_CONTEXT] = g_param_spec_object
     ("resolution-context", "resolutuon-context", "The root resolution context",
-     GZOCHID_TYPE_RESOLUTION_CONTEXT, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+     GZOCHID_TYPE_RESOLUTION_CONTEXT,
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
 
   obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
     ("event-loop", "event-loop", "The global event loop",
-     GZOCHID_TYPE_EVENT_LOOP, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+     GZOCHID_TYPE_EVENT_LOOP, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
   
   obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
     ("socket-server", "socket-server", "The global socket server",
-     GZOCHID_TYPE_SOCKET_SERVER, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+     GZOCHID_TYPE_SOCKET_SERVER, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
 
   obj_properties[PROP_META_CLIENT_CONTAINER] = g_param_spec_object
     ("metaclient-container", "metaclient-container",
      "The meta client container", GZOCHID_TYPE_META_CLIENT_CONTAINER,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
+
+  obj_properties[PROP_GAME_SERVER] = g_param_spec_object
+    ("game-server", "game-server", "The game protocol server",
+     GZOCHID_TYPE_GAME_SERVER, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
 
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
@@ -129,7 +139,6 @@ static void
 gzochid_root_context_init (GzochidRootContext *self)
 {
   self->admin_context = (gzochid_context *) gzochid_admin_context_new ();
-  self->game_server = gzochid_game_context_new ();
 }
 
 static const struct option longopts[] =
@@ -232,15 +241,9 @@ initialize_logging (GKeyFile *key_file)
 static void
 root_context_start (GzochidRootContext *root_context)
 {
+  GError *err = NULL;
   GzochidMetaClient *metaclient = NULL;
-  GHashTable *game_config = gzochid_configuration_extract_group
-    (root_context->configuration, "game");
-  
-  gzochid_game_context_init
-    (root_context->game_server, G_OBJECT (root_context));
 
-  g_hash_table_unref (game_config);
-  
   gzochid_event_loop_start (root_context->event_loop);
 
   if (root_context->admin_context != NULL)
@@ -251,14 +254,20 @@ root_context_start (GzochidRootContext *root_context)
 	(root_context->admin_context, GZOCHID_ADMIN_STATE_RUNNING);
     }
 
+  gzochid_game_server_start (root_context->game_server, &err);
+  
+  if (err != NULL)
+    {
+      g_critical ("Failed to start game server: %s; exiting...", err->message);
+      exit (EXIT_FAILURE);
+    }
+  
   g_object_get (root_context->metaclient_container,
 		"metaclient", &metaclient,
 		NULL);
   
   if (metaclient != NULL)
     {
-      GError *err = NULL;
-      
       gzochid_metaclient_start (metaclient, &err);
 
       if (err != NULL)
