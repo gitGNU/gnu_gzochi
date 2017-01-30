@@ -80,6 +80,7 @@ struct _GzochidDataClient
   GList *changesets;
   GList *deferred_response_closures;
   GHashTable *release_closures;
+  GThread *processing_thread;
 };
 
 G_DEFINE_TYPE (GzochidDataClient, gzochid_data_client, G_TYPE_OBJECT);
@@ -265,7 +266,8 @@ process_response
 	(client, qualified_key, response, success_callback, success_data,
 	 failure_callback, failure_data, release_callback, release_data);
 
-      g_thread_new ("test-response", process_response_async, closure);
+      client->processing_thread =
+	g_thread_new ("test-response", process_response_async, closure);
     }
   else client->deferred_response_closures = g_list_append
 	 (client->deferred_response_closures,
@@ -446,17 +448,20 @@ static void
 dataclient_storage_fixture_teardown (dataclient_storage_fixture *fixture,
 				     gconstpointer user_data)
 {
+  if (fixture->dataclient->processing_thread != NULL)
+    g_thread_join (fixture->dataclient->processing_thread);
+
   g_list_free_full
     (fixture->dataclient->deferred_response_closures, execute_deferred_closure);
   g_list_free_full (fixture->dataclient->requested_keys, g_free);
   g_list_free_full (fixture->dataclient->changesets, clear_changeset);
   g_hash_table_destroy (fixture->dataclient->release_closures);
   g_list_free_full (fixture->dataclient->released_keys, g_free);
-  
-  g_object_unref (fixture->dataclient);
 
   fixture->iface->close_store (fixture->store);
   fixture->iface->close_context (fixture->storage_context);
+
+  g_object_unref (fixture->dataclient);
 }
 
 static void
