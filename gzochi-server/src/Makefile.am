@@ -53,8 +53,8 @@ noinst_HEADERS = admin.h app-task.h app.h auth_int.h callback.h channel.h \
 	metaserver-protocol.h nodemap-mem.h nodemap.h oids-dataclient.h \
 	oids-storage.h oids.h protocol-common.h protocol.h queue.h reloc.h \
 	resolver.h schedule.h scheme.h scheme-task.h session.h \
-	sessionserver-protocol.h sessionserver.h socket.h stats.h \
-	storage-dataclient.h storage-mem.h storage.h task.h threads.h \
+	sessionclient.h sessionserver-protocol.h sessionserver.h socket.h \
+	stats.h storage-dataclient.h storage-mem.h storage.h task.h threads.h \
 	toollib.h tx.h txlog.h util.h
 
 noinst_LTLIBRARIES = libgzochid.la libgzochi-metad.la
@@ -73,8 +73,8 @@ libgzochid_la_SOURCES = admin.c app-task.c app.c auth.c callback.c channel.c \
 	io.c itree.c log.c lrucache.c metaclient-protocol.c metaclient.c \
 	oids-dataclient.c oids-storage.c oids.c protocol-common.c queue.c \
 	reloc.c resolver.c schedule.c scheme.c scheme-task.c session.c \
-	socket.c stats.c storage-dataclient.c storage-mem.c storage.c task.c \
-	threads.c tx.c txlog.c util.c
+	sessionclient.c socket.c stats.c storage-dataclient.c storage-mem.c \
+	storage.c task.c threads.c tx.c txlog.c util.c
 
 libgzochid_la_LIBADD = api/libgzochid-api.la @GZOCHI_COMMON_LIBS@ \
 	@GUILE_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ \

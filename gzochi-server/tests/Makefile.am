@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2016 Julian Graham
+# Copyright (C) 2017 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -53,6 +53,7 @@ test_programs = \
 	test-scheme \
 	test-scheme-task \
 	test-session \
+	test-sessionclient \
 	test-sessionserver \
 	test-sessionserver-protocol \
 	test-socket \
@@ -353,6 +354,13 @@ test_session_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
 test_session_SOURCES = test-session.c 
 test_session_LDADD = $(top_builddir)/src/libgzochid.la \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+
+test_sessionclient_CFLAGS = -I$(top_srcdir)/src \
+        @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+test_sessionclient_SOURCES = test-sessionclient.c
+test_sessionclient_LDADD = $(top_builddir)/src/libgzochid_la-sessionclient.o \
+	$(top_builddir)/src/libgzochid_la-resolver.o \
+        @GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
 test_sessionserver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
 	@GZOCHI_COMMON_CFLAGS@
