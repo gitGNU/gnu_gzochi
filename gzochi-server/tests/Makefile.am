@@ -54,6 +54,7 @@ test_programs = \
 	test-scheme-task \
 	test-session \
 	test-sessionclient \
+	test-sessionclient-protocol \
 	test-sessionserver \
 	test-sessionserver-protocol \
 	test-socket \
@@ -360,6 +361,14 @@ test_sessionclient_CFLAGS = -I$(top_srcdir)/src \
 test_sessionclient_SOURCES = test-sessionclient.c
 test_sessionclient_LDADD = $(top_builddir)/src/libgzochid_la-sessionclient.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
+        @GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
+
+test_sessionclient_protocol_CFLAGS = -I$(top_srcdir)/src \
+        @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+test_sessionclient_protocol_SOURCES = test-sessionclient-protocol.c
+test_sessionclient_protocol_LDADD = \
+	$(top_builddir)/src/libgzochid_la-sessionclient-protocol.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
         @GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
 test_sessionserver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
