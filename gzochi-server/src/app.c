@@ -437,5 +437,7 @@ gzochid_application_context_init
   
   gzochid_event_attach (context->event_source, update_stats, context->stats);
 
+  g_object_get (metaclient_container, "metaclient", &context->metaclient, NULL);
+  
   run (context);
 }

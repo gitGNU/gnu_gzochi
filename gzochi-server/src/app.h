@@ -74,6 +74,10 @@ struct _gzochid_application_context
   
   gzochid_event_source *event_source;
   gzochid_application_stats *stats;
+
+  /* Reference to the metaclient, if available. Otherwise, `NULL'. */
+
+  GzochidMetaClient *metaclient; 
 };
 
 typedef struct _gzochid_application_context gzochid_application_context;
