@@ -377,7 +377,7 @@ remove_session (gzochid_application_context *context, guint64 session_oid,
   GError *local_err = NULL;
   GString *binding = g_string_new (SESSION_PREFIX);
 
-  g_string_printf (binding, "%" G_GUINT64_FORMAT, session_oid);
+  g_string_append_printf (binding, "%" G_GUINT64_FORMAT, session_oid);
   gzochid_data_remove_binding (context, binding->str, &local_err);
   if (local_err == NULL)
     {
@@ -672,7 +672,7 @@ persistence_task_worker (gzochid_application_context *context,
   persistence_task->holder->oid = reference->oid;
 
   binding = g_string_new (persistence_task->prefix);
-  g_string_printf (binding, "%" G_GUINT64_FORMAT, reference->oid);
+  g_string_append_printf (binding, "%" G_GUINT64_FORMAT, reference->oid);
 
   g_clear_error (&persistence_task->holder->err);
   

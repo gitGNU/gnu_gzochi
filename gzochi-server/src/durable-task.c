@@ -353,7 +353,7 @@ static char *
 create_pending_task_binding (guint64 oid)
 {
   GString *str = g_string_new (PENDING_TASK_PREFIX);
-  g_string_printf (str, "%" G_GUINT64_FORMAT, oid);
+  g_string_append_printf (str, "%" G_GUINT64_FORMAT, oid);
   return g_string_free (str, FALSE);
 }
 
