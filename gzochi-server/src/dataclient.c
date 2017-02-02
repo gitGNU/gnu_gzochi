@@ -181,6 +181,8 @@ gzochid_data_client_constructed (GObject *gobject)
     (g_hash_table_lookup (metaserver_config, "lock.release.msec"), 1000);
   client->range_lock_release_ms = gzochid_config_to_int
     (g_hash_table_lookup (metaserver_config, "rangelock.release.msec"), 500);
+
+  g_hash_table_destroy (metaserver_config);
 }
 
 static void
