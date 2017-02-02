@@ -30,6 +30,7 @@
 #include "metaclient.h"
 #include "resolver.h"
 #include "socket.h"
+#include "sessionclient.h"
 
 struct _GzochidHttpServer
 {
@@ -52,6 +53,12 @@ gzochid_http_server_get_base_url (GzochidHttpServer *server)
   return "http://127.0.0.1/";
 }
 
+GType
+gzochid_game_server_get_type ()
+{
+  return G_TYPE_OBJECT;
+}
+
 struct _GzochidDataClient
 {
   GObject parent_instance;
@@ -61,13 +68,14 @@ G_DEFINE_TYPE (GzochidDataClient, gzochid_data_client, G_TYPE_OBJECT);
 
 enum gzochid_data_client_properties
   {
-    PROP_CONFIGURATION = 1,
-    PROP_MAIN_CONTEXT,
-    PROP_SOCKET,
-    N_PROPERTIES
+    PROP_DATA_CLIENT_CONFIGURATION = 1,
+    PROP_DATA_CLIENT_MAIN_CONTEXT,
+    PROP_DATA_CLIENT_SOCKET,
+    N_DATA_CLIENT_PROPERTIES
   };
 
-static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+static GParamSpec *dataclient_obj_properties[N_DATA_CLIENT_PROPERTIES] =
+  { NULL };
 
 static void
 gzochid_data_client_dispose (GObject *gobject)
@@ -87,24 +95,77 @@ static void gzochid_data_client_class_init (GzochidDataClientClass *klass)
   object_class->dispose = gzochid_data_client_dispose;
   object_class->set_property = gzochid_data_client_set_property;
 
-  obj_properties[PROP_CONFIGURATION] = g_param_spec_object
+  dataclient_obj_properties[PROP_DATA_CLIENT_CONFIGURATION] =
+    g_param_spec_object
     ("configuration", "config", "The global configuration object",
      GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
 
-  obj_properties[PROP_MAIN_CONTEXT] = g_param_spec_boxed
+  dataclient_obj_properties[PROP_DATA_CLIENT_MAIN_CONTEXT] = g_param_spec_boxed
     ("main-context", "main-context", "The meta client's main context",
      G_TYPE_MAIN_CONTEXT, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
 
-  obj_properties[PROP_SOCKET] = g_param_spec_pointer
-    ("reconnectable-socket", "socket",
-     "The meta client's reconnectable socket",
+  dataclient_obj_properties[PROP_DATA_CLIENT_SOCKET] = g_param_spec_pointer
+    ("reconnectable-socket", "socket", "The meta client's reconnectable socket",
      G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
 
   g_object_class_install_properties
-    (object_class, N_PROPERTIES, obj_properties);
+    (object_class, N_DATA_CLIENT_PROPERTIES, dataclient_obj_properties);
 }
 
 static void gzochid_data_client_init (GzochidDataClient *self)
+{
+}
+
+struct _GzochidSessionClient
+{
+  GObject parent_instance;
+};
+
+G_DEFINE_TYPE (GzochidSessionClient, gzochid_session_client, G_TYPE_OBJECT);
+
+enum gzochid_session_client_properties
+  {
+    PROP_SESSION_CLIENT_GAME_SERVER = 1,
+    PROP_SESSION_CLIENT_SOCKET,
+    N_SESSION_CLIENT_PROPERTIES
+  };
+
+static GParamSpec *sessionclient_obj_properties[N_SESSION_CLIENT_PROPERTIES] =
+  { NULL };
+
+static void
+gzochid_session_client_dispose (GObject *gobject)
+{
+}
+
+static void
+gzochid_session_client_set_property (GObject *object, guint property_id,
+				     const GValue *value, GParamSpec *pspec)
+{
+}
+
+static void gzochid_session_client_class_init (GzochidSessionClientClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = gzochid_session_client_dispose;
+  object_class->set_property = gzochid_session_client_set_property;
+  
+  sessionclient_obj_properties[PROP_SESSION_CLIENT_GAME_SERVER] =
+    g_param_spec_object
+    ("game-server", "game-server", "The game protocol server",
+     G_TYPE_OBJECT, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+  
+  sessionclient_obj_properties[PROP_SESSION_CLIENT_SOCKET] =
+    g_param_spec_pointer
+    ("reconnectable-socket", "socket", "The meta client's reconnectable socket",
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+
+  g_object_class_install_properties
+    (object_class, N_SESSION_CLIENT_PROPERTIES, sessionclient_obj_properties);
+}
+
+static void gzochid_session_client_init (GzochidSessionClient *self)
 {
 }
 

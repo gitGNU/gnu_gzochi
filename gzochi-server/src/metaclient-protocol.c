@@ -28,6 +28,8 @@
 #include "metaclient-protocol.h"
 #include "metaclient.h"
 #include "protocol-common.h"
+#include "sessionclient-protocol.h"
+#include "sessionclient.h"
 
 /* This protocol implementation is a "router" for segments of the meta protocol
    that correspond to more specific client components; overall connection
@@ -174,10 +176,29 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
 	    break;
 	  }	  
 	  
+	case GZOCHID_SESSION_PROTOCOL_RELAY_DISCONNECT_TO:
+	case GZOCHID_SESSION_PROTOCOL_RELAY_MESSAGE_TO:
+	  {
+	    GzochidSessionClient *sessionclient = NULL;
+	    GByteArray *delegate_buffer = g_byte_array_sized_new (len);
+
+	    g_object_get (client, "sessionclient", &sessionclient, NULL);
+	    
+	    g_byte_array_append
+	      (delegate_buffer, buffer->data + offset - 2, len + 2);
+	    gzochid_sessionclient_client_protocol.dispatch
+	      (delegate_buffer, sessionclient);
+
+	    g_byte_array_unref (delegate_buffer);
+	    g_object_unref (sessionclient);
+	    
+	    break;
+	  }	        
+
 	default:
 	  g_warning ("Unexpected opcode %d received from client", opcode);
 	}
-      
+
       offset += len;
       remaining -= len + 2;
       total += len + 2;

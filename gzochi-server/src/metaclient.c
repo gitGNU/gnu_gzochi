@@ -37,6 +37,7 @@
 #include "metaclient.h"
 #include "metaclient-protocol.h"
 #include "resolver.h"
+#include "sessionclient.h"
 #include "socket.h"
 
 struct _GzochidMetaClient
@@ -65,6 +66,15 @@ struct _GzochidMetaClient
   */
   
   GzochidDataClient *dataclient;
+
+  /*
+    The sessionclient instance to which the metaclient delegates handling of 
+    `GZOCHID_SESSION_PROTOCOL_*' opcodes. 
+
+    The sessionclient has a lifecycle similar to that of the dataclient.
+  */
+
+  GzochidSessionClient *sessionclient;
   
   /* The socket server for the meta client. */
 
@@ -116,6 +126,8 @@ enum gzochid_meta_client_properties
     PROP_SOCKET_SERVER,
     PROP_EVENT_LOOP,
     PROP_EVENT_SOURCE,
+    PROP_DATA_CLIENT,
+    PROP_SESSION_CLIENT,
     N_PROPERTIES
   };
 
@@ -125,14 +137,22 @@ static void
 gzochid_meta_client_get_property (GObject *object, guint property_id,
 				  GValue *value, GParamSpec *pspec)
 {
-  GzochidMetaClient *meta_client = GZOCHID_META_CLIENT (object);
+  GzochidMetaClient *client = GZOCHID_META_CLIENT (object);
 
   switch (property_id)
     {
     case PROP_EVENT_SOURCE:
-      g_value_set_boxed (value, meta_client->event_source);
+      g_value_set_boxed (value, client->event_source);
       break;
 
+    case PROP_DATA_CLIENT:
+      g_value_set_object (value, client->dataclient);
+      break;
+
+    case PROP_SESSION_CLIENT:
+      g_value_set_object (value, client->sessionclient);
+      break;
+      
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
       break;
@@ -212,12 +232,35 @@ static void
 gzochid_meta_client_constructed (GObject *gobject)
 {
   GzochidMetaClient *client = GZOCHID_META_CLIENT (gobject);  
+  GzochidGameServer *game_server = gzochid_resolver_require_full
+    (client->resolution_context, GZOCHID_TYPE_GAME_SERVER, NULL);
 
   /* Extract and save the "metaserver" configuration group to use to look up
      connection details. */
   
   client->metaclient_configuration = gzochid_configuration_extract_group
     (client->configuration, "metaserver");
+
+  /* Explicit construction of the dataclient with main context and 
+     reconnectable socket pointer. */
+  
+  client->dataclient = g_object_new
+    (GZOCHID_TYPE_DATA_CLIENT,
+     "configuration", client->configuration,
+     "main-context", client->main_context,
+     "reconnectable-socket", client->socket,
+     NULL);
+
+  /* Explicit construction of the sessionclient with game server and 
+     reconnectable socket pointer. */
+
+  client->sessionclient = g_object_new
+    (GZOCHID_TYPE_SESSION_CLIENT,
+     "game-server", game_server,
+     "reconnectable-socket", client->socket,
+     NULL);
+
+  g_object_unref (game_server);
 }
 
 static void
@@ -251,6 +294,14 @@ gzochid_meta_client_class_init (GzochidMetaClientClass *klass)
   obj_properties[PROP_EVENT_SOURCE] = g_param_spec_boxed
     ("event-source", "event-source", "The meta client event source",
      G_TYPE_SOURCE, G_PARAM_READABLE);
+
+  obj_properties[PROP_DATA_CLIENT] = g_param_spec_object
+    ("data-client", "dataclient", "The data client", GZOCHID_TYPE_DATA_CLIENT,
+     G_PARAM_READABLE);
+
+  obj_properties[PROP_SESSION_CLIENT] = g_param_spec_object
+    ("session-client", "sessionclient", "The session client",
+     GZOCHID_TYPE_SESSION_CLIENT, G_PARAM_READABLE);
   
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
@@ -347,18 +398,7 @@ gzochid_meta_client_init (GzochidMetaClient *self)
   gzochid_reconnectable_socket_listen
     (self->socket, on_connect, self, on_disconnect, self);
 
-  /* Explicit construction of the dataclient with main context and 
-     reconnectable socket pointer. */
-  
-  self->dataclient = g_object_new
-    (GZOCHID_TYPE_DATA_CLIENT,
-     "configuration", self->configuration,
-     "main-context", self->main_context,
-     "reconnectable-socket", self->socket,
-     NULL);
-
   self->running = FALSE;
-
   self->event_source = gzochid_event_source_new ();
 }
 

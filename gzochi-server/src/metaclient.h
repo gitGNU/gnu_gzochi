@@ -35,7 +35,8 @@ GType gzochid_meta_client_get_type (void);
   server to communicate with other servers when running in distributed mode. It
   has the following readable properties:
   
-  - "dataclient" returns a reference to a GzochidDataClient
+  - "data-client" returns a reference to a `GzochidDataClient'
+  - "session-client" returns a reference to a `GzochidSessionClient'
   
   The meta client is not eligible for injection as a dependency by 
   `gzochid_resolver_require'.
