@@ -351,7 +351,8 @@ test_scheme_task_SOURCES = test-scheme-task.c
 test_scheme_task_LDADD = $(top_builddir)/src/libgzochid.la \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
-test_session_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_session_CFLAGS = -I$(top_srcdir)/src \
+	@GLIB_CFLAGS@ @GUILE_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
 test_session_SOURCES = test-session.c 
 test_session_LDADD = $(top_builddir)/src/libgzochid.la \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@

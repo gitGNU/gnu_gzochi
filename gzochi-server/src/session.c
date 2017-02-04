@@ -1,5 +1,5 @@
 /* session.c: Client session management routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -17,6 +17,7 @@
 
 #include <assert.h>
 #include <glib.h>
+#include <glib-object.h>
 #include <gmp.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -29,9 +30,11 @@
 #include "game-protocol.h"
 #include "gzochid-auth.h"
 #include "io.h"
+#include "metaclient.h"
 #include "reloc.h"
 #include "scheme-task.h"
 #include "session.h"
+#include "sessionclient.h"
 #include "task.h"
 #include "tx.h"
 #include "txlog.h"
@@ -186,6 +189,47 @@ cleanup_transaction (gzochid_client_session_transaction_context *tx_context)
   free (tx_context);
 }
 
+/* Relays a "disconnect" message via the meta server to the target session which
+   may live on a different gzochid application server node. */
+
+static void
+forward_disconnect (GzochidMetaClient *metaclient, char *app,
+ 		    guint64 target_session_oid)
+{
+  GzochidSessionClient *session_client = NULL;      
+  
+  g_debug ("Client not found for session '%s/%" G_GUINT64_FORMAT "'; "
+ 	   "forwarding disconnect to meta server.", app, target_session_oid);
+  
+  g_object_get (metaclient, "session-client", &session_client, NULL);
+  
+  gzochid_sessionclient_relay_disconnect_from
+    (session_client, app, target_session_oid);
+  g_object_unref (session_client);
+}
+ 
+/* Relays the specified message via the meta server for the target session which
+   may live on a different gzochid application server node. */
+
+static void
+forward_message (GzochidMetaClient *metaclient, char *app,
+ 		 guint64 target_session_oid, unsigned char *msg, short len)
+{
+  GBytes *msg_bytes = g_bytes_new (msg, len);
+  GzochidSessionClient *session_client = NULL;
+  
+  g_debug ("Client not found for session '%s/%" G_GUINT64_FORMAT "'; "
+ 	   "forwarding message to meta server.", app, target_session_oid);
+  
+  g_object_get (metaclient, "session-client", &session_client, NULL);
+  
+  gzochid_sessionclient_relay_message_from
+    (session_client, app, target_session_oid, msg_bytes);
+  
+  g_object_unref (session_client);
+  g_bytes_unref (msg_bytes);
+} 
+
 static void 
 session_commit_operation
 (gzochid_client_session_transaction_context *tx_context, 
@@ -194,11 +238,14 @@ session_commit_operation
   gzochid_application_context *context = tx_context->context;
   gzochid_client_session_pending_message_operation *msg_op = NULL;
   gzochid_game_client *client = NULL;
-
+  
   g_mutex_lock (&context->client_mapping_lock);
   client = g_hash_table_lookup (context->oids_to_clients, &op->target_session);
 
-  if (client == NULL)
+  /* If the client isn't connected locally, and this server's not part of a
+     cluster, then there's nothing to be done. */
+  
+  if (client == NULL && context->metaclient == NULL)
     {
       g_warning
 	("Client not found for session '%" G_GUINT64_FORMAT
@@ -211,7 +258,15 @@ session_commit_operation
   switch (op->type)
     {
     case GZOCHID_CLIENT_SESSION_OP_DISCONNECT:
-      gzochid_game_client_disconnect (client); break;
+
+      if (client != NULL)
+	gzochid_game_client_disconnect (client); 
+      else if (context->metaclient != NULL)
+	forward_disconnect
+	  (context->metaclient, context->descriptor->name, op->target_session);
+
+      break;
+      
     case GZOCHID_CLIENT_SESSION_OP_LOGIN_SUCCESS:
       gzochid_game_client_login_success (client); break;
     case GZOCHID_CLIENT_SESSION_OP_LOGIN_FAILURE:
@@ -228,7 +283,11 @@ session_commit_operation
 	  gzochid_event_dispatch (context->event_source, event);
 	  g_object_unref (event);
 
-	  gzochid_game_client_send (client, msg_op->message, msg_op->len);
+	  if (client != NULL)
+	    gzochid_game_client_send (client, msg_op->message, msg_op->len);
+	  else if (context->metaclient != NULL)
+	    forward_message (context->metaclient, context->descriptor->name,
+			     op->target_session, msg_op->message, msg_op->len);
 	}
 
       break;
