@@ -34,6 +34,7 @@
 #include "schedule.h"
 #include "scheme-task.h"
 #include "session.h"
+#include "sessionclient.h"
 #include "socket.h"
 #include "task.h"
 
@@ -154,7 +155,8 @@ logged_in_task (gzochid_application_context *context,
   gzochid_client_session *session = gzochid_client_session_new (identity);
   
   guint64 *session_oid = malloc (sizeof (guint64));
-
+  guint64 local_session_oid = 0;
+  
   gzochid_application_task *login_task = NULL;
   gzochid_application_task *login_catch_task = NULL;
   gzochid_application_task *application_task = NULL;
@@ -177,6 +179,11 @@ logged_in_task (gzochid_application_context *context,
       return;
     }
 
+  /* Useful to have a stack-local version of this id, in case it gets freed by
+     one of the cleanup handler for some task. */
+  
+  else local_session_oid = *session_oid;
+  
   login_task = gzochid_application_task_new
     (context, identity, gzochid_scheme_application_logged_in_worker,
      session_oid);
@@ -207,6 +214,25 @@ logged_in_task (gzochid_application_context *context,
   gettimeofday (&task.target_execution_time, NULL);
 
   gzochid_schedule_run_task (client->closure->task_queue, &task);
+
+  /* If after executing the login task the client is *still* present in the
+     client-to-session oid mapping table, safe to assume they've completed the
+     login process; if we're connected to a metaserver, inform it that there's
+     a new session on this application server node. */
+  
+  if (g_hash_table_contains (context->oids_to_clients, &local_session_oid)
+      && context->metaclient != NULL)
+    {
+      GzochidSessionClient *sessionclient = NULL;
+
+      g_object_get
+	(context->metaclient, "session-client", &sessionclient, NULL);
+
+      gzochid_sessionclient_session_connected
+	(sessionclient, context->descriptor->name, local_session_oid);
+      
+      g_object_unref (sessionclient);
+    }
 }
 
 /* Schedules the transactional stage of the login process. */
@@ -281,7 +307,7 @@ dispatch_login_request (gzochid_game_client *client, char *endpoint,
     }
 }
 
-/* Schedules the transactional stage of the login process. */
+/* Schedules the transactional stage of the disconnect process. */
 
 static void 
 disconnected (gzochid_application_context *context, gzochid_game_client *client)
@@ -331,8 +357,30 @@ disconnected (gzochid_application_context *context, gzochid_game_client *client)
       task.data = application_task;
       gettimeofday (&task.target_execution_time, NULL);
 
-      g_hash_table_remove (context->clients_to_oids, client);
-      g_hash_table_remove (context->oids_to_clients, session_oid);
+      if (g_hash_table_contains (context->oids_to_clients, session_oid))
+	{
+	  /* If this application server node is connected to a metaserver, let
+	     the metaserver know that the session is disconnecting. This isn't
+	     the only place that a client can be unmapped, but it should be the
+	     only place that it can happen to a client that was previously
+	     announced to the metaserver. */
+	  
+	  if (context->metaclient != NULL)
+	    {
+	      GzochidSessionClient *sessionclient = NULL;
+
+	      g_object_get
+		(context->metaclient, "session-client", &sessionclient, NULL);
+
+	      gzochid_sessionclient_session_disconnected
+		(sessionclient, context->descriptor->name, *session_oid);
+	      
+	      g_object_unref (sessionclient);
+	    }
+
+	  g_hash_table_remove (context->clients_to_oids, client);
+	  g_hash_table_remove (context->oids_to_clients, session_oid);
+	}
       
       gzochid_schedule_submit_task (client->closure->task_queue, &task);
 
