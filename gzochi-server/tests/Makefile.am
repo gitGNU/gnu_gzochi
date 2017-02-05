@@ -23,6 +23,7 @@ SUBDIRS = api auth scheme storage
 test_programs = \
 	test-app-task \
 	test-auth \
+	test-channelserver \
 	test-config \
 	test-data \
 	test-data-protocol \
@@ -105,15 +106,24 @@ test_auth_LDADD = $(top_builddir)/src/libgzochid_la-auth.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GOBJECT_LIBS@
 
-test_data_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
-test_data_SOURCES = test-data.c
-test_data_LDADD = $(top_builddir)/src/libgzochid.la \
-	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
+test_channelserver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
+	@GZOCHI_COMMON_CFLAGS@
+test_channelserver_SOURCES = test-channelserver.c
+test_channelserver_LDADD = \
+	$(top_builddir)/src/libgzochi_metad_la-channelserver.o \
+	$(top_builddir)/src/libgzochid_la-resolver.o \
+	$(top_builddir)/src/libgzochid_la-util.o \
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_config_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_config_SOURCES = test-config.c
 test_config_LDADD = $(top_builddir)/src/libgzochid_la-config.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@
+
+test_data_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GUILE_CFLAGS@
+test_data_SOURCES = test-data.c
+test_data_LDADD = $(top_builddir)/src/libgzochid.la \
+	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
 test_data_protocol_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ \
 	@GZOCHI_COMMON_CFLAGS@

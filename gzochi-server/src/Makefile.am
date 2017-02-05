@@ -44,9 +44,9 @@ conf/gzochid.conf: conf/gzochid.conf.in $(top_builddir)/config.status
 dist_include_HEADERS = gzochid-auth.h gzochid-storage.h
 
 noinst_HEADERS = admin.h app-task.h app.h auth_int.h callback.h channel.h \
-	config.h context.h data-protocol.h data.h dataclient-protocol.h \
-	dataclient.h dataserver-protocol.h dataserver.h debug.h \
-	descriptor.h durable-task.h event-app.h event-meta.h event.h \
+	channelserver.h config.h context.h data-protocol.h data.h \
+	dataclient-protocol.h dataclient.h dataserver-protocol.h dataserver.h \
+	debug.h descriptor.h durable-task.h event-app.h event-meta.h event.h \
 	fmemopen.h fsm.h game.h game-protocol.h guile.h gzochid.h httpd-app.h \
 	httpd-meta.h httpd.h io.h itree.h lock.h log.h lrucache.h \
 	meta-protocol.h metaclient-protocol.h metaclient.h \
@@ -118,11 +118,12 @@ libgzochi_metad_la_CFLAGS = @CFLAGS@ \
 	@GMODULE_CFLAGS@ @GTHREAD_CFLAGS@ @GOBJECT_CFLAGS@ @MICROHTTPD_CFLAGS@ \
 	@GZOCHI_COMMON_CFLAGS@ \
 	-Wall -Werror
-libgzochi_metad_la_SOURCES = config.c data-protocol.c dataserver-protocol.c \
-	dataserver.c event.c event-meta.c httpd.c httpd-meta.c itree.c \
-	lock-mem.c log.c metaserver-protocol.c nodemap-mem.c oids-storage.c \
-	oids.c protocol-common.c resolver.c sessionserver-protocol.c \
-	sessionserver.c socket.c storage-mem.c storage.c util.c
+libgzochi_metad_la_SOURCES = channelserver.c config.c data-protocol.c \
+	dataserver-protocol.c dataserver.c event.c event-meta.c httpd.c \
+	httpd-meta.c itree.c lock-mem.c log.c metaserver-protocol.c \
+	nodemap-mem.c oids-storage.c oids.c protocol-common.c resolver.c \
+	sessionserver-protocol.c sessionserver.c socket.c storage-mem.c \
+	storage.c util.c
 libgzochi_metad_la_LIBADD = @GLIB_LIBS@ @GMODULE_LIBS@ @GTHREAD_LIBS@ \
 	@GOBJECT_LIBS@ @MICROHTTPD_LIBS@ @GZOCHI_COMMON_LIBS@
 

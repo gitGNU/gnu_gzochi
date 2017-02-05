@@ -147,6 +147,51 @@
 
 #define GZOCHID_SESSION_PROTOCOL_RELAY_MESSAGE_FROM 0x64
 
+/*
+  Relay via the metaserver a request to join the target session to the target 
+  channel.
+  
+  `NULL'-terminated string: Name of the game application that owns the channel.
+  8 bytes: The big-endian encoding of the target channel oid
+  8 bytes: The big-endian encoding of the target session oid
+ */
+
+#define GZOCHID_CHANNEL_PROTOCOL_RELAY_JOIN_FROM 0x70
+
+/*
+  Relay via the metaserver a request to remove the target session from the 
+  target channel.
+
+  `NULL'-terminated string: Name of the game application that owns the channel.
+  8 bytes: The big-endian encoding of the target channel oid
+  8 bytes: The big-endian encoding of the target session oid
+ */
+
+#define GZOCHID_CHANNEL_PROTOCOL_RELAY_LEAVE_FROM 0x72
+
+/*
+  Relay via the metaserver a message for all servers to be broadcast over the
+  target channel.
+
+  `NULL'-terminated string: Name of the game application that owns the channel.
+  8 bytes: The big-endian encoding of the target channel oid
+  2 bytes: The big-endian encoding of the length of the message; the message 
+    bytes follow
+ */
+
+#define GZOCHID_CHANNEL_PROTOCOL_RELAY_MESSAGE_FROM 0x74
+
+/*
+  Notifies all servers via the metaserver to close their local representations
+  of the target channel.
+
+  `NULL'-terminated string: Name of the game application that owns the channel.
+  8 bytes: The big-endian encoding of the target channel oid
+ */
+
+#define GZOCHID_CHANNEL_PROTOCOL_RELAY_CLOSE_FROM 0x76
+
+
 /* The following opcodes are for messages sent from the server to the client. */
 
 /*
@@ -196,5 +241,48 @@
 */
 
 #define GZOCHID_SESSION_PROTOCOL_RELAY_MESSAGE_TO 0x65
+
+/*
+  Directs the target server to join the specified session to the specified
+  channel.
+
+  `NULL'-terminated string: Name of the game application that owns the channel.
+  8 bytes: The big-endian encoding of the target channel oid
+  8 bytes: The big-endian encoding of the target session oid
+*/
+
+#define GZOCHID_CHANNEL_PROTOCOL_RELAY_JOIN_TO 0x71
+
+/*
+  Directs the target server to remove the specified session from the specified
+  channel.
+
+  `NULL'-terminated string: Name of the game application that owns the channel.
+  8 bytes: The big-endian encoding of the target channel oid
+  8 bytes: The big-endian encoding of the target session oid
+*/
+
+#define GZOCHID_CHANNEL_PROTOCOL_RELAY_LEAVE_TO 0x73
+
+/*
+  Directs the target server to publish the specified message on the specified
+  channel.
+
+  `NULL'-terminated string: Name of the game application that owns the channel.
+  8 bytes: The big-endian encoding of the target channel oid
+  2 bytes: The big-endian encoding of the length of the message; the message 
+    bytes follow
+ */
+
+#define GZOCHID_CHANNEL_PROTOCOL_RELAY_MESSAGE_TO 0x75
+
+/*
+  Directs the target server to close the specified channel.
+
+  `NULL'-terminated string: Name of the gane application that owns the channel.
+  8 bytes: The big-endian encoding of the target channel oid
+ */
+
+#define GZOCHID_CHANNEL_PROTOCOL_RELAY_CLOSE_TO 0x77
 
 #endif /* GZOCHID_META_PROTOCOL_H */
