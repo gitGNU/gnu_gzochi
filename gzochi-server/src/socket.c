@@ -1,5 +1,5 @@
 /* socket.c: Application socket server implementation for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -39,6 +39,8 @@ gzochid_socket_server_dispose (GObject *gobject)
 
   g_main_context_unref (server->main_context);
   g_main_loop_unref (server->main_loop);
+
+  G_OBJECT_CLASS (gzochid_socket_server_parent_class)->dispose (gobject);
 }
 
 static void

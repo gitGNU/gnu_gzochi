@@ -88,6 +88,8 @@ gzochid_auth_plugin_registry_dispose (GObject *object)
   GzochidAuthPluginRegistry *registry = GZOCHID_AUTH_PLUGIN_REGISTRY (object);
 
   g_object_unref (registry->configuration);
+
+  G_OBJECT_CLASS (gzochid_auth_plugin_registry_parent_class)->dispose (object);
 }
 
 static void
@@ -96,6 +98,8 @@ gzochid_auth_plugin_registry_finalize (GObject *object)
   GzochidAuthPluginRegistry *registry = GZOCHID_AUTH_PLUGIN_REGISTRY (object);
 
   g_hash_table_destroy (registry->auth_plugins);
+
+  G_OBJECT_CLASS (gzochid_auth_plugin_registry_parent_class)->finalize (object);
 }
 
 static void

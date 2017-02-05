@@ -203,6 +203,8 @@ gzochi_metad_data_server_finalize (GObject *gobject)
 	
 	free (server->storage_engine);
     }
+
+  G_OBJECT_CLASS (gzochi_metad_data_server_parent_class)->finalize (gobject);
 }
 
 static void
@@ -213,6 +215,8 @@ gzochi_metad_data_server_dispose (GObject *gobject)
   g_object_unref (server->configuration);
   g_object_unref (server->resolution_context);
   g_object_unref (server->socket_server);
+
+  G_OBJECT_CLASS (gzochi_metad_data_server_parent_class)->dispose (gobject);
 }
 
 static void

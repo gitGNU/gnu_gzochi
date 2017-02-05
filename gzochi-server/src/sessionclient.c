@@ -64,6 +64,8 @@ gzochid_session_client_dispose (GObject *object)
   GzochidSessionClient *sessionclient = GZOCHID_SESSION_CLIENT (object);
 
   g_object_unref (sessionclient->game_server);
+
+  G_OBJECT_CLASS (gzochid_session_client_parent_class)->dispose (object);
 }
 
 static void

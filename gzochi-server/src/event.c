@@ -325,6 +325,8 @@ gzochid_event_loop_dispose (GObject *gobject)
 
   g_main_loop_unref (event_loop->main_loop);
   g_main_context_unref (event_loop->main_context);
+
+  G_OBJECT_CLASS (gzochid_event_loop_parent_class)->dispose (gobject);
 }
 
 static void

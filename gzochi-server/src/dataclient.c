@@ -193,6 +193,8 @@ gzochid_data_client_finalize (GObject *gobject)
   g_hash_table_destroy (client->application_callback_queues);
 
   g_mutex_clear (&client->queue_mutex);
+
+  G_OBJECT_CLASS (gzochid_data_client_parent_class)->finalize (gobject);  
 }
 
 static void
@@ -201,6 +203,8 @@ gzochid_data_client_dispose (GObject *gobject)
   GzochidDataClient *client = GZOCHID_DATA_CLIENT (gobject);
 
   g_object_unref (client->configuration);
+
+  G_OBJECT_CLASS (gzochid_data_client_parent_class)->dispose (gobject);
 }
 
 static void

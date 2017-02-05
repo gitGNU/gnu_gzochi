@@ -66,6 +66,8 @@ gzochid_resolution_context_dispose (GObject *object)
 
   g_hash_table_remove (self->instances, &context_type);
   g_hash_table_foreach (self->instances, unref_value, self->forsaken_instances);
+
+  G_OBJECT_CLASS (gzochid_resolution_context_parent_class)->dispose (object);
 }
 
 static void
@@ -75,6 +77,8 @@ gzochid_resolution_context_finalize (GObject *object)
   
   g_hash_table_destroy (self->instances);
   g_list_free (self->forsaken_instances);
+
+  G_OBJECT_CLASS (gzochid_resolution_context_parent_class)->finalize (object);
 }
 
 static void

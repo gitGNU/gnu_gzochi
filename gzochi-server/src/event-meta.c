@@ -1,5 +1,5 @@
 /* event-meta.c: gzochi-metad-specific event type implementations
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -123,6 +123,8 @@ gzochi_metad_client_event_finalize (GObject *object)
     free (self->connection_description);
   if (self->admin_server_base_url != NULL)
     free (self->admin_server_base_url);
+
+  G_OBJECT_CLASS (gzochi_metad_client_event_parent_class)->finalize (object);
 }
 
 static void

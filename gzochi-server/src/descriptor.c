@@ -288,6 +288,9 @@ application_descriptor_finalize (GObject *object)
   
   g_hash_table_destroy (self->properties);
   g_hash_table_destroy (self->auth_properties);  
+
+  G_OBJECT_CLASS (gzochid_application_descriptor_parent_class)
+    ->finalize (object);
 }
 
 static void

@@ -65,6 +65,8 @@ gzochi_metad_session_server_finalize (GObject *gobject)
 
   gzochi_metad_nodemap_mem_free (server->nodemap);
   g_hash_table_destroy (server->connected_servers);
+
+  G_OBJECT_CLASS (gzochi_metad_session_server_parent_class)->finalize (gobject);
 }
 
 static void

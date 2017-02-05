@@ -206,6 +206,8 @@ gzochid_meta_client_dispose (GObject *object)
 
   g_main_context_unref (client->main_context);
   g_main_loop_unref (client->main_loop);
+
+  G_OBJECT_CLASS (gzochid_meta_client_parent_class)->dispose (object);
 }
 
 static void
@@ -226,6 +228,8 @@ gzochid_meta_client_finalize (GObject *object)
   
   g_source_destroy ((GSource *) client->event_source);
   g_source_unref ((GSource *) client->event_source);
+
+  G_OBJECT_CLASS (gzochid_meta_client_parent_class)->finalize (object);
 }
 
 static void

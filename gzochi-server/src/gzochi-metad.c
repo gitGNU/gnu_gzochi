@@ -214,6 +214,8 @@ root_context_dispose (GObject *object)
   GzochiMetadRootContext *root_context = GZOCHI_METAD_ROOT_CONTEXT (object);
 
   g_object_unref (root_context->configuration);
+
+  G_OBJECT_CLASS (gzochi_metad_root_context_parent_class)->dispose (object);
 }
 
 static void
@@ -223,6 +225,8 @@ root_context_finalize (GObject *object)
   
   g_source_destroy ((GSource *) root_context->event_source);
   g_source_unref ((GSource *) root_context->event_source);
+
+  G_OBJECT_CLASS (gzochi_metad_root_context_parent_class)->finalize (object);
 }
 
 static void

@@ -162,6 +162,8 @@ game_server_dispose (GObject *obj)
   g_object_unref (self->configuration);
   g_object_unref (self->event_loop);
   g_object_unref (self->socket_server);
+
+  G_OBJECT_CLASS (gzochid_game_server_parent_class)->dispose (obj);
 }
 
 static void
@@ -170,6 +172,8 @@ game_server_finalize (GObject *obj)
   GzochidGameServer *self = GZOCHID_GAME_SERVER (obj);
 
   g_hash_table_destroy (self->applications);
+
+  G_OBJECT_CLASS (gzochid_game_server_parent_class)->finalize (obj);
 }
 
 static void
