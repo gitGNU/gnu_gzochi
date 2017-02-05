@@ -114,7 +114,7 @@ const char *gzochid_client_socket_get_connection_description
    readiness for data. */
 
 void gzochid_client_socket_write
-(gzochid_client_socket *, unsigned char *, size_t);
+(gzochid_client_socket *, const unsigned char *, size_t);
 
 /* Private client socket API, visible for testing only. */
 

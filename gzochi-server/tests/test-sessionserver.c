@@ -1,5 +1,5 @@
 /* test-sessionserver.c: Tests for sessionserver.c in gzochi-metad.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -30,8 +30,8 @@ struct _gzochid_client_socket
 };
 
 void
-gzochid_client_socket_write (gzochid_client_socket *sock, unsigned char *data,
-			     size_t len)
+gzochid_client_socket_write (gzochid_client_socket *sock,
+			     const unsigned char *data, size_t len)
 {
   g_byte_array_append (sock->bytes_written, data, len);
 }

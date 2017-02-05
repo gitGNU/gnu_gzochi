@@ -453,8 +453,8 @@ _gzochid_client_socket_get_protocol_data (gzochid_client_socket *sock)
 }
 
 void
-gzochid_client_socket_write (gzochid_client_socket *sock, unsigned char *data,
-			     size_t len)
+gzochid_client_socket_write (gzochid_client_socket *sock,
+			     const unsigned char *data, size_t len)
 {
   assert (sock->server != NULL);
   
