@@ -26,6 +26,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "channelserver.h"
 #include "config.h"
 #include "dataserver.h"
 #include "event.h"
@@ -88,6 +89,11 @@ struct _GzochiMetadRootContext
   GzochidSocketServer *socket_server;
 
   gzochid_server_socket *server_socket; /* The meta server's server socket. */
+
+  /* The meta server channel server. */
+  
+  GzochiMetadChannelServer *channel_server;
+  
   GzochiMetadDataServer *data_server; /* The meta server data server. */
 
   /* The meta server session server. */
@@ -120,6 +126,7 @@ enum gzochi_metad_root_context_properties
     PROP_EVENT_LOOP,
     PROP_EVENT_SOURCE,
     PROP_SOCKET_SERVER,
+    PROP_CHANNEL_SERVER,
     PROP_DATA_SERVER,
     PROP_SESSION_SERVER,
     N_PROPERTIES
@@ -141,6 +148,10 @@ root_context_get_property (GObject *object, guint property_id, GValue *value,
 
     case PROP_EVENT_SOURCE:
       g_value_set_boxed (value, self->event_source);
+      break;
+
+    case PROP_CHANNEL_SERVER:
+      g_value_set_object (value, self->channel_server);
       break;
       
     case PROP_DATA_SERVER:
@@ -181,6 +192,10 @@ root_context_set_property (GObject *object, guint property_id,
       self->socket_server = g_object_ref (g_value_get_object (value));
       break;
 
+    case PROP_CHANNEL_SERVER:
+      self->channel_server = g_object_ref (g_value_get_object (value));
+      break;
+      
     case PROP_DATA_SERVER:
       self->data_server = g_object_ref (g_value_get_object (value));
       break;
@@ -242,11 +257,11 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
 
   obj_properties[PROP_CONFIGURATION] = g_param_spec_object
     ("configuration", "config", "The global configuration object",
-     GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+     GZOCHID_TYPE_CONFIGURATION, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
   
   obj_properties[PROP_HTTP_SERVER] = g_param_spec_object
     ("http-server", "httpd", "The admin HTTP server", GZOCHID_TYPE_HTTP_SERVER,
-     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
 
   obj_properties[PROP_ADMIN_SERVER_BASE_URL] = g_param_spec_string
     ("admin-server-base-url", "base-url", "The admin server base URL", NULL,
@@ -254,7 +269,7 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
   
   obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
     ("event-loop", "event-loop", "The global event loop",
-     GZOCHID_TYPE_EVENT_LOOP, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+     GZOCHID_TYPE_EVENT_LOOP, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
   
   obj_properties[PROP_EVENT_SOURCE] = g_param_spec_boxed
     ("event-source", "event-source", "The global event source",
@@ -262,15 +277,21 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
 
   obj_properties[PROP_SOCKET_SERVER] = g_param_spec_object
     ("socket-server", "socket-server", "The global socket server",
-     GZOCHID_TYPE_SOCKET_SERVER, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+     GZOCHID_TYPE_SOCKET_SERVER, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY);
+
+  obj_properties[PROP_CHANNEL_SERVER] = g_param_spec_object
+    ("channel-server", "channel-server", "The channel server",
+     GZOCHI_METAD_TYPE_CHANNEL_SERVER,
+     G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
 
   obj_properties[PROP_DATA_SERVER] = g_param_spec_object
     ("data-server", "data-server", "The data server",
-     GZOCHI_METAD_TYPE_DATA_SERVER, G_PARAM_READWRITE | G_PARAM_CONSTRUCT);
+     GZOCHI_METAD_TYPE_DATA_SERVER, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
 
   obj_properties[PROP_SESSION_SERVER] = g_param_spec_object
     ("session-server", "session-server", "The session server",
-     GZOCHI_METAD_TYPE_SESSION_SERVER, G_PARAM_READWRITE | G_PARAM_CONSTRUCT);
+     GZOCHI_METAD_TYPE_SESSION_SERVER,
+     G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
 
   g_object_class_install_properties
     (object_class, N_PROPERTIES, obj_properties);
@@ -306,7 +327,7 @@ Copyright (C) %s Julian Graham\n\
 License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\
 This is free software: you are free to change and redistribute it.\n\
 There is NO WARRANTY, to the extent permitted by law.\n"),
-	  "2016");
+	  "2017");
 }
 
 /* Prints help and configuration options to standard output. */

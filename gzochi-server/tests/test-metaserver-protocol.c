@@ -24,6 +24,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include "channelserver-protocol.h"
+#include "channelserver.h"
 #include "data-protocol.h"
 #include "dataserver.h"
 #include "dataserver-protocol.h"
@@ -52,6 +54,7 @@ struct _GzochiMetadRootContext
 {
   GObject parent_instance;
 
+  GObject *channelserver;
   GObject *dataserver;
   GObject *sessionserver;
 
@@ -73,7 +76,8 @@ G_DEFINE_TYPE (GzochiMetadRootContext, gzochi_metad_root_context,
 
 enum gzochi_metad_data_server_properties
   {
-    PROP_DATA_SERVER = 1,
+    PROP_CHANNEL_SERVER = 1,
+    PROP_DATA_SERVER,
     PROP_SESSION_SERVER,
     PROP_EVENT_SOURCE,
     PROP_ADMIN_SERVER_BASE_URL,
@@ -90,6 +94,10 @@ root_context_get_property (GObject *object, guint property_id, GValue *value,
   
   switch (property_id)
     {
+    case PROP_CHANNEL_SERVER:
+      g_value_set_object (value, root_context->channelserver);
+      break;
+
     case PROP_DATA_SERVER:
       g_value_set_object (value, root_context->dataserver);
       break;
@@ -138,6 +146,10 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
   object_class->get_property = root_context_get_property;
   object_class->set_property = root_context_set_property;
 
+  obj_properties[PROP_CHANNEL_SERVER] = g_param_spec_object
+    ("channel-server", "channel-server", "Test channelserver object",
+     G_TYPE_OBJECT, G_PARAM_READABLE);
+
   obj_properties[PROP_DATA_SERVER] = g_param_spec_object
     ("data-server", "data-server", "Test dataserver object", G_TYPE_OBJECT,
      G_PARAM_READABLE);
@@ -161,6 +173,7 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
 static void
 gzochi_metad_root_context_init (GzochiMetadRootContext *self)
 {
+  self->channelserver = g_object_new (G_TYPE_OBJECT, NULL);
   self->dataserver = g_object_new (G_TYPE_OBJECT, NULL);
   self->sessionserver = g_object_new (G_TYPE_OBJECT, NULL);
   self->event_source = gzochid_event_source_new ();
@@ -171,6 +184,38 @@ test_can_dispatch (const GByteArray *buffer, gpointer user_data)
 {
   assert (1 == 0);
 }
+
+static void
+test_free (gpointer user_data)
+{
+}
+
+static GList *channelserver_messages = NULL;
+static gboolean channelserver_connected_flag = FALSE;
+static gboolean channelserver_error_flag = FALSE;
+
+static unsigned int
+channelserver_dispatch (const GByteArray *buffer, gpointer user_data)
+{
+  channelserver_messages = g_list_append
+    (channelserver_messages, g_bytes_new (buffer->data, buffer->len));
+  
+  return 1;
+}
+
+static void
+channelserver_error (gpointer user_data)
+{
+  channelserver_error_flag = TRUE;
+}
+
+gzochid_client_protocol gzochi_metad_channelserver_client_protocol =
+  {
+    test_can_dispatch,
+    channelserver_dispatch,
+    channelserver_error,
+    test_free
+  };
 
 static GList *dataserver_messages = NULL;
 static gboolean dataserver_error_flag = FALSE;
@@ -188,11 +233,6 @@ static void
 dataserver_error (gpointer user_data)
 {
   dataserver_error_flag = TRUE;
-}
-
-static void
-test_free (gpointer user_data)
-{
 }
 
 gzochid_client_protocol gzochi_metad_dataserver_client_protocol =
@@ -241,6 +281,22 @@ struct _metaserver_protocol_fixture
 };
 
 typedef struct _metaserver_protocol_fixture metaserver_protocol_fixture;
+
+gzochi_metad_channelserver_client *
+gzochi_metad_channelserver_client_new (GzochiMetadChannelServer *channelserver,
+				       gzochid_client_socket *socket,
+				       unsigned int node_id)
+{
+  return NULL;
+}
+
+void
+gzochi_metad_channelserver_server_connected
+(GzochiMetadChannelServer *channelserver, int node_id,
+ gzochid_client_socket *socket, GError **err)
+{
+  channelserver_connected_flag = TRUE;
+}
 
 gzochi_metad_dataserver_client *
 gzochi_metad_dataserver_client_new (GzochiMetadDataServer *dataserver,
@@ -318,11 +374,20 @@ metaserver_protocol_fixture_tear_down (metaserver_protocol_fixture *fixture,
   g_object_unref (fixture->socket_server);
   g_io_channel_unref (fixture->socket_channel);
 
+  g_list_free_full (channelserver_messages, (GDestroyNotify) g_bytes_unref);
+  channelserver_messages = NULL;
+
+  channelserver_connected_flag = FALSE;
+  channelserver_error_flag = FALSE;
+
   g_list_free_full (dataserver_messages, (GDestroyNotify) g_bytes_unref);
   dataserver_messages = NULL;
   
   dataserver_error_flag = FALSE;
   
+  g_list_free_full (sessionserver_messages, (GDestroyNotify) g_bytes_unref);
+  sessionserver_messages = NULL;
+
   sessionserver_connected_flag = FALSE;
   sessionserver_error_flag = FALSE;
 }
@@ -455,6 +520,7 @@ test_client_dispatch_one_login (metaserver_protocol_fixture *fixture,
      G_IO_STATUS_NORMAL);
 
   g_assert (memcmp (buf, "\x00\x18\x11\x02http://localhost:8081/", 27) == 0);
+  g_assert (channelserver_connected_flag);
   g_assert (sessionserver_connected_flag);
 }
 
@@ -488,7 +554,30 @@ test_client_dispatch_one_login_base_url (metaserver_protocol_fixture *fixture,
      G_IO_STATUS_NORMAL);
 
   g_assert(memcmp (buf, "\x00\x18\x11\x02http://localhost:8081/", 27) == 0);
+  g_assert (channelserver_connected_flag);
   g_assert (sessionserver_connected_flag);
+}
+
+static void
+test_client_dispatch_one_channel (metaserver_protocol_fixture *fixture,
+				  gconstpointer user_data)
+{
+  gzochi_metad_metaserver_client *client =
+    _gzochid_client_socket_get_protocol_data (fixture->client_socket);
+
+  GBytes *expected_bytes = g_bytes_new_static
+    ("\x00\x0c\x76""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01", 15);
+  GByteArray *input_bytes = g_byte_array_new ();
+
+  g_byte_array_append
+    (input_bytes, "\x00\x0c\x76""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01", 15);
+  gzochi_metad_metaserver_client_protocol.dispatch (input_bytes, client);  
+  g_byte_array_unref (input_bytes);
+  
+  g_assert (g_list_find_custom
+	    (channelserver_messages, expected_bytes, g_bytes_compare) != NULL);
+
+  g_bytes_unref (expected_bytes);
 }
 
 static void
@@ -587,6 +676,7 @@ test_client_error (metaserver_protocol_fixture *fixture,
   g_object_unref (event_loop);
 
   g_assert (callback_data.handled);
+  g_assert (channelserver_error_flag);
   g_assert (dataserver_error_flag);
   g_assert (sessionserver_error_flag);
   
@@ -629,6 +719,10 @@ main (int argc, char *argv[])
      test_client_dispatch_one_login_base_url,
      metaserver_protocol_fixture_tear_down);
 
+  g_test_add
+    ("/client/dispatch/one/channel", metaserver_protocol_fixture, NULL,
+     metaserver_protocol_fixture_set_up, test_client_dispatch_one_channel,
+     metaserver_protocol_fixture_tear_down);
   g_test_add ("/client/dispatch/one/data", metaserver_protocol_fixture, NULL,
 	      metaserver_protocol_fixture_set_up, test_client_dispatch_one_data,
 	      metaserver_protocol_fixture_tear_down);

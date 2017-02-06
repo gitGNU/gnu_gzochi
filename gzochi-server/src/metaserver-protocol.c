@@ -22,6 +22,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "channelserver-protocol.h"
+#include "channelserver.h"
 #include "dataserver-protocol.h"
 #include "dataserver.h"
 #include "event-meta.h"
@@ -59,6 +61,10 @@ struct _gzochi_metad_metaserver_client
 
   GObject *root_context; 
 
+  /* Delegate client for channelserver operations. */
+
+  gzochi_metad_channelserver_client *channelserver_client;
+  
   /* Delegate client for dataserver operations. */
   
   gzochi_metad_dataserver_client *dataserver_client;
@@ -76,11 +82,13 @@ server_accept (GIOChannel *channel, const char *desc, gpointer data)
     (1, sizeof (gzochi_metad_metaserver_client));
   gzochid_client_socket *sock = gzochid_client_socket_new
     (channel, desc, gzochi_metad_metaserver_client_protocol, client);  
+  GzochiMetadChannelServer *channelserver = NULL;
   GzochiMetadDataServer *dataserver = NULL;
   GzochiMetadSessionServer *sessionserver = NULL;
 
   g_object_get
     (root_context,
+     "channel-server", &channelserver,
      "data-server", &dataserver,
      "session-server", &sessionserver,
      NULL);
@@ -91,6 +99,8 @@ server_accept (GIOChannel *channel, const char *desc, gpointer data)
   client->sock = sock;
   client->root_context = g_object_ref (root_context);
   
+  client->channelserver_client = gzochi_metad_channelserver_client_new
+    (channelserver, sock, client->node_id);
   client->dataserver_client = gzochi_metad_dataserver_client_new
     (dataserver, sock, client->node_id);
   client->sessionserver_client = gzochi_metad_sessionserver_client_new
@@ -99,6 +109,7 @@ server_accept (GIOChannel *channel, const char *desc, gpointer data)
   g_message
     ("Received connection from %s; assigning id %d", desc, client->node_id);
 
+  g_object_unref (channelserver);
   g_object_unref (dataserver);
   g_object_unref (sessionserver);
   
@@ -158,6 +169,7 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
       GByteArray *login_response_message = g_byte_array_new ();
 
       GzochiMetadClientEvent *event = NULL;
+      GzochiMetadChannelServer *channelserver = NULL;
       GzochiMetadSessionServer *sessionserver = NULL;
       gzochid_event_source *event_source = NULL;
       const char *conn_desc = gzochid_client_socket_get_connection_description
@@ -181,14 +193,17 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
       g_object_get
 	(client->root_context,
 	 "admin-server-base-url", &admin_server_base_url,
+	 "channel-server", &channelserver,
 	 "event-source", &event_source,
 	 "session-server", &sessionserver,
 	 NULL);
 
-      /* This is the first moment at which it's reasonable to let the session
-	 server know that there's a new application server node connected. 
-	 TODO: Add some actual error handling. */
-      
+      /* This is the first moment at which it's reasonable to let the channel 
+	 server and the session server know that there's a new application 
+	 server node connected. TODO: Add some actual error handling. */
+
+      gzochi_metad_channelserver_server_connected
+	(channelserver, client->node_id, client->sock, NULL);
       gzochi_metad_sessionserver_server_connected
 	(sessionserver, client->node_id, client->sock, NULL);
       g_object_unref (sessionserver);      
@@ -254,6 +269,24 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
 	  dispatch_login
 	    (client, (unsigned char *) buffer->data + offset + 1, len - 1);
 	  break;
+
+	  /* Opcodes understood by the channelserver protocol. */
+
+	case GZOCHID_CHANNEL_PROTOCOL_RELAY_JOIN_FROM:
+	case GZOCHID_CHANNEL_PROTOCOL_RELAY_LEAVE_FROM:
+	case GZOCHID_CHANNEL_PROTOCOL_RELAY_CLOSE_FROM:
+	case GZOCHID_CHANNEL_PROTOCOL_RELAY_MESSAGE_FROM:
+	  {
+	    GByteArray *delegate_buffer = g_byte_array_sized_new (len);
+	    
+	    g_byte_array_append
+	      (delegate_buffer, buffer->data + offset - 2, len + 2);
+	    gzochi_metad_channelserver_client_protocol.dispatch
+	      (delegate_buffer, client->channelserver_client);
+	    g_byte_array_unref (delegate_buffer);
+	    
+	    break;
+	  }
 	  
 	  /* Opcodes understood by the dataserver protocol. */
 	  
@@ -325,6 +358,8 @@ client_error (gpointer user_data)
   g_source_unref ((GSource *) event_source);
   g_object_unref (event);
   
+  gzochi_metad_channelserver_client_protocol.error
+    (client->channelserver_client);
   gzochi_metad_dataserver_client_protocol.error (client->dataserver_client);
   gzochi_metad_sessionserver_client_protocol.error
     (client->sessionserver_client);
@@ -339,6 +374,8 @@ client_free (gpointer user_data)
 {
   gzochi_metad_metaserver_client *client = user_data;
   
+  gzochi_metad_channelserver_client_protocol.free
+    (client->channelserver_client);
   gzochi_metad_dataserver_client_protocol.free (client->dataserver_client);
   gzochi_metad_sessionserver_client_protocol.free
     (client->sessionserver_client);
