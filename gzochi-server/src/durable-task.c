@@ -545,7 +545,7 @@ static void
 durable_task_cleanup_worker (gzochid_application_context *context,
 			     gzochid_auth_identity *identity, gpointer data)
 {
-  free (data);
+  g_free (data);
 }
 
 void 
@@ -642,9 +642,8 @@ void gzochid_schedule_durable_task_handle
     (durable_task_handle_reference->oid);
 
   /* The memory allocated for this oid is freed by the cleanup task. */
-
-  oid = malloc (sizeof (guint64));
-  *oid = durable_task_handle_reference->oid;
+  
+  oid = g_memdup (&durable_task_handle_reference->oid, sizeof (guint64));
 
   task_handle->binding = create_pending_task_binding
     (durable_task_handle_reference->oid);
@@ -655,7 +654,7 @@ void gzochid_schedule_durable_task_handle
 
   if (local_err != NULL)
     {
-      free (oid);
+      g_free (oid);
       gzochid_durable_application_task_free (durable_task);      
 
       g_propagate_error (err, local_err);
@@ -1018,7 +1017,7 @@ static void
 coordinator_cleanup_worker (gzochid_application_context *app_context,
 			    gzochid_auth_identity *identity, gpointer data)
 {
-  free (data);
+  g_free (data);
 }
 
 /* Enqueues a new instance of the coordinator task to be submitted to the
@@ -1056,8 +1055,7 @@ schedule_coordinator_task (gzochid_application_context *app_context,
       return;
     }
 
-  oid = malloc (sizeof (guint64));
-  *oid = chain_context_ref->oid;
+  oid = g_memdup (&chain_context_ref->oid, sizeof (guint64));
 
   /* Create the worker, catch, and cleanup tasks for the coordinator... */
   

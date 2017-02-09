@@ -95,7 +95,7 @@ create_transaction_context (gzochid_application_context *app_context,
 	 ->transaction_begin (app_context->storage_context);
 
   tx_context->oids_to_references = g_hash_table_new_full 
-    (g_int64_hash, g_int64_equal, free, NULL);
+    (g_int64_hash, g_int64_equal, g_free, NULL);
   tx_context->ptrs_to_references = g_hash_table_new 
     (g_direct_hash, g_direct_equal);
 
@@ -448,12 +448,10 @@ get_reference_by_oid (gzochid_application_context *context, guint64 oid,
 
   if (reference == NULL)
     {
-      guint64 *key = malloc (sizeof (guint64));
-
-      *key = oid;
-      
       reference = create_empty_reference (context, oid, serialization);
-      g_hash_table_insert (tx_context->oids_to_references, key, reference);
+      g_hash_table_insert
+	(tx_context->oids_to_references, g_memdup (&oid, sizeof (guint64)),
+	 reference);
     }
 
   return reference;
@@ -470,8 +468,6 @@ get_reference_by_ptr (gzochid_application_context *context, void *ptr,
 
   if (reference == NULL)
     {
-      guint64 *key = NULL;
-      
       reference = create_new_reference (context, ptr, serialization);
 
       assert (g_hash_table_lookup 
@@ -479,10 +475,9 @@ get_reference_by_ptr (gzochid_application_context *context, void *ptr,
       assert (g_hash_table_lookup 
 	      (tx_context->ptrs_to_references, ptr) == NULL);
 
-      key = malloc (sizeof (guint64));
-      *key = reference->oid;
-      
-      g_hash_table_insert (tx_context->oids_to_references, key, reference);
+      g_hash_table_insert
+	(tx_context->oids_to_references,
+	 g_memdup (&reference->oid, sizeof (guint64)), reference);
       g_hash_table_insert (tx_context->ptrs_to_references, ptr, reference);
 
       if (tx_context->transaction->rollback)
@@ -552,7 +547,6 @@ dereference (gzochid_data_transaction_context *context,
   else 
     {
       GError *local_err = NULL;
-      guint64 *key = malloc (sizeof (guint64));
       GzochidEvent *event = g_object_new
 	(GZOCHID_TYPE_DATA_EVENT, "type", BYTES_READ, "bytes", data_len, NULL);
       
@@ -572,9 +566,9 @@ dereference (gzochid_data_transaction_context *context,
 	reference->state = GZOCHID_MANAGED_REFERENCE_STATE_MODIFIED;
       else reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NOT_MODIFIED;
 
-      *key = reference->oid;
-      
-      g_hash_table_insert (context->oids_to_references, key, reference);
+      g_hash_table_insert
+	(context->oids_to_references,
+	 g_memdup (&reference->oid, sizeof (guint64)), reference);
       g_hash_table_insert 
 	(context->ptrs_to_references, reference->obj, reference);
 

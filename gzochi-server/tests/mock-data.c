@@ -41,7 +41,7 @@ create_empty_reference (gzochid_application_context *context, guint64 oid,
   reference->state = GZOCHID_MANAGED_REFERENCE_STATE_EMPTY;
   reference->serialization = serialization;
 
-  *oid_ptr = oid;
+  oid_ptr = g_memdup (&oid, sizeof (guint64));
  
   g_hash_table_insert (oids_to_references, oid_ptr, reference);
   
@@ -94,9 +94,7 @@ void
 gzochid_data_set_binding_to_oid 
 (gzochid_application_context *context, char *name, guint64 oid, GError **error)
 {
-  guint64 *oid_ptr = malloc (sizeof (guint64));
-
-  *oid_ptr = oid;
+  guint64 *oid_ptr = g_memdup (&oid, sizeof (guint64));
   
   if (g_hash_table_contains (bindings, name))
     free (g_hash_table_lookup (bindings, name));
@@ -140,10 +138,10 @@ gzochid_test_mock_data_store
  gpointer data, guint64 oid)
 {
   GByteArray *out = g_byte_array_new ();
-  guint64 *oid_ptr = malloc (sizeof (guint64));
+  guint64 *oid_ptr = NULL;
 
   oid = next_oid++;
-  *oid_ptr = oid;
+  oid_ptr = g_memdup (&oid, sizeof (guint64));
  
   serialization->serializer (context, data, out, NULL);
   g_hash_table_insert (oids, oid_ptr, out);
@@ -152,8 +150,8 @@ gzochid_test_mock_data_store
 void 
 gzochid_test_mock_data_initialize ()
 {
-  oids = g_hash_table_new_full (g_int64_hash, g_int64_equal, free, NULL);
+  oids = g_hash_table_new_full (g_int64_hash, g_int64_equal, g_free, NULL);
   oids_to_references = g_hash_table_new_full
-    (g_int64_hash, g_int64_equal, free, NULL);
-  bindings = g_hash_table_new_full (g_str_hash, g_str_equal, free, NULL);
+    (g_int64_hash, g_int64_equal, g_free, NULL);
+  bindings = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 }
