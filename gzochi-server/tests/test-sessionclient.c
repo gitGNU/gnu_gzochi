@@ -158,7 +158,7 @@ gzochid_game_client_disconnect (gzochid_game_client *client)
 }
 
 void
-gzochid_game_client_send (gzochid_game_client *client, unsigned char *msg,
+gzochid_game_client_send (gzochid_game_client *client, const unsigned char *msg,
 			  unsigned short len)
 {
   g_byte_array_append (client->bytes_received, msg, len);

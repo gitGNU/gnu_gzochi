@@ -625,7 +625,7 @@ gzochid_game_client_login_failure (gzochid_game_client *client)
 
 void 
 gzochid_game_client_send
-(gzochid_game_client *client, unsigned char *msg, unsigned short len)
+(gzochid_game_client *client, const unsigned char *msg, unsigned short len)
 {
   unsigned char *buf = malloc (sizeof (unsigned char) * (len + 3));
 

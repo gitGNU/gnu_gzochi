@@ -80,7 +80,7 @@ void gzochid_game_client_login_failure (gzochid_game_client *);
    it. */
 
 void gzochid_game_client_send
-(gzochid_game_client *, unsigned char *, unsigned short);
+(gzochid_game_client *, const unsigned char *, unsigned short);
 
 /* Private client socket API, visible for testing only. */
 
