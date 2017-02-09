@@ -1,5 +1,5 @@
 /* channel.h: Prototypes and declarations for channel.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -69,6 +69,59 @@ void gzochid_channel_leave
 void gzochid_channel_send 
 (gzochid_application_context *, gzochid_channel *,  unsigned char *, short);
 void gzochid_channel_close (gzochid_application_context *, gzochid_channel *);
+
+enum
+  {
+    /* Indicates that a channel membership operation has failed because the
+       target session is already a member of the target channel. */
+    
+    GZOCHID_CHANNEL_ERROR_ALREADY_MEMBER,
+    
+    /* Indicates a failure to complete a channel operation because the target 
+       identity was not mapped to a locally-connected session. */
+    
+    GZOCHID_CHANNEL_ERROR_NOT_MAPPED,
+
+    /* Indicates that a channel membership operation has failed because the
+       target session is not a member of the target channel. */
+    
+    GZOCHID_CHANNEL_ERROR_NOT_MEMBER,
+
+    GZOCHID_CHANNEL_ERROR_FAILED /* Generic channel failure. */
+  };
+
+#define GZOCHID_CHANNEL_ERROR gzochid_channel_error_quark ()
+
+GQuark gzochid_channel_error_quark (void);
+
+/* Non-transactionally joins the session with the specified oid to the channel
+   with the specified oid, qualified by the specified application. Signals an
+   error if the session is not locally connected, or if it is already joined to
+   the channel. */
+
+void gzochid_channel_join_direct (gzochid_application_context *, guint64,
+				  guint64, GError **);
+
+/* Non-transactionally removes the session with the specified oid from the
+   channel with the specified oid, qualified by the specified application. 
+   Signals an error if the session is not locally connected, or if it is not
+   currently a member of the channel. */
+
+void gzochid_channel_leave_direct (gzochid_application_context *, guint64,
+				   guint64, GError **);
+
+/* Non-transactionally closes the channel with the specified oid, qualified by
+   the specified application. */
+
+void gzochid_channel_close_direct (gzochid_application_context *, guint64);
+
+/* Non-transactionally sends the specified message to all locally-connected
+   sessions that are members of the session with the specified oid, qualified by
+   the specified application. */
+
+void gzochid_channel_message_direct (gzochid_application_context *, guint64,
+				     GBytes *);
+
 
 /* Returns the oid of the specified channel's Scheme representation. */
 

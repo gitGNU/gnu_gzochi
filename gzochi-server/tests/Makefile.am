@@ -23,6 +23,7 @@ SUBDIRS = api auth scheme storage
 test_programs = \
 	test-app-task \
 	test-auth \
+	test-channel \
 	test-channelserver \
 	test-channelserver-protocol \
 	test-config \
@@ -106,6 +107,14 @@ test_auth_LDADD = $(top_builddir)/src/libgzochid_la-auth.o \
 	$(top_builddir)/src/libgzochid_la-lrucache.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GMODULE_LIBS@ @GOBJECT_LIBS@
+
+test_channel_CFLAGS = -I$(top_srcdir)/src \
+	@GLIB_CFLAGS@ @GMODULE_CFLAGS@ @GOBJECT_CFLAGS@ @GUILE_CFLAGS@\
+	@GZOCHI_COMMON_CFLAGS@
+test_channel_SOURCES = test-channel.c
+test_channel_LDADD = $(top_builddir)/src/libgzochid.la \
+	@GLIB_LIBS@ @GMODULE_LIBS@ @GOBJECT_LIBS@ @GUILE_LIBS@ \
+	@GZOCHI_COMMON_LIBS@
 
 test_channelserver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
 	@GZOCHI_COMMON_CFLAGS@

@@ -1,5 +1,5 @@
 /* channel.c: Channel management routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -464,6 +464,222 @@ channel_side_effect_prepare (gpointer data)
   return TRUE;
 }
 
+void
+gzochid_channel_join_direct (gzochid_application_context *app_context,
+			     guint64 channel_oid, guint64 session_oid,
+			     GError **err)
+{
+  GSequence *sessions = NULL;
+
+  g_mutex_lock (&app_context->channel_mapping_lock);
+  g_mutex_lock (&app_context->client_mapping_lock);
+  
+  sessions = g_hash_table_lookup
+    (app_context->channel_oids_to_local_session_oids, &channel_oid);
+
+  if (!g_hash_table_contains (app_context->oids_to_clients, &session_oid))
+    g_set_error
+      (err, GZOCHID_CHANNEL_ERROR, GZOCHID_CHANNEL_ERROR_NOT_MAPPED,
+       "No local client bound to oid %" G_GUINT64_FORMAT, session_oid);
+  
+  else if (sessions == NULL)
+    {      
+      /* If not, that's okay; it may not have been used on this node. Create
+	 an empty sequence to store new members. */
+      
+      sessions = g_sequence_new (free);
+      g_sequence_append (sessions, g_memdup (&session_oid, sizeof (guint64)));
+      
+      g_hash_table_insert
+	(app_context->channel_oids_to_local_session_oids,
+	 g_memdup (&channel_oid, sizeof (guint64)), sessions);
+    }
+  else
+    {
+      GSequenceIter *iter = g_sequence_lookup
+	(sessions, &session_oid, gzochid_util_guint64_data_compare, NULL);
+
+      /* Add or remove the session to or from the channel's session list. */
+	  
+      if (iter == NULL)
+	g_sequence_insert_sorted
+	  (sessions, g_memdup (&session_oid, sizeof (guint64)),
+	   gzochid_util_guint64_data_compare, NULL);
+      else g_set_error
+	     (err, GZOCHID_CHANNEL_ERROR, GZOCHID_CHANNEL_ERROR_ALREADY_MEMBER,
+	      "Session %" G_GUINT64_FORMAT " already a member of channel %"
+	      G_GUINT64_FORMAT, session_oid, channel_oid);
+    }
+
+  g_mutex_unlock (&app_context->client_mapping_lock);
+  g_mutex_unlock (&app_context->channel_mapping_lock);
+}
+
+void
+gzochid_channel_leave_direct (gzochid_application_context *app_context,
+			      guint64 channel_oid, guint64 session_oid,
+			      GError **err)
+{  
+  g_mutex_lock (&app_context->channel_mapping_lock);
+  g_mutex_lock (&app_context->client_mapping_lock);
+  
+  if (!g_hash_table_contains (app_context->oids_to_clients, &session_oid))
+    g_set_error
+      (err, GZOCHID_CHANNEL_ERROR, GZOCHID_CHANNEL_ERROR_NOT_MAPPED,
+       "No local client bound to oid %" G_GUINT64_FORMAT, session_oid);
+  else
+    {
+      GSequence *sessions = g_hash_table_lookup
+	(app_context->channel_oids_to_local_session_oids, &channel_oid);
+      gboolean found_session = FALSE;
+  
+      if (sessions != NULL)
+	{      
+	  GSequenceIter *iter = g_sequence_lookup
+	    (sessions, &session_oid, gzochid_util_guint64_data_compare, NULL);
+	  
+	  if (iter != NULL)
+	    {
+	      found_session = TRUE;
+	      g_sequence_remove (iter);
+	      
+	      if (g_sequence_is_empty (sessions))
+		g_hash_table_remove
+		  (app_context->channel_oids_to_local_session_oids,
+		   &channel_oid);
+	    }
+	}
+
+      if (!found_session)
+	g_set_error
+	  (err, GZOCHID_CHANNEL_ERROR, GZOCHID_CHANNEL_ERROR_NOT_MEMBER,
+	   "Session %" G_GUINT64_FORMAT " is not a member of channel %"
+	   G_GUINT64_FORMAT, session_oid, channel_oid);
+    }
+
+  g_mutex_unlock (&app_context->client_mapping_lock);
+  g_mutex_unlock (&app_context->channel_mapping_lock);
+}
+
+void
+gzochid_channel_close_direct (gzochid_application_context *app_context,
+			      guint64 channel_oid)
+{
+  g_mutex_lock (&app_context->channel_mapping_lock);
+
+  g_hash_table_remove
+    (app_context->channel_oids_to_local_session_oids, &channel_oid);
+
+  g_mutex_unlock (&app_context->channel_mapping_lock);
+}
+
+/*
+  Does the work of sending the specified message to the sessions in the 
+  specified array of `guint64'. If any oid is found to be locally unmapped, it
+  is removed from the channel's session list.
+
+  The reason this function is separated from `gzochid_channel_message_direct' is
+  that the transactional message sender needs to be able to send messages to
+  only those clients who were members of the channel within the scope of the
+  transaction. `gzochid_channel_message_direct' just sends the message to all
+  current channel members.
+*/
+
+static void
+send_channel_message_direct (gzochid_application_context *app_context,
+			     guint64 channel_oid, GArray *session_oids,
+			     const unsigned char *msg, size_t len)
+{
+  int i = 0;
+  GSequence *sessions = g_hash_table_lookup
+    (app_context->channel_oids_to_local_session_oids, &channel_oid);
+  
+  for (; i < session_oids->len; i++)
+    { 
+      guint64 session_oid = g_array_index (session_oids, guint64, i);
+      gzochid_game_client *client = g_hash_table_lookup
+	(app_context->oids_to_clients, &session_oid);
+      
+      /* Grab the client connection to which the session oid corresponds. */
+	      
+      if (client != NULL)
+	{
+	  GzochidEvent *event = g_object_new
+	    (GZOCHID_TYPE_EVENT, "type", MESSAGE_SENT, NULL);
+	  gzochid_event_dispatch (app_context->event_source, event);
+	  g_object_unref (event);
+	  
+	  gzochid_game_client_send (client, msg, len);
+	}
+      else
+	{
+	  /* If no client was found for the specified session, remove it from 
+	     the set of local session oids so we don't waste time on it again; 
+	     a conveniently lazy way of purging old members. */
+		  
+	  GSequenceIter *iter = g_sequence_lookup
+	    (sessions, &session_oid, gzochid_util_guint64_data_compare, NULL);
+		  
+	  if (iter != NULL)
+	    {
+	      g_debug 
+		("Client not found for messaged channel session '%"
+		 G_GUINT64_FORMAT "'; removing.", session_oid);
+	      
+	      g_sequence_remove (iter);
+
+	      if (g_sequence_is_empty (sessions))
+		g_hash_table_remove
+		  (app_context->channel_oids_to_local_session_oids,
+		   &channel_oid);
+	    }
+	}
+    }
+}
+
+/* `GFunc' implementation to pack each oid in the channel's session list into
+   the transaction context's `GArray'. */
+
+static void
+append_session_oid (gpointer data, gpointer user_data)
+{
+  guint64 *session_oid_ptr = data;
+  g_array_append_val (user_data, *session_oid_ptr);
+}
+
+void
+gzochid_channel_message_direct (gzochid_application_context *app_context,
+				guint64 channel_oid, GBytes *msg_bytes)
+{
+  size_t data_len = 0;
+  const unsigned char *data = g_bytes_get_data (msg_bytes, &data_len);
+  GSequence *sessions = NULL;
+  
+  g_mutex_lock (&app_context->channel_mapping_lock);
+  g_mutex_lock (&app_context->client_mapping_lock);
+
+  sessions = g_hash_table_lookup
+    (app_context->channel_oids_to_local_session_oids, &channel_oid);
+
+  if (sessions != NULL && !g_sequence_is_empty (sessions))
+    {
+      /* Capture the current state of channel membership. */
+      
+      GArray *session_oids = g_array_sized_new
+	(FALSE, FALSE, sizeof (guint64), g_sequence_get_length (sessions));
+
+      g_sequence_foreach (sessions, append_session_oid, session_oids);      
+
+      send_channel_message_direct
+	(app_context, channel_oid, session_oids, data, data_len);
+
+      g_array_free (session_oids, TRUE);
+    }
+
+  g_mutex_unlock (&app_context->client_mapping_lock);
+  g_mutex_unlock (&app_context->channel_mapping_lock);
+}
+
 /* Makes the channel side effect permanent with respect to the current state of
    the channel on this application server node. */
 
@@ -473,127 +689,40 @@ channel_side_effect_commit (gpointer data)
   gzochid_channel_side_effect_transaction_context *tx_context = data;
 
   if (tx_context->side_effect != NULL)
-    {
-      GSequence *sessions = NULL;
-
-      /* Locking the channel map; no matter what kind of side effect is being
-	 processed, it'll require exclusive access to the channel. */
-      
-      g_mutex_lock (&tx_context->app_context->channel_mapping_lock);
-
-      /* Does the channel have any member sessions on this node? */
-      
-      sessions = g_hash_table_lookup
-	(tx_context->app_context->channel_oids_to_local_session_oids,
-	 &tx_context->side_effect->channel_oid);
-
-      if (sessions == NULL)
-	{
-	  guint64 *channel_oid_ptr = malloc (sizeof (guint64));
-
-	  *channel_oid_ptr = tx_context->side_effect->channel_oid;
-	  
-	  /* If not, that's okay; it may not have been used on this node. Create
-	     an empty sequence to store new members. */
-	  
-	  sessions = g_sequence_new (free);
-
-	  g_hash_table_insert
-	    (tx_context->app_context->channel_oids_to_local_session_oids,
-	     channel_oid_ptr, sessions);
-	}
-      
+    {      
       if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_SEND)
 	{
-	  int i = 0;
 	  gzochid_channel_message_side_effect *message_side_effect =
 	    (gzochid_channel_message_side_effect *) tx_context->side_effect;
 
+	  g_mutex_lock (&tx_context->app_context->channel_mapping_lock);
 	  g_mutex_lock (&tx_context->app_context->client_mapping_lock);
 	  
-	  for (; i < message_side_effect->session_oids->len; i++)
-	    { 
-	      guint64 session_oid = g_array_index
-		(message_side_effect->session_oids, guint64, i);
-	      gzochid_game_client *client = g_hash_table_lookup
-		(tx_context->app_context->oids_to_clients, &session_oid);
+	  send_channel_message_direct
+	    (tx_context->app_context, tx_context->side_effect->channel_oid,
+	     message_side_effect->session_oids, message_side_effect->msg,
+	     message_side_effect->len);
 
-	      /* Grab the client connection to which the session oid 
-		 corresponds. */
-	      
-	      if (client != NULL)
-		{
-		  GzochidEvent *event = g_object_new
-		    (GZOCHID_TYPE_EVENT, "type", MESSAGE_SENT, NULL);
-		  gzochid_event_dispatch
-		    (tx_context->app_context->event_source, event);
-		  g_object_unref (event);
-
-		  gzochid_game_client_send
-		    (client, message_side_effect->msg,
-		     message_side_effect->len);
-		}
-	      else
-		{
-		  /* If no client was found for the specified session, remove it
-		     from the set of local session oids so we don't waste time 
-		     on it again; a conveniently lazy way of purging old 
-		     members. */
-		  
-		  GSequenceIter *iter = g_sequence_lookup
-		    (sessions, &session_oid,
-		     gzochid_util_guint64_data_compare, NULL);
-		  
-		  if (iter != NULL)
-		    {
-		      g_debug 
-			("Client not found for messaged channel session "
-			 "'%" G_GUINT64_FORMAT "'; removing.", session_oid);
-
-		      g_sequence_remove (iter);
-		    }
-		}
-	    }
-	  
 	  g_mutex_unlock (&tx_context->app_context->client_mapping_lock);
+	  g_mutex_unlock (&tx_context->app_context->channel_mapping_lock);
 	}
-      else if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_JOIN
-	       || tx_context->side_effect->op == GZOCHID_CHANNEL_OP_LEAVE)
+      else if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_CLOSE)
+	gzochid_channel_close_direct
+	  (tx_context->app_context, tx_context->side_effect->channel_oid);
+      else
 	{
 	  gzochid_channel_membership_side_effect *membership_side_effect =
-	    (gzochid_channel_membership_side_effect *)
-	    tx_context->side_effect;
-	  
-	  GSequenceIter *iter = g_sequence_lookup
-	    (sessions, &membership_side_effect->session_oid,
-	     gzochid_util_guint64_data_compare, NULL);
+	    (gzochid_channel_membership_side_effect *) tx_context->side_effect;
 
-	  /* Add or remove the session to or from the channel's session list. */
-	  
 	  if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_JOIN)
-	    {
-	      if (iter == NULL)
-		{
-		  guint64 *session_oid_ptr = malloc (sizeof (guint64));
-
-		  *session_oid_ptr = membership_side_effect->session_oid;
-		  
-		  g_sequence_insert_sorted
-		    (sessions, session_oid_ptr,
-		     gzochid_util_guint64_data_compare, NULL);
-		}
-	    }
-	  else if (iter != NULL)
-	    g_sequence_remove (iter);
-	}
-
-      /* Shut the channel down and free everything. */
-      
-      else g_hash_table_remove
-	     (tx_context->app_context->channel_oids_to_local_session_oids,
-	      &tx_context->side_effect->channel_oid);	  
-
-      g_mutex_unlock (&tx_context->app_context->channel_mapping_lock);
+	    gzochid_channel_join_direct
+	      (tx_context->app_context, tx_context->side_effect->channel_oid,
+	       membership_side_effect->session_oid, NULL);
+	  else if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_LEAVE)
+	    gzochid_channel_leave_direct
+	      (tx_context->app_context, tx_context->side_effect->channel_oid,
+	       membership_side_effect->session_oid, NULL);
+	}      
     }
 
   cleanup_side_effect_transaction (tx_context);
@@ -1248,4 +1377,10 @@ gzochid_channel_close (gzochid_application_context *context,
       (tx_context->queue_ref->obj,
        &gzochid_durable_application_task_handle_serialization,
        task_handle, NULL);
+}
+
+GQuark
+gzochid_channel_error_quark ()
+{
+  return g_quark_from_static_string ("gzochid-channel-error-quark");
 }
