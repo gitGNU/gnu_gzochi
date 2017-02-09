@@ -46,8 +46,10 @@ gzochid_application_context_new (void)
   gzochid_application_context *context = calloc 
     (1, sizeof (gzochid_application_context));
 
-  context->oids_to_clients = g_hash_table_new (g_int64_hash, g_int64_equal);
-  context->clients_to_oids = g_hash_table_new (g_direct_hash, g_direct_equal);
+  context->oids_to_clients = g_hash_table_new_full
+    (g_int64_hash, g_int64_equal, g_free, NULL);
+  context->clients_to_oids = g_hash_table_new_full
+    (g_direct_hash, g_direct_equal, NULL, g_free);
 
   g_mutex_init (&context->free_oids_lock);
   g_mutex_init (&context->client_mapping_lock);

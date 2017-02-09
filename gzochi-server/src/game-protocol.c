@@ -201,8 +201,10 @@ logged_in_task (gzochid_application_context *context,
   gzochid_application_task_unref (login_catch_task);
 
   g_mutex_lock (&context->client_mapping_lock);
-  g_hash_table_insert (context->oids_to_clients, session_oid, client);
-  g_hash_table_insert (context->clients_to_oids, client, session_oid);
+  g_hash_table_insert (context->oids_to_clients,
+		       g_memdup (session_oid, sizeof (guint64)), client);
+  g_hash_table_insert (context->clients_to_oids, client,
+		       g_memdup (session_oid, sizeof (guint64)));
   g_mutex_unlock (&context->client_mapping_lock);
 
   application_task = gzochid_application_task_new
