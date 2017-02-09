@@ -235,6 +235,7 @@ gzochid_client_socket_new (GIOChannel *channel,
   sock->protocol = protocol;
   sock->protocol_data = protocol_data;
   
+  sock->read_source = NULL;
   sock->write_source = NULL;
 
   g_mutex_init (&sock->sock_mutex);
@@ -255,7 +256,9 @@ free_client_socket (gpointer data)
 
   sock->protocol.free (sock->protocol_data);
 
-  g_object_unref (sock->server);
+  if (sock->server != NULL)
+    g_object_unref (sock->server);
+
   g_io_channel_unref (sock->channel);
   g_mutex_clear (&sock->sock_mutex);
   g_byte_array_unref (sock->recv_buffer);
@@ -477,14 +480,22 @@ gzochid_client_socket_write (gzochid_client_socket *sock,
 void
 gzochid_client_socket_free (gzochid_client_socket *sock)
 {
-  /* It's not safe to free the socket synchronously, because another thread may
-     be in the process of dispatching a read or a write and the caller has no
-     way of knowing that. Instead, unref both sources and let the 
-     `GDestroyNotify' attached to the read source take care of the cleanup. */
+  /* It's not safe to free the socket synchronously if it's been added to a
+     main loop, because another thread may be in the process of dispatching a 
+     read or a write and the caller has no way of knowing that. Instead, unref 
+     both sources and let the `GDestroyNotify' attached to the read source take
+     care of the cleanup. */
 
   if (sock->write_source != NULL)
     g_source_unref (sock->write_source);
-  g_source_unref (sock->read_source);
+  
+  if (sock->read_source != NULL)
+    g_source_unref (sock->read_source);
+
+  /* ...however, if the socket hasn't been added to a loop, it can be cleaned
+     up directly. */
+  
+  else free_client_socket (sock);
 }
 
 /* A pair of lifecycle callbacks for a `gzochid_reconnectable_socket'. */
