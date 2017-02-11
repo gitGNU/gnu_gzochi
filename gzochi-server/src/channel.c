@@ -26,6 +26,7 @@
 #include "app-task.h"
 #include "auth_int.h"
 #include "channel.h"
+#include "channelclient.h"
 #include "event.h"
 #include "game.h"
 #include "game-protocol.h"
@@ -695,7 +696,19 @@ channel_side_effect_commit (gpointer data)
   gzochid_channel_side_effect_transaction_context *tx_context = data;
 
   if (tx_context->side_effect != NULL)
-    {      
+    {
+      GzochidChannelClient *channelclient = NULL;
+
+      /* If there is a meta client, get its channel client preemptively, since
+	 we're likely to need it below and the `g_object_get' invocation is
+	 verbose. */
+      
+      if (tx_context->app_context->metaclient != NULL)
+	g_object_get
+	  (tx_context->app_context->metaclient,
+	   "channel-client", &channelclient,
+	   NULL);
+      
       if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_SEND)
 	{
 	  gzochid_channel_message_side_effect *message_side_effect =
@@ -709,26 +722,99 @@ channel_side_effect_commit (gpointer data)
 	     message_side_effect->session_oids, message_side_effect->msg,
 	     message_side_effect->len);
 
+	  if (channelclient != NULL)
+	    {
+	      /* If we're in distributed mode, also send the message to the
+		 meta server for broadcast to the other nodes. */
+	      
+	      GBytes *msg = g_bytes_new_static
+		(message_side_effect->msg, message_side_effect->len);
+
+	      gzochid_channelclient_relay_message_from
+		(channelclient, tx_context->app_context->descriptor->name,
+		 tx_context->side_effect->channel_oid, msg);
+
+	      g_bytes_unref (msg);
+	    }
+	  
 	  g_mutex_unlock (&tx_context->app_context->client_mapping_lock);
 	  g_mutex_unlock (&tx_context->app_context->channel_mapping_lock);
 	}
       else if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_CLOSE)
-	gzochid_channel_close_direct
-	  (tx_context->app_context, tx_context->side_effect->channel_oid);
+	{
+	  gzochid_channel_close_direct
+	    (tx_context->app_context, tx_context->side_effect->channel_oid);
+
+	  if (channelclient != NULL)
+
+	    /* If we're in distributed mode, also direct other nodes to close
+	       the channel locally. */
+	    
+	    gzochid_channelclient_relay_close_from
+	      (channelclient, tx_context->app_context->descriptor->name,
+	       tx_context->side_effect->channel_oid);
+	}
       else
 	{
+	  GError *err = NULL;
+	  GzochidChannelClient *channelclient = NULL;
 	  gzochid_channel_membership_side_effect *membership_side_effect =
 	    (gzochid_channel_membership_side_effect *) tx_context->side_effect;
 
 	  if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_JOIN)
-	    gzochid_channel_join_direct
-	      (tx_context->app_context, tx_context->side_effect->channel_oid,
-	       membership_side_effect->session_oid, NULL);
+	    {
+	      gzochid_channel_join_direct
+		(tx_context->app_context, tx_context->side_effect->channel_oid,
+		 membership_side_effect->session_oid, &err);
+
+	      if (err != NULL)
+		{
+		  if (err->code != GZOCHID_CHANNEL_ERROR_NOT_MAPPED &&
+		      channelclient != NULL)
+
+		    /* If we're in distributed mode and the channel couldn't
+		       be joined because the session doesn't exist locally,
+		       forward the join to the meta server so it can relay it to
+		       the node to which the session's connected. */
+		    
+		    gzochid_channelclient_relay_join_from
+		      (channelclient, tx_context->app_context->descriptor->name,
+		       tx_context->side_effect->channel_oid,
+		       membership_side_effect->session_oid);
+		  
+		  g_error_free (err);		  
+		}
+	    }
 	  else if (tx_context->side_effect->op == GZOCHID_CHANNEL_OP_LEAVE)
-	    gzochid_channel_leave_direct
-	      (tx_context->app_context, tx_context->side_effect->channel_oid,
-	       membership_side_effect->session_oid, NULL);
-	}      
+	    {
+	      gzochid_channel_leave_direct
+		(tx_context->app_context, tx_context->side_effect->channel_oid,
+		 membership_side_effect->session_oid, NULL);
+
+	      if (err != NULL)
+		{
+		  if (err->code != GZOCHID_CHANNEL_ERROR_NOT_MAPPED &&
+		      channelclient != NULL)
+
+		    /* If we're in distributed mode and the channel couldn't
+		       be left because the session doesn't exist locally,
+		       forward the removal to the meta server so it can relay 
+		       it to the node to which the session's connected. */
+		    
+		    gzochid_channelclient_relay_leave_from
+		      (channelclient, tx_context->app_context->descriptor->name,
+		       tx_context->side_effect->channel_oid,
+		       membership_side_effect->session_oid);
+
+		  g_error_free (err);
+		}
+	    }
+	}
+
+      /* Unref the client if we had a reference to it. */
+      
+      if (channelclient != NULL)
+	g_object_unref (channelclient);
     }
 
   cleanup_side_effect_transaction (tx_context);
