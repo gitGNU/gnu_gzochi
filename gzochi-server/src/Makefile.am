@@ -44,8 +44,8 @@ conf/gzochid.conf: conf/gzochid.conf.in $(top_builddir)/config.status
 dist_include_HEADERS = gzochid-auth.h gzochid-storage.h
 
 noinst_HEADERS = admin.h app-task.h app.h auth_int.h callback.h channel.h \
-	channelserver-protocol.h channelserver.h config.h context.h \
-	data-protocol.h data.h dataclient-protocol.h dataclient.h \
+	channelclient.h channelserver-protocol.h channelserver.h config.h \
+	context.h data-protocol.h data.h dataclient-protocol.h dataclient.h \
 	dataserver-protocol.h dataserver.h debug.h descriptor.h durable-task.h \
 	event-app.h event-meta.h event.h fmemopen.h fsm.h game.h \
 	game-protocol.h guile.h gzochid.h httpd-app.h httpd-meta.h httpd.h \
@@ -68,15 +68,15 @@ libgzochid_la_CFLAGS = @CFLAGS@ \
 	-Wall -Werror
 
 libgzochid_la_SOURCES = admin.c app-task.c app.c auth.c callback.c channel.c \
-	config.c context.c data-protocol.c data.c dataclient-protocol.c \
-	dataclient.c debug.c descriptor.c durable-task.c event-app.c event.c \
-	fmemopen.c fsm.c game.c game-protocol.c guile.c httpd-app.c httpd.c \
-	io.c itree.c log.c lrucache.c metaclient-protocol.c metaclient.c \
-	oids-dataclient.c oids-storage.c oids.c protocol-common.c queue.c \
-	reloc.c resolver.c schedule.c scheme.c scheme-task.c session.c \
-	sessionclient-protocol.c sessionclient.c socket.c stats.c \
-	storage-dataclient.c storage-mem.c storage.c task.c threads.c tx.c \
-	txlog.c util.c
+	channelclient.c config.c context.c data-protocol.c data.c \
+	dataclient-protocol.c dataclient.c debug.c descriptor.c durable-task.c \
+	event-app.c event.c fmemopen.c fsm.c game.c game-protocol.c guile.c \
+	httpd-app.c httpd.c io.c itree.c log.c lrucache.c \
+	metaclient-protocol.c metaclient.c oids-dataclient.c oids-storage.c \
+	oids.c protocol-common.c queue.c reloc.c resolver.c schedule.c \
+	scheme.c scheme-task.c session.c sessionclient-protocol.c \
+	sessionclient.c socket.c stats.c storage-dataclient.c storage-mem.c \
+	storage.c task.c threads.c tx.c txlog.c util.c
 
 libgzochid_la_LIBADD = api/libgzochid-api.la @GZOCHI_COMMON_LIBS@ \
 	@GUILE_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@ @GTHREAD_LIBS@ @GMODULE_LIBS@ \
