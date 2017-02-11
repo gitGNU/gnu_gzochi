@@ -20,6 +20,8 @@
 #include <gzochi-common.h>
 #include <string.h>
 
+#include "channelclient-protocol.h"
+#include "channelclient.h"
 #include "dataclient-protocol.h"
 #include "dataclient.h"
 #include "event-app.h"
@@ -154,7 +156,30 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
 	    (client, (unsigned char *) buffer->data + offset + 1, len - 1);
 	  break;
 	  
-	  /* Opcodes understood by the dataserver protocol. */
+	  /* Opcodes understood by the channelclient protocol. */
+
+	case GZOCHID_CHANNEL_PROTOCOL_RELAY_JOIN_TO:
+	case GZOCHID_CHANNEL_PROTOCOL_RELAY_LEAVE_TO:
+	case GZOCHID_CHANNEL_PROTOCOL_RELAY_CLOSE_TO:
+	case GZOCHID_CHANNEL_PROTOCOL_RELAY_MESSAGE_TO:
+	  {
+	    GzochidChannelClient *channelclient = NULL;
+	    GByteArray *delegate_buffer = g_byte_array_sized_new (len);
+
+	    g_object_get (client, "channelclient", &channelclient, NULL);
+	    
+	    g_byte_array_append
+	      (delegate_buffer, buffer->data + offset - 2, len + 2);
+	    gzochid_channelclient_client_protocol.dispatch
+	      (delegate_buffer, channelclient);
+
+	    g_byte_array_unref (delegate_buffer);
+	    g_object_unref (channelclient);
+	    
+	    break;
+	  }
+
+	  /* Opcodes understood by the dataclient protocol. */
 
 	case GZOCHID_DATA_PROTOCOL_OIDS_RESPONSE:
 	case GZOCHID_DATA_PROTOCOL_VALUE_RESPONSE:
@@ -176,6 +201,8 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
 	    break;
 	  }	  
 	  
+	  /* Opcodes understood by the sessionclient protocol. */
+
 	case GZOCHID_SESSION_PROTOCOL_RELAY_DISCONNECT_TO:
 	case GZOCHID_SESSION_PROTOCOL_RELAY_MESSAGE_TO:
 	  {

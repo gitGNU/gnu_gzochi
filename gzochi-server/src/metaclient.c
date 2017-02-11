@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 
+#include "channelclient.h"
 #include "config.h"
 #include "dataclient.h"
 #include "event.h"
@@ -56,13 +57,22 @@ struct _GzochidMetaClient
   GzochidResolutionContext *resolution_context; 
 
   /*
-    The dataclient instance to which the metaclient delegates handling of 
-    `GZOCHID_DATA_PROTOCOL_*' opcodes. 
+    The channelclient instance to which the metaclient delegates handling of
+    `GZOCHID_CHANNEL_PROTOCOL_*' opcodes.
 
-    Note that because the metaclient and the dataclient have to share some
+    Note that because the metaclient and the channelclient have to share some
     non-injectable properties, this object is not constructed / managed by 
     gzochid's resolution context. The metaclient constructs it (see below) and
     "owns" it.
+  */
+
+  GzochidChannelClient *channelclient;
+  
+  /*
+    The dataclient instance to which the metaclient delegates handling of 
+    `GZOCHID_DATA_PROTOCOL_*' opcodes. 
+
+    The sessionclient has a lifecycle similar to that of the channelclient.
   */
   
   GzochidDataClient *dataclient;
@@ -71,7 +81,7 @@ struct _GzochidMetaClient
     The sessionclient instance to which the metaclient delegates handling of 
     `GZOCHID_SESSION_PROTOCOL_*' opcodes. 
 
-    The sessionclient has a lifecycle similar to that of the dataclient.
+    The sessionclient has a lifecycle similar to that of the channelclient.
   */
 
   GzochidSessionClient *sessionclient;
@@ -126,6 +136,7 @@ enum gzochid_meta_client_properties
     PROP_SOCKET_SERVER,
     PROP_EVENT_LOOP,
     PROP_EVENT_SOURCE,
+    PROP_CHANNEL_CLIENT,
     PROP_DATA_CLIENT,
     PROP_SESSION_CLIENT,
     N_PROPERTIES
@@ -143,6 +154,10 @@ gzochid_meta_client_get_property (GObject *object, guint property_id,
     {
     case PROP_EVENT_SOURCE:
       g_value_set_boxed (value, client->event_source);
+      break;
+
+    case PROP_CHANNEL_CLIENT:
+      g_value_set_object (value, client->channelclient);
       break;
 
     case PROP_DATA_CLIENT:
@@ -200,6 +215,7 @@ gzochid_meta_client_dispose (GObject *object)
   GzochidMetaClient *client = GZOCHID_META_CLIENT (object);
 
   g_object_unref (client->configuration);
+  g_object_unref (client->channelclient);
   g_object_unref (client->dataclient);
   g_object_unref (client->resolution_context);
   g_object_unref (client->socket_server);
@@ -245,6 +261,15 @@ gzochid_meta_client_constructed (GObject *gobject)
   client->metaclient_configuration = gzochid_configuration_extract_group
     (client->configuration, "metaserver");
 
+  /* Explicit construction of the channelclient with game server and 
+     reconnectable socket pointer. */
+
+  client->channelclient = g_object_new
+    (GZOCHID_TYPE_CHANNEL_CLIENT,
+     "game-server", game_server,
+     "reconnectable-socket", client->socket,
+     NULL);
+  
   /* Explicit construction of the dataclient with main context and 
      reconnectable socket pointer. */
   
@@ -298,6 +323,10 @@ gzochid_meta_client_class_init (GzochidMetaClientClass *klass)
   obj_properties[PROP_EVENT_SOURCE] = g_param_spec_boxed
     ("event-source", "event-source", "The meta client event source",
      G_TYPE_SOURCE, G_PARAM_READABLE);
+
+  obj_properties[PROP_CHANNEL_CLIENT] = g_param_spec_object
+    ("channel-client", "channelclient", "The channel client",
+     GZOCHID_TYPE_CHANNEL_CLIENT, G_PARAM_READABLE);
 
   obj_properties[PROP_DATA_CLIENT] = g_param_spec_object
     ("data-client", "dataclient", "The data client", GZOCHID_TYPE_DATA_CLIENT,

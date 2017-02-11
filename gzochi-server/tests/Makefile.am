@@ -25,6 +25,7 @@ test_programs = \
 	test-auth \
 	test-channel \
 	test-channelclient \
+	test-channelclient-protocol \
 	test-channelserver \
 	test-channelserver-protocol \
 	test-config \
@@ -125,6 +126,14 @@ test_channelclient_LDADD = \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
+
+test_channelclient_protocol_CFLAGS = -I$(top_srcdir)/src \
+        @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ @GZOCHI_COMMON_CFLAGS@
+test_channelclient_protocol_SOURCES = test-channelclient-protocol.c
+test_channelclient_protocol_LDADD = \
+	$(top_builddir)/src/libgzochid_la-channelclient-protocol.o \
+	$(top_builddir)/src/libgzochid_la-protocol-common.o \
+        @GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
 
 test_channelserver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
 	@GZOCHI_COMMON_CFLAGS@

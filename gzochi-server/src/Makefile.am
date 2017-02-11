@@ -44,19 +44,19 @@ conf/gzochid.conf: conf/gzochid.conf.in $(top_builddir)/config.status
 dist_include_HEADERS = gzochid-auth.h gzochid-storage.h
 
 noinst_HEADERS = admin.h app-task.h app.h auth_int.h callback.h channel.h \
-	channelclient.h channelserver-protocol.h channelserver.h config.h \
-	context.h data-protocol.h data.h dataclient-protocol.h dataclient.h \
-	dataserver-protocol.h dataserver.h debug.h descriptor.h durable-task.h \
-	event-app.h event-meta.h event.h fmemopen.h fsm.h game.h \
-	game-protocol.h guile.h gzochid.h httpd-app.h httpd-meta.h httpd.h \
-	io.h itree.h lock.h log.h lrucache.h meta-protocol.h \
-	metaclient-protocol.h metaclient.h metaserver-protocol.h nodemap-mem.h \
-	nodemap.h oids-dataclient.h oids-storage.h oids.h protocol-common.h \
-	protocol.h queue.h reloc.h resolver.h schedule.h scheme.h \
-	scheme-task.h session.h sessionclient-protocol.h sessionclient.h \
-	sessionserver-protocol.h sessionserver.h socket.h stats.h \
-	storage-dataclient.h storage-mem.h storage.h task.h threads.h \
-	toollib.h tx.h txlog.h util.h
+	channelclient-protocol.h channelclient.h channelserver-protocol.h \
+	channelserver.h config.h context.h data-protocol.h data.h \
+	dataclient-protocol.h dataclient.h dataserver-protocol.h dataserver.h \
+	debug.h descriptor.h durable-task.h event-app.h event-meta.h event.h \
+	fmemopen.h fsm.h game.h game-protocol.h guile.h gzochid.h httpd-app.h \
+	httpd-meta.h httpd.h io.h itree.h lock.h log.h lrucache.h \
+	meta-protocol.h metaclient-protocol.h metaclient.h \
+	metaserver-protocol.h nodemap-mem.h nodemap.h oids-dataclient.h \
+	oids-storage.h oids.h protocol-common.h protocol.h queue.h reloc.h \
+	resolver.h schedule.h scheme.h scheme-task.h session.h \
+	sessionclient-protocol.h sessionclient.h sessionserver-protocol.h \
+	sessionserver.h socket.h stats.h storage-dataclient.h storage-mem.h \
+	storage.h task.h threads.h toollib.h tx.h txlog.h util.h
 
 noinst_LTLIBRARIES = libgzochid.la libgzochi-metad.la
 
@@ -68,13 +68,13 @@ libgzochid_la_CFLAGS = @CFLAGS@ \
 	-Wall -Werror
 
 libgzochid_la_SOURCES = admin.c app-task.c app.c auth.c callback.c channel.c \
-	channelclient.c config.c context.c data-protocol.c data.c \
-	dataclient-protocol.c dataclient.c debug.c descriptor.c durable-task.c \
-	event-app.c event.c fmemopen.c fsm.c game.c game-protocol.c guile.c \
-	httpd-app.c httpd.c io.c itree.c log.c lrucache.c \
-	metaclient-protocol.c metaclient.c oids-dataclient.c oids-storage.c \
-	oids.c protocol-common.c queue.c reloc.c resolver.c schedule.c \
-	scheme.c scheme-task.c session.c sessionclient-protocol.c \
+	channelclient-protocol.c channelclient.c config.c context.c \
+	data-protocol.c data.c dataclient-protocol.c dataclient.c debug.c \
+	descriptor.c durable-task.c event-app.c event.c fmemopen.c fsm.c \
+	game.c game-protocol.c guile.c httpd-app.c httpd.c io.c itree.c log.c \
+	lrucache.c metaclient-protocol.c metaclient.c oids-dataclient.c \
+	oids-storage.c oids.c protocol-common.c queue.c reloc.c resolver.c \
+	schedule.c scheme.c scheme-task.c session.c sessionclient-protocol.c \
 	sessionclient.c socket.c stats.c storage-dataclient.c storage-mem.c \
 	storage.c task.c threads.c tx.c txlog.c util.c
 

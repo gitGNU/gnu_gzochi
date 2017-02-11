@@ -22,6 +22,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "channelclient.h"
 #include "config.h"
 #include "event.h"
 #include "event-app.h"
@@ -57,6 +58,59 @@ GType
 gzochid_game_server_get_type ()
 {
   return G_TYPE_OBJECT;
+}
+
+struct _GzochidChannelClient
+{
+  GObject parent_instance;
+};
+
+G_DEFINE_TYPE (GzochidChannelClient, gzochid_channel_client, G_TYPE_OBJECT);
+
+enum gzochid_channel_client_properties
+  {
+    PROP_CHANNEL_CLIENT_GAME_SERVER = 1,
+    PROP_CHANNEL_CLIENT_SOCKET,
+    N_CHANNEL_CLIENT_PROPERTIES
+  };
+
+static GParamSpec *channelclient_obj_properties[N_CHANNEL_CLIENT_PROPERTIES] =
+  { NULL };
+
+static void
+gzochid_channel_client_dispose (GObject *gobject)
+{
+}
+
+static void
+gzochid_channel_client_set_property (GObject *object, guint property_id,
+				     const GValue *value, GParamSpec *pspec)
+{
+}
+
+static void gzochid_channel_client_class_init (GzochidChannelClientClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->dispose = gzochid_channel_client_dispose;
+  object_class->set_property = gzochid_channel_client_set_property;
+  
+  channelclient_obj_properties[PROP_CHANNEL_CLIENT_GAME_SERVER] =
+    g_param_spec_object
+    ("game-server", "game-server", "The game protocol server",
+     G_TYPE_OBJECT, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+  
+  channelclient_obj_properties[PROP_CHANNEL_CLIENT_SOCKET] =
+    g_param_spec_pointer
+    ("reconnectable-socket", "socket", "The meta client's reconnectable socket",
+     G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+
+  g_object_class_install_properties
+    (object_class, N_CHANNEL_CLIENT_PROPERTIES, channelclient_obj_properties);
+}
+
+static void gzochid_channel_client_init (GzochidChannelClient *self)
+{
 }
 
 struct _GzochidDataClient

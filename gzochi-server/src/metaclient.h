@@ -35,6 +35,7 @@ GType gzochid_meta_client_get_type (void);
   server to communicate with other servers when running in distributed mode. It
   has the following readable properties:
   
+  - "channel-client" returns a reference to a `GzochidChannelClient'  
   - "data-client" returns a reference to a `GzochidDataClient'
   - "session-client" returns a reference to a `GzochidSessionClient'
   
