@@ -543,7 +543,9 @@ gzochid_channel_leave_direct (gzochid_application_context *app_context,
 	      found_session = TRUE;
 	      g_sequence_remove (iter);
 	      
-	      if (g_sequence_is_empty (sessions))
+	      if (g_sequence_get_begin_iter (sessions) ==
+		  g_sequence_get_end_iter (sessions))
+		
 		g_hash_table_remove
 		  (app_context->channel_oids_to_local_session_oids,
 		   &channel_oid);
@@ -628,7 +630,9 @@ send_channel_message_direct (gzochid_application_context *app_context,
 	      
 	      g_sequence_remove (iter);
 
-	      if (g_sequence_is_empty (sessions))
+	      if (g_sequence_get_begin_iter (sessions) ==
+		  g_sequence_get_end_iter (sessions))
+		
 		g_hash_table_remove
 		  (app_context->channel_oids_to_local_session_oids,
 		   &channel_oid);
@@ -661,7 +665,9 @@ gzochid_channel_message_direct (gzochid_application_context *app_context,
   sessions = g_hash_table_lookup
     (app_context->channel_oids_to_local_session_oids, &channel_oid);
 
-  if (sessions != NULL && !g_sequence_is_empty (sessions))
+  if (sessions != NULL &&
+      g_sequence_get_begin_iter (sessions) !=
+      g_sequence_get_end_iter (sessions))
     {
       /* Capture the current state of channel membership. */
       
