@@ -46,7 +46,7 @@ typedef struct _GzochidEventPrivate GzochidEventPrivate;
 
 /* Boilerplate setup for the base event object. */
 
-G_DEFINE_TYPE (GzochidEvent, gzochid_event, G_TYPE_OBJECT);
+G_DEFINE_TYPE (GzochidEvent, gzochid_event, G_TYPE_INITIALLY_UNOWNED);
 
 enum gzochid_event_properties
   {
@@ -499,9 +499,7 @@ gzochid_event_attach (gzochid_event_source *source,
 void
 gzochid_event_dispatch (gzochid_event_source *source, GzochidEvent *event)
 {
-  g_object_ref (event);
-  
   g_mutex_lock (&source->mutex);
-  g_queue_push_tail (source->events, event);
+  g_queue_push_tail (source->events, g_object_ref_sink (event));
   g_mutex_unlock (&source->mutex);
 }

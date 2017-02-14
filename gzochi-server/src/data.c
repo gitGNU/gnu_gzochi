@@ -137,7 +137,6 @@ flush_reference (gzochid_data_managed_reference *reference,
   GError *err = NULL;
 
   guint64 encoded_oid = gzochid_util_encode_oid (reference->oid);
-  GzochidEvent *event = NULL;
   
   switch (reference->state)
     {
@@ -169,12 +168,10 @@ flush_reference (gzochid_data_managed_reference *reference,
 	 (char *) &encoded_oid, sizeof (guint64),
 	 (char *) out->data, out->len);
 
-      event = g_object_new
-	(GZOCHID_TYPE_DATA_EVENT,
-	 "type", BYTES_WRITTEN, "bytes", out->len, NULL);
-      
-      gzochid_event_dispatch (context->context->event_source, event);
-      g_object_unref (event);
+      gzochid_event_dispatch
+	(context->context->event_source,
+	 g_object_new (GZOCHID_TYPE_DATA_EVENT,
+		       "type", BYTES_WRITTEN, "bytes", out->len, NULL));
       
       g_byte_array_unref (out);
       
@@ -547,11 +544,11 @@ dereference (gzochid_data_transaction_context *context,
   else 
     {
       GError *local_err = NULL;
-      GzochidEvent *event = g_object_new
-	(GZOCHID_TYPE_DATA_EVENT, "type", BYTES_READ, "bytes", data_len, NULL);
       
-      gzochid_event_dispatch (context->context->event_source, event);
-      g_object_unref (event);
+      gzochid_event_dispatch
+	(context->context->event_source,
+	 g_object_new (GZOCHID_TYPE_DATA_EVENT,
+		       "type", BYTES_READ, "bytes", data_len, NULL));
       
       in = g_byte_array_sized_new (data_len);
       g_byte_array_append (in, (unsigned char *) data, data_len);

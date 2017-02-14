@@ -73,7 +73,7 @@ GType gzochid_event_get_type (void);
 
 struct _GzochidEvent
 {
-  GObject parent_instance; /* The base struct, for casting. */
+  GInitiallyUnowned parent_instance; /* The base struct, for casting. */
 
   /* Pointer to the instance's private struct. */
 
@@ -84,7 +84,7 @@ typedef struct _GzochidEvent GzochidEvent;
 
 struct _GzochidEventClass
 {
-  GObjectClass parent_class;
+  GInitiallyUnownedClass parent_class;
 };
 
 typedef struct _GzochidEventClass GzochidEventClass;

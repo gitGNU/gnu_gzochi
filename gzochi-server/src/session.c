@@ -276,12 +276,11 @@ session_commit_operation
       if (!tx_context->login_failed 
 	  || op->target_session != tx_context->login_operation->target_session) 
 	{
-	  GzochidEvent *event = g_object_new
-	    (GZOCHID_TYPE_EVENT, "type", MESSAGE_SENT, NULL);
 	  msg_op = (gzochid_client_session_pending_message_operation *) op;
 
-	  gzochid_event_dispatch (context->event_source, event);
-	  g_object_unref (event);
+	  gzochid_event_dispatch
+	    (context->event_source,
+	     g_object_new (GZOCHID_TYPE_EVENT, "type", MESSAGE_SENT, NULL));
 
 	  if (client != NULL)
 	    gzochid_game_client_send (client, msg_op->message, msg_op->len);

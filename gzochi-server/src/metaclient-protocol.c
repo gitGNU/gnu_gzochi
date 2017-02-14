@@ -99,23 +99,22 @@ dispatch_login_response (GzochidMetaClient *client, const unsigned char *data,
 	 NULL);
       
       if (url_len > 0)
-	event = g_object_new
-	  (GZOCHID_TYPE_META_SERVER_EVENT,
-	   "type", META_SERVER_CONNECTED,
-	   "connection-description", conn_desc,	 
-	   "admin-server-base-url", admin_server_base_url,
-	   NULL);
+	gzochid_dispatch_event
+	  (event_source, g_object_new
+	   (GZOCHID_TYPE_META_SERVER_EVENT,
+	    "type", META_SERVER_CONNECTED,
+	    "connection-description", conn_desc,
+	    "admin-server-base-url", admin_server_base_url,
+	    NULL));
 
       /* When there's no admin console available, the base URL will be empty. */
       
-      else event = g_object_new
-	     (GZOCHID_TYPE_META_SERVER_EVENT,
-	      "type", META_SERVER_CONNECTED,
-	      "connection-description", conn_desc,	 
-	      NULL);
-      
-      gzochid_event_dispatch (event_source, GZOCHID_EVENT (event));
-      g_object_unref (event);
+      else gzochid_dispatch_event
+	     (event_source, g_object_new
+	      (GZOCHID_TYPE_META_SERVER_EVENT,
+	       "type", META_SERVER_CONNECTED,
+	       "connection-description", conn_desc,
+	       NULL));
       
       g_free (conn_desc);
       g_source_unref ((GSource *) event_source);

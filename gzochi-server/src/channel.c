@@ -607,10 +607,9 @@ send_channel_message_direct (gzochid_application_context *app_context,
 	      
       if (client != NULL)
 	{
-	  GzochidEvent *event = g_object_new
-	    (GZOCHID_TYPE_EVENT, "type", MESSAGE_SENT, NULL);
-	  gzochid_event_dispatch (app_context->event_source, event);
-	  g_object_unref (event);
+	  gzochid_event_dispatch
+	    (app_context->event_source,
+	     g_object_new (GZOCHID_TYPE_EVENT, "type", MESSAGE_SENT, NULL));
 	  
 	  gzochid_game_client_send (client, msg, len);
 	}

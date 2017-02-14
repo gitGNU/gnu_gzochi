@@ -864,16 +864,12 @@ gzochid_metaclient_stop (GzochidMetaClient *metaclient)
 void
 gzochid_metaclient_nullify_connection (GzochidMetaClient *metaclient)
 {
-  GzochidEvent *event = GZOCHID_EVENT
-    (g_object_new (GZOCHID_TYPE_META_SERVER_EVENT,
-		   "type", META_SERVER_DISCONNECTED,
-		   NULL));
-
   gzochid_reconnectable_socket_disconnect (metaclient->socket);
-  gzochid_event_dispatch (metaclient->event_source, event);
+  gzochid_event_dispatch
+    (metaclient->event_source,
+     g_object_new (GZOCHID_TYPE_META_SERVER_EVENT,
+		   "type", META_SERVER_DISCONNECTED, NULL));
   
-  g_object_unref (event);
-      
   g_main_loop_quit (metaclient->main_loop);
 }
 

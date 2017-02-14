@@ -49,8 +49,6 @@ static void test_event_dispatch ()
   GzochidEventLoop *event_loop = g_object_new (GZOCHID_TYPE_EVENT_LOOP, NULL);
   gzochid_event_source *event_source = gzochid_event_source_new ();
 
-  GzochidEvent *event = g_object_new
-    (GZOCHID_TYPE_TRANSACTION_EVENT, "type", TRANSACTION_START, NULL);
   struct handler_data handler_data;
 
   g_mutex_init (&handler_data.mutex);
@@ -59,7 +57,9 @@ static void test_event_dispatch ()
   
   gzochid_event_source_attach (event_loop, event_source);
   gzochid_event_attach (event_source, test_handler, &handler_data);
-  gzochid_event_dispatch (event_source, event);
+  gzochid_event_dispatch (event_source, g_object_new
+			  (GZOCHID_TYPE_TRANSACTION_EVENT,
+			   "type", TRANSACTION_START, NULL));
 
   g_mutex_lock (&handler_data.mutex);
   gzochid_event_loop_start (event_loop);
@@ -77,7 +77,6 @@ static void test_event_dispatch ()
   g_source_destroy ((GSource *) event_source);
   g_source_unref ((GSource *) event_source);
   
-  g_object_unref (event);
   g_object_unref (event_loop);
 }
 

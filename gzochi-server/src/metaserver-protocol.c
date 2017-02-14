@@ -175,21 +175,6 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
       const char *conn_desc = gzochid_client_socket_get_connection_description
 	(client->sock);
       
-      if (str_len > 1)
-	event = g_object_new
-	  (GZOCHI_METAD_TYPE_CLIENT_EVENT,
-	   "type", CLIENT_CONNECTED,
-	   "node-id", client->node_id,
-	   "connection-description", conn_desc,	 
-	   "admin-server-base-url", client_admin_server_base_url,
-	   NULL);
-      else event = g_object_new
-	     (GZOCHI_METAD_TYPE_CLIENT_EVENT,
-	      "type", CLIENT_CONNECTED,
-	      "node-id", client->node_id,
-	      "connection-description", conn_desc,	 
-	      NULL);
-      
       g_object_get
 	(client->root_context,
 	 "admin-server-base-url", &admin_server_base_url,
@@ -207,10 +192,26 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
       gzochi_metad_sessionserver_server_connected
 	(sessionserver, client->node_id, client->sock, NULL);
       g_object_unref (sessionserver);      
+
+      if (str_len > 1)
+	gzochid_event_dispatch
+	  (event_source, g_object_new
+	   (GZOCHI_METAD_TYPE_CLIENT_EVENT,
+	    "type", CLIENT_CONNECTED,
+	    "node-id", client->node_id,
+	    "connection-description", conn_desc,	 
+	    "admin-server-base-url", client_admin_server_base_url,
+	    NULL));
       
-      gzochid_event_dispatch (event_source, GZOCHID_EVENT (event));
+      else gzochid_event_dispatch
+	     (event_source, g_object_new
+	      (GZOCHI_METAD_TYPE_CLIENT_EVENT,
+	       "type", CLIENT_CONNECTED,
+	       "node-id", client->node_id,
+	       "connection-description", conn_desc,	 
+	       NULL));
+
       g_source_unref ((GSource *) event_source);
-      g_object_unref (event);
        
       /* Pad with two `NULL' bytes to leave space for the actual length to be 
 	 encoded. */
@@ -345,18 +346,16 @@ static void
 client_error (gpointer user_data)
 {
   gzochi_metad_metaserver_client *client = user_data;
-
   gzochid_event_source *event_source = NULL;
-  GzochidEvent *event = GZOCHID_EVENT
-    (g_object_new (GZOCHI_METAD_TYPE_CLIENT_EVENT,
-		   "type", CLIENT_DISCONNECTED,
-		   "node-id", client->node_id,
-		   NULL));
 
   g_object_get (client->root_context, "event-source", &event_source, NULL);
-  gzochid_event_dispatch (event_source, event);
+
+  gzochid_event_dispatch
+    (event_source, g_object_new
+     (GZOCHI_METAD_TYPE_CLIENT_EVENT,
+      "type", CLIENT_DISCONNECTED, "node-id", client->node_id, NULL));
+
   g_source_unref ((GSource *) event_source);
-  g_object_unref (event);
   
   gzochi_metad_channelserver_client_protocol.error
     (client->channelserver_client);
