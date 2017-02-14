@@ -168,7 +168,6 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
       char *admin_server_base_url = NULL;
       GByteArray *login_response_message = g_byte_array_new ();
 
-      GzochiMetadClientEvent *event = NULL;
       GzochiMetadChannelServer *channelserver = NULL;
       GzochiMetadSessionServer *sessionserver = NULL;
       gzochid_event_source *event_source = NULL;

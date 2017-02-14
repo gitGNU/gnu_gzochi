@@ -87,8 +87,6 @@ dispatch_login_response (GzochidMetaClient *client, const unsigned char *data,
     }
   else
     {
-      GzochidMetaServerEvent *event = NULL;
-
       gzochid_event_source *event_source = NULL;
       char *conn_desc = NULL;
 
@@ -99,7 +97,7 @@ dispatch_login_response (GzochidMetaClient *client, const unsigned char *data,
 	 NULL);
       
       if (url_len > 0)
-	gzochid_dispatch_event
+	gzochid_event_dispatch
 	  (event_source, g_object_new
 	   (GZOCHID_TYPE_META_SERVER_EVENT,
 	    "type", META_SERVER_CONNECTED,
@@ -109,7 +107,7 @@ dispatch_login_response (GzochidMetaClient *client, const unsigned char *data,
 
       /* When there's no admin console available, the base URL will be empty. */
       
-      else gzochid_dispatch_event
+      else gzochid_event_dispatch
 	     (event_source, g_object_new
 	      (GZOCHID_TYPE_META_SERVER_EVENT,
 	       "type", META_SERVER_CONNECTED,
