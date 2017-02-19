@@ -95,6 +95,14 @@ allocate (gpointer user_data, gzochid_data_oids_block *block, GError **err)
   gzochid_oid_dataclient_context *context = user_data;
   oids_pending_response pending_response;
 
+  if (gzochid_transaction_active () && gzochid_transaction_rollback_only ())
+    {
+      g_set_error
+	(err, GZOCHID_OIDS_ERROR, GZOCHID_OIDS_ERROR_TRANSACTION,
+	 "Transaction marked for rollback.");
+      return FALSE;
+    }
+  
   /* Create and initialize the pending response structure. */
   
   pending_response.dest = block;
@@ -109,11 +117,23 @@ allocate (gpointer user_data, gzochid_data_oids_block *block, GError **err)
   gzochid_dataclient_reserve_oids
     (context->dataclient, context->app, oids_callback, &pending_response);
 
-  /* Wait on the pending response condition in a loop to handle spurious 
-     wakeups. */
-  
-  while (!pending_response.complete)
-    g_cond_wait (&pending_response.cond, &pending_response.mutex);
+  if (gzochid_transaction_active () && gzochid_transaction_timed ())
+
+    /* Wait on the pending response condition in a loop to handle spurious 
+       wakeups. */
+
+    while (!pending_response.complete && !gzochid_transaction_timed_out ())
+      {
+	struct timeval remaining = gzochid_transaction_time_remaining ();
+	gint64 end_timestamp = g_get_monotonic_time () + remaining.tv_sec * 1000
+	  + remaining.tv_usec;
+	
+	if (!g_cond_wait_until
+	    (&pending_response.cond, &pending_response.mutex, end_timestamp))
+	  g_debug ("Transaction timed out while waiting for oid block.");
+      }
+  else while (!pending_response.complete)
+	 g_cond_wait (&pending_response.cond, &pending_response.mutex);
 
   g_mutex_unlock (&pending_response.mutex);
 
@@ -121,8 +141,8 @@ allocate (gpointer user_data, gzochid_data_oids_block *block, GError **err)
   
   g_mutex_clear (&pending_response.mutex);
   g_cond_clear (&pending_response.cond);
-  
-  return TRUE;
+
+  return pending_response.complete;
 }
 
 gzochid_oid_allocation_strategy *
