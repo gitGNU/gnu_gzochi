@@ -40,8 +40,13 @@
 static gboolean
 client_can_dispatch (const GByteArray *buffer, gpointer user_data)
 {
-  return buffer->len >= 3
-    && buffer->len >= gzochi_common_io_read_short (buffer->data, 0) + 3;
+  if (buffer->len >= 3)
+    {
+      unsigned short payload_len =
+	gzochi_common_io_read_short (buffer->data, 0);
+      return buffer->len >= payload_len + 3;
+    }
+  else return FALSE;
 }
 
 /* Processes the message payload following the 

@@ -133,11 +133,16 @@ gzochid_server_protocol gzochi_metad_metaserver_server_protocol =
 static gboolean
 can_dispatch (const GByteArray *buffer, gpointer user_data)
 {
-  return buffer->len >= 3
-    && buffer->len >= gzochi_common_io_read_short (buffer->data, 0) + 3;
+  if (buffer->len >= 3)
+    {
+      unsigned short payload_len =
+	gzochi_common_io_read_short (buffer->data, 0);
+      return buffer->len >= payload_len + 3;
+    }
+  else return FALSE;
 }
 
-/* Processes the message payload following the `GZOZCHID_META_PROTOCOL_LOGIN'
+/* Processes the message payload following the `GZOCHID_META_PROTOCOL_LOGIN'
    opcode. Returns `TRUE' if the message was successfully decoded, `FALSE'
    otherwise. */
 
