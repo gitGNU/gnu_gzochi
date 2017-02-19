@@ -163,7 +163,7 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
 	    GzochidChannelClient *channelclient = NULL;
 	    GByteArray *delegate_buffer = g_byte_array_sized_new (len);
 
-	    g_object_get (client, "channelclient", &channelclient, NULL);
+	    g_object_get (client, "channel-client", &channelclient, NULL);
 	    
 	    g_byte_array_append
 	      (delegate_buffer, buffer->data + offset - 2, len + 2);
@@ -185,7 +185,7 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
 	    GzochidDataClient *dataclient = NULL;
 	    GByteArray *delegate_buffer = g_byte_array_sized_new (len);
 
-	    g_object_get (client, "dataclient", &dataclient, NULL);
+	    g_object_get (client, "data-client", &dataclient, NULL);
 	    
 	    g_byte_array_append
 	      (delegate_buffer, buffer->data + offset - 2, len + 2);
@@ -206,7 +206,7 @@ client_dispatch (const GByteArray *buffer, gpointer user_data)
 	    GzochidSessionClient *sessionclient = NULL;
 	    GByteArray *delegate_buffer = g_byte_array_sized_new (len);
 
-	    g_object_get (client, "sessionclient", &sessionclient, NULL);
+	    g_object_get (client, "session-client", &sessionclient, NULL);
 	    
 	    g_byte_array_append
 	      (delegate_buffer, buffer->data + offset - 2, len + 2);
