@@ -1,5 +1,5 @@
 /* session.c: Session management routines for libgzochi-glib
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -50,8 +50,8 @@ gzochi_client_common_session_set_disconnected_callback
 void 
 gzochi_client_common_session_set_received_message_callback
 (gzochi_client_common_session *session,
- void (*cb) (gzochi_client_common_session *, unsigned char *, short, void *),
- void *user_data)
+ void (*cb) (gzochi_client_common_session *, unsigned char *, unsigned short,
+	     void *), void *user_data)
 {
   session->received_message_callback = cb;
   session->received_message_user_data = user_data;
@@ -70,7 +70,7 @@ int
 gzochi_client_common_session_is_dispatchable 
 (gzochi_client_common_session *session)
 {
-  short message_len = 0;
+  unsigned short message_len = 0;
 
   if (! session->connected && ! session->disconnect_acknowledged)
     return TRUE;
