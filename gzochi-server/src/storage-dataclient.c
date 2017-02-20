@@ -1130,12 +1130,24 @@ lock_release_callback (gpointer user_data)
 
   if (lock != NULL)
     {
+      dataclient_qualified_key qualified_key = (dataclient_qualified_key)
+	{ database->name, callback_data->key };
+      
       g_hash_table_remove (database->locks, callback_data->key);      
 
-      /* Are there additional references to this key? I.e., are there any 
-	 active transactions still using it? */
+      /*
+	Are there additional references to this key? I.e., are there any 
+	active transactions still using it?
+
+	Note that we need to check whether the key is _already_ in the evicted
+	key list because of the special case around upgrading locks in unbounded
+	transactions; having two copies of a key in the eviction list will harm
+	the throughout of transactions that _are_ bounded.
+      */
       
-      if (! lock_unref (store->context->environment, lock))
+      if (! lock_unref (store->context->environment, lock)
+	  && g_list_find_custom (environment->evicted_keys, &qualified_key,
+				 dataclient_qualified_key_compare) == NULL)
 
 	/* If so, add the key to the list of in-progress evictions.  */
 	
@@ -1328,9 +1340,20 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	  lock_request = lock_request_new
 	    (database->name, key_bytes, for_write);
 
-	  /* Can't be requested yet because it's in the eviction list. */
+	  /* There's a special case when the current transaction isn't timed:
+	     A key with a read lock may be in the eviction list even as we're 
+	     requesting to upgrade it to a write lock. It doesn't make sense to
+	     make the transaction wait, because it'll wait forever. In this
+	     case, ignore the fact that the key's being evicted and let it be
+	     re-requested immediately. */
 	  
-	  lock_request->next_request_time = G_MAXINT64;
+	  if (dataclient_tx->end_time == G_MAXINT64)
+	    lock_request->next_request_time = 0;
+
+	  /* Otherwise, it can't be requested yet because it's in the eviction 
+	     list. */
+	  
+	  else lock_request->next_request_time = G_MAXINT64;
 	  
 	  evicted_key->lock_request = lock_request;
 	 
