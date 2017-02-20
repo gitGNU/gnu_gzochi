@@ -283,8 +283,13 @@ dispatch_request_next_key (gzochi_metad_dataserver_client *client,
       return FALSE;
     }
 
+  /* The data protocol specifies that an empty key in a "next key" request
+     indicates a request to lock the entire keyspace; but the data server uses
+     `NULL' to represent this condition. */
+  
   response = gzochi_metad_dataserver_request_next_key
-    (client->dataserver, client->node_id, app, store, key, &err);
+    (client->dataserver, client->node_id, app, store,
+     g_bytes_get_size (key) == 0 ? NULL : key, &err);
 
   if (response == NULL)
     {
@@ -437,8 +442,14 @@ dispatch_release_key_range (gzochi_metad_dataserver_client *client,
       return FALSE;
     }
   
+  /* The data protocol specifies that an empty "from" or "to" key in a key range
+     release indicates the beginning or end, respectively of the keyspace; but
+     the data server uses `NULL' to represent these boundaries. */
+
   gzochi_metad_dataserver_release_range
-    (client->dataserver, client->node_id, app, store, from_key, to_key);
+    (client->dataserver, client->node_id, app, store,
+     g_bytes_get_size (from_key) == 0 ? NULL : from_key,
+     g_bytes_get_size (to_key) == 0 ? NULL : to_key);
 
   g_bytes_unref (from_key);
   g_bytes_unref (to_key);
