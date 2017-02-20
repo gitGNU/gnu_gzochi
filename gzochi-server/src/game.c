@@ -311,6 +311,8 @@ initialize_storage (GzochidGameServer *server)
       server->storage_engine = calloc (1, sizeof (gzochid_storage_engine));
       server->storage_engine->interface = &gzochid_storage_engine_interface_mem;
     }
+
+  g_hash_table_destroy (config);
 }
 
 /* Adds a few core `gzochid_application_task_serialization' objects to the 
