@@ -332,6 +332,7 @@ test_oids_dataclient_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@
 test_oids_dataclient_SOURCES = test-oids-dataclient.c
 test_oids_dataclient_LDADD = $(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-oids-dataclient.o \
+	$(top_builddir)/src/libgzochid_la-tx.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@
 
 test_oids_storage_CFLAGS = -I$(top_srcdir)/src @GZOCHI_COMMON_CFLAGS@ \
