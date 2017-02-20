@@ -338,15 +338,9 @@ disconnected (gzochid_application_context *context, gzochid_game_client *client)
 	gzochid_application_task_new
 	(context, gzochid_game_client_get_identity (client),
 	 gzochid_client_session_disconnected_worker, session_oid);
-      gzochid_application_task *cleanup_task = 
-	gzochid_application_task_new
-	(context, gzochid_game_client_get_identity (client), 
-	 gzochid_scheme_application_disconnected_cleanup_worker,
-	 session_oid);
       gzochid_transactional_application_task_execution *execution = 
 	gzochid_transactional_application_task_timed_execution_new 
-	(callback_task, catch_task, cleanup_task,
-	 client->closure->tx_timeout);
+	(callback_task, catch_task, NULL, client->closure->tx_timeout);
       gzochid_application_task *application_task = gzochid_application_task_new 
 	(context, gzochid_game_client_get_identity (client),
 	 gzochid_application_resubmitting_transactional_task_worker, execution);
@@ -358,7 +352,6 @@ disconnected (gzochid_application_context *context, gzochid_game_client *client)
   
       gzochid_application_task_unref (callback_task);
       gzochid_application_task_unref (catch_task);
-      gzochid_application_task_unref (cleanup_task);
 
       task.worker = gzochid_application_task_thread_worker;
       task.data = application_task;
