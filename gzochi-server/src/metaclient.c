@@ -100,8 +100,13 @@ struct _GzochidMetaClient
      string. */
   
   char *admin_server_base_url;
+
+  /* The current meta server connection description, or `NULL' if not 
+     connected. */
+
+  char *connection_description; 
   
-  /* The client's connection to the data server. */
+  /* The client's connection to the meta server. */
 
   gzochid_reconnectable_socket *socket;
 
@@ -134,6 +139,7 @@ enum gzochid_meta_client_properties
     PROP_CONFIGURATION = 1,
     PROP_RESOLUTION_CONTEXT,
     PROP_SOCKET_SERVER,
+    PROP_CONNECTION_DESCRIPTION,
     PROP_EVENT_LOOP,
     PROP_EVENT_SOURCE,
     PROP_CHANNEL_CLIENT,
@@ -152,6 +158,10 @@ gzochid_meta_client_get_property (GObject *object, guint property_id,
 
   switch (property_id)
     {
+    case PROP_CONNECTION_DESCRIPTION:
+      g_value_set_static_string (value, client->connection_description);
+      break;
+      
     case PROP_EVENT_SOURCE:
       g_value_set_boxed (value, client->event_source);
       break;
@@ -316,6 +326,10 @@ gzochid_meta_client_class_init (GzochidMetaClientClass *klass)
     ("socket-server", "socket-server", "The global socket server",
      GZOCHID_TYPE_SOCKET_SERVER, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
 
+  obj_properties[PROP_CONNECTION_DESCRIPTION] = g_param_spec_string
+    ("connection-description", "connection-description",
+     "The current metaserver connection description", NULL, G_PARAM_READABLE);
+  
   obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
     ("event-loop", "event-loop", "The global event loop",
      GZOCHID_TYPE_EVENT_LOOP, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
@@ -594,7 +608,6 @@ attempt_connect (GzochidMetaClient *client, char *hostname, unsigned int port,
   GIOChannel *channel = NULL;
   struct sockaddr_in name;
   struct hostent *hostinfo = NULL;
-  char *connection_description = NULL;
   gzochid_client_socket *client_socket = NULL;
   int flag = 1;
 
@@ -644,7 +657,7 @@ attempt_connect (GzochidMetaClient *client, char *hostname, unsigned int port,
   setsockopt (sock, SOL_SOCKET, SO_NOSIGPIPE, (char *) &flag, sizeof (int));
 #endif
 
-  connection_description = g_strdup_printf ("%s:%d", hostname, port);
+  client->connection_description = g_strdup_printf ("%s:%d", hostname, port);
 
   channel = g_io_channel_unix_new (sock);
   
@@ -653,10 +666,8 @@ attempt_connect (GzochidMetaClient *client, char *hostname, unsigned int port,
   g_io_channel_set_buffered (channel, FALSE);
   
   client_socket = gzochid_client_socket_new
-    (channel, connection_description, gzochid_metaclient_client_protocol,
-     client);
-
-  g_free (connection_description);
+    (channel, client->connection_description,
+     gzochid_metaclient_client_protocol, client);
 
   /* Add the client socket to the socket server's main loop. */
   
@@ -864,6 +875,9 @@ gzochid_metaclient_stop (GzochidMetaClient *metaclient)
 void
 gzochid_metaclient_nullify_connection (GzochidMetaClient *metaclient)
 {
+  g_free (metaclient->connection_description);
+  metaclient->connection_description = NULL;
+  
   gzochid_reconnectable_socket_disconnect (metaclient->socket);
   gzochid_event_dispatch
     (metaclient->event_source,
