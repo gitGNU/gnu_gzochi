@@ -542,6 +542,54 @@ test_util_list_copy_deep ()
   g_list_free_full (l2, g_free);
 }
 
+static void
+test_util_format_bytes_graph ()
+{
+  char str[4];
+  GBytes *bytes = g_bytes_new_static ("foo", 3);
+
+  gzochid_util_format_bytes (bytes, str, 4);
+  g_assert_cmpstr (str, ==, "foo");
+  
+  g_bytes_unref (bytes);
+}
+
+static void
+test_util_format_bytes_binary ()
+{
+  char str[13];
+  GBytes *bytes = g_bytes_new_static ("\x00\x01\x02", 3);
+
+  gzochid_util_format_bytes (bytes, str, 13);
+  g_assert_cmpstr (str, ==, "\\x00\\x01\\x02");
+  
+  g_bytes_unref (bytes);
+}
+
+static void
+test_util_format_bytes_graph_overflow ()
+{
+  char str[4];
+  GBytes *bytes = g_bytes_new_static ("fooo", 4);
+
+  gzochid_util_format_bytes (bytes, str, 4);
+  g_assert_cmpstr (str, ==, "fo_");
+  
+  g_bytes_unref (bytes);
+}
+
+static void
+test_util_format_bytes_binary_overflow ()
+{
+  char str[12];
+  GBytes *bytes = g_bytes_new_static ("\x00\x01\x02", 4);
+
+  gzochid_util_format_bytes (bytes, str, 12);
+  g_assert_cmpstr (str, ==, "\\x00\\x01_");
+  
+  g_bytes_unref (bytes);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -589,6 +637,13 @@ main (int argc, char *argv[])
   g_test_add_func ("/util/decode_oid/simple", test_util_decode_oid_simple);
 
   g_test_add_func ("/util/list_copy_deep/simple", test_util_list_copy_deep);
+
+  g_test_add_func ("/util/format_bytes/graph", test_util_format_bytes_graph);
+  g_test_add_func ("/util/format_bytes/binary", test_util_format_bytes_binary);
+  g_test_add_func ("/util/format_bytes/graph_overflow",
+		   test_util_format_bytes_graph_overflow);
+  g_test_add_func ("/util/format_bytes/binary_overflow",
+		   test_util_format_bytes_binary_overflow);
   
   return g_test_run ();
 }

@@ -1,5 +1,5 @@
 /* util.c: Assorted utility routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <ctype.h>
 #include <glib.h>
 #include <gzochi-common.h>
 #include <stdlib.h>
@@ -325,4 +326,50 @@ gzochid_util_list_copy_deep (GList *list, GCopyFunc func, gpointer user_data)
     }
 
   return g_list_reverse (new_list);
+}
+
+/* Converts the lower 4 bits of the specified byte to its ASCII hexadecimal
+   representation; i.e., 0-9a-f. */
+
+static inline char
+nibble_to_hex_char (unsigned char n)
+{
+  return n < 10 ? n + 48 : n + 87;
+}
+
+void
+gzochid_util_format_bytes (GBytes *bytes, char *buf, size_t buf_len)
+{
+  size_t bytes_len = 0;
+  int bytes_offset = 0, buf_offset = 0, max_offset = buf_len - 1;
+  const unsigned char *bytes_data = g_bytes_get_data (bytes, &bytes_len);
+
+  for (; bytes_offset < bytes_len && buf_offset < max_offset; bytes_offset++)
+    {
+      unsigned char b = bytes_data[bytes_offset];
+
+      if (isgraph (b))
+	{
+	  if (bytes_offset == bytes_len - 1 || buf_offset < max_offset - 1)
+	    buf[buf_offset++] = b;
+	  else buf[buf_offset++] = '_';
+	}
+      else
+	{
+	  if (max_offset - buf_offset >= 4)
+	    {
+	      buf[buf_offset++] = '\\';
+	      buf[buf_offset++] = 'x';
+	      buf[buf_offset++] = nibble_to_hex_char (b / 16);
+	      buf[buf_offset++] = nibble_to_hex_char (b % 16);
+	    }
+	  else
+	    {
+	      buf[buf_offset++] = '_';
+	      break;
+	    }
+	}
+    }
+  
+  buf[buf_offset] = 0;
 }

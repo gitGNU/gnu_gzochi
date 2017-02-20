@@ -1,5 +1,5 @@
 /* util.h: Prototypes and declarations for util.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -107,5 +107,22 @@ guint64 gzochid_util_decode_oid (guint64);
 */
 
 GList *gzochid_util_list_copy_deep (GList *, GCopyFunc, gpointer);
+
+/*
+  Formats the contents of the specified `GBytes' for console display, writing
+  as much of the result as can fit to the specified buffer, which must be at 
+  least one byte in size. The formatting works as follows:
+
+  - Printable, non-whitespace characters are written directly to the buffer.
+  - Non-printable / whitespace characters are written as the four-byte string
+    "\xNN" where NN is the fixed-width hexadecimal representation of the 
+    character.
+  - If at any point the output buffer cannot hold the representation of the next
+    character in the `GBytes' array, the penultimate character in the buffer is
+    set to `_' (provided the buffer is at least two bytes wide).
+  - The buffer is `NULL'-terminated.
+*/
+
+void gzochid_util_format_bytes (GBytes *, char *, size_t);
 
 #endif /* GZOCHID_UTIL_H */
