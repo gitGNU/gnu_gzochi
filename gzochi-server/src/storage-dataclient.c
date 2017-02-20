@@ -1006,7 +1006,6 @@ lock_success_callback (GBytes *data, gpointer user_data)
     { database->name, callback_data->key };
   
   dataclient_lock *lock = NULL;
-  gboolean lock_exists = FALSE;
   
   g_mutex_lock (&database->mutex);
     
@@ -1018,8 +1017,6 @@ lock_success_callback (GBytes *data, gpointer user_data)
       
       if (callback_data->for_write)
 	lock->for_write = TRUE;
-
-      lock_exists = TRUE;
     }
 
   /* Otherwise create a new lock. */
@@ -1051,15 +1048,6 @@ lock_success_callback (GBytes *data, gpointer user_data)
   notify_waiters (database->read_lock_requests, callback_data->key);
   g_hash_table_remove (database->read_lock_requests, callback_data->key);
 
-  if (lock_exists)
-
-    /* The callback data doesn't need to be freed here; it'll be freed in the
-       release callback. ...Unless this is an upgraed to an existing lock, in
-       which case, the release callback will only be called once, and we can
-       free the callback data now. */
-    
-    callback_data_free (callback_data);
-    
   g_mutex_unlock (&database->mutex);
 }
 

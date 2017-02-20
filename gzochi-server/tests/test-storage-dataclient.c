@@ -61,6 +61,7 @@ dataclient_storage_response_closure;
 
 struct _dataclient_release_closure
 {
+  gchar *qualified_key;
   gzochid_dataclient_release_callback release_callback;
   gpointer release_data;
 };
@@ -79,7 +80,7 @@ struct _GzochidDataClient
   GList *released_keys;
   GList *changesets;
   GList *deferred_response_closures;
-  GHashTable *release_closures;
+  GList *release_closures;
   GThread *processing_thread;
 };
 
@@ -107,6 +108,8 @@ execute_release_closure (gpointer data)
 {
   dataclient_release_closure *closure = data;
   closure->release_callback (closure->release_data);
+
+  g_free (closure->qualified_key);
   free (closure);
 }
 
@@ -121,17 +124,18 @@ gzochid_data_client_init (GzochidDataClient *self)
   self->released_keys = NULL;
   self->changesets = NULL;
   self->deferred_response_closures = NULL;
-  self->release_closures = g_hash_table_new_full
-    (g_str_hash, g_str_equal, g_free, execute_release_closure);
+  self->release_closures = NULL;
 }
 
 static dataclient_release_closure *
-create_release_closure (gzochid_dataclient_release_callback release_callback,
+create_release_closure (gchar *qualified_key,
+			gzochid_dataclient_release_callback release_callback,
 			gpointer release_data)
 {
   dataclient_release_closure *closure =
     malloc (sizeof (dataclient_release_closure));
 
+  closure->qualified_key = g_strdup (qualified_key);
   closure->release_callback = release_callback;
   closure->release_data = release_data;
   
@@ -149,24 +153,16 @@ process_response_async (gpointer data)
       closure->success_callback
 	(closure->response->data, closure->success_data);
 
-      if (! g_hash_table_contains
-	  (client->release_closures, closure->qualified_key))
-
-	g_hash_table_insert
-	  (client->release_closures, closure->qualified_key,
-	   create_release_closure (closure->release_callback,
-				   closure->release_data));
-
-      else g_free (closure->qualified_key);
+      client->release_closures =
+	g_list_append (client->release_closures, 
+		       create_release_closure (closure->qualified_key,
+					       closure->release_callback,
+					       closure->release_data));      
     }
-  else
-    {
-      closure->failure_callback
+  else closure->failure_callback
 	 (closure->response->timeout, closure->failure_data);
-
-      g_free (closure->qualified_key);
-    }
       
+  g_free (closure->qualified_key);
   free (closure);
 
   g_mutex_lock (&client->process_response_mutex);  
@@ -310,12 +306,29 @@ create_qualified_key_range (char *app, char *store, GBytes *from, GBytes *to)
 	 ("/%s/%s/%s/%s", app, store, key_text (from), key_text (to));
 }
 
+static gint
+find_release_closure (gconstpointer a, gconstpointer b)
+{
+  const dataclient_release_closure *closure = a;
+  const char *qualified_key = b;
+
+  return strcmp (closure->qualified_key, qualified_key);
+}
+
 static void
 release_key (GzochidDataClient *client, char *app, char *store, GBytes *key)
 {
   gchar *release_closure_key = create_qualified_key (app, store, key);
+  GList *release_closure_ptr = g_list_find_custom
+    (client->release_closures, release_closure_key, find_release_closure);
 
-  g_hash_table_remove (client->release_closures, release_closure_key);
+  if (release_closure_ptr != NULL)
+    {
+      execute_release_closure (release_closure_ptr->data);
+      client->release_closures = g_list_delete_link
+	(client->release_closures, release_closure_ptr);
+    }
+  
   g_free (release_closure_key);
 }
 
@@ -325,8 +338,16 @@ release_key_range (GzochidDataClient *client, char *app, char *store,
 {
   gchar *release_closure_key =
     create_qualified_key_range (app, store, from, to);
+  GList *release_closure_ptr = g_list_find_custom
+    (client->release_closures, release_closure_key, find_release_closure);
 
-  g_hash_table_remove (client->release_closures, release_closure_key);
+  if (release_closure_ptr != NULL)
+    {
+      execute_release_closure (release_closure_ptr->data);
+      client->release_closures = g_list_delete_link
+	(client->release_closures, release_closure_ptr);
+    }
+
   g_free (release_closure_key);
 }
 
@@ -455,7 +476,8 @@ dataclient_storage_fixture_teardown (dataclient_storage_fixture *fixture,
     (fixture->dataclient->deferred_response_closures, execute_deferred_closure);
   g_list_free_full (fixture->dataclient->requested_keys, g_free);
   g_list_free_full (fixture->dataclient->changesets, clear_changeset);
-  g_hash_table_destroy (fixture->dataclient->release_closures);
+  g_list_free_full
+    (fixture->dataclient->release_closures, execute_release_closure);
   g_list_free_full (fixture->dataclient->released_keys, g_free);
 
   fixture->iface->close_store (fixture->store);
