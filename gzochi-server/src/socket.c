@@ -142,6 +142,8 @@ dispatch_client_write (GIOChannel *channel, GIOCondition cond, gpointer data)
   if (sock->send_buffer->len == 0)
     {
       g_source_destroy (sock->write_source);
+      g_source_unref (sock->write_source);
+
       sock->write_source = NULL;
     }
 
