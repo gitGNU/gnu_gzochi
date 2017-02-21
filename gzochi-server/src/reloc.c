@@ -182,6 +182,12 @@ gzochid_scm_location_get (gzochid_application_context *context, SCM obj)
       gzochid_scm_location_info *value = 
 	malloc (sizeof (gzochid_scm_location_info));
 
+      /* The object may be getting protected in other places as well, but if
+	 it's going until the table, it's gotta get protected because the
+	 table's going to unprotect it at the end of the transaction. */
+      
+      scm_gc_protect_object (obj);
+      
       *key = bits;
       value->bits = bits;
 
