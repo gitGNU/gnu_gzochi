@@ -378,8 +378,8 @@ disconnected (gzochid_application_context *context, gzochid_game_client *client)
 	      g_object_unref (sessionclient);
 	    }
 
-	  g_hash_table_remove (context->clients_to_oids, client);
 	  g_hash_table_remove (context->oids_to_clients, session_oid);
+	  g_hash_table_remove (context->clients_to_oids, client);
 	}
       
       gzochid_schedule_submit_task (client->closure->task_queue, &task);
