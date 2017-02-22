@@ -97,6 +97,10 @@ gzochid_metaserver_info_free (gzochid_metaserver_info *info)
 
 struct _gzochid_server_state
 {
+  /* `TRUE' if the server has a metaclient configured, `FALSE' otherwise. */
+
+  gboolean has_metaclient; 
+  
   /* Information about the currently-connected meta server, if such a connection
      has been configured and is active; otherwise, `NULL'. */
   
@@ -114,6 +118,7 @@ gzochid_server_state_new ()
 {
   gzochid_server_state *state = malloc (sizeof (gzochid_server_state));
 
+  state->has_metaclient = FALSE;
   state->metaserver_info = NULL;
   g_mutex_init (&state->mutex);
   
@@ -398,6 +403,7 @@ app_info (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
 {
   GString *response_str = g_string_new (NULL);
   gzochid_application_context *app_context = request_context;
+  gzochid_server_state *state = user_data;
 
   append_header (response_str);
 
@@ -405,14 +411,21 @@ app_info (const GMatchInfo *match_info, gzochid_http_response_sink *sink,
     (response_str, "    <h1>%s</h1>\n", app_context->descriptor->name);
   g_string_append_printf 
     (response_str, "    <p>%s</p>\n", app_context->descriptor->description);
-  g_string_append (response_str, "    <h2>Application data</h2>\n");
-  g_string_append_printf 
-    (response_str, "    <a href=\"/app/%s/names/\">names</a><br />\n", 
-     app_context->descriptor->name);
-  g_string_append_printf 
-    (response_str, "    <a href=\"/app/%s/oids/\">oids</a><br />\n", 
-     app_context->descriptor->name);
 
+  /* Shouldn't show users links to dump contents of store if we're in 
+     distributed mode. */
+  
+  if (!state->has_metaclient)
+    {
+      g_string_append (response_str, "    <h2>Application data</h2>\n");
+      g_string_append_printf 
+	(response_str, "    <a href=\"/app/%s/names/\">names</a><br />\n", 
+	 app_context->descriptor->name);
+      g_string_append_printf 
+	(response_str, "    <a href=\"/app/%s/oids/\">oids</a><br />\n", 
+	 app_context->descriptor->name);
+    }
+  
   g_string_append (response_str, "    <h2>Application statistics</h2>\n");
   g_string_append (response_str, "    <table>\n");
 
@@ -696,7 +709,8 @@ handle_metaserver_event (GzochidEvent *event, gpointer user_data)
 }
 
 /* Conditionally attach the admin console's handler for meta server events to
-   the data client's event source, if a data client is available. */
+   the data client's event source, if a data client is available. Also set the
+   `has_metaclient' flag on the server state. */
 
 static void
 attach_data_client_handler (GzochidResolutionContext *res_context,
@@ -723,6 +737,8 @@ attach_data_client_handler (GzochidResolutionContext *res_context,
       g_source_unref ((GSource *) event_source);
 
       g_object_unref (metaclient);
+
+      state->has_metaclient = TRUE;
     }
 
   g_object_unref (container);
@@ -747,12 +763,20 @@ gzochid_httpd_app_register_handlers (GzochidHttpServer *http_server,
   apps_root = gzochid_httpd_add_continuation
     (http_server, "/app/([^/]+)", bind_app, game_server);
 
-  gzochid_httpd_append_terminal (apps_root, "/?", app_info, NULL);
-  gzochid_httpd_append_terminal (apps_root, "/oids/", list_oids, NULL);
-  oids_root = gzochid_httpd_append_continuation
-    (apps_root, "/oids/", null_continuation, NULL);
-  
-  gzochid_httpd_append_terminal (oids_root, "([a-f0-9]+)", render_oid, NULL);
+  gzochid_httpd_append_terminal (apps_root, "/?", app_info, state);
 
-  gzochid_httpd_append_terminal (apps_root, "/names/", list_names, NULL);
+  /* Don't register handlers for dumping contents of the store if the server's
+     running in distribured mode. */
+  
+  if (!state->has_metaclient)
+    {
+      gzochid_httpd_append_terminal (apps_root, "/oids/", list_oids, NULL);
+      oids_root = gzochid_httpd_append_continuation
+	(apps_root, "/oids/", null_continuation, NULL);
+  
+      gzochid_httpd_append_terminal
+	(oids_root, "([a-f0-9]+)", render_oid, NULL);
+
+      gzochid_httpd_append_terminal (apps_root, "/names/", list_names, NULL);
+    }
 }
