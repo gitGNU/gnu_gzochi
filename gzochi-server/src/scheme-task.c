@@ -496,6 +496,14 @@ gzochid_scheme_application_disconnected_worker
     }
 }
 
+void 
+gzochid_scheme_application_disconnected_cleanup_worker 
+(gzochid_application_context *context, gzochid_auth_identity *identity, 
+ gpointer ptr)
+{
+  g_free (ptr);
+}
+
 void
 gzochid_scheme_application_ready (gzochid_application_context *context, 
 				  gzochid_auth_identity *identity, GError **err)
