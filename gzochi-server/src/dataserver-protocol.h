@@ -49,6 +49,6 @@ void gzochi_metad_dataserver_client_free (gzochi_metad_dataserver_client *);
 
 /* A `gzochid_client_protocol' implementation for the dataserver protocol. */
 
-gzochid_client_protocol gzochi_metad_dataserver_client_protocol;
+extern gzochid_client_protocol gzochi_metad_dataserver_client_protocol;
 
 #endif /* GZOCHID_DATASERVER_PROTOCOL_H */

@@ -51,6 +51,6 @@ void gzochi_metad_sessionserver_client_free
 
 /* A `gzochid_client_protocol' implementation for the sessionserver protocol. */
 
-gzochid_client_protocol gzochi_metad_sessionserver_client_protocol;
+extern gzochid_client_protocol gzochi_metad_sessionserver_client_protocol;
 
 #endif /* GZOCHI_METAD_SESSION_SERVER_PROTOCOL_H */

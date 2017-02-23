@@ -51,6 +51,6 @@ void gzochi_metad_channelserver_client_free
 
 /* A `gzochid_client_protocol' implementation for the channelserver protocol. */
 
-gzochid_client_protocol gzochi_metad_channelserver_client_protocol;
+extern gzochid_client_protocol gzochi_metad_channelserver_client_protocol;
 
 #endif /* GZOCHI_METAD_CHANNEL_SERVER_PROTOCOL_H */
