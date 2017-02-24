@@ -900,20 +900,21 @@ send_channel_message (gzochid_application_context *context,
   g_mutex_lock (&context->channel_mapping_lock);
 
   if (g_hash_table_contains
-      (context->channel_oids_to_local_session_oids, &op->target_channel))
+      (context->channel_oids_to_local_session_oids, &op->target_channel)
+      || context->metaclient != NULL)
     {
+      gzochid_channel_side_effect_transaction_context *tx_context =
+	join_side_effect_transaction (context);
       GSequence *sessions = g_hash_table_lookup
 	(context->channel_oids_to_local_session_oids, &op->target_channel);
-      GSequenceIter *iter = g_sequence_get_begin_iter (sessions);
+      GArray *session_oids = g_array_new (FALSE, FALSE, sizeof (guint64));
 
-      /* Take a snapshot of the current membership of the channel. */
-      
-      if (!g_sequence_iter_is_end (iter))
+      if (sessions != NULL)
 	{
-	  GArray *session_oids = g_array_new (FALSE, FALSE, sizeof (guint64));
-	  gzochid_channel_side_effect_transaction_context *tx_context =
-	    join_side_effect_transaction (context);
-
+	  GSequenceIter *iter = g_sequence_get_begin_iter (sessions);
+	  
+	  /* Take a snapshot of the current membership of the channel. */
+      
 	  while (!g_sequence_iter_is_end (iter))
 	    {
 	      guint64 *session_oid = g_sequence_get (iter);
@@ -921,13 +922,13 @@ send_channel_message (gzochid_application_context *context,
 	      g_array_append_val (session_oids, *session_oid);
 	      iter = g_sequence_iter_next (iter);
 	    }
-
-	  tx_context->side_effect = gzochid_channel_message_side_effect_new
-	    (GZOCHID_CHANNEL_OP_SEND, op->target_channel, session_oids,
-	     send_op->message, send_op->len);
-	  
-	  g_array_unref (session_oids);
 	}
+
+      tx_context->side_effect = gzochid_channel_message_side_effect_new
+	(GZOCHID_CHANNEL_OP_SEND, op->target_channel, session_oids,
+	 send_op->message, send_op->len);
+	  
+      g_array_unref (session_oids);
     }
   
   g_mutex_unlock (&context->channel_mapping_lock);
