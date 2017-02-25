@@ -154,7 +154,8 @@ dispatch_client_write (GIOChannel *channel, GIOCondition cond, gpointer data)
 static gboolean
 dispatch_client_error (gzochid_client_socket *sock)
 {
-  g_debug ("Socket disconnected.");
+  g_debug ("Socket %s disconnected.",
+	   gzochid_client_socket_get_connection_description (sock));
   sock->protocol.error (sock->protocol_data);
   return FALSE;
 }
