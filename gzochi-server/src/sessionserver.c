@@ -61,7 +61,7 @@ gzochi_metad_session_server_init (GzochiMetadSessionServer *self)
   
   self->nodemap = gzochi_metad_nodemap_mem_new ();
   self->connected_servers = g_hash_table_new_full
-    (g_int_hash, g_int_equal, (GDestroyNotify) free, NULL);
+    (g_int_hash, g_int_equal, g_free, NULL);
 }
 
 static void
@@ -83,18 +83,6 @@ gzochi_metad_session_server_class_init (GzochiMetadSessionServerClass *klass)
   object_class->finalize = gzochi_metad_session_server_finalize;
 }
 
-/* Returns a heap-allocated pointer to a four-byte buffer containing the 
-   specified int value. The buffer should be freed via `free' when no longer in
-   use. */
-
-static inline int *
-copy_int (const int v)
-{
-  int *int_copy = malloc (sizeof (int));
-  *int_copy = v;
-  return int_copy;
-}
-
 void
 gzochi_metad_sessionserver_server_connected
 (GzochiMetadSessionServer *sessionserver, int node_id,
@@ -107,7 +95,8 @@ gzochi_metad_sessionserver_server_connected
        "Node with id %d is already connected.", node_id);
 
   else g_hash_table_insert
-	 (sessionserver->connected_servers, copy_int (node_id), sock);
+	 (sessionserver->connected_servers, g_memdup (&node_id, sizeof (int)),
+	  sock);
 }
 
 void
