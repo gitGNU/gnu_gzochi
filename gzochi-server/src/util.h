@@ -125,4 +125,23 @@ GList *gzochid_util_list_copy_deep (GList *, GCopyFunc, gpointer);
 
 void gzochid_util_format_bytes (GBytes *, char *, size_t);
 
+/* 
+   Helper macro to enable a concise representation of a common use case for 
+   `gzochid_util_format_bytes', which is to declare and fill out a 
+   stack-allocated buffer of some specified size with a printable representation
+   of the target byte buffer, and then do something with it, e.g. use it in a 
+   log message. 
+
+   The `stmt' argument can include multiple expressions.
+*/
+
+#define GZOCHID_WITH_FORMATTED_BYTES(bytes, var, len, stmt)  \
+  do							     \
+    {							     \
+      char var[len];					     \
+      gzochid_util_format_bytes (bytes, var, len);	     \
+      stmt;						     \
+    }							     \
+  while (0)
+
 #endif /* GZOCHID_UTIL_H */
