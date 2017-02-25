@@ -40,6 +40,8 @@
 
 #define LOCK_ACCESS(for_write) (for_write ? "r/w" : "read")
 
+#define MAX_MESSAGE_LENGTH (0xffff - 3)
+
 /* Captures callback configuration for a request issued through the data 
    client. */
 
@@ -687,16 +689,31 @@ gzochid_dataclient_submit_changeset
 {
   gzochid_data_changeset *changeset = gzochid_data_changeset_new (app, changes);
   GByteArray *payload = g_byte_array_new ();
-  GBytes *payload_bytes = NULL;
 
   /* Serialize the changeset submission message. */
   
   gzochid_data_protocol_changeset_write (changeset, payload);
 
-  payload_bytes = g_byte_array_free_to_bytes (payload); 
-  write_message (client, GZOCHID_DATA_PROTOCOL_SUBMIT_CHANGESET, payload_bytes);
-  g_bytes_unref (payload_bytes);
+  gzochid_trace
+    ("Submitting changeset for %s with %d elements; total %d bytes.", app,
+     changes->len, payload->len);
+  
+  if (payload->len <= MAX_MESSAGE_LENGTH)
+    {
+      GBytes *payload_bytes = g_byte_array_free_to_bytes (payload);
 
+      write_message
+	(client, GZOCHID_DATA_PROTOCOL_SUBMIT_CHANGESET, payload_bytes);
+      g_bytes_unref (payload_bytes);
+    }
+  else
+    {
+      g_critical
+	("Refusing to submit %d-byte changeset for %s to meta server.",
+	 payload->len, app);
+      g_byte_array_unref (payload);
+    }
+  
   gzochid_data_changeset_free (changeset);
 }
 
