@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <assert.h>
 #include <glib.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -34,6 +35,8 @@ struct _priority_mask_holder
 
 typedef struct _priority_mask_holder priority_mask_holder;
 
+static priority_mask_holder *default_holder;
+
 static void
 log_handler (const gchar *log_domain, GLogLevelFlags log_level,
 	     const gchar *message, gpointer user_data)
@@ -42,17 +45,7 @@ log_handler (const gchar *log_domain, GLogLevelFlags log_level,
   struct timeval tv;
   struct tm ltm;
 
-  priority_mask_holder *holder = user_data;
-
-  /* Replicate behavior of default logger with respect to printing debug 
-     messages. */
-  
-  const gchar *domains = g_getenv ("G_MESSAGES_DEBUG");
-  
-  if (!(log_level & GZOCHID_LOG_LEVEL_MASK & holder->priority_mask)
-      && (domains == NULL
-	  || ((!log_domain || !strstr (domains, log_domain))
-	      && strcmp (domains, "all") != 0)))
+  if (!gzochid_log_level_visible (log_domain, log_level))
     return;
 
   gettimeofday (&tv, NULL);
@@ -79,8 +72,9 @@ log_handler (const gchar *log_domain, GLogLevelFlags log_level,
 
 void gzochid_install_log_handler (GLogLevelFlags log_level)
 {
-  priority_mask_holder *holder = NULL;
   GLogLevelFlags priority_mask = GZOCHID_LOG_LEVEL_MASK;
+  
+  assert (default_holder == NULL);
   
   if (log_level & G_LOG_LEVEL_DEBUG)
     priority_mask = priority_mask & ~GZOCHID_LOG_LEVEL_TRACE;
@@ -98,10 +92,26 @@ void gzochid_install_log_handler (GLogLevelFlags log_level)
   else if (log_level & G_LOG_LEVEL_ERROR)
     priority_mask = G_LOG_LEVEL_ERROR;
 
-  holder = malloc (sizeof (priority_mask_holder));
-  holder->priority_mask = priority_mask;
+  default_holder = malloc (sizeof (priority_mask_holder));
+  default_holder->priority_mask = priority_mask;
   
-  g_log_set_handler
-    (NULL, G_LOG_LEVEL_MASK | G_LOG_FLAG_FATAL | G_LOG_FLAG_RECURSION,
-     log_handler, holder);
+  g_log_set_default_handler (log_handler, NULL);
+}
+
+gboolean
+gzochid_log_level_visible (const gchar *log_domain, GLogLevelFlags log_level)
+{
+  const gchar *domains = NULL;
+
+  if (default_holder == NULL)
+    return FALSE;
+
+  /* Replicate behavior of default logger with respect to printing debug 
+     messages. */
+  
+  domains = g_getenv ("G_MESSAGES_DEBUG");
+
+  return log_level & GZOCHID_LOG_LEVEL_MASK & default_holder->priority_mask
+    || (domains != NULL && ((log_domain != NULL && strstr (domains, log_domain))
+			    || strcmp (domains, "all") == 0));
 }

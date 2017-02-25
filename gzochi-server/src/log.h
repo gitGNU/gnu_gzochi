@@ -31,4 +31,16 @@
 
 void gzochid_install_log_handler (GLogLevelFlags);
 
+/*
+  Returns `TRUE' if visible log output will be produced by the default handler 
+  (which must have been previously installed by `gzochid_install_log_handler') 
+  for the specified log domain and log level.
+
+  This function supports a special case in which it is expensive to generate the
+  varargs values passed to `g_log' (or some variant thereof) such as is the case
+  when rendering a `GBytes' with `gzochid_util_format_bytes'.
+*/
+
+gboolean gzochid_log_level_visible (const gchar *, GLogLevelFlags);
+
 #endif /* GZOCHID_LOG_H */
