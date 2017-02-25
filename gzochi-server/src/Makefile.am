@@ -60,7 +60,7 @@ noinst_HEADERS = admin.h app-task.h app.h auth_int.h callback.h channel.h \
 
 noinst_LTLIBRARIES = libgzochid.la libgzochi-metad.la
 
-libgzochid_la_CFLAGS = @CFLAGS@ \
+libgzochid_la_CFLAGS = @CFLAGS@ -DG_LOG_DOMAIN=\"gzochid\" \
 	-DGZOCHID_AUTH_PLUGIN_DIR=\"$(plugindir)/auth\" \
 	-DGZOCHID_STORAGE_ENGINE_DIR=\"$(plugindir)/storage\" @GUILE_CFLAGS@ \
 	@GLIB_CFLAGS@ @GOBJECT_CFLAGS@ @GTHREAD_CFLAGS@ @GMODULE_CFLAGS@ \
@@ -114,7 +114,7 @@ gzochi_migrate_CFLAGS = @CFLAGS@ \
 gzochi_migrate_SOURCES = gzochi-migrate.c toollib.c
 gzochi_migrate_LDADD = libgzochid.la @GLIB_LIBS@ @GMODULE_LIBS@ @GUILE_LIBS@
 
-libgzochi_metad_la_CFLAGS = @CFLAGS@ \
+libgzochi_metad_la_CFLAGS = @CFLAGS@ -DG_LOG_DOMAIN=\"gzochi-metad\" \
 	-DGZOCHID_STORAGE_ENGINE_DIR=\"$(plugindir)/storage\" @GLIB_CFLAGS@ \
 	@GMODULE_CFLAGS@ @GTHREAD_CFLAGS@ @GOBJECT_CFLAGS@ @MICROHTTPD_CFLAGS@ \
 	@GZOCHI_COMMON_CFLAGS@ \

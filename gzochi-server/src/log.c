@@ -26,6 +26,10 @@
 
 #include "log.h"
 
+#ifndef G_LOG_DOMAIN
+#define G_LOG_DOMAIN "gzochid"
+#endif /* G_LOG_DOMAIN */
+
 #define GZOCHID_LOG_LEVEL_MASK (G_LOG_LEVEL_MASK | GZOCHID_LOG_LEVEL_TRACE)
 
 struct _priority_mask_holder
@@ -41,6 +45,7 @@ static void
 log_handler (const gchar *log_domain, GLogLevelFlags log_level,
 	     const gchar *message, gpointer user_data)
 {
+  const char *domain = log_domain == NULL ? G_LOG_DOMAIN : log_domain;
   const char *severity = "";
   struct timeval tv;
   struct tm ltm;
@@ -53,21 +58,21 @@ log_handler (const gchar *log_domain, GLogLevelFlags log_level,
 
   if (log_level & G_LOG_LEVEL_ERROR ||
       log_level & G_LOG_LEVEL_CRITICAL)
-    severity = "ERR";
+    severity = "ERR    ";
   else if (log_level & G_LOG_LEVEL_WARNING)
     severity = "WARNING";
   else if (log_level & G_LOG_LEVEL_MESSAGE)
-    severity = "NOTICE";
+    severity = "NOTICE ";
   else if (log_level & G_LOG_LEVEL_INFO)
-    severity = "INFO";
+    severity = "INFO   ";
   else if (log_level & G_LOG_LEVEL_DEBUG)
-    severity = "DEBUG";
+    severity = "DEBUG  ";
   else if (log_level & GZOCHID_LOG_LEVEL_TRACE)
-    severity = "TRACE";
-
-  fprintf (stderr, "%d-%.2d-%.2dT%.2d:%.2d,%dZ %s %s\n", 1900 + ltm.tm_year, 
-	   ltm.tm_mon + 1, ltm.tm_mday, ltm.tm_hour, ltm.tm_min, 
-	   (int) (tv.tv_usec / 1000), severity, message);
+    severity = "TRACE  ";
+  
+  fprintf (stderr, "%d-%.2d-%.2dT%.2d:%.2d,%dZ %s [%s] %s\n",
+	   1900 + ltm.tm_year, ltm.tm_mon + 1, ltm.tm_mday, ltm.tm_hour,
+	   ltm.tm_min, (int) (tv.tv_usec / 1000), severity, domain, message);
 }
 
 void gzochid_install_log_handler (GLogLevelFlags log_level)
