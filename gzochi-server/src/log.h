@@ -1,5 +1,5 @@
 /* log.h: Prototypes and declarations for log.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -19,6 +19,15 @@
 #define GZOCHID_LOG_H
 
 #include <glib.h>
+
+#define GZOCHID_LOG_LEVEL_TRACE (1 << G_LOG_LEVEL_USER_SHIFT)
+
+/* Convenience macro for logging at `GZOCHID_LOG_LEVEL_TRACE' with same 
+   semantics as `g_debug', `g_warning', etc. */
+
+#define gzochid_trace(...) g_log (G_LOG_DOMAIN,		   \
+				  GZOCHID_LOG_LEVEL_TRACE, \
+				  __VA_ARGS__)
 
 void gzochid_install_log_handler (GLogLevelFlags);
 

@@ -1,5 +1,5 @@
 /* log.c: Log configuration routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -25,6 +25,8 @@
 
 #include "log.h"
 
+#define GZOCHID_LOG_LEVEL_MASK (G_LOG_LEVEL_MASK | GZOCHID_LOG_LEVEL_TRACE)
+
 struct _priority_mask_holder
 {
   GLogLevelFlags priority_mask;
@@ -47,7 +49,7 @@ log_handler (const gchar *log_domain, GLogLevelFlags log_level,
   
   const gchar *domains = g_getenv ("G_MESSAGES_DEBUG");
   
-  if (!(log_level & G_LOG_LEVEL_MASK & holder->priority_mask)
+  if (!(log_level & GZOCHID_LOG_LEVEL_MASK & holder->priority_mask)
       && (domains == NULL
 	  || ((!log_domain || !strstr (domains, log_domain))
 	      && strcmp (domains, "all") != 0)))
@@ -67,6 +69,8 @@ log_handler (const gchar *log_domain, GLogLevelFlags log_level,
     severity = "INFO";
   else if (log_level & G_LOG_LEVEL_DEBUG)
     severity = "DEBUG";
+  else if (log_level & GZOCHID_LOG_LEVEL_TRACE)
+    severity = "TRACE";
 
   fprintf (stderr, "%d-%.2d-%.2dT%.2d:%.2d,%dZ %s %s\n", 1900 + ltm.tm_year, 
 	   ltm.tm_mon + 1, ltm.tm_mday, ltm.tm_hour, ltm.tm_min, 
@@ -76,12 +80,16 @@ log_handler (const gchar *log_domain, GLogLevelFlags log_level,
 void gzochid_install_log_handler (GLogLevelFlags log_level)
 {
   priority_mask_holder *holder = NULL;
-  GLogLevelFlags priority_mask = G_LOG_LEVEL_MASK;
+  GLogLevelFlags priority_mask = GZOCHID_LOG_LEVEL_MASK;
   
+  if (log_level & G_LOG_LEVEL_DEBUG)
+    priority_mask = priority_mask & ~GZOCHID_LOG_LEVEL_TRACE;
   if (log_level & G_LOG_LEVEL_INFO)
-    priority_mask = priority_mask & ~G_LOG_LEVEL_DEBUG;
+    priority_mask = priority_mask &
+      ~(G_LOG_LEVEL_DEBUG | GZOCHID_LOG_LEVEL_TRACE);
   else if (log_level & G_LOG_LEVEL_MESSAGE)
-    priority_mask = priority_mask & ~(G_LOG_LEVEL_INFO | G_LOG_LEVEL_DEBUG);
+    priority_mask = priority_mask &
+      ~(G_LOG_LEVEL_INFO | G_LOG_LEVEL_DEBUG | GZOCHID_LOG_LEVEL_TRACE);
   else if (log_level & G_LOG_LEVEL_WARNING)
     priority_mask =
       G_LOG_LEVEL_ERROR | G_LOG_LEVEL_CRITICAL | G_LOG_LEVEL_WARNING;
