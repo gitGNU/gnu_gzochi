@@ -29,16 +29,25 @@
 #include "gzochid-storage.h"
 #include "httpd.h"
 #include "lock.h"
+#include "log.h"
 #include "oids-storage.h"
 #include "oids.h"
 #include "resolver.h"
 #include "socket.h"
 #include "storage-mem.h"
 #include "storage.h"
+#include "util.h"
+
+#ifdef G_LOG_DOMAIN
+#undef G_LOG_DOMAIN
+#endif /* G_LOG_DOMAIN */
+#define G_LOG_DOMAIN "gzochi-metad.dataserver"
 
 #ifndef GZOCHID_STORAGE_ENGINE_DIR
 #define GZOCHID_STORAGE_ENGINE_DIR "./storage"
 #endif /* GZOCHID_STORAGE_ENGINE_DIR */
+
+#define LOCK_ACCESS(for_write) (for_write ? "r/w" : "read")
 
 /* A store with an associated lock table. */
 
@@ -367,9 +376,14 @@ gzochi_metad_dataserver_reserve_oids (GzochiMetadDataServer *server,
   gzochi_metad_dataserver_application_store *app_store =
     ensure_open_application_store (server, app);
 
+  gzochid_trace ("Node %d requested oid block for %s.", node_id, app);
+  
   assert (gzochid_oids_reserve_block
 	  (app_store->oid_strategy, &oids_block, NULL));
 
+  gzochid_trace ("Reserved block { %" G_GUINT64_FORMAT ", %d } for node %d/%s.",
+		 oids_block.block_start, oids_block.block_size, node_id, app);
+  
   response = gzochid_data_reserve_oids_response_new (app, &oids_block);
   return response;
 }
@@ -395,6 +409,12 @@ gzochi_metad_dataserver_request_value (GzochiMetadDataServer *server,
       g_propagate_error (err, local_err);
       return NULL;
     }
+
+  if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+    GZOCHID_WITH_FORMATTED_BYTES
+      (key, buf, 33, gzochid_trace
+       ("Node %d requested %s lock on key %s/%s/%s.", node_id,
+	LOCK_ACCESS (for_write), app, store_name, buf));
   
   if (gzochid_lock_check_and_set
       (store->locks, node_id, key, for_write, &most_recent_lock))
@@ -421,9 +441,24 @@ gzochi_metad_dataserver_request_value (GzochiMetadDataServer *server,
 
       STORAGE_INTERFACE (server)->transaction_rollback (transaction);
 
+      if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+	GZOCHID_WITH_FORMATTED_BYTES
+	  (key, buf, 33, gzochid_trace
+	   ("Granted %s lock on key %s/%s/%s to node %d.",
+	    LOCK_ACCESS (for_write), app, store_name, buf, node_id));
+      
       return response;
     }
-  else return gzochid_data_response_new (app, store_name, FALSE, NULL);
+  else
+    {
+      if (gzochid_log_level_visible (G_LOG_DOMAIN, G_LOG_LEVEL_DEBUG))
+	GZOCHID_WITH_FORMATTED_BYTES
+	  (key, buf, 33, g_debug ("Denied %s lock on key %s/%s/%s to node %d.",
+				  LOCK_ACCESS (for_write), app, store_name, buf,
+				  node_id));
+      
+      return gzochid_data_response_new (app, store_name, FALSE, NULL);
+    }
 }
 
 gzochid_data_response *
@@ -457,11 +492,24 @@ gzochi_metad_dataserver_request_next_key (GzochiMetadDataServer *server,
     (app_store->storage_context);
   
   if (key == NULL)
-    data = STORAGE_INTERFACE (server)->transaction_first_key
-      (transaction, store->store, &data_len);
-  else data = STORAGE_INTERFACE (server)->transaction_next_key
-	 (transaction, store->store, (char *) g_bytes_get_data (key, NULL),
-	  g_bytes_get_size (key), &data_len);
+    {
+      gzochid_trace ("Node %d requested range lock on %s/%s keyspace.", node_id,
+		     app, store_name);
+      data = STORAGE_INTERFACE (server)->transaction_first_key
+	(transaction, store->store, &data_len);
+    }
+  else
+    {
+      if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+	GZOCHID_WITH_FORMATTED_BYTES
+	  (key, buf, 33, gzochid_trace
+	   ("Node %d requested range lock from key %s/%s/%s.", node_id, app,
+	    store_name, buf));
+	   
+      data = STORAGE_INTERFACE (server)->transaction_next_key
+	(transaction, store->store, (char *) g_bytes_get_data (key, NULL),
+	 g_bytes_get_size (key), &data_len);
+    }
   
   assert (!transaction->rollback);
   
@@ -473,8 +521,32 @@ gzochi_metad_dataserver_request_next_key (GzochiMetadDataServer *server,
 
   if (!gzochid_lock_range_check_and_set
       (store->locks, node_id, key, to_key, &most_recent_lock))
-    response = gzochid_data_response_new (app, store_name, FALSE, NULL);
-  else response = gzochid_data_response_new (app, store_name, TRUE, to_key);
+    {
+      if (key == NULL)
+	g_debug ("Denied range lock on %s/%s keyspace to node %d.", app,
+		 store_name, node_id);
+      else if (gzochid_log_level_visible (G_LOG_DOMAIN, G_LOG_LEVEL_DEBUG))
+	GZOCHID_WITH_FORMATTED_BYTES
+	  (key, buf, 33, g_debug
+	   ("Denied range lock starting at %s/%s/%s to node %d.", app,
+	    store_name, buf, node_id));
+      
+      response = gzochid_data_response_new (app, store_name, FALSE, NULL);
+    }
+  else
+    {
+      if (key == NULL)
+	gzochid_trace ("Granted range lock on %s/%s keyspace to node %d.", app,
+		       store_name, node_id);
+      else if (gzochid_log_level_visible
+	       (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+	GZOCHID_WITH_FORMATTED_BYTES
+	  (key, buf, 33, gzochid_trace
+	   ("Granted range lock starting at %s/%s/%s to node %d.", app,
+	    store_name, buf, node_id));
+      
+      response = gzochid_data_response_new (app, store_name, TRUE, to_key);
+    }
 
   if (to_key != NULL)
     g_bytes_unref (to_key);
@@ -495,6 +567,9 @@ gzochi_metad_dataserver_process_changeset (GzochiMetadDataServer *server,
   gzochid_storage_transaction *transaction =
     STORAGE_INTERFACE (server)->transaction_begin (app_store->storage_context);
 
+  gzochid_trace ("Processing %d changes from %d/%s.", changeset->changes->len,
+		 node_id, changeset->app);
+  
   for (; i < changeset->changes->len; i++)
     {
       gzochid_data_change change = g_array_index
@@ -550,14 +625,31 @@ gzochi_metad_dataserver_process_changeset (GzochiMetadDataServer *server,
     }
     
   if (needs_rollback)
-    STORAGE_INTERFACE (server)->transaction_rollback (transaction);
+    {
+      g_debug ("Changes from %d/%s rolled back during processing.", node_id,
+	       changeset->app);
+      STORAGE_INTERFACE (server)->transaction_rollback (transaction);
+    }
   else
     {
       STORAGE_INTERFACE (server)->transaction_prepare (transaction);
 
       if (transaction->rollback)
-	STORAGE_INTERFACE (server)->transaction_rollback (transaction);
-      else STORAGE_INTERFACE (server)->transaction_commit (transaction);
+	{
+	  g_set_error
+	    (err, GZOCHI_METAD_DATASERVER_ERROR,
+	     GZOCHI_METAD_DATASERVER_ERROR_FAILED,
+	     "Transaction failed to prepare.");
+	  g_debug ("Changes from %d/%s rolled back during prepare.", node_id,
+		   changeset->app);
+	  STORAGE_INTERFACE (server)->transaction_rollback (transaction);
+	}
+      else
+	{
+	  gzochid_trace ("Committed changes from %d/%s.", node_id,
+			 changeset->app);
+	  STORAGE_INTERFACE (server)->transaction_commit (transaction);
+	}
     }
 }
 
@@ -579,9 +671,15 @@ gzochi_metad_dataserver_release_key (GzochiMetadDataServer *server,
 	("Failed to release key for application '%s': %s", app,
 	 local_err->message);
       g_error_free (local_err);
+      return;
     }
+
+  if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+    GZOCHID_WITH_FORMATTED_BYTES
+      (key, buf, 33, gzochid_trace ("Node id %d releasing key %s/%s/%s.",
+				    node_id, app, store_name, buf));
   
-  gzochid_lock_release (store->locks, node_id, key);  
+  gzochid_lock_release (store->locks, node_id, key);
 }
 
 void
@@ -600,11 +698,21 @@ gzochi_metad_dataserver_release_range (GzochiMetadDataServer *server,
   if (local_err != NULL)
     {
       g_warning
-	("Failed to release key for application '%s': %s", app,
+	("Failed to release key range for application '%s': %s", app,
 	 local_err->message);
       g_error_free (local_err);
+      return;
     }
 
+  if (first_key == NULL)
+    gzochid_trace ("Node %d releasing range lock on %s/%s keyspace.", node_id,
+		   app, store_name);
+  else if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+    GZOCHID_WITH_FORMATTED_BYTES
+      (first_key, buf, 33, gzochid_trace 
+       ("Node id %d releasing range lock from %s/%s/%s.", node_id, app,
+	store_name, buf));
+  
   gzochid_lock_release_range (store->locks, node_id, first_key, last_key);
 }
 

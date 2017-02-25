@@ -23,9 +23,15 @@
 #include <string.h>
 
 #include "channelserver.h"
+#include "log.h"
 #include "meta-protocol.h"
 #include "socket.h"
 #include "util.h"
+
+#ifdef G_LOG_DOMAIN
+#undef G_LOG_DOMAIN
+#endif /* G_LOG_DOMAIN */
+#define G_LOG_DOMAIN "gzochi-metad.channelserver"
 
 /* Boilerplate setup for the channel server object. */
 
@@ -164,6 +170,10 @@ gzochi_metad_channelserver_relay_join (GzochiMetadChannelServer *channelserver,
 
   args[0] = &from_node_id;
   args[1] = msg_bytes;
+
+  gzochid_trace ("Relaying notification for session %s/%" G_GUINT64_FORMAT
+		 " joining channel %s/%" G_GUINT64_FORMAT ".", app, session_oid,
+		 app, channel_oid);
   
   g_hash_table_foreach (channelserver->connected_servers, relay_message, args);
 
@@ -205,6 +215,10 @@ gzochi_metad_channelserver_relay_leave (GzochiMetadChannelServer *channelserver,
   args[0] = &from_node_id;
   args[1] = msg_bytes;
 
+  gzochid_trace ("Relaying notification from session %s/%" G_GUINT64_FORMAT
+		 " leaving channel %s/%" G_GUINT64_FORMAT ".", app, session_oid,
+		 app, channel_oid);
+
   g_hash_table_foreach (channelserver->connected_servers, relay_message, args);
 
   g_bytes_unref (msg_bytes);
@@ -240,6 +254,9 @@ gzochi_metad_channelserver_relay_close (GzochiMetadChannelServer *channelserver,
   
   args[0] = &from_node_id;
   args[1] = msg_bytes;
+
+  gzochid_trace ("Relaying notification to close channel %s/%" G_GUINT64_FORMAT
+		 ".", app, channel_oid);
 
   g_hash_table_foreach (channelserver->connected_servers, relay_message, args);
 
@@ -290,6 +307,9 @@ gzochi_metad_channelserver_relay_message
 
   args[0] = &from_node_id;
   args[1] = msg_bytes;
+
+  gzochid_trace ("Relaying message to channel %s/%" G_GUINT64_FORMAT ".", app,
+		 channel_oid);
 
   g_hash_table_foreach (channelserver->connected_servers, relay_message, args);
 

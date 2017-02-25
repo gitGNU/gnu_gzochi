@@ -27,9 +27,15 @@
 #include "channel.h"
 #include "channelclient.h"
 #include "game.h"
+#include "log.h"
 #include "meta-protocol.h"
 #include "socket.h"
 #include "util.h"
+
+#ifdef G_LOG_DOMAIN
+#undef G_LOG_DOMAIN
+#endif /* G_LOG_DOMAIN */
+#define G_LOG_DOMAIN "gzochid.channelclient"
 
 /* The channel client object. */
 
@@ -132,6 +138,11 @@ gzochid_channelclient_relay_join_from (GzochidChannelClient *client,
   gzochi_common_io_write_long (channel_oid, relay_msg, app_len + 4);
   gzochi_common_io_write_long (session_oid, relay_msg, app_len + 12);
 
+  gzochid_trace
+    ("Notifying metaserver that session %s/%" G_GUINT64_FORMAT
+     " has joined channel %s/%" G_GUINT64_FORMAT ".", app, session_oid, app,
+     channel_oid);
+  
   gzochid_reconnectable_socket_write (client->socket, relay_msg, total_len);
   
   free (relay_msg);
@@ -152,6 +163,10 @@ gzochid_channelclient_relay_leave_from (GzochidChannelClient *client,
   gzochi_common_io_write_long (channel_oid, relay_msg, app_len + 4);
   gzochi_common_io_write_long (session_oid, relay_msg, app_len + 12);
 
+  gzochid_trace ("Notifying metaserver that session %s/%" G_GUINT64_FORMAT
+		 " has left channel %s/%" G_GUINT64_FORMAT ".", app,
+		 session_oid, app, channel_oid);
+
   gzochid_reconnectable_socket_write (client->socket, relay_msg, total_len);
   
   free (relay_msg);
@@ -169,6 +184,9 @@ gzochid_channelclient_relay_close_from (GzochidChannelClient *client,
   relay_msg[2] = GZOCHID_CHANNEL_PROTOCOL_RELAY_CLOSE_FROM;
   memcpy (relay_msg + 3, app, app_len + 1);
   gzochi_common_io_write_long (channel_oid, relay_msg, app_len + 4);
+
+  gzochid_trace ("Notifying metaserver that channel %s/%" G_GUINT64_FORMAT
+		 " has been closed.", app, channel_oid);
 
   gzochid_reconnectable_socket_write (client->socket, relay_msg, total_len);
   
@@ -194,6 +212,9 @@ gzochid_channelclient_relay_message_from (GzochidChannelClient *client,
   gzochi_common_io_write_short (msg_len, relay_msg, app_len + 12);
   memcpy (relay_msg + app_len + 14, msg, msg_len);
   
+  gzochid_trace ("Relaying a message to channel %s/%" G_GUINT64_FORMAT ".", app,
+		 channel_oid);
+
   gzochid_reconnectable_socket_write (client->socket, relay_msg, total_len);
   
   free (relay_msg);
@@ -207,6 +228,10 @@ gzochid_channelclient_relay_join_to (GzochidChannelClient *client,
   gzochid_application_context *app_context =
     gzochid_game_server_lookup_application (client->game_server, app);
 
+  gzochid_trace ("Received notification that session %s/%" G_GUINT64_FORMAT
+		 " has joined channel %s/%" G_GUINT64_FORMAT ".", app,
+		 session_oid, app, channel_oid);
+  
   if (app_context != NULL)
     {
       GError *local_err = NULL;
@@ -235,6 +260,10 @@ gzochid_channelclient_relay_leave_to (GzochidChannelClient *client,
 {
   gzochid_application_context *app_context =
     gzochid_game_server_lookup_application (client->game_server, app);
+
+  gzochid_trace ("Received notification that session %s/%" G_GUINT64_FORMAT
+		 " has left channel %s/%" G_GUINT64_FORMAT ".", app,
+		 session_oid, app, channel_oid);
 
   if (app_context != NULL)
     {
@@ -265,6 +294,9 @@ gzochid_channelclient_relay_close_to (GzochidChannelClient *client,
   gzochid_application_context *app_context =
     gzochid_game_server_lookup_application (client->game_server, app);
   
+  gzochid_trace ("Received notification that channel %s/%" G_GUINT64_FORMAT
+		 " has been closed.", app, channel_oid);
+
   if (app_context != NULL)
     gzochid_channel_close_direct (app_context, channel_oid);
   else g_set_error
@@ -281,6 +313,9 @@ gzochid_channelclient_relay_message_to (GzochidChannelClient *client,
   gzochid_application_context *app_context =
     gzochid_game_server_lookup_application (client->game_server, app);
   
+  gzochid_trace ("Received relay message for channel %s/%" G_GUINT64_FORMAT ".",
+		 app, channel_oid);
+
   if (app_context != NULL)
     gzochid_channel_message_direct (app_context, channel_oid, msg_bytes);
   else g_set_error

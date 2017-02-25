@@ -1,5 +1,5 @@
 /* sessionserver.c: Session server for gzochi-metad
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -23,11 +23,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "log.h"
 #include "meta-protocol.h"
 #include "nodemap.h"
 #include "nodemap-mem.h"
 #include "sessionserver.h"
 #include "socket.h"
+
+#ifdef G_LOG_DOMAIN
+#undef G_LOG_DOMAIN
+#endif /* G_LOG_DOMAIN */
+#define G_LOG_DOMAIN "gzochi-metad.sessionserver"
 
 /* Boilerplate setup for the session server object. */
 
@@ -160,6 +166,9 @@ gzochi_metad_sessionserver_session_connected
 (GzochiMetadSessionServer *sessionserver, int node_id, const char *app,
  guint64 session_id, GError **err)
 {
+  gzochid_trace ("Mapping connected session %s/%" G_GUINT64_FORMAT
+		 " to node %d.", app, session_id, node_id);
+
   if (g_hash_table_contains (sessionserver->connected_servers, &node_id))
     {
       GError *tmp_err = NULL;
@@ -186,6 +195,9 @@ gzochi_metad_sessionserver_session_disconnected
   gzochi_metad_nodemap_iface *iface =
     GZOCHI_METAD_NODEMAP_IFACE (sessionserver->nodemap);
 
+  gzochid_trace ("Unmapping disconnected session %s/%" G_GUINT64_FORMAT ".",
+		 app, session_id);
+ 
   iface->unmap_session (sessionserver->nodemap, app, session_id, &tmp_err);
 
   if (tmp_err != NULL)
@@ -223,15 +235,28 @@ gzochi_metad_sessionserver_relay_disconnect
 	  memcpy (buf + 3, app, app_len + 1); 
 	  gzochi_common_io_write_long (session_id, buf, app_len + 4);
 
+	  gzochid_trace ("Relaying disconnect to session %s/%" G_GUINT64_FORMAT
+			 " on node %d.", app, session_id, node_id);
+	  
 	  gzochid_client_socket_write (sock, buf, total_len);
 
 	  free (buf);
 	}
-      else g_set_error (err, GZOCHI_METAD_SESSIONSERVER_ERROR,
-			GZOCHI_METAD_SESSIONSERVER_ERROR_NOT_CONNECTED,
-			"No node with id %d connected.", node_id);
+      else
+	{
+	  g_debug ("Failed to relay disconnect to session %s/%" G_GUINT64_FORMAT
+		   " on disconnected node %d.", app, session_id, node_id);
+	  g_set_error (err, GZOCHI_METAD_SESSIONSERVER_ERROR,
+		       GZOCHI_METAD_SESSIONSERVER_ERROR_NOT_CONNECTED,
+		       "No node with id %d connected.", node_id);
+	}
     }
-  else propagate_nodemap_error (err, tmp_err);
+  else
+    {
+      g_debug ("Failed to identify node mapping for session %s/%"
+	       G_GUINT64_FORMAT " for disconnect relay.", app, session_id);
+      propagate_nodemap_error (err, tmp_err);
+    }
 }
 
 void
@@ -272,16 +297,29 @@ gzochi_metad_sessionserver_relay_message
 	  gzochi_common_io_write_short (msg_len, buf, app_len + 12);
 
 	  memcpy (buf + app_len + 14, msg_data, msg_len);
+
+	  gzochid_trace ("Relaying message to session %s/%" G_GUINT64_FORMAT
+			 " on node %d.", app, session_id, node_id);
 	  
 	  gzochid_client_socket_write (sock, buf, total_len);
 
 	  free (buf);
 	}
-      else g_set_error (err, GZOCHI_METAD_SESSIONSERVER_ERROR,
-			GZOCHI_METAD_SESSIONSERVER_ERROR_NOT_CONNECTED,
-			"No node with id %d connected.", node_id);
+      else
+	{
+	  g_debug ("Failed to relay message to session %s/%" G_GUINT64_FORMAT
+		   " on disconnected node %d.", app, session_id, node_id);
+	  g_set_error (err, GZOCHI_METAD_SESSIONSERVER_ERROR,
+		       GZOCHI_METAD_SESSIONSERVER_ERROR_NOT_CONNECTED,
+		       "No node with id %d connected.", node_id);
+	}
     }
-  else propagate_nodemap_error (err, tmp_err);
+  else
+    {
+      g_debug ("Failed to identify node mapping for session %s/%"
+	       G_GUINT64_FORMAT " for message relay.", app, session_id);
+      propagate_nodemap_error (err, tmp_err);
+    }
 }
 
 GQuark

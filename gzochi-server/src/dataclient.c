@@ -1,5 +1,5 @@
 /* dataclient.c: Dataserver client for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -28,8 +28,17 @@
 #include "data-protocol.h"
 #include "dataclient.h"
 #include "dataclient-protocol.h"
+#include "log.h"
 #include "meta-protocol.h"
 #include "socket.h"
+#include "util.h"
+
+#ifdef G_LOG_DOMAIN
+#undef G_LOG_DOMAIN
+#endif /* G_LOG_DOMAIN */
+#define G_LOG_DOMAIN "gzochid.dataclient"
+
+#define LOCK_ACCESS(for_write) (for_write ? "r/w" : "read")
 
 /* Captures callback configuration for a request issued through the data 
    client. */
@@ -395,6 +404,10 @@ gzochid_dataclient_received_oids (GzochidDataClient *client,
   
   if (queue->oids_callback != NULL)
     {
+      gzochid_trace ("Received oid block { %" G_GUINT64_FORMAT
+		     "/%d }; invoking callback.", response->block.block_start,
+		     response->block.block_size);
+
       queue->oids_callback (response->block, queue->oids_callback_data);
 
       /* Null out the oids callback after receipt. */
@@ -402,6 +415,9 @@ gzochid_dataclient_received_oids (GzochidDataClient *client,
       queue->oids_callback = NULL;
       queue->oids_callback_data = NULL;
     }
+  else g_debug ("Received oid block { %" G_GUINT64_FORMAT
+		"/%d }, but no pending callbacks.", response->block.block_start,
+		response->block.block_size);
 
   release_callback_queue (queue);
 }
@@ -413,6 +429,8 @@ gzochid_dataclient_reserve_oids (GzochidDataClient *client, char *app,
 {
   GBytes *message_bytes = g_bytes_new (app, strlen (app) + 1);
   dataclient_callback_queue *queue = acquire_callback_queue (client, app);
+
+  gzochid_trace ("Requesting oid block from meta server.");
   
   write_message (client, GZOCHID_DATA_PROTOCOL_REQUEST_OIDS, message_bytes);
   g_bytes_unref (message_bytes);
@@ -470,9 +488,20 @@ process_queued_callback (GzochidDataClient *client,
       assert (callbacks->timeout == G_MAXINT64);
 
       if (opcode == GZOCHID_DATA_PROTOCOL_VALUE_RESPONSE)
-        release_callback = g_timeout_source_new (client->lock_release_ms);
+	{
+	  gzochid_trace
+	    ("Obtained lock for %s/%s; will expire in %dms.",
+	     response->app, response->store, client->lock_release_ms);
+	  release_callback = g_timeout_source_new (client->lock_release_ms);
+	}
       else if (opcode == GZOCHID_DATA_PROTOCOL_NEXT_KEY_RESPONSE)
-	release_callback = g_timeout_source_new (client->range_lock_release_ms);
+	{
+	  gzochid_trace
+	    ("Obtained range lock on keys in %s/%s; will expired in %dms.",
+	     response->app, response->store, client->range_lock_release_ms);
+	  release_callback = g_timeout_source_new
+	    (client->range_lock_release_ms);
+	}
 
       if (release_callback != NULL)
 	{
@@ -483,6 +512,8 @@ process_queued_callback (GzochidDataClient *client,
     }
   else
     {
+      g_debug
+	("Lock request against %s/%s failed.", response->app, response->store);
       callbacks->failure_callback (response->timeout, callbacks->failure_data);
       free (callbacks);
     }
@@ -540,6 +571,12 @@ gzochid_dataclient_request_value
   g_byte_array_append (payload, key_bytes, key_len);
   
   payload_bytes = g_byte_array_free_to_bytes (payload);
+
+  if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+    GZOCHID_WITH_FORMATTED_BYTES
+      (key, buf, 33, gzochid_trace ("Requesting %s lock on %s/%s/%s.",
+				    LOCK_ACCESS (for_write), app, store, buf));
+
   write_message (client, GZOCHID_DATA_PROTOCOL_REQUEST_VALUE, payload_bytes);
   g_bytes_unref (payload_bytes);
 
@@ -618,6 +655,17 @@ gzochid_dataclient_request_next_key
   write_nullable_bytes (payload, key);
 
   payload_bytes = g_byte_array_free_to_bytes (payload);
+
+  if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+    {
+      if (key != NULL)
+	GZOCHID_WITH_FORMATTED_BYTES
+	  (key, buf, 33, gzochid_trace
+	   ("Requesting range lock starting at %s/%s/%s.", app, store, buf));
+      else gzochid_trace
+	     ("Requesting range lock on %s/%s keyspace.", app, store);
+    }
+
   write_message (client, GZOCHID_DATA_PROTOCOL_REQUEST_NEXT_KEY, payload_bytes);
   g_bytes_unref (payload_bytes);
   
@@ -685,6 +733,12 @@ void gzochid_dataclient_release_key
      mutex. */
 
   buf = format_message (GZOCHID_DATA_PROTOCOL_RELEASE_KEY, payload_bytes, &len);
+
+  if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+    GZOCHID_WITH_FORMATTED_BYTES
+      (key, fmt, 33, gzochid_trace
+       ("Releasing key %s/%s/%s.", app, store, fmt));
+
   gzochid_reconnectable_socket_write (client->socket, buf, len);
   free (buf);
 
@@ -714,6 +768,27 @@ void gzochid_dataclient_release_key_range
   
   buf = format_message
     (GZOCHID_DATA_PROTOCOL_RELEASE_KEY_RANGE, payload_bytes, &len);
+
+  if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+    {
+      if (from != NULL)
+	GZOCHID_WITH_FORMATTED_BYTES
+	  (from, buf1, 33,
+	   if (to != NULL)
+	     GZOCHID_WITH_FORMATTED_BYTES
+	       (to, buf2, 33, gzochid_trace
+		("Releasing range lock on %s/%s from %s to %s.", app, store,
+		 buf1, buf2));
+	   else gzochid_trace ("Releasing range lock starting at %s/%s/%s.",
+			       app, store, buf1));
+      else if (to != NULL)
+	GZOCHID_WITH_FORMATTED_BYTES
+	  (to, buf2, 33, gzochid_trace
+	   ("Releasing range lock ending at %s/%s/%s.", app, store, buf2));
+      else gzochid_trace
+	     ("Releasing range lock on %s/%s keyspace.", app, store);
+    }
+
   gzochid_reconnectable_socket_write (client->socket, buf, len);
   free (buf);
 

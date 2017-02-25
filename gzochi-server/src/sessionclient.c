@@ -26,10 +26,16 @@
 #include "app.h"
 #include "game.h"
 #include "game-protocol.h"
+#include "log.h"
 #include "meta-protocol.h"
 #include "sessionclient.h"
 #include "socket.h"
 #include "util.h"
+
+#ifdef G_LOG_DOMAIN
+#undef G_LOG_DOMAIN
+#endif /* G_LOG_DOMAIN */
+#define G_LOG_DOMAIN "gzochid.sessionclient"
 
 /* The data client object. */
 
@@ -130,6 +136,9 @@ gzochid_sessionclient_session_connected (GzochidSessionClient *client,
   memcpy (relay_msg + 3, app, app_len + 1);
   gzochi_common_io_write_long (session_id, relay_msg, app_len + 4);
 
+  gzochid_trace ("Notifying metaserver of connected session %s/%"
+		 G_GUINT64_FORMAT ".", app, session_id);
+  
   gzochid_reconnectable_socket_write (client->socket, relay_msg, total_len);
   
   free (relay_msg);
@@ -142,12 +151,15 @@ gzochid_sessionclient_session_disconnected (GzochidSessionClient *client,
   size_t app_len = strlen (app);
   size_t total_len = app_len + 12;
   unsigned char *relay_msg = malloc (sizeof (unsigned char) * total_len);
-    
+  
   gzochi_common_io_write_short (total_len - 3, relay_msg, 0);
   relay_msg[2] = GZOCHID_SESSION_PROTOCOL_SESSION_DISCONNECTED;
   memcpy (relay_msg + 3, app, app_len + 1);
   gzochi_common_io_write_long (session_id, relay_msg, app_len + 4);
 
+  gzochid_trace ("Notifying metaserver of disconnect from session %s/%"
+		 G_GUINT64_FORMAT ".", app, session_id);
+  
   gzochid_reconnectable_socket_write (client->socket, relay_msg, total_len);
   
   free (relay_msg);
@@ -166,6 +178,9 @@ gzochid_sessionclient_relay_disconnect_from (GzochidSessionClient *client,
   relay_msg[2] = GZOCHID_SESSION_PROTOCOL_RELAY_DISCONNECT_FROM;
   memcpy (relay_msg + 3, app, app_len + 1);
   gzochi_common_io_write_long (session_id, relay_msg, app_len + 4);
+
+  gzochid_trace ("Relaying disconnect for non-local session %s/%"
+		 G_GUINT64_FORMAT ".", app, session_id);
 
   gzochid_reconnectable_socket_write (client->socket, relay_msg, total_len);
   
@@ -190,6 +205,9 @@ gzochid_sessionclient_relay_message_from (GzochidSessionClient *client,
   gzochi_common_io_write_long (session_id, relay_msg, app_len + 4);
   gzochi_common_io_write_short (msg_len, relay_msg, app_len + 12);
   memcpy (relay_msg + app_len + 14, msg, msg_len);
+
+  gzochid_trace ("Relaying message for non-local session %s/%" G_GUINT64_FORMAT
+		 ".", app, session_id);
   
   gzochid_reconnectable_socket_write (client->socket, relay_msg, total_len);
   
@@ -209,13 +227,24 @@ gzochid_sessionclient_relay_disconnect_to (GzochidSessionClient *client,
       g_mutex_lock (&app_context->client_mapping_lock);
 
       if (g_hash_table_contains (app_context->oids_to_clients, &session_id))
-	gzochid_game_client_disconnect
-	  (g_hash_table_lookup (app_context->oids_to_clients, &session_id));
-      else g_set_error
-	     (err, GZOCHID_SESSIONCLIENT_ERROR,
-	      GZOCHID_SESSIONCLIENT_ERROR_NOT_MAPPED,
-	      "Unable to relay disconnect to unmapped session %s/%"
-	      G_GUINT64_FORMAT ".", app, session_id);
+	{
+	  gzochid_trace ("Relaying disconnect to local session %s/%"
+			 G_GUINT64_FORMAT ".", app, session_id);
+
+	  gzochid_game_client_disconnect
+	    (g_hash_table_lookup (app_context->oids_to_clients, &session_id));
+	}
+      else
+	{
+	  g_debug
+	    ("Unable to relay disconnect to unmapped session %s/%"
+	     G_GUINT64_FORMAT ".", app, session_id);
+	  g_set_error
+	    (err, GZOCHID_SESSIONCLIENT_ERROR,
+	     GZOCHID_SESSIONCLIENT_ERROR_NOT_MAPPED,
+	     "Unable to relay disconnect to unmapped session %s/%"
+	     G_GUINT64_FORMAT ".", app, session_id);
+	}
 
       g_mutex_unlock (&app_context->client_mapping_lock);
     }
@@ -244,16 +273,25 @@ gzochid_sessionclient_relay_message_to (GzochidSessionClient *client,
 	  
 	  gzochid_game_client *game_client = g_hash_table_lookup
 	    (app_context->oids_to_clients, &session_id);
-	  
+
+	  gzochid_trace ("Relaying message to local session %s/%"
+			 G_GUINT64_FORMAT ".", app, session_id);
+
 	  gzochid_game_client_send
 	    (game_client, (unsigned char *) msg_data, msg_size);
 	}
-      else g_set_error
-	     (err, GZOCHID_SESSIONCLIENT_ERROR,
-	      GZOCHID_SESSIONCLIENT_ERROR_NOT_MAPPED,
-	      "Unable to relay message to unmapped session %s/%"
-	      G_GUINT64_FORMAT ".", app, session_id);
-
+      else
+	{
+	  g_debug
+	    ("Unable to relay message to unmapped session %s/%" G_GUINT64_FORMAT
+	     ".", app, session_id);
+	  g_set_error
+	    (err, GZOCHID_SESSIONCLIENT_ERROR,
+	     GZOCHID_SESSIONCLIENT_ERROR_NOT_MAPPED,
+	     "Unable to relay message to unmapped session %s/%" G_GUINT64_FORMAT
+	     ".", app, session_id);
+	}
+      
       g_mutex_unlock (&app_context->client_mapping_lock);
     }
   else g_set_error
