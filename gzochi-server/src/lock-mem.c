@@ -791,6 +791,10 @@ gzochid_lock_release (gzochid_lock_table *lock_table, guint node_id,
 
       if (lock_ptr != NULL)
 	remove_lock (lock_table, lock_ptr->data);
+      else GZOCHID_WITH_FORMATTED_BYTES
+	     (key, buf, 33, g_warning
+	      ("Attempted to release non-existent lock on %s for node %d.", buf,
+	       node_id));
     }
 }
 
@@ -889,6 +893,20 @@ gzochid_lock_release_range (gzochid_lock_table *lock_table, guint node_id,
 
   if (match_context.range_lock != NULL)  
     remove_range_lock (lock_table, match_context.range_lock);
+  else
+    {
+      char from_buf[33], to_buf[33];
+
+      if (from != NULL)
+	gzochid_util_format_bytes (from, from_buf, 33);
+      else memcpy (from_buf, "NULL", 5);
+      if (to != NULL)
+	gzochid_util_format_bytes (to, to_buf, 33);
+      else memcpy (to_buf, "NULL", 5);
+
+      g_warning ("Attempted to release non-existent range lock from %s to %s "
+		 "for node %d.", from_buf, to_buf, node_id);
+    }
 }
 
 /* Adapts `remove_lock' as a `GFunc' for use by `g_list_foreach' in 
