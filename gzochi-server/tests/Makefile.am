@@ -180,6 +180,7 @@ test_dataclient_LDADD = \
 	$(top_builddir)/src/libgzochid_la-config.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
 	$(top_builddir)/src/libgzochid_la-dataclient.o \
+	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-util.o \
 	@GLIB_LIBS@ @GOBJECT_LIBS@ @GZOCHI_COMMON_LIBS@
@@ -204,6 +205,7 @@ test_dataserver_LDADD = $(top_builddir)/src/libgzochi_metad_la-dataserver.o \
 	$(top_builddir)/src/libgzochid_la-data-protocol.o \
 	$(top_builddir)/src/libgzochid_la-itree.o \
 	$(top_builddir)/src/libgzochi_metad_la-lock-mem.o \
+	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-oids.o \
 	$(top_builddir)/src/libgzochid_la-oids-storage.o \
 	$(top_builddir)/src/libgzochid_la-protocol-common.o \
