@@ -71,6 +71,14 @@ storage.engine.dir = @libdir@/gzochid/storage
 
 storage.engine = bdb
 
+# The number of game task execution threads to run. This setting determines the
+# server's throughput with respect to handling messages delivered from clients
+# and executing tasks scheduled by game application code. It's usually best to
+# set this value to the number of logical CPU cores on the machine running the
+# gzochid container.
+
+thread_pool.max_threads = 4
+
 # The default maximum duration (in milliseconds) for time-limited transactions,
 # which include any post-initialization application tasks and callbacks. Among
 # other things, this setting has an impact on the task execution throughput of

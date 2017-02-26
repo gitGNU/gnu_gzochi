@@ -524,6 +524,18 @@ inspected and boot time. All applications running within the
 container share the same storage engine, although each maintains its
 own databases.
 
+@item thread_pool.max_threads
+The number of threads in the task execution thread pool used by the
+container to execute callbacks for application lifecycle events
+(initialized, ready) client events (logins, received messages,
+disconnects) and tasks scheduled by the callbacks for these events
+(and by other tasks).
+
+Given that the bodies of these work items should be largely
+compute-bound, it is generally a good idea to pin the size of this
+thread pool to the number of logical CPU cores on the machine
+running the container.
+
 @item tx.timeout
 The maximum duration, in milliseconds, for time-limited transactions
 executed on behalf of a game application. Any task or callback whose
