@@ -60,6 +60,7 @@ initialize (int from_state, int to_state, gpointer user_data)
       (g_hash_table_lookup 
        (admin_context->config, "module.httpd.enabled"), FALSE))
     {
+      GError *err = NULL;
       int port = gzochid_config_to_int 
 	(g_hash_table_lookup (admin_context->config, "module.httpd.port"), 
 	 8000);
@@ -72,7 +73,14 @@ initialize (int from_state, int to_state, gpointer user_data)
 	(admin_context->http_server, admin_context->root_context->game_server,
 	 admin_context->root_context->resolution_context);
 
-      gzochid_http_server_start (admin_context->http_server, port, NULL);
+      gzochid_http_server_start (admin_context->http_server, port, &err);
+
+      if (err != NULL)
+	{
+	  g_critical
+	    ("Failed to start admin HTTP server: %s; exiting...", err->message);
+	  exit (EXIT_FAILURE);
+	}
     }
   if (gzochid_config_to_boolean 
       (g_hash_table_lookup 

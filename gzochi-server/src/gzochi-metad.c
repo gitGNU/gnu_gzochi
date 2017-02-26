@@ -406,11 +406,19 @@ initialize_httpd (GzochidHttpServer *http_server,
   if (gzochid_config_to_boolean
       (g_hash_table_lookup (admin_config, "module.httpd.enabled"), FALSE))
     {
+      GError *err = NULL;
       int port = gzochid_config_to_int
 	(g_hash_table_lookup (admin_config, "module.httpd.port"), 8800);
 
       gzochid_httpd_meta_register_handlers (http_server, event_source);
-      gzochid_http_server_start (http_server, port, NULL);
+      gzochid_http_server_start (http_server, port, &err);
+
+      if (err != NULL)
+	{
+	  g_critical
+	    ("Failed to start admin HTTP server: %s; exiting...", err->message);
+	  exit (EXIT_FAILURE);
+	}
     }
   
   g_hash_table_destroy (admin_config);
