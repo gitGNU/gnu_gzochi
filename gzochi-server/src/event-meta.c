@@ -159,3 +159,99 @@ static void
 gzochi_metad_client_event_init (GzochiMetadClientEvent *self)
 {
 }
+
+struct _GzochiMetadSessionEvent
+{
+  GzochidEvent parent_instance; /* The base struct, for casting. */
+
+  guint node_id; /* The node id. */
+  char *app; /* The gzochi game appliaction name. */
+};
+
+G_DEFINE_TYPE (GzochiMetadSessionEvent, gzochi_metad_session_event,
+	       GZOCHID_TYPE_EVENT);
+
+enum gzochi_metad_session_event_properties
+  {
+    PROP_SESSION_EVENT_NODE_ID = 1,
+    PROP_SESSION_EVENT_APPLICATION,
+    N_SESSION_EVENT_PROPERTIES
+  };
+
+static GParamSpec *
+session_event_properties[N_SESSION_EVENT_PROPERTIES] = { NULL };
+
+static void
+gzochi_metad_session_event_get_property (GObject *object, guint property_id,
+					 GValue *value, GParamSpec *pspec)
+{
+  GzochiMetadSessionEvent *event = GZOCHI_METAD_SESSION_EVENT (object);
+
+  switch (property_id)
+    {
+    case PROP_SESSION_EVENT_NODE_ID:
+      g_value_set_uint (value, event->node_id);
+      break;
+
+    case PROP_SESSION_EVENT_APPLICATION:
+      g_value_set_static_string (value, event->app);
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+gzochi_metad_session_event_set_property (GObject *object, guint property_id,
+					 const GValue *value, GParamSpec *pspec)
+{
+  GzochiMetadSessionEvent *event = GZOCHI_METAD_SESSION_EVENT (object);
+
+  switch (property_id)
+    {
+    case PROP_SESSION_EVENT_NODE_ID:
+      event->node_id = g_value_get_uint (value);
+      break;
+            
+    case PROP_SESSION_EVENT_APPLICATION:
+      if (event->app != NULL)
+	{
+	  free (event->app);
+	  event->app = NULL;
+	}
+      if (g_value_get_string (value) != NULL)	
+	event->app = strdup (g_value_get_string (value));
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+gzochi_metad_session_event_class_init (GzochiMetadSessionEventClass *klass)
+{
+  GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+  object_class->get_property = gzochi_metad_session_event_get_property;
+  object_class->set_property = gzochi_metad_session_event_set_property;
+  
+  session_event_properties[PROP_SESSION_EVENT_NODE_ID] = g_param_spec_uint
+    ("node-id", "id", "The gzochi application server node id", 0, G_MAXUINT, 0,
+     G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+  
+  session_event_properties[PROP_SESSION_EVENT_APPLICATION] =
+    g_param_spec_string ("application", "app", "The gzochi game application",
+			 NULL, G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY);
+
+  g_object_class_install_properties
+    (object_class, N_SESSION_EVENT_PROPERTIES, session_event_properties);
+}
+
+static void
+gzochi_metad_session_event_init (GzochiMetadSessionEvent *self)
+{
+}

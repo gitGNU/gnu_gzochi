@@ -1,5 +1,5 @@
 /* event-meta.h: Prototypes and declarations for event-meta.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -71,6 +71,52 @@ static inline GzochiMetadClientEvent *
 GZOCHI_METAD_CLIENT_EVENT (gconstpointer ptr) {
   return G_TYPE_CHECK_INSTANCE_CAST
     (ptr, gzochi_metad_client_event_get_type (), GzochiMetadClientEvent);
+}
+
+/* Enumeration of session event types. */
+
+enum _gzochi_metad_session_event_type
+  {
+    /* A client session has been established on a gzochid application node. */
+    
+    SESSION_CONNECTED,
+
+    /* A client session has disconnected from a gzochid application node. */
+    
+    SESSION_DISCONNECTED
+  };
+
+typedef enum _gzochi_metad_session_event_type gzochi_metad_session_event_type;
+
+/* The core client event type definitions. */
+
+#define GZOCHI_METAD_TYPE_SESSION_EVENT gzochi_metad_session_event_get_type ()
+
+/* The following boilerplate can be consolidated once GLib 2.44 makes it into
+   Debian stable and `G_DECLARE_FINAL_TYPE' can be used. */
+
+GType gzochi_metad_session_event_get_type (void);
+
+/*
+  The session event sub-type. The following properties are available:
+  
+  application: the name of the associated gzochi game application
+  node-id: meta server-assigned id for the target application node
+*/
+
+typedef struct _GzochiMetadSessionEvent GzochiMetadSessionEvent;
+
+struct _GzochiMetadSessionEventClass
+{
+  GzochidEventClass parent_class;
+};
+
+typedef struct _GzochiMetadSessionEventClass GzochiMetadSessionEventClass;
+
+static inline GzochiMetadSessionEvent *
+GZOCHI_METAD_SESSION_EVENT (gconstpointer ptr) {
+  return G_TYPE_CHECK_INSTANCE_CAST
+    (ptr, gzochi_metad_session_event_get_type (), GzochiMetadSessionEvent);
 }
 
 /* End boilerplate. */
