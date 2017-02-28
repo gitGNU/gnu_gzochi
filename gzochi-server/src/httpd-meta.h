@@ -1,5 +1,5 @@
 /* httpd-meta.h: Prototypes and declarations for httpd-meta.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,8 +18,9 @@
 #ifndef GZOCHID_HTTPD_META_H
 #define GZOCHID_HTTPD_META_H
 
-#include "httpd.h"
 #include "event.h"
+#include "httpd.h"
+#include "resolver.h"
 
 /*
   Configure the specified HTTP server context with a RESTful hierarchy of 
@@ -35,6 +36,7 @@
 */
 
 void gzochid_httpd_meta_register_handlers (GzochidHttpServer *,
-					   gzochid_event_source *);
+					   gzochid_event_source *,
+					   GzochidResolutionContext *);
 
 #endif /* GZOCHID_HTTPD_META_H */

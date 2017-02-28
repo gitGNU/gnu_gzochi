@@ -24,6 +24,7 @@
 #include "event-meta.h"
 #include "httpd.h"
 #include "httpd-meta.h"
+#include "sessionserver.h"
 
 #define HEADER "  <head><title>gzochi-metad v" VERSION "</title></head>"
 
@@ -48,6 +49,10 @@ struct _gzochi_metad_client_info
   /* String representation of client connection time. */
 
   char *connection_timestamp_str; 
+
+  /* The number of sessions connected to this client across all applications. */
+
+  guint num_connected_sessions; 
 };
 
 typedef struct _gzochi_metad_client_info gzochi_metad_client_info;
@@ -73,6 +78,8 @@ gzochi_metad_client_info_new (guint node_id, const char *connection_description,
 
   info->connection_timestamp_str =
     g_time_val_to_iso8601 (&connection_timestamp);
+
+  info->num_connected_sessions = 0;
   
   return info;
 }
@@ -172,6 +179,9 @@ render_server (gpointer key, gpointer value, gpointer user_data)
 
   g_string_append_printf
     (response_str, "  <td>%s</td>\n", info->connection_timestamp_str);
+
+  g_string_append_printf
+    (response_str, "  <td>%d</td>\n", info->num_connected_sessions);
   
   g_string_append (response_str, "</tr>\n");
 }
@@ -191,6 +201,7 @@ list_servers (GString *response_str, const gzochi_metad_server_state *state)
   g_string_append (response_str, "    <th>node id</th>\n");
   g_string_append (response_str, "    <th>server address</th>\n");
   g_string_append (response_str, "    <th>connection timestamp</th>\n");
+  g_string_append (response_str, "    <th># of connected sessions</th>\n");
   g_string_append (response_str, "  </tr>\n");
   
   g_hash_table_foreach (state->connected_servers, render_server, response_str);
@@ -292,12 +303,61 @@ handle_client_event (GzochidEvent *event, gpointer user_data)
   g_mutex_unlock (&state->mutex);
 }
 
+/* `gzochid_event_handler' implementation to update the admin console's
+   representation of the meta server state in response to session events. */
+
+static void
+handle_session_event (GzochidEvent *event, gpointer user_data)
+{
+  gzochi_metad_server_state *state = user_data;  
+  GzochiMetadSessionEvent *session_event = GZOCHI_METAD_SESSION_EVENT (event);
+  gzochi_metad_client_info *info = NULL;
+  gzochi_metad_session_event_type type;
+  guint node_id = 0;
+
+  g_object_get (session_event, "type", &type, "node-id", &node_id, NULL);
+
+  info = g_hash_table_lookup (state->connected_servers, &node_id);
+
+  if (info == NULL)
+    {
+      g_warning ("Ignoring session event for unknown node %d.", node_id);
+      return;
+    }
+  
+  g_mutex_lock (&state->mutex);
+  
+  switch (type)
+    {
+    case SESSION_CONNECTED:
+      info->num_connected_sessions++;
+      break;
+
+    case SESSION_DISCONNECTED:
+      info->num_connected_sessions--;
+      break;
+    };
+
+  g_mutex_unlock (&state->mutex);
+}
+
 void
 gzochid_httpd_meta_register_handlers (GzochidHttpServer *httpd_context,
-				      gzochid_event_source *event_source)
+				      gzochid_event_source *root_event_source,
+				      GzochidResolutionContext *res_context)
 {
   gzochi_metad_server_state *state = gzochi_metad_server_state_new ();
+  gzochid_event_source *event_source = NULL;
+  GzochiMetadSessionServer *sessionserver = gzochid_resolver_require_full
+    (res_context, GZOCHI_METAD_TYPE_SESSION_SERVER, NULL);
+
+  gzochid_event_attach (root_event_source, handle_client_event, state);  
+
+  g_object_get (sessionserver, "event-source", &event_source, NULL);  
+  gzochid_event_attach (event_source, handle_session_event, state);  
+  g_source_unref ((GSource *) event_source);
   
-  gzochid_event_attach (event_source, handle_client_event, state);  
   gzochid_httpd_add_terminal (httpd_context, "/", hello_world, state);
+
+  g_object_unref (sessionserver);
 }

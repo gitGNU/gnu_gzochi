@@ -221,6 +221,9 @@ root_context_constructed (GObject *object)
     (g_hash_table_lookup (meta_configuration, "server.port"), 9001);
 
   g_hash_table_destroy (meta_configuration);
+
+  gzochid_event_source_attach
+    (root_context->event_loop, root_context->event_source);
 }
 
 static void
@@ -398,7 +401,8 @@ initialize_logging (GKeyFile *key_file)
 
 static void
 initialize_httpd (GzochidHttpServer *http_server,
-		  gzochid_event_source *event_source, GKeyFile *key_file)
+		  gzochid_event_source *root_event_source,
+		  GzochidResolutionContext *res_context, GKeyFile *key_file)
 {
   GHashTable *admin_config =
     gzochid_config_keyfile_extract_config (key_file, "admin");
@@ -410,7 +414,8 @@ initialize_httpd (GzochidHttpServer *http_server,
       int port = gzochid_config_to_int
 	(g_hash_table_lookup (admin_config, "module.httpd.port"), 8800);
 
-      gzochid_httpd_meta_register_handlers (http_server, event_source);
+      gzochid_httpd_meta_register_handlers
+	(http_server, root_event_source, res_context);
       gzochid_http_server_start (http_server, port, &err);
 
       if (err != NULL)
@@ -502,8 +507,8 @@ main (int argc, char *argv[])
     }
 
   gzochid_event_loop_start (root_context->event_loop);
-  initialize_httpd
-    (root_context->http_server, root_context->event_source, key_file);
+  initialize_httpd (root_context->http_server, root_context->event_source,
+		    resolution_context, key_file);
 
   if (root_context->http_server != NULL)
     root_context->admin_server_base_url =
