@@ -232,10 +232,21 @@ gzochi_metad_session_event_set_property (GObject *object, guint property_id,
 }
 
 static void
+gzochi_metad_session_event_finalize (GObject *object)
+{
+  GzochiMetadSessionEvent *self = GZOCHI_METAD_SESSION_EVENT (object);
+
+  free (self->app);
+
+  G_OBJECT_CLASS (gzochi_metad_session_event_parent_class)->finalize (object);
+}
+
+static void
 gzochi_metad_session_event_class_init (GzochiMetadSessionEventClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
+  object_class->finalize = gzochi_metad_session_event_finalize;
   object_class->get_property = gzochi_metad_session_event_get_property;
   object_class->set_property = gzochi_metad_session_event_set_property;
   

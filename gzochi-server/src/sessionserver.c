@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "event-meta.h"
+#include "event.h"
 #include "log.h"
 #include "meta-protocol.h"
 #include "nodemap.h"
@@ -48,10 +50,63 @@ struct _GzochiMetadSessionServer
   /* Mapping of node id -> `gzochid_client_socket'. */
   
   GHashTable *connected_servers; 
+
+  gzochid_event_source *event_source; /* Event source for session events. */
 };
 
 G_DEFINE_TYPE (GzochiMetadSessionServer, gzochi_metad_session_server,
 	       G_TYPE_OBJECT);
+
+enum gzochi_metad_session_server_properties
+  {
+    PROP_EVENT_LOOP = 1,
+    PROP_EVENT_SOURCE,
+    N_PROPERTIES
+  };
+
+static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
+
+static void
+gzochi_metad_session_server_get_property (GObject *object, guint property_id,
+					  GValue *value, GParamSpec *pspec)
+{
+  GzochiMetadSessionServer *self = GZOCHI_METAD_SESSION_SERVER (object);
+
+  switch (property_id)
+    {
+    case PROP_EVENT_SOURCE:
+      g_value_set_boxed (value, self->event_source);
+      break;
+      
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
+
+static void
+gzochi_metad_session_server_set_property (GObject *object, guint property_id,
+					  const GValue *value,
+					  GParamSpec *pspec)
+{
+  GzochiMetadSessionServer *self = GZOCHI_METAD_SESSION_SERVER (object);
+
+  switch (property_id)
+    {
+    case PROP_EVENT_LOOP:
+
+      /* Don't need to store a reference to the event loop, just attach the
+	 event source to it. */
+      
+      gzochid_event_source_attach
+	(g_value_get_object (value), self->event_source);
+      break;
+      
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+      break;
+    }
+}
 
 static void
 gzochi_metad_session_server_init (GzochiMetadSessionServer *self)
@@ -62,6 +117,7 @@ gzochi_metad_session_server_init (GzochiMetadSessionServer *self)
   self->nodemap = gzochi_metad_nodemap_mem_new ();
   self->connected_servers = g_hash_table_new_full
     (g_int_hash, g_int_equal, g_free, NULL);
+  self->event_source = gzochid_event_source_new ();
 }
 
 static void
@@ -72,6 +128,9 @@ gzochi_metad_session_server_finalize (GObject *gobject)
   gzochi_metad_nodemap_mem_free (server->nodemap);
   g_hash_table_destroy (server->connected_servers);
 
+  g_source_destroy ((GSource *) server->event_source);
+  g_source_unref ((GSource *) server->event_source);
+  
   G_OBJECT_CLASS (gzochi_metad_session_server_parent_class)->finalize (gobject);
 }
 
@@ -81,6 +140,19 @@ gzochi_metad_session_server_class_init (GzochiMetadSessionServerClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   object_class->finalize = gzochi_metad_session_server_finalize;
+  object_class->get_property = gzochi_metad_session_server_get_property;
+  object_class->set_property = gzochi_metad_session_server_set_property;
+
+  obj_properties[PROP_EVENT_LOOP] = g_param_spec_object
+    ("event-loop", "event-loop", "The global event loop",
+     GZOCHID_TYPE_EVENT_LOOP, G_PARAM_WRITABLE | G_PARAM_CONSTRUCT);
+  
+  obj_properties[PROP_EVENT_SOURCE] = g_param_spec_boxed
+    ("event-source", "event-source", "The session server event source",
+     G_TYPE_SOURCE, G_PARAM_READABLE);
+
+  g_object_class_install_properties
+    (object_class, N_PROPERTIES, obj_properties);
 }
 
 void
@@ -169,6 +241,13 @@ gzochi_metad_sessionserver_session_connected
 
       if (tmp_err != NULL)
 	propagate_nodemap_error (err, tmp_err);
+      else gzochid_event_dispatch
+	     (sessionserver->event_source, g_object_new
+	      (GZOCHI_METAD_TYPE_SESSION_EVENT,
+	       "type", SESSION_CONNECTED,
+	       "node-id", node_id,
+	       "application", app,
+	       NULL));
     }
   else g_set_error (err, GZOCHI_METAD_SESSIONSERVER_ERROR,
 		    GZOCHI_METAD_SESSIONSERVER_ERROR_NOT_CONNECTED,
@@ -183,14 +262,29 @@ gzochi_metad_sessionserver_session_disconnected
   GError *tmp_err = NULL;
   gzochi_metad_nodemap_iface *iface =
     GZOCHI_METAD_NODEMAP_IFACE (sessionserver->nodemap);
-
+  int node_id = 0;
+  
   gzochid_trace ("Unmapping disconnected session %s/%" G_GUINT64_FORMAT ".",
 		 app, session_id);
- 
-  iface->unmap_session (sessionserver->nodemap, app, session_id, &tmp_err);
 
-  if (tmp_err != NULL)
-    propagate_nodemap_error (err, tmp_err);
+  node_id = iface->lookup_session
+    (sessionserver->nodemap, app, session_id, &tmp_err);
+
+  if (tmp_err == NULL)
+    {
+      iface->unmap_session (sessionserver->nodemap, app, session_id, &tmp_err);
+
+      if (tmp_err != NULL)
+	propagate_nodemap_error (err, tmp_err);
+      else gzochid_event_dispatch
+	     (sessionserver->event_source, g_object_new
+	      (GZOCHI_METAD_TYPE_SESSION_EVENT,
+	       "type", SESSION_DISCONNECTED,
+	       "node-id", node_id,
+	       "application", app,
+	       NULL));
+    }
+  else propagate_nodemap_error (err, tmp_err);
 }
 
 void

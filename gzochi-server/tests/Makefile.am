@@ -429,7 +429,9 @@ test_sessionserver_CFLAGS = -I$(top_srcdir)/src @GLIB_CFLAGS@ @GOBJECT_CFLAGS@ \
 test_sessionserver_SOURCES = test-sessionserver.c
 test_sessionserver_LDADD = \
 	$(top_builddir)/src/libgzochi_metad_la-sessionserver.o \
+	$(top_builddir)/src/libgzochi_metad_la-event-meta.o \
 	$(top_builddir)/src/libgzochi_metad_la-nodemap-mem.o \
+	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	@GZOCHI_COMMON_LIBS@ @GLIB_LIBS@ @GOBJECT_LIBS@
 

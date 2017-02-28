@@ -20,6 +20,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#include "event.h"
+#include "event-meta.h"
 #include "resolver.h"
 #include "sessionserver.h"
 #include "socket.h"
@@ -55,6 +57,8 @@ gzochid_test_client_socket_free (gzochid_client_socket *socket)
 
 struct _sessionserver_fixture
 {
+  GzochidResolutionContext *resolution_context;
+  GzochidEventLoop *event_loop;
   GzochiMetadSessionServer *server;
   gzochid_client_socket *client_socket;
 };
@@ -64,8 +68,13 @@ typedef struct _sessionserver_fixture sessionserver_fixture;
 static void
 setup_sessionserver (sessionserver_fixture *fixture, gconstpointer user_data)
 {
-  fixture->server = gzochid_resolver_require
-    (GZOCHI_METAD_TYPE_SESSION_SERVER, NULL);
+  fixture->resolution_context =
+    g_object_new (GZOCHID_TYPE_RESOLUTION_CONTEXT, NULL);
+  fixture->event_loop = gzochid_resolver_require_full
+    (fixture->resolution_context, GZOCHID_TYPE_EVENT_LOOP, NULL);
+  fixture->server = gzochid_resolver_require_full
+    (fixture->resolution_context, GZOCHI_METAD_TYPE_SESSION_SERVER, NULL);
+
   fixture->client_socket = gzochid_test_client_socket_new ();
 }
 
@@ -73,6 +82,9 @@ static void
 teardown_sessionserver (sessionserver_fixture *fixture, gconstpointer user_data)
 {
   g_object_unref (fixture->server);
+  g_object_unref (fixture->event_loop);
+  g_object_unref (fixture->resolution_context);
+  
   gzochid_test_client_socket_free (fixture->client_socket);
 }
 
@@ -112,24 +124,117 @@ test_server_disconnected (sessionserver_fixture *fixture,
   g_error_free (err);  
 }
 
+struct callback_data
+{
+  GMutex mutex;
+  GCond cond;
+
+  gboolean handled;  
+};
+
+static void
+init_callback_data (struct callback_data *callback_data)
+{
+  g_mutex_init (&callback_data->mutex);
+  g_cond_init (&callback_data->cond);
+  callback_data->handled = FALSE;
+}
+
+static void
+clear_callback_data (struct callback_data *callback_data)
+{
+  g_mutex_clear (&callback_data->mutex);
+  g_cond_clear (&callback_data->cond);
+}
+
+static void
+handle_session_connected (GzochidEvent *event, gpointer user_data)
+{
+  GzochiMetadSessionEvent *client_event = GZOCHI_METAD_SESSION_EVENT (event);
+  struct callback_data *callback_data = user_data;
+  gzochi_metad_session_event_type type;
+  char *app = NULL;
+
+  g_mutex_lock (&callback_data->mutex);
+  
+  g_object_get (client_event, "type", &type, "application", &app, NULL);
+  g_assert_cmpint (type, ==, SESSION_CONNECTED);
+  g_assert_cmpstr (app, ==, "test");
+  callback_data->handled = TRUE;
+  
+  g_cond_signal (&callback_data->cond);
+  g_mutex_unlock (&callback_data->mutex);
+
+  free (app);
+}
+
 static void
 test_session_connected (sessionserver_fixture *fixture, gconstpointer user_data)
 {
   GError *err = NULL;
+  struct callback_data callback_data;
+  gzochid_event_source *event_source = NULL;
+
+  init_callback_data (&callback_data);
   
   gzochi_metad_sessionserver_server_connected
     (fixture->server, 1, fixture->client_socket, NULL);
 
+  g_object_get (fixture->server, "event-source", &event_source, NULL);
+  gzochid_event_attach (event_source, handle_session_connected, &callback_data);
+  g_source_unref ((GSource *) event_source);
+
+  gzochid_event_loop_start (fixture->event_loop);
+
+  g_mutex_lock (&callback_data.mutex);
+  
   gzochi_metad_sessionserver_session_connected
     (fixture->server, 1, "test", 1, &err);
   g_assert_no_error (err);
 
+  g_cond_wait_until
+    (&callback_data.cond, &callback_data.mutex,
+     g_get_monotonic_time () + 100000);
+  g_mutex_unlock (&callback_data.mutex);
+
+  gzochid_event_loop_stop (fixture->event_loop);
+  
   gzochi_metad_sessionserver_session_connected
     (fixture->server, 1, "test", 1, &err);  
   g_assert_error (err, GZOCHI_METAD_SESSIONSERVER_ERROR,
 		  GZOCHI_METAD_SESSIONSERVER_ERROR_ALREADY_CONNECTED);
 
   g_error_free (err);
+
+  clear_callback_data (&callback_data);
+}
+
+static void
+handle_session_disconnected (GzochidEvent *event, gpointer user_data)
+{
+  GzochiMetadSessionEvent *client_event = GZOCHI_METAD_SESSION_EVENT (event);
+  struct callback_data *callback_data = user_data;
+  gzochi_metad_session_event_type type;
+  char *app = NULL;
+  
+  g_object_get (client_event, "type", &type, "application", &app, NULL);
+
+  if (type == SESSION_CONNECTED)
+    {
+      free (app);
+      return;
+    }
+
+  g_mutex_lock (&callback_data->mutex);
+  
+  g_assert_cmpint (type, ==, SESSION_DISCONNECTED);
+  g_assert_cmpstr (app, ==, "test");
+  callback_data->handled = TRUE;
+  
+  g_cond_signal (&callback_data->cond);
+  g_mutex_unlock (&callback_data->mutex);
+
+  free (app);
 }
 
 static void
@@ -137,15 +242,36 @@ test_session_disconnected (sessionserver_fixture *fixture,
 			   gconstpointer user_data)
 {
   GError *err = NULL;
+  struct callback_data callback_data;
+  gzochid_event_source *event_source = NULL;
   
+  init_callback_data (&callback_data);
+
   gzochi_metad_sessionserver_server_connected
     (fixture->server, 1, fixture->client_socket, NULL);
 
+  gzochid_event_loop_start (fixture->event_loop);
+
   gzochi_metad_sessionserver_session_connected
     (fixture->server, 1, "test", 1, NULL);
+
+  g_object_get (fixture->server, "event-source", &event_source, NULL);
+  gzochid_event_attach
+    (event_source, handle_session_disconnected, &callback_data);
+  g_source_unref ((GSource *) event_source);
+
+  g_mutex_lock (&callback_data.mutex);
+  
   gzochi_metad_sessionserver_session_disconnected
     (fixture->server, "test", 1, &err);
   g_assert_no_error (err);
+
+  g_cond_wait_until
+    (&callback_data.cond, &callback_data.mutex,
+     g_get_monotonic_time () + 100000);
+  g_mutex_unlock (&callback_data.mutex);
+
+  gzochid_event_loop_stop (fixture->event_loop);
 
   gzochi_metad_sessionserver_session_disconnected
     (fixture->server, "test", 1, &err);  
@@ -153,6 +279,8 @@ test_session_disconnected (sessionserver_fixture *fixture,
 		  GZOCHI_METAD_SESSIONSERVER_ERROR_NOT_CONNECTED);
 
   g_error_free (err);
+
+  clear_callback_data (&callback_data);
 }
 
 static void

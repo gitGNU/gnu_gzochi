@@ -25,7 +25,6 @@
 #include "config.h"
 #include "dataserver-protocol.h"
 #include "dataserver.h"
-#include "event.h"
 #include "gzochid-storage.h"
 #include "httpd.h"
 #include "lock.h"
