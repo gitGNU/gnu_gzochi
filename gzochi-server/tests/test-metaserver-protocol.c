@@ -87,6 +87,31 @@ enum gzochi_metad_data_server_properties
 static GParamSpec *obj_properties[N_PROPERTIES] = { NULL };
 
 static void
+root_context_dispose (GObject *object)
+{
+  GzochiMetadRootContext *root_context = GZOCHI_METAD_ROOT_CONTEXT (object);
+
+  g_object_unref (root_context->channelserver);
+  g_object_unref (root_context->dataserver);
+  g_object_unref (root_context->sessionserver);
+  
+  G_OBJECT_CLASS (gzochi_metad_root_context_parent_class)->dispose (object);  
+}
+
+static void
+root_context_finalize (GObject *object)
+{
+  GzochiMetadRootContext *root_context = GZOCHI_METAD_ROOT_CONTEXT (object);
+
+  g_source_unref ((GSource *) root_context->event_source);
+  
+  if (root_context->admin_server_base_url != NULL)
+    free (root_context->admin_server_base_url);
+
+  G_OBJECT_CLASS (gzochi_metad_root_context_parent_class)->finalize (object);  
+}
+
+static void
 root_context_get_property (GObject *object, guint property_id, GValue *value,
 			   GParamSpec *pspec)
 {
@@ -143,6 +168,8 @@ gzochi_metad_root_context_class_init (GzochiMetadRootContextClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
+  object_class->dispose = root_context_dispose;
+  object_class->finalize = root_context_finalize;
   object_class->get_property = root_context_get_property;
   object_class->set_property = root_context_set_property;
 
@@ -371,6 +398,7 @@ static void
 metaserver_protocol_fixture_tear_down (metaserver_protocol_fixture *fixture,
 				       gconstpointer user_data)
 {
+  g_object_unref (fixture->root_context);
   g_object_unref (fixture->socket_server);
   g_io_channel_unref (fixture->socket_channel);
 

@@ -337,7 +337,7 @@ test_util_deserialize_list ()
   g_assert_cmpstr ((char *) g_list_nth_data (lst, 1), ==, "e");
   g_assert_cmpstr ((char *) g_list_nth_data (lst, 2), ==, "f");
 
-  g_list_free (lst);
+  g_list_free_full (lst, free);
   g_byte_array_unref (in);
 }
 

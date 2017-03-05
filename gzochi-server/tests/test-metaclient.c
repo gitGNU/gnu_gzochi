@@ -321,8 +321,7 @@ metaclient_fixture_setup_inner (metaclient_fixture *fixture, GKeyFile *key_file)
 }
 
 static void
-metaclient_fixture_setup (metaclient_fixture *fixture,
-				    gconstpointer user_data)
+metaclient_fixture_setup (metaclient_fixture *fixture, gconstpointer user_data)
 {
   GKeyFile *key_file = g_key_file_new ();
 
@@ -335,7 +334,7 @@ metaclient_fixture_setup (metaclient_fixture *fixture,
 
 static void
 metaclient_fixture_with_httpd_setup (metaclient_fixture *fixture,
-					       gconstpointer user_data)
+				     gconstpointer user_data)
 {
   GKeyFile *key_file = g_key_file_new ();
 
@@ -347,7 +346,7 @@ metaclient_fixture_with_httpd_setup (metaclient_fixture *fixture,
 
 static void
 metaclient_fixture_teardown (metaclient_fixture *fixture,
-				       gconstpointer user_data)
+			     gconstpointer user_data)
 {
   gzochid_metaclient_stop (fixture->metaclient);
   
@@ -373,6 +372,7 @@ set_timeout (metaclient_fixture *fixture, guint interval)
 
   g_source_set_callback (timeout, exit_loop, fixture, NULL);
   g_source_attach (timeout, fixture->socket_server->main_context);
+  g_source_unref (timeout);
 }
 
 static void

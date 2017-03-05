@@ -200,7 +200,7 @@ static void
 gzochid_game_server_init (GzochidGameServer *self)
 {
   self->applications = g_hash_table_new_full
-    (g_str_hash, g_str_equal, NULL, (GDestroyNotify) application_context_free);
+    (g_str_hash, g_str_equal, free, (GDestroyNotify) application_context_free);
 }
 
 gzochid_application_context *

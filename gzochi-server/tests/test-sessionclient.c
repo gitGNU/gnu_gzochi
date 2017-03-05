@@ -41,6 +41,8 @@ game_server_finalize (GObject *obj)
   GzochidGameServer *self = GZOCHID_GAME_SERVER (obj);
 
   g_hash_table_destroy (self->applications);
+
+  G_OBJECT_CLASS (gzochid_game_server_parent_class)->finalize (obj);
 }
 
 static void
