@@ -19,6 +19,7 @@
 #include <glib.h>
 #include <glib-object.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "resolver.h"
@@ -106,11 +107,58 @@ gzochi_metad_sessionserver_relay_message
       data));
 }
 
+struct _metaserver_wrapper_client
+{
+  gzochi_metad_sessionserver_client *sessionserver_client;
+};
+
+typedef struct _metaserver_wrapper_client metaserver_wrapper_client;
+
+static gboolean
+can_dispatch_wrapper (const GByteArray *bytes, gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  return gzochi_metad_sessionserver_client_protocol.can_dispatch
+    (bytes, wrapper_client->sessionserver_client);
+}
+
+static unsigned int
+dispatch_wrapper (const GByteArray *bytes, gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  return gzochi_metad_sessionserver_client_protocol.dispatch
+    (bytes, wrapper_client->sessionserver_client);
+}
+
+static void
+error_wrapper (gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  gzochi_metad_sessionserver_client_protocol.error
+    (wrapper_client->sessionserver_client);
+}
+
+static void
+free_wrapper (gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  gzochi_metad_sessionserver_client_protocol.free
+    (wrapper_client->sessionserver_client);
+  free (wrapper_client);
+}
+
+static gzochid_client_protocol wrapper_protocol =
+  { can_dispatch_wrapper, dispatch_wrapper, error_wrapper, free_wrapper };
+
 struct _sessionserver_protocol_fixture
 {
   GzochidSocketServer *socket_server;
   GzochiMetadSessionServer *sessionserver;
-  gzochi_metad_sessionserver_client *client;
+  metaserver_wrapper_client *client;
 
   GIOChannel *read_channel;
   GIOChannel *write_channel;
@@ -125,8 +173,10 @@ sessionserver_protocol_fixture_set_up (sessionserver_protocol_fixture *fixture,
   int pipefd[2] = { 0 };
   int pipe_fd = pipe (pipefd);
   GIOChannel *write_channel = g_io_channel_unix_new (pipefd[1]);
+  metaserver_wrapper_client *wrapper_client =
+    malloc (sizeof (metaserver_wrapper_client));
   gzochid_client_socket *client_socket = gzochid_client_socket_new
-    (write_channel, "", gzochi_metad_sessionserver_client_protocol, NULL);
+    (write_channel, "", wrapper_protocol, wrapper_client);
   
   fixture->socket_server = gzochid_resolver_require
     (GZOCHID_TYPE_SOCKET_SERVER, NULL);
@@ -135,7 +185,9 @@ sessionserver_protocol_fixture_set_up (sessionserver_protocol_fixture *fixture,
 
   fixture->read_channel = g_io_channel_unix_new (pipefd[0]);
   fixture->write_channel = write_channel;
-  fixture->client = gzochi_metad_sessionserver_client_new
+  fixture->client = wrapper_client;
+
+  wrapper_client->sessionserver_client = gzochi_metad_sessionserver_client_new
     (fixture->sessionserver, client_socket, 0);
   
   g_io_channel_set_flags (fixture->read_channel, G_IO_FLAG_NONBLOCK, NULL);  
@@ -153,7 +205,6 @@ sessionserver_protocol_fixture_tear_down
   g_object_unref (fixture->sessionserver);
   
   g_io_channel_unref (fixture->read_channel);
-  gzochi_metad_sessionserver_client_protocol.free (fixture->client);
   
   clear_activity_log ();
 }
@@ -167,9 +218,7 @@ test_client_can_dispatch_true (sessionserver_protocol_fixture *fixture,
   g_byte_array_append
     (bytes, "\x00\x0c\x60""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01", 15);
 
-  g_assert
-    (gzochi_metad_sessionserver_client_protocol.can_dispatch
-     (bytes, fixture->client));
+  g_assert (wrapper_protocol.can_dispatch (bytes, fixture->client));
 
   g_byte_array_unref (bytes);
 }
@@ -182,9 +231,7 @@ test_client_can_dispatch_false (sessionserver_protocol_fixture *fixture,
 
   g_byte_array_append (bytes, "\x00\x0c\x60""foo", 7);
 
-  g_assert
-    (! gzochi_metad_sessionserver_client_protocol.can_dispatch
-     (bytes, fixture->client));
+  g_assert (! wrapper_protocol.can_dispatch (bytes, fixture->client));
 
   g_byte_array_unref (bytes);
 }
@@ -198,7 +245,7 @@ test_client_dispatch_one_session_connected
   g_byte_array_append
     (bytes, "\x00\x0c\x60""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01", 15);
   
-  gzochi_metad_sessionserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
   
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -215,7 +262,7 @@ test_client_dispatch_one_session_disconnected
   g_byte_array_append
     (bytes, "\x00\x0c\x61""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01", 15);
   
-  gzochi_metad_sessionserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
   
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -232,7 +279,7 @@ test_client_dispatch_one_relay_disconnect
   g_byte_array_append
     (bytes, "\x00\x0c\x62""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01", 15);
   
-  gzochi_metad_sessionserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
   
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -249,7 +296,7 @@ test_client_dispatch_one_relay_message (sessionserver_protocol_fixture *fixture,
     (bytes, "\x00\x12\x64""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01\x00\x04"
      "bar", 21);
   
-  gzochi_metad_sessionserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
   
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -267,7 +314,7 @@ test_client_dispatch_multiple (sessionserver_protocol_fixture *fixture,
     (bytes, "\x00\x0c\x62""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01", 15);
   g_byte_array_append
     (bytes, "\x00\x0c\x61""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01", 15);
-  gzochi_metad_sessionserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 2);
@@ -281,7 +328,7 @@ static void
 test_client_error (sessionserver_protocol_fixture *fixture,
 		   gconstpointer user_data)
 {
-  gzochi_metad_sessionserver_client_protocol.error (fixture->client);
+  wrapper_protocol.error (fixture->client);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
   g_assert_cmpstr ((char *) activity_log->data, ==, "SERVER 0 DISCONNECTED");

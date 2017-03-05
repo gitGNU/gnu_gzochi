@@ -1,5 +1,5 @@
 /* test-dataserver-protocol.c: Test routines for test-dataserver-protocol.c.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -157,11 +157,58 @@ gzochi_metad_dataserver_process_changeset (GzochiMetadDataServer *dataserver,
     }
 }
 
+struct _metaserver_wrapper_client
+{
+  gzochi_metad_dataserver_client *dataserver_client;
+};
+
+typedef struct _metaserver_wrapper_client metaserver_wrapper_client;
+
+static gboolean
+can_dispatch_wrapper (const GByteArray *bytes, gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  return gzochi_metad_dataserver_client_protocol.can_dispatch
+    (bytes, wrapper_client->dataserver_client);
+}
+
+static unsigned int
+dispatch_wrapper (const GByteArray *bytes, gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  return gzochi_metad_dataserver_client_protocol.dispatch
+    (bytes, wrapper_client->dataserver_client);
+}
+
+static void
+error_wrapper (gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  gzochi_metad_dataserver_client_protocol.error
+    (wrapper_client->dataserver_client);
+}
+
+static void
+free_wrapper (gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  gzochi_metad_dataserver_client_protocol.free
+    (wrapper_client->dataserver_client);
+  free (wrapper_client);
+}
+
+static gzochid_client_protocol wrapper_protocol =
+  { can_dispatch_wrapper, dispatch_wrapper, error_wrapper, free_wrapper };
+
 struct _dataserver_protocol_fixture
 {
   GzochidSocketServer *socket_server;
   GzochiMetadDataServer *dataserver;
-  gzochi_metad_dataserver_client *client;
+  metaserver_wrapper_client *client;
 
   GIOChannel *read_channel;
   GIOChannel *write_channel;
@@ -176,8 +223,10 @@ dataserver_protocol_fixture_set_up (dataserver_protocol_fixture *fixture,
   int pipefd[2] = { 0 };
   int pipe_fd = pipe (pipefd);
   GIOChannel *write_channel = g_io_channel_unix_new (pipefd[1]);
+  metaserver_wrapper_client *wrapper_client =
+    malloc (sizeof (metaserver_wrapper_client));
   gzochid_client_socket *client_socket = gzochid_client_socket_new
-    (write_channel, "", gzochi_metad_dataserver_client_protocol, NULL);
+    (write_channel, "", wrapper_protocol, wrapper_client);
   
   fixture->socket_server = gzochid_resolver_require
     (GZOCHID_TYPE_SOCKET_SERVER, NULL);
@@ -186,9 +235,11 @@ dataserver_protocol_fixture_set_up (dataserver_protocol_fixture *fixture,
 
   fixture->read_channel = g_io_channel_unix_new (pipefd[0]);
   fixture->write_channel = write_channel;
-  fixture->client = gzochi_metad_dataserver_client_new
-    (fixture->dataserver, client_socket, 0);
+  fixture->client = wrapper_client;
   
+  wrapper_client->dataserver_client = gzochi_metad_dataserver_client_new
+    (fixture->dataserver, client_socket, 1);
+
   g_io_channel_set_flags (fixture->read_channel, G_IO_FLAG_NONBLOCK, NULL);  
   g_io_channel_set_encoding (write_channel, NULL, NULL);
   g_io_channel_set_flags (write_channel, G_IO_FLAG_NONBLOCK, NULL);
@@ -204,7 +255,6 @@ dataserver_protocol_fixture_tear_down (dataserver_protocol_fixture *fixture,
   g_object_unref (fixture->dataserver);
   
   g_io_channel_unref (fixture->read_channel);
-  gzochi_metad_dataserver_client_protocol.free (fixture->client);
   
   clear_activity_log ();
 }
@@ -217,9 +267,7 @@ test_client_can_dispatch_true (dataserver_protocol_fixture *fixture,
 
   g_byte_array_append (bytes, "\x00\x18\x10\x02http://localhost:8080/", 27);
 
-  g_assert
-    (gzochi_metad_dataserver_client_protocol.can_dispatch
-     (bytes, fixture->client));
+  g_assert (wrapper_protocol.can_dispatch (bytes, fixture->client));
 
   g_byte_array_unref (bytes);
 }
@@ -232,9 +280,7 @@ test_client_can_dispatch_false (dataserver_protocol_fixture *fixture,
 
   g_byte_array_append (bytes, "\x00\x18\x10\x02http", 9);
 
-  g_assert
-    (! gzochi_metad_dataserver_client_protocol.can_dispatch
-     (bytes, fixture->client));
+  g_assert (! wrapper_protocol.can_dispatch (bytes, fixture->client));
 
   g_byte_array_unref (bytes);
 }
@@ -247,7 +293,7 @@ test_client_dispatch_one_reserve_oids (dataserver_protocol_fixture *fixture,
   GByteArray *bytes = g_byte_array_new ();
 
   g_byte_array_append (bytes, "\x00\x05\x20test", 8);
-  gzochi_metad_dataserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_main_context_iteration (fixture->socket_server->main_context, FALSE);
@@ -272,7 +318,7 @@ test_client_dispatch_one_request_value (dataserver_protocol_fixture *fixture,
   g_byte_array_append
     (bytes, "\x00\x0f\x21test\x00oids\x00\x00\x00\x02""1", 18);
   
-  gzochi_metad_dataserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_main_context_iteration (fixture->socket_server->main_context, FALSE);
@@ -295,7 +341,7 @@ test_client_dispatch_one_request_next_key
   GByteArray *bytes = g_byte_array_new ();
 
   g_byte_array_append (bytes, "\x00\x11\x22test\x00names\x00\x00\x04""foo", 20);
-  gzochi_metad_dataserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_main_context_iteration (fixture->socket_server->main_context, FALSE);
@@ -317,7 +363,7 @@ test_client_dispatch_one_release_key (dataserver_protocol_fixture *fixture,
   GByteArray *bytes = g_byte_array_new ();
 
   g_byte_array_append (bytes, "\x00\x0e\x40test\x00oids\x00\x00\x02""1", 17);
-  gzochi_metad_dataserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -333,7 +379,7 @@ test_client_dispatch_one_release_range
   g_byte_array_append
     (bytes, "\x00\x19\x42test\x00names\x00\x00\x05""foo1\x00\x00\x05""foo2\x00",
      28);
-  gzochi_metad_dataserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -354,7 +400,7 @@ test_client_dispatch_one_process_changeset
   g_byte_array_append (bytes, "names\x00\x00\x04""foo\x00\x00\x00", 14);
   g_byte_array_append (bytes, "names\x00\x00\x04""bar\x00\x00\x02""3", 16);
 
-  gzochi_metad_dataserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 4);
@@ -378,7 +424,7 @@ test_client_dispatch_multiple (dataserver_protocol_fixture *fixture,
     (bytes, "\x00\x11\x40test\x00names\x00""\x00\x04""foo", 20);
   g_byte_array_append
     (bytes, "\x00\x11\x40test\x00names\x00""\x00\x04""bar", 20);
-  gzochi_metad_dataserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 2);
@@ -392,7 +438,7 @@ static void
 test_client_error (dataserver_protocol_fixture *fixture,
 		   gconstpointer user_data)
 {
-  gzochi_metad_dataserver_client_protocol.error (fixture->client);
+  wrapper_protocol.error (fixture->client);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
   g_assert_cmpstr ((char *) activity_log->data, ==, "RELEASE ALL");

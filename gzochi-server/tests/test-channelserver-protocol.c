@@ -19,6 +19,7 @@
 #include <glib.h>
 #include <glib-object.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "channelserver-protocol.h"
@@ -109,11 +110,58 @@ gzochi_metad_channelserver_relay_close (GzochiMetadChannelServer *channelserver,
       channel_oid));
 }
 
+struct _metaserver_wrapper_client
+{
+  gzochi_metad_channelserver_client *channelserver_client;
+};
+
+typedef struct _metaserver_wrapper_client metaserver_wrapper_client;
+
+static gboolean
+can_dispatch_wrapper (const GByteArray *bytes, gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  return gzochi_metad_channelserver_client_protocol.can_dispatch
+    (bytes, wrapper_client->channelserver_client);
+}
+
+static unsigned int
+dispatch_wrapper (const GByteArray *bytes, gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  return gzochi_metad_channelserver_client_protocol.dispatch
+    (bytes, wrapper_client->channelserver_client);
+}
+
+static void
+error_wrapper (gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  gzochi_metad_channelserver_client_protocol.error
+    (wrapper_client->channelserver_client);
+}
+
+static void
+free_wrapper (gpointer data)
+{
+  metaserver_wrapper_client *wrapper_client = data;
+
+  gzochi_metad_channelserver_client_protocol.free
+    (wrapper_client->channelserver_client);
+  free (wrapper_client);
+}
+
+static gzochid_client_protocol wrapper_protocol =
+  { can_dispatch_wrapper, dispatch_wrapper, error_wrapper, free_wrapper };
+
 struct _channelserver_protocol_fixture
 {
   GzochidSocketServer *socket_server;
   GzochiMetadChannelServer *channelserver;
-  gzochi_metad_channelserver_client *client;
+  metaserver_wrapper_client *client;
 
   GIOChannel *read_channel;
   GIOChannel *write_channel;
@@ -128,8 +176,10 @@ channelserver_protocol_fixture_set_up (channelserver_protocol_fixture *fixture,
   int pipefd[2] = { 0 };
   int pipe_fd = pipe (pipefd);
   GIOChannel *write_channel = g_io_channel_unix_new (pipefd[1]);
+  metaserver_wrapper_client *wrapper_client =
+    malloc (sizeof (metaserver_wrapper_client));
   gzochid_client_socket *client_socket = gzochid_client_socket_new
-    (write_channel, "", gzochi_metad_channelserver_client_protocol, NULL);
+    (write_channel, "", wrapper_protocol, wrapper_client);
   
   fixture->socket_server = gzochid_resolver_require
     (GZOCHID_TYPE_SOCKET_SERVER, NULL);
@@ -138,7 +188,9 @@ channelserver_protocol_fixture_set_up (channelserver_protocol_fixture *fixture,
 
   fixture->read_channel = g_io_channel_unix_new (pipefd[0]);
   fixture->write_channel = write_channel;
-  fixture->client = gzochi_metad_channelserver_client_new
+  fixture->client = wrapper_client;
+
+  wrapper_client->channelserver_client = gzochi_metad_channelserver_client_new
     (fixture->channelserver, client_socket, 1);
   
   g_io_channel_set_flags (fixture->read_channel, G_IO_FLAG_NONBLOCK, NULL);  
@@ -156,7 +208,6 @@ channelserver_protocol_fixture_tear_down
   g_object_unref (fixture->channelserver);
   
   g_io_channel_unref (fixture->read_channel);
-  gzochi_metad_channelserver_client_protocol.free (fixture->client);
   
   clear_activity_log ();
 }
@@ -170,9 +221,7 @@ test_client_can_dispatch_true (channelserver_protocol_fixture *fixture,
   g_byte_array_append
     (bytes, "\x00\x0c\x76""foo\x00\x00\x00\x00\x00\x00\x00\x00\x01", 15);
 
-  g_assert
-    (gzochi_metad_channelserver_client_protocol.can_dispatch
-     (bytes, fixture->client));
+  g_assert (wrapper_protocol.can_dispatch (bytes, fixture->client));
 
   g_byte_array_unref (bytes);
 }
@@ -185,9 +234,7 @@ test_client_can_dispatch_false (channelserver_protocol_fixture *fixture,
 
   g_byte_array_append (bytes, "\x00\x0c\x76""foo", 7);
 
-  g_assert
-    (! gzochi_metad_channelserver_client_protocol.can_dispatch
-     (bytes, fixture->client));
+  g_assert (! wrapper_protocol.can_dispatch (bytes, fixture->client));
 
   g_byte_array_unref (bytes);
 }
@@ -202,7 +249,7 @@ test_client_dispatch_one_join (channelserver_protocol_fixture *fixture,
     (bytes, "\x00\x15\x70test\x00\x00\x00\x00\x00\x00\x00\x00\x02"
      "\x00\x00\x00\x00\x00\x00\x00\x03", 24);
 
-  gzochi_metad_channelserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -221,7 +268,7 @@ test_client_dispatch_one_leave (channelserver_protocol_fixture *fixture,
     (bytes, "\x00\x15\x72test\x00\x00\x00\x00\x00\x00\x00\x00\x02"
      "\x00\x00\x00\x00\x00\x00\x00\x03", 24);
 
-  gzochi_metad_channelserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -240,7 +287,7 @@ test_client_dispatch_one_relay_message (channelserver_protocol_fixture *fixture,
     (bytes, "\x00\x12\x74""foo\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\x04"
      "bar", 21);
   
-  gzochi_metad_channelserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
   
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -257,7 +304,7 @@ test_client_dispatch_one_close (channelserver_protocol_fixture *fixture,
   g_byte_array_append
     (bytes, "\x00\x0d\x76test\x00\x00\x00\x00\x00\x00\x00\x00\x02", 16);
 
-  gzochi_metad_channelserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
@@ -277,7 +324,7 @@ test_client_dispatch_multiple (channelserver_protocol_fixture *fixture,
     (bytes, "\x00\x15\x72test\x00\x00\x00\x00\x00\x00\x00\x00\x02"
      "\x00\x00\x00\x00\x00\x00\x00\x03", 24);
 
-  gzochi_metad_channelserver_client_protocol.dispatch (bytes, fixture->client);
+  wrapper_protocol.dispatch (bytes, fixture->client);
   g_byte_array_unref (bytes);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 2);
@@ -293,7 +340,7 @@ static void
 test_client_error (channelserver_protocol_fixture *fixture,
 		   gconstpointer user_data)
 {
-  gzochi_metad_channelserver_client_protocol.error (fixture->client);
+  wrapper_protocol.error (fixture->client);
 
   g_assert_cmpint (g_list_length (activity_log), ==, 1);
   g_assert_cmpstr ((char *) activity_log->data, ==, "SERVER 1 DISCONNECTED");
