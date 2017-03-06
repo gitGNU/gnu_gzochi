@@ -181,6 +181,8 @@ fill_recv_buffer (gzochid_client_socket *sock)
 
       if (error != NULL)
 	{
+	  g_warning ("Encountered error while reading from socket: %s",
+		     error->message);
 	  g_error_free (error);
 	  return FALSE;
 	}
