@@ -109,13 +109,9 @@ static void
 game_protocol_fixture_tear_down (game_protocol_fixture *fixture,
 				 gconstpointer user_data)
 {
-  GSource *server_source = g_main_context_find_source_by_user_data
-    (fixture->socket_server->main_context, fixture->server_socket);
   GSource *client_source = g_main_context_find_source_by_user_data
     (fixture->socket_server->main_context, fixture->client_socket);
 
-  g_source_unref (server_source);
-  
   if (client_source != NULL)
     g_source_unref (client_source);
 

@@ -721,6 +721,7 @@ handle_events (gpointer data)
 	  else
 	    {
 	      gzochid_reconnectable_socket_connect (client->socket, socket);
+	      gzochid_client_socket_unref (socket);
 	      break;
 	    }
 	}

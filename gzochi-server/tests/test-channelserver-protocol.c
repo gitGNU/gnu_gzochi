@@ -198,6 +198,7 @@ channelserver_protocol_fixture_set_up (channelserver_protocol_fixture *fixture,
   g_io_channel_set_flags (write_channel, G_IO_FLAG_NONBLOCK, NULL);
   
   gzochid_client_socket_listen (fixture->socket_server, client_socket);
+  gzochid_client_socket_unref (client_socket);
 }
 
 static void

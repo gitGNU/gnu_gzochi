@@ -1,5 +1,5 @@
 /* socket.h: Prototypes and declarations for socket.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -90,8 +90,9 @@ typedef struct _gzochid_client_socket gzochid_client_socket;
 gzochid_client_socket *gzochid_client_socket_new
 (GIOChannel *, const char *, gzochid_client_protocol, gpointer);
 
-/* Attach the specified client socket to the specifeid socket server and begin
-   handling events according to its associated protocol.
+/* Attach the specified client socket to the specified socket server, increasing
+   its reference count, and begin handling events according to its associated 
+   protocol.
 
    This function can be used to listen for events on a client socket that was 
    created explicitly - that is to say, not as the result of an `accept' 
@@ -100,9 +101,16 @@ gzochid_client_socket *gzochid_client_socket_new
 void gzochid_client_socket_listen
 (GzochidSocketServer *, gzochid_client_socket *);
 
-/* Frees the resources associated with the specified client socket. */
+/* Increases the reference count of the specified client socket and returns the
+   socket. */
 
-void gzochid_client_socket_free (gzochid_client_socket *);
+gzochid_client_socket *gzochid_client_socket_ref (gzochid_client_socket *);
+
+/* Decreases the reference count of the specified client socket. When the 
+   reference count reaches zero, the memory associated with the socket will 
+   be freed. */
+
+void gzochid_client_socket_unref (gzochid_client_socket *);
 
 /* Returns the connection description of the specified client socket. */
 

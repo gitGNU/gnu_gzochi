@@ -288,6 +288,7 @@ test_metaclient_LDADD = \
 	$(top_builddir)/src/libgzochid_la-event.o \
 	$(top_builddir)/src/libgzochid_la-event-app.o \
 	$(top_builddir)/src/libgzochid_la-metaclient.o \
+	$(top_builddir)/src/libgzochid_la-metaclient-protocol.o \
 	$(top_builddir)/src/libgzochid_la-protocol-common.o \
 	$(top_builddir)/src/libgzochid_la-resolver.o \
 	$(top_builddir)/src/libgzochid_la-socket.o \

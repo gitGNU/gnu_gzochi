@@ -673,8 +673,6 @@ test_client_error (metaserver_protocol_fixture *fixture,
 {
   GzochidEventLoop *event_loop = g_object_new (GZOCHID_TYPE_EVENT_LOOP, NULL);
   gzochid_event_source *event_source = NULL;
-  GSource *source = g_main_context_find_source_by_user_data
-    (fixture->socket_server->main_context, fixture->client_socket);
   gzochi_metad_metaserver_client *client =
     _gzochid_client_socket_get_protocol_data (fixture->client_socket);
   struct callback_data callback_data;
@@ -710,8 +708,6 @@ test_client_error (metaserver_protocol_fixture *fixture,
   
   g_mutex_clear (&callback_data.mutex);
   g_cond_clear (&callback_data.cond);
-  
-  g_source_unref (source);
 }
 
 int

@@ -72,7 +72,7 @@ channel_fixture_setup (channel_fixture *fixture, gconstpointer user_data)
 static void
 channel_fixture_teardown (channel_fixture *fixture, gconstpointer user_data)
 {
-  gzochid_client_socket_free (fixture->client_socket);
+  gzochid_client_socket_unref (fixture->client_socket);
   gzochid_application_context_free (fixture->app_context);
 
   g_io_channel_unref (fixture->read_channel);

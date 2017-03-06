@@ -33,14 +33,14 @@ G_DEFINE_TYPE (GzochidSocketServer, gzochid_socket_server, G_TYPE_OBJECT);
 /* Lifecycle functions for the `GzochidSocketServer' object. */
 
 static void
-gzochid_socket_server_dispose (GObject *gobject)
+gzochid_socket_server_finalize (GObject *gobject)
 {
   GzochidSocketServer *server = GZOCHID_SOCKET_SERVER (gobject);
 
   g_main_context_unref (server->main_context);
   g_main_loop_unref (server->main_loop);
 
-  G_OBJECT_CLASS (gzochid_socket_server_parent_class)->dispose (gobject);
+  G_OBJECT_CLASS (gzochid_socket_server_parent_class)->finalize (gobject);
 }
 
 static void
@@ -48,7 +48,7 @@ gzochid_socket_server_class_init (GzochidSocketServerClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-  object_class->dispose = gzochid_socket_server_dispose;
+  object_class->finalize = gzochid_socket_server_finalize;
 }
 
 static void
@@ -87,6 +87,8 @@ struct _gzochid_client_socket
 
   gzochid_client_protocol protocol; /* The client protocol. */
   gpointer protocol_data; /* Callback data for the client protocol. */
+
+  gint ref_count; /* The socket's reference count. */
 };
 
 gzochid_server_socket *
@@ -213,6 +215,13 @@ dispatch_client (GIOChannel *channel, GIOCondition condition, gpointer data)
 {
   gzochid_client_socket *sock = data;
 
+  /* It's possible that a dangling read or error may be dispatched to a 
+     destroyed source, which may already have been finalized. So check the 
+     destroyed status before doing anything else. */
+  
+  if (g_source_is_destroyed (g_main_current_source ()))
+    return FALSE;
+
   switch (condition)
     {
     case G_IO_IN:
@@ -245,29 +254,9 @@ gzochid_client_socket_new (GIOChannel *channel,
   sock->recv_buffer = g_byte_array_new ();
   sock->send_buffer = g_byte_array_new ();
 
+  sock->ref_count = 1;
+  
   return sock;
-}
-
-/* Free the client socket and all of its non-GSource members. (Those get freed
-   asynchronously via the source destroy functions in 
-   `gzochid_client_socket_free'. */
-
-static void
-free_client_socket (gpointer data)
-{
-  gzochid_client_socket *sock = data;
-
-  sock->protocol.free (sock->protocol_data);
-
-  if (sock->server != NULL)
-    g_object_unref (sock->server);
-
-  g_io_channel_unref (sock->channel);
-  g_mutex_clear (&sock->sock_mutex);
-  g_byte_array_unref (sock->recv_buffer);
-  g_byte_array_unref (sock->send_buffer);
-  g_free (sock->connection_description);
-  free (sock);
 }
 
 void gzochid_server_socket_free (gzochid_server_socket *sock)
@@ -281,7 +270,6 @@ free_server_socket (gpointer data)
 {
   gzochid_server_socket *sock = data;
 
-  g_object_unref (sock->server);  
   g_io_channel_unref (sock->channel);
   free (sock->addr);
   
@@ -301,11 +289,12 @@ add_client (GzochidSocketServer *server, gzochid_client_socket *sock)
      destroyed. */
   
   g_source_set_callback
-    (sock->read_source, (GSourceFunc) dispatch_client, sock,
-     free_client_socket);
+    (sock->read_source, (GSourceFunc) dispatch_client,
+     gzochid_client_socket_ref (sock),
+     (GDestroyNotify) gzochid_client_socket_unref);
   g_source_attach (sock->read_source, server->main_context);
   
-  sock->server = g_object_ref (server);  
+  sock->server = server;  
 }
 
 static gboolean
@@ -341,6 +330,7 @@ dispatch_accept (GIOChannel *channel, GIOCondition cond, gpointer data)
       g_io_channel_set_buffered (channel, FALSE);
 
       add_client (server_socket->server, sock);
+      gzochid_client_socket_unref (sock);
     }
 
   return TRUE;
@@ -365,7 +355,7 @@ void gzochid_server_socket_listen
   server_source = g_io_create_watch (sock->channel, G_IO_IN);
   
   assert (sock->server == NULL);
-  sock->server = g_object_ref (server);
+  sock->server = server;
   
   addr.sin_family = AF_INET;
   addr.sin_port = htons (port);
@@ -403,6 +393,7 @@ void gzochid_server_socket_listen
   g_source_set_callback
     (server_source, (GSourceFunc) dispatch_accept, sock, free_server_socket);
   g_source_attach (server_source, server->main_context);
+  g_source_unref (server_source);
 }
 
 static gpointer 
@@ -480,25 +471,55 @@ gzochid_client_socket_write (gzochid_client_socket *sock,
   g_mutex_unlock (&sock->sock_mutex);
 }
 
-void
-gzochid_client_socket_free (gzochid_client_socket *sock)
+gzochid_client_socket *
+gzochid_client_socket_ref (gzochid_client_socket *sock)
 {
-  /* It's not safe to free the socket synchronously if it's been added to a
-     main loop, because another thread may be in the process of dispatching a 
-     read or a write and the caller has no way of knowing that. Instead, unref 
-     both sources and let the `GDestroyNotify' attached to the read source take
-     care of the cleanup. */
+  g_atomic_int_inc (&sock->ref_count);
+  return sock;
+}
 
-  if (sock->write_source != NULL)
-    g_source_unref (sock->write_source);
-  
-  if (sock->read_source != NULL)
-    g_source_unref (sock->read_source);
+void
+gzochid_client_socket_unref (gzochid_client_socket *sock)
+{
+  if (g_atomic_int_dec_and_test (&sock->ref_count))
+    {
+      /* It's not safe to free the socket synchronously if it's been added to a
+	 main loop, because another thread may be in the process of dispatching
+	 a read or a write and the caller has no way of knowing that. Instead, 
+	 unref both sources and let the `GDestroyNotify' attached to the read 
+	 source take care of the cleanup. */
 
-  /* ...however, if the socket hasn't been added to a loop, it can be cleaned
-     up directly. */
-  
-  else free_client_socket (sock);
+      /* Need hold the socket mutex in case we're in the middle of a write. */
+      
+      g_mutex_lock (&sock->sock_mutex);
+      
+      if (sock->write_source != NULL)
+	{
+	  g_source_destroy (sock->write_source);
+	  g_source_unref (sock->write_source);
+	}
+      
+      g_mutex_unlock (&sock->sock_mutex);
+      
+      if (sock->read_source != NULL)
+	{
+	  if (! g_source_is_destroyed (sock->read_source))
+	    g_source_destroy (sock->read_source);
+	  g_source_unref (sock->read_source);
+	}
+      
+      sock->protocol.free (sock->protocol_data);
+      
+      g_io_channel_unref (sock->channel);
+      g_mutex_clear (&sock->sock_mutex);
+
+      g_byte_array_unref (sock->recv_buffer);
+      g_byte_array_unref (sock->send_buffer);
+
+      g_free (sock->connection_description);
+
+      free (sock);
+    }
 }
 
 /* A pair of lifecycle callbacks for a `gzochid_reconnectable_socket'. */
@@ -556,6 +577,9 @@ gzochid_reconnectable_socket_new ()
 void
 gzochid_reconnectable_socket_free (gzochid_reconnectable_socket *sock)
 {
+  if (sock->socket != NULL)
+    gzochid_client_socket_unref (sock->socket);
+    
   g_byte_array_unref (sock->outbound_messages);
   g_list_free_full (sock->listeners, free);
   
@@ -614,7 +638,7 @@ gzochid_reconnectable_socket_connect (gzochid_reconnectable_socket *sock,
   g_rec_mutex_lock (&sock->mutex);
 
   assert (sock->socket == NULL);
-  sock->socket = client_socket;
+  sock->socket = gzochid_client_socket_ref (client_socket);
 
   listener_ptr = sock->listeners;
   
@@ -649,6 +673,7 @@ gzochid_reconnectable_socket_disconnect (gzochid_reconnectable_socket *sock)
   g_rec_mutex_lock (&sock->mutex);
 
   assert (sock->socket != NULL);
+  gzochid_client_socket_unref (sock->socket);
   sock->socket = NULL;
 
   listener_ptr = sock->listeners;

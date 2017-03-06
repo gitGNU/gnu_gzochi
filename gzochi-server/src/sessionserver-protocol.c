@@ -37,8 +37,6 @@ struct _gzochi_metad_sessionserver_client
   /* Reference to the session server. */
 
   GzochiMetadSessionServer *sessionserver;
-
-  gzochid_client_socket *sock; /* The client socket. */
 };
 
 gzochi_metad_sessionserver_client *
@@ -50,7 +48,6 @@ gzochi_metad_sessionserver_client_new (GzochiMetadSessionServer *sessionserver,
     malloc (sizeof (gzochi_metad_sessionserver_client));
 
   client->sessionserver = g_object_ref (sessionserver);
-  client->sock = sock;
   client->node_id = node_id;
   
   return client;

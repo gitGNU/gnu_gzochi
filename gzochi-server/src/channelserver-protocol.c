@@ -37,8 +37,6 @@ struct _gzochi_metad_channelserver_client
   /* Reference to the channel server. */
 
   GzochiMetadChannelServer *channelserver;
-
-  gzochid_client_socket *sock; /* The client socket. */
 };
 
 gzochi_metad_channelserver_client *
@@ -50,7 +48,6 @@ gzochi_metad_channelserver_client_new (GzochiMetadChannelServer *channelserver,
     malloc (sizeof (gzochi_metad_channelserver_client));
 
   client->channelserver = g_object_ref (channelserver);
-  client->sock = sock;
   client->node_id = node_id;
   
   return client;  

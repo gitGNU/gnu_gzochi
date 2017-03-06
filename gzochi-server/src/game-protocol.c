@@ -406,12 +406,6 @@ dispatch_logout_request (gzochid_game_client *client)
   else disconnected (client->app_context, client);
 
   client->disconnected = TRUE;
-
-  /* This will trigger the client's read source to be destroyed and ultimately
-     the protocol's `free' function to be called. */
-  
-  gzochid_client_socket_free (client->sock);
-
 }
 
 /* Cleanup handler for the received message event. */
@@ -591,11 +585,6 @@ client_error (gpointer data)
       if (client->identity != NULL)
 	disconnected (client->app_context, client);
       client->disconnected = TRUE;
-
-      /* This will trigger the client's read source to be destroyed and 
-	 ultimately the protocol's `free' function to be called. */
-  
-      gzochid_client_socket_free (client->sock);
     }
 }
 

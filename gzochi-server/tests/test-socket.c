@@ -143,22 +143,8 @@ static void
 test_socket_fixture_tear_down (test_socket_fixture *fixture,
 			       gconstpointer user_data)
 {
-  GSource *server_source = g_main_context_find_source_by_user_data
-    (fixture->socket_server->main_context, fixture->server_socket);
-  GSource *client_source = g_main_context_find_source_by_user_data
-    (fixture->socket_server->main_context, fixture->client_socket);
-  
-  g_source_destroy (server_source);
-  g_source_unref (server_source);
-
-  if (client_source != NULL)
-    {
-      g_source_destroy (client_source);
-      g_source_unref (client_source);
-    }
-
-  free (fixture->state);
   g_object_unref (fixture->socket_server);
+  free (fixture->state);
 }
 
 static void
@@ -212,6 +198,7 @@ test_socket_client_listen ()
   g_assert_cmpint (state.can_dispatch_called, ==, 1);
 
   g_object_unref (socket_server);
+  gzochid_client_socket_unref (client_socket);
 }
 
 static void
