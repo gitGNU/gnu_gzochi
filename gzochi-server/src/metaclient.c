@@ -228,6 +228,7 @@ gzochid_meta_client_dispose (GObject *object)
   g_object_unref (client->channelclient);
   g_object_unref (client->dataclient);
   g_object_unref (client->resolution_context);
+  g_object_unref (client->sessionclient);
   g_object_unref (client->socket_server);
 
   g_main_context_unref (client->main_context);
@@ -862,6 +863,9 @@ gzochid_metaclient_stop (GzochidMetaClient *metaclient)
       
       g_thread_join (metaclient->thread);
 
+      if (metaclient->connection_description != NULL)
+	gzochid_metaclient_nullify_connection (metaclient);
+      
       g_free (metaclient->hostname);
       metaclient->hostname = NULL;
       metaclient->port = 0;

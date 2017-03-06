@@ -195,6 +195,8 @@ dispatch_login (gzochi_metad_metaserver_client *client, unsigned char *data,
 	(channelserver, client->node_id, client->sock, NULL);
       gzochi_metad_sessionserver_server_connected
 	(sessionserver, client->node_id, client->sock, NULL);
+
+      g_object_unref (channelserver);
       g_object_unref (sessionserver);      
 
       if (str_len > 1)
@@ -383,6 +385,7 @@ client_free (gpointer user_data)
   gzochi_metad_sessionserver_client_protocol.free
     (client->sessionserver_client);
 
+  g_object_unref (client->root_context);
   free (client);
 }
 
