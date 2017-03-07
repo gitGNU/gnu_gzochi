@@ -31,6 +31,11 @@
 #include "tx.h"
 #include "util.h"
 
+#ifdef G_LOG_DOMAIN
+#undef G_LOG_DOMAIN
+#endif /* G_LOG_DOMAIN */
+#define G_LOG_DOMAIN "gzochid.data"
+
 struct _gzochid_data_oid_block_state
 {
   guint64 first;
@@ -291,12 +296,18 @@ reserve_oids (gzochid_application_context *context)
     }
   else
     {
+      GError *err = NULL;
       gzochid_data_oids_block new_block;
 
-      assert (gzochid_oids_reserve_block
-	      (context->oid_strategy, &new_block, NULL));
-
-      block_state = create_oid_block_state (&new_block);
+      if (gzochid_oids_reserve_block (context->oid_strategy, &new_block, &err))
+	block_state = create_oid_block_state (&new_block);
+      else
+	{
+	  g_debug ("Failed to reserve oids: %s", err->message);
+	  gzochid_transaction_mark_for_rollback
+	    (&data_participant, err->code == GZOCHID_OIDS_ERROR_TRANSACTION);
+	  g_error_free (err);
+	}
     }
 
   g_mutex_unlock (&context->free_oids_lock);
@@ -379,12 +390,21 @@ create_empty_reference (gzochid_application_context *context, guint64 oid,
   return reference;
 }
 
-static int 
-next_object_id (gzochid_data_transaction_context *context, guint64 *oid)
+static gboolean
+next_object_id (gzochid_data_transaction_context *context, guint64 *oid,
+		GError **err)
 {
   if (context->free_oids == NULL)
     context->free_oids = reserve_oids (context->context);
 
+  if (context->free_oids == NULL)
+    {
+      g_set_error
+	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION,
+	 "Failed to compute next object id.");
+      return FALSE;
+    }
+  
   *oid = context->free_oids->next;
   context->free_oids->next += 1;
 
@@ -393,26 +413,33 @@ next_object_id (gzochid_data_transaction_context *context, guint64 *oid)
       context->used_oid_blocks = g_list_append 
 	(context->used_oid_blocks, context->free_oids);
       context->free_oids = reserve_oids (context->context);
+
+      if (context->free_oids == NULL)
+	{
+	  g_set_error
+	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION,
+	     "Failed to compute next object id.");
+	  return FALSE;
+	}
     }
 
-  return 0;
+  return TRUE;
 }
 
 gzochid_data_managed_reference *
 create_new_reference (gzochid_application_context *context, void *ptr, 
-		      gzochid_io_serialization *serialization)
+		      gzochid_io_serialization *serialization, GError **err)
 {
+  guint64 oid;
+  GError *local_err = NULL;
   gzochid_data_transaction_context *tx_context = 
     gzochid_transaction_context (&data_participant);
-  gzochid_data_managed_reference *reference = 
-    calloc (1, sizeof (gzochid_data_managed_reference));
-  
-  reference->context = context;
-  
-  next_object_id (tx_context, &reference->oid);
-  reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NEW;
-  reference->serialization = serialization;
-  reference->obj = ptr;
+    
+  if (!next_object_id (tx_context, &oid, &local_err))
+    {
+      g_propagate_error (err, local_err);
+      return NULL;
+    }
 
   /*
     Once this function returns, callers will have an oid of the object that will
@@ -424,14 +451,41 @@ create_new_reference (gzochid_application_context *context, void *ptr,
   
   if (!tx_context->transaction->rollback)
     {
-      guint64 encoded_oid = gzochid_util_encode_oid (reference->oid);
+      gzochid_data_managed_reference *reference = 
+	calloc (1, sizeof (gzochid_data_managed_reference));
+      guint64 encoded_oid;
+
+      reference->oid = oid;
+      reference->state = GZOCHID_MANAGED_REFERENCE_STATE_NEW;
+      reference->serialization = serialization;
+      reference->obj = ptr;
+
+      encoded_oid = gzochid_util_encode_oid (reference->oid);
       
       context->storage_engine_interface->transaction_get_for_update
 	(tx_context->transaction, tx_context->context->oids,
 	 (char *) &encoded_oid, sizeof (guint64), NULL);
+
+      if (tx_context->transaction->rollback)	
+	{
+	  gzochid_transaction_mark_for_rollback 
+	    (&data_participant, tx_context->transaction->should_retry);
+	  g_set_error 
+	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	     "Transaction rolled back while creating new reference.");
+
+	  free (reference);
+	  return NULL;
+	}
+      else return reference;
     }
-  
-  return reference;
+  else
+    {
+      g_set_error 
+	(err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
+	 "Attempted reference creation after transaction marked for rollback.");
+      return NULL;
+    }
 }
 
 static gzochid_data_managed_reference *
@@ -465,27 +519,19 @@ get_reference_by_ptr (gzochid_application_context *context, void *ptr,
 
   if (reference == NULL)
     {
-      reference = create_new_reference (context, ptr, serialization);
+      GError *local_err = NULL;
 
-      assert (g_hash_table_lookup 
-	      (tx_context->oids_to_references, &reference->oid) == NULL);
-      assert (g_hash_table_lookup 
-	      (tx_context->ptrs_to_references, ptr) == NULL);
+      reference = create_new_reference
+	(context, ptr, serialization, &local_err);
 
-      g_hash_table_insert
-	(tx_context->oids_to_references,
-	 g_memdup (&reference->oid, sizeof (guint64)), reference);
-      g_hash_table_insert (tx_context->ptrs_to_references, ptr, reference);
-
-      if (tx_context->transaction->rollback)
+      if (reference != NULL)
 	{
-	  gzochid_transaction_mark_for_rollback 
-	    (&data_participant, tx_context->transaction->should_retry);
-	  g_set_error 
-	    (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION, 
-	     "Transaction rolled back while creating new reference.");
-	  return NULL;
+	  g_hash_table_insert
+	    (tx_context->oids_to_references,
+	     g_memdup (&reference->oid, sizeof (guint64)), reference);
+	  g_hash_table_insert (tx_context->ptrs_to_references, ptr, reference);
 	}
+      else g_propagate_error (err, local_err);
     }
   
   return reference;

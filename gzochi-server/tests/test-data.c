@@ -32,6 +32,14 @@ static gboolean serialized = FALSE;
 static gboolean deserialized = FALSE;
 static gboolean finalized = FALSE;
 
+static gboolean
+allocate_fail (gpointer data, gzochid_data_oids_block *block, GError **err)
+{
+  g_set_error
+    (err, GZOCHID_OIDS_ERROR, GZOCHID_OIDS_ERROR_FAILED, "Allocation failure.");
+  return FALSE;
+}
+
 static void 
 test_serializer 
 (gzochid_application_context *context, void *ptr, GByteArray *out, GError **err)
@@ -85,7 +93,7 @@ fetch_reference (gpointer data)
 }
 
 static void 
-application_context_init (gzochid_application_context *context)
+application_context_init_inner (gzochid_application_context *context)
 {
   context->storage_engine_interface = &gzochid_storage_engine_interface_mem;
   context->storage_context = 
@@ -96,7 +104,20 @@ application_context_init (gzochid_application_context *context)
     (context->storage_context, "/dev/null", 0);
   context->names = gzochid_storage_engine_interface_mem.open 
     (context->storage_context, "/dev/null", 0);
+}
 
+static void
+application_context_init_full (gzochid_application_context *context,
+			       gzochid_oid_allocation_strategy *strategy)
+{
+  application_context_init_inner (context);
+  context->oid_strategy = strategy;
+}
+
+static void 
+application_context_init (gzochid_application_context *context)
+{
+  application_context_init_inner (context);
   context->oid_strategy = gzochid_storage_oid_strategy_new
     (context->storage_engine_interface, context->storage_context,
      context->meta);
@@ -113,7 +134,77 @@ application_context_shutdown (gzochid_application_context *context)
   gzochid_oid_allocation_strategy_free (context->oid_strategy);
 }
 
-static void test_data_reference_finalize ()
+static void
+data_reference_by_ptr_success_inner (gpointer data)
+{
+  GError *err = NULL;
+  GString *str = g_string_new ("test-string");
+  gzochid_application_context *context = data;
+  gzochid_data_managed_reference *ref = gzochid_data_create_reference
+    (context, &test_serialization, str, &err);
+
+  g_assert (ref != NULL);
+  g_assert_no_error (err); 
+}
+
+static void
+test_data_reference_by_ptr_success ()
+{
+  gzochid_application_context *context = gzochid_application_context_new ();
+  gzochid_storage_transaction *tx = NULL;
+
+  application_context_init (context);
+
+  tx = gzochid_storage_engine_interface_mem.transaction_begin
+    (context->storage_context);
+  
+  gzochid_transaction_execute
+    (data_reference_by_ptr_success_inner, context);
+  gzochid_storage_engine_interface_mem.transaction_rollback (tx);  
+
+  application_context_shutdown (context);
+  gzochid_application_context_free (context);
+}
+
+static void
+data_reference_by_ptr_failure_oids_inner (gpointer data)
+{
+  GError *err = NULL;
+  GString *str = g_string_new ("test-string");
+  gzochid_application_context *context = data;
+  gzochid_data_managed_reference *ref = gzochid_data_create_reference
+    (context, &test_serialization, str, &err);
+
+  g_assert (ref == NULL);
+  g_assert_error (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_TRANSACTION);
+
+  g_string_free (str, TRUE);
+  g_error_free (err);
+  
+}
+
+static void
+test_data_reference_by_ptr_failure_oids ()
+{
+  gzochid_application_context *context = gzochid_application_context_new ();
+  gzochid_storage_transaction *tx = NULL;
+
+  application_context_init_full
+    (context, gzochid_oid_allocation_strategy_new (allocate_fail, NULL, NULL));
+
+  tx = gzochid_storage_engine_interface_mem.transaction_begin
+    (context->storage_context);
+  
+  gzochid_transaction_execute
+    (data_reference_by_ptr_failure_oids_inner, context);
+  gzochid_storage_engine_interface_mem.transaction_rollback (tx);  
+
+  application_context_shutdown (context);
+  gzochid_application_context_free (context);
+}
+
+static void
+test_data_reference_finalize ()
 {
   gzochid_application_context *context = gzochid_application_context_new ();
   gzochid_storage_transaction *tx = NULL;
@@ -200,6 +291,10 @@ main (int argc, char *argv[])
 {
   g_test_init (&argc, &argv, NULL);
 
+  g_test_add_func ("/data/reference/by-pointer/success",
+		   test_data_reference_by_ptr_success);
+  g_test_add_func ("/data/reference/by-pointer/failure-oids",
+		   test_data_reference_by_ptr_failure_oids);
   g_test_add_func ("/data/reference/finalize", test_data_reference_finalize);
   g_test_add_func ("/data/transaction/prepare/flush-reference-failure",
 		   test_data_transaction_prepare_flush_reference_failure);
