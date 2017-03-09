@@ -149,6 +149,17 @@ login_catch_worker (gzochid_application_context *context,
   gzochid_client_session_disconnected_worker (context, identity, session_oid);
 }
 
+/* A `gzochid_application_worker' implementation intended for use as the 
+   "cleanup" task worker for the transactional stage of the login process (see
+   below); frees the heap-allocated session oid. */
+
+static void
+login_cleanup_worker (gzochid_application_context *context,
+		      gzochid_auth_identity *identity, gpointer data)
+{
+  g_free (data);
+}
+
 /* The application task worker for the login event.  */
 
 static void
@@ -164,6 +175,7 @@ logged_in_task (gzochid_application_context *context,
   
   gzochid_application_task *login_task = NULL;
   gzochid_application_task *login_catch_task = NULL;
+  gzochid_application_task *login_cleanup_task = NULL;
   gzochid_application_task *application_task = NULL;
   gzochid_transactional_application_task_execution *execution = NULL;    
 
@@ -192,18 +204,21 @@ logged_in_task (gzochid_application_context *context,
   login_task = gzochid_application_task_new
     (context, identity, gzochid_scheme_application_logged_in_worker,
      session_oid);
-
   login_catch_task = gzochid_application_task_new
     (context, identity, login_catch_worker, session_oid);
-
+  login_cleanup_task = gzochid_application_task_new
+    (context, identity, login_cleanup_worker, session_oid);
+  
   execution = gzochid_transactional_application_task_timed_execution_new 
-    (login_task, login_catch_task, NULL, client->closure->tx_timeout);
+    (login_task, login_catch_task, login_cleanup_task,
+     client->closure->tx_timeout);
 
   /* Not necessary to hold a ref to these, as we've transferred them to the
      execution. */
   
   gzochid_application_task_unref (login_task);
   gzochid_application_task_unref (login_catch_task);
+  gzochid_application_task_unref (login_cleanup_task);
 
   g_mutex_lock (&context->client_mapping_lock);
   g_hash_table_insert (context->oids_to_clients,
