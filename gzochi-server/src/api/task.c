@@ -51,8 +51,10 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
   if (scm_is_false (delay) || scm_is_eq (delay, SCM_UNDEFINED))
     {
       gzochid_schedule_durable_task 
-	(context, identity, scheme_task, &gzochid_scheme_task_serialization);
-      
+	(context, identity, scheme_task, &gzochid_scheme_task_serialization,
+	 NULL);
+
+      gzochid_application_task_unref (scheme_task);      
       gzochid_api_check_transaction ();
       
       return SCM_UNSPECIFIED;
@@ -69,8 +71,9 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
 	{
 	  gzochid_schedule_delayed_durable_task 
 	    (context, identity, scheme_task, 
-	     &gzochid_scheme_task_serialization, delay_tv);
-	  
+	     &gzochid_scheme_task_serialization, delay_tv, NULL);
+
+	  gzochid_application_task_unref (scheme_task);      
 	  gzochid_api_check_transaction ();
 	  
 	  return SCM_UNSPECIFIED;
@@ -88,8 +91,10 @@ SCM_DEFINE (primitive_schedule_task, "primitive-schedule-task", 1, 2, 0,
 	  
 	  handle = gzochid_schedule_periodic_durable_task 
 	    (context, identity, scheme_task, 
-	     &gzochid_scheme_task_serialization, delay_tv, period_tv);
+	     &gzochid_scheme_task_serialization, delay_tv, period_tv, NULL);
 
+	  gzochid_application_task_unref (scheme_task);
+	  
 	  /* Scheduling a durable task can fail, since it depends on the health
 	     of the current transaction... */	     
 	  
