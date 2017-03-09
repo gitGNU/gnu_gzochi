@@ -569,7 +569,7 @@ gzochid_schedule_delayed_durable_task
   
   gzochid_durable_application_task_handle *handle = 
     gzochid_create_durable_application_task_handle
-    (task, serialization, delay, NULL, &err);
+    (task, serialization, delay, NULL, &local_err);
 
   if (handle != NULL)
     gzochid_schedule_durable_task_handle (context, handle, err);
