@@ -165,8 +165,6 @@ gzochid_scheme_application_initialized_worker
 static gzochid_application_callback *
 scm_to_callback (gzochid_application_context *context, SCM scm_callback)
 {
-  GList *module = gzochid_scheme_callback_module (scm_callback);
-  char *procedure = gzochid_scheme_callback_procedure (scm_callback);
   gzochid_scm_location_info *scm_callback_reloc = gzochid_scm_location_get
     (context, scm_callback);
   
@@ -176,8 +174,14 @@ scm_to_callback (gzochid_application_context *context, SCM scm_callback)
 
   if (reference == NULL) /* Can happen on transaction timeout. */
     return NULL;
-  else return gzochid_application_callback_new
-	 (procedure, module, reference->oid);
+  else
+    {
+      GList *module = gzochid_scheme_callback_module (scm_callback);
+      char *procedure = gzochid_scheme_callback_procedure (scm_callback);
+      
+      return gzochid_application_callback_new
+	(procedure, module, reference->oid);
+    }
 }
 
 static gpointer 
@@ -279,6 +283,11 @@ gzochid_scheme_application_logged_in_worker
 	(context, &gzochid_scm_location_aware_serialization, scm_handler_reloc,
 	 NULL);
 
+      /* If the reference couldn't be created, bail out. */
+      
+      if (handler_reference == NULL)
+	return;
+      
       scm_gc_protect_object (handler);
       
       gzochid_client_session_set_handler
