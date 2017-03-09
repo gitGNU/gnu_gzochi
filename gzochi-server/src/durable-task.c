@@ -551,12 +551,11 @@ durable_task_cleanup_worker (gzochid_application_context *context,
 void 
 gzochid_schedule_durable_task 
 (gzochid_application_context *context, gzochid_auth_identity *identity,
- gzochid_application_task *task, 
- gzochid_application_task_serialization *serialization)
+ gzochid_application_task *task,
+ gzochid_application_task_serialization *serialization, GError **err)
 {
-  struct timeval immediate = { 0, 0 };
   gzochid_schedule_delayed_durable_task 
-    (context, identity, task, serialization, immediate);
+    (context, identity, task, serialization, (struct timeval) { 0, 0 }, err);
 }
 
 void 
@@ -564,14 +563,17 @@ gzochid_schedule_delayed_durable_task
 (gzochid_application_context *context, gzochid_auth_identity *identity,
  gzochid_application_task *task, 
  gzochid_application_task_serialization *serialization, 
- struct timeval delay)
+ struct timeval delay, GError **err)
 {
+  GError *local_err = NULL;
+  
   gzochid_durable_application_task_handle *handle = 
     gzochid_create_durable_application_task_handle
-    (task, serialization, delay, NULL, NULL);
+    (task, serialization, delay, NULL, &err);
 
   if (handle != NULL)
-    gzochid_schedule_durable_task_handle (context, handle, NULL);
+    gzochid_schedule_durable_task_handle (context, handle, err);
+  else g_propagate_error (err, local_err);
 }
 
 gzochid_periodic_task_handle *
@@ -579,31 +581,34 @@ gzochid_schedule_periodic_durable_task
 (gzochid_application_context *context, gzochid_auth_identity *identity, 
  gzochid_application_task *task,
  gzochid_application_task_serialization *serialization, 
- struct timeval delay, struct timeval period)
+ struct timeval delay, struct timeval period, GError **err)
 {
+  GError *local_err = NULL;
   gzochid_durable_application_task_handle *handle = 
     gzochid_create_durable_application_task_handle
-    (task, serialization, delay, &period, NULL);
+    (task, serialization, delay, &period, &local_err);
 
   if (handle != NULL)
     {
-      GError *err = NULL;
+      gzochid_schedule_durable_task_handle (context, handle, &local_err);
 
-      gzochid_schedule_durable_task_handle (context, handle, &err);
-
-      if (err == NULL)
+      if (local_err == NULL)
 	return handle;
       else
 	{
 	  g_debug
 	    ("Failed to schedule durable task in transaction: %s",
-	     err->message);
+	     local_err->message);
 
-	  g_error_free (err);
+	  g_propagate_error (err, local_err);
 	  return NULL;
 	}
     }
-  else return NULL;
+  else
+    {
+      g_propagate_error (err, local_err);
+      return NULL;
+    }
 }
 
 void gzochid_schedule_durable_task_handle

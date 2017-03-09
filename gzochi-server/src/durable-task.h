@@ -1,5 +1,5 @@
 /* durable-task.h: Prototypes and declarations for durable-task.c
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -75,19 +75,49 @@ gzochid_create_durable_application_task_handle
 (gzochid_application_task *, gzochid_application_task_serialization *,
  struct timeval, struct timeval *, GError **);
 
+/* 
+   Durably persists the specified application task and schedules it for 
+   immediate, one-time execution; if not successfully completed in the event of
+   server failure, it will be rescheduled on server startup.
+
+   Errors are signaled via the `GError' argument, if present.
+ */
+
 void gzochid_schedule_durable_task
 (gzochid_application_context *, gzochid_auth_identity *, 
- gzochid_application_task *, gzochid_application_task_serialization *);
+ gzochid_application_task *, gzochid_application_task_serialization *,
+ GError **);
+
+/* 
+   Durably persists the specified application task and schedules it for 
+   one-time execution after the specified delay; if not successfully completed 
+   in the event of server failure, it will be rescheduled on server startup.
+
+   Errors are signaled via the `GError' argument, if present.
+ */
 
 void gzochid_schedule_delayed_durable_task 
 (gzochid_application_context *, gzochid_auth_identity *, 
  gzochid_application_task *, gzochid_application_task_serialization *, 
- struct timeval);
+ struct timeval, GError **);
+
+/* 
+   Durably persists the specified application task and schedules it for 
+   repeated execution (with the specified interval delay) after the specified 
+   initial delay; in the event of server failure, execcution will be resumed on
+   server startup.
+
+   On success, this function returns a handle that can be used to cancel further
+   executions of the task.
+
+   On error, this function returns `NULL' and sets the `GError' argument, if 
+   present.
+ */
 
 gzochid_periodic_task_handle *gzochid_schedule_periodic_durable_task 
 (gzochid_application_context *, gzochid_auth_identity *, 
  gzochid_application_task *, gzochid_application_task_serialization *, 
- struct timeval, struct timeval);
+ struct timeval, struct timeval, GError **);
 
 /*
   Schedules the specified durable task handle within the context of the current

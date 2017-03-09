@@ -1057,9 +1057,9 @@ join_transaction (gzochid_application_context *context)
   if (!gzochid_transaction_active()
       || gzochid_transaction_context (&channel_participant) == NULL)
     {
+      gzochid_durable_queue *queue = gzochid_durable_queue_new (context);
       gzochid_data_managed_reference *queue_ref = gzochid_data_create_reference
-	(context, &gzochid_durable_queue_serialization,
-	 gzochid_durable_queue_new (context), NULL);
+	(context, &gzochid_durable_queue_serialization, queue, NULL);
 
       /* The reference to the queue may be `NULL' if the data transaction 
 	 deadlocks or times out. If that happens, this function shouldn't join
@@ -1081,6 +1081,7 @@ join_transaction (gzochid_application_context *context)
 	    (context, gzochid_auth_system_identity (),
 	     tx_context->queue_ref->obj, NULL);
 	}
+      else gzochid_durable_queue_free (queue);
     }
   else tx_context = gzochid_transaction_context (&channel_participant);
 
@@ -1422,6 +1423,8 @@ gzochid_channel_send (gzochid_application_context *context,
       (tx_context->queue_ref->obj,
        &gzochid_durable_application_task_handle_serialization,
        task_handle, NULL);
+  
+  else finalize_channel_operation (context, operation);
 }
 
 void
