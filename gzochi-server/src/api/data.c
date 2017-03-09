@@ -1,5 +1,5 @@
 /* data.c: Primitive functions for user-facing gzochi data management API
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -202,13 +202,18 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
 
   free (prefixed_name);
 
-  if (err != NULL && g_error_matches
-      (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_FAILED))
+  if (err != NULL)
     {
-      SCM cond = gzochid_scheme_make_name_not_bound_condition (cname);
-
-      free (cname);
-      gzochid_guile_r6rs_raise (cond);
+      if (g_error_matches (err, GZOCHID_DATA_ERROR, GZOCHID_DATA_ERROR_FAILED))
+	{
+	  SCM cond = gzochid_scheme_make_name_not_bound_condition (cname);
+	  
+	  free (cname);
+	  g_error_free (err);
+      
+	  gzochid_guile_r6rs_raise (cond);
+	}
+      else g_error_free (err);
     }
   else free (cname);
 
