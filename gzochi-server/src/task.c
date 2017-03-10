@@ -1,5 +1,5 @@
 /* task.c: Application task management routines for gzochid
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,8 +18,10 @@
 #include <glib.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "task.h"
+#include "threads.h"
 
 gzochid_task *
 gzochid_task_new (gzochid_thread_worker worker, gpointer data, 
@@ -48,4 +50,3 @@ gzochid_task_free (gzochid_task *task)
 {
   free (task);
 }
-

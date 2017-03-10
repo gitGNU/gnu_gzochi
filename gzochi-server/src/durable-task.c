@@ -78,11 +78,32 @@ create_transaction_context (gzochid_application_context *app_context)
   return tx_context;
 }
 
+/* Wrapper around `gzochid_task_free' to allow the embedded 
+   `gzochid_application_task' to be unref'd before the outer task is freed. (For
+   obvious reasons, this must only be used on tasks that wrap a 
+   `gzochid_application_task'!) */
+
+static void
+task_free_wrapper (gpointer data)
+{
+  gzochid_task *task = data;
+
+  gzochid_application_task_unref (task->data);
+  gzochid_task_free (task);
+}
+
+/* Releases the resources used by the specified task transaction. The `unref'
+   flag determines whether the application tasks are unref'd (in the case of
+   rollback, in which they will never be executed) or not (in the case of 
+   commit, in which they will be unref'd after execution). */ 
+
 static void 
-cleanup_transaction (gzochid_task_transaction_context *tx_context)
+cleanup_transaction (gzochid_task_transaction_context *tx_context,
+		     gboolean unref_app_tasks)
 {
   g_list_free_full
-    (tx_context->scheduled_tasks, (GDestroyNotify) gzochid_task_free);
+    (tx_context->scheduled_tasks,
+     unref_app_tasks ? task_free_wrapper : (GDestroyNotify) gzochid_task_free);
   free (tx_context);
 }
 
@@ -102,14 +123,13 @@ task_commit (gpointer data)
 
   g_list_foreach (tx_context->scheduled_tasks, commit_scheduled_task, data);
 
-  cleanup_transaction (tx_context);
+  cleanup_transaction (tx_context, FALSE);
 }
 
 static void 
 task_rollback (gpointer data)
 { 
-  gzochid_task_transaction_context *tx_context = data;
-  cleanup_transaction (tx_context);
+  cleanup_transaction (data, TRUE);
 }
 
 static gzochid_transaction_participant task_participant = 
