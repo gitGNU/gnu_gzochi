@@ -215,7 +215,8 @@ SCM_DEFINE (primitive_remove_binding_x, "primitive-remove-binding!", 1, 0, 0,
 	}
       else g_error_free (err);
     }
-  else free (cname);
+
+  free (cname);
 
   gzochid_api_check_transaction ();
   return SCM_UNSPECIFIED;
