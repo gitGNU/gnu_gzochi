@@ -586,8 +586,9 @@ static void
 client_free (gpointer data)
 {
   gzochid_game_client *client = data;
-  
-  gzochid_auth_identity_unref (client->identity);
+
+  if (client->identity != NULL)
+    gzochid_auth_identity_unref (client->identity);
   free (client);
 }
 
