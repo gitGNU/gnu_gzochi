@@ -1306,6 +1306,11 @@ gzochid_channel_join (gzochid_application_context *context,
       (tx_context->queue_ref->obj,
        &gzochid_durable_application_task_handle_serialization,
        task_handle, NULL);
+
+  /* If the task handle couldn't be created, we have to clean up the channel
+     operation explicitly. */
+  
+  else finalize_channel_operation (context, operation);
 }
 
 void
@@ -1367,6 +1372,11 @@ gzochid_channel_leave (gzochid_application_context *context,
       (tx_context->queue_ref->obj,
        &gzochid_durable_application_task_handle_serialization,
        task_handle, NULL);
+
+  /* If the task handle couldn't be created, we have to clean up the channel
+     operation explicitly. */
+  
+  else finalize_channel_operation (context, operation);
 }
 
 void
@@ -1423,6 +1433,9 @@ gzochid_channel_send (gzochid_application_context *context,
       (tx_context->queue_ref->obj,
        &gzochid_durable_application_task_handle_serialization,
        task_handle, NULL);
+
+  /* If the task handle couldn't be created, we have to clean up the channel
+     operation explicitly. */
   
   else finalize_channel_operation (context, operation);
 }
@@ -1472,6 +1485,11 @@ gzochid_channel_close (gzochid_application_context *context,
       (tx_context->queue_ref->obj,
        &gzochid_durable_application_task_handle_serialization,
        task_handle, NULL);
+
+  /* If the task handle couldn't be created, we have to clean up the channel
+     operation explicitly. */
+  
+  else finalize_channel_operation (context, operation);
 }
 
 GQuark
