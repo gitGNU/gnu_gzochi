@@ -603,9 +603,6 @@ find_evicted_key (dataclient_environment *environment,
   Upon hitting zero, the data client for the specified environment is notified
   that the lock should be released. The lock itself is also freed, via 
   `free_lock'.
-
-  Because this function manipulates the eviction lists, the caller must hold
-  the environment's mutex.
 */
 
 static gboolean
@@ -645,11 +642,15 @@ lock_unref (dataclient_environment *environment, dataclient_lock *lock)
 	    }
 
 	  /* Remove the key from the eviction list... */
+
+	  g_mutex_lock (&environment->mutex);
 	  
 	  environment->evicted_keys = g_list_remove
 	    (environment->evicted_keys, evicted_key);
 	  
 	  dataclient_evicted_key_free (evicted_key); /* ...and free it. */
+
+	  g_mutex_unlock (&environment->mutex);
 	}
 
       return TRUE;
