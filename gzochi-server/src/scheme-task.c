@@ -178,9 +178,13 @@ scm_to_callback (gzochid_application_context *context, SCM scm_callback)
     {
       GList *module = gzochid_scheme_callback_module (scm_callback);
       char *procedure = gzochid_scheme_callback_procedure (scm_callback);
-      
-      return gzochid_application_callback_new
+      gzochid_application_callback *callback = gzochid_application_callback_new
 	(procedure, module, reference->oid);
+
+      g_list_free_full (module, free);      
+      free (procedure);
+      
+      return callback;
     }
 }
 
@@ -276,6 +280,7 @@ gzochid_scheme_application_logged_in_worker
     }
   else
     {
+      gzochid_client_session_handler *session_handler = NULL;
       gzochid_scm_location_info *scm_handler_reloc = 
 	gzochid_scm_location_get (context, handler);
       gzochid_data_managed_reference *handler_reference = 
@@ -289,10 +294,11 @@ gzochid_scheme_application_logged_in_worker
 	return;
       
       scm_gc_protect_object (handler);
+
+      session_handler = gzochid_with_application_context 
+	(context, identity, unpack_handler, handler);
       
-      gzochid_client_session_set_handler
-	(session, gzochid_with_application_context 
-	 (context, identity, unpack_handler, handler));
+      gzochid_client_session_set_handler (session, session_handler);
       gzochid_client_session_set_handler_scm_oid
 	(session, handler_reference->oid);
       
@@ -314,6 +320,15 @@ gzochid_scheme_application_logged_in_worker
 		(session, reloc_reference->oid);
 	      gzochid_client_session_send_login_success (context, session);
 	    }
+	}
+      else
+	{
+	  if (session_handler->received_message != NULL)
+	    gzochid_application_callback_free
+	      (session_handler->received_message);
+	  if (session_handler->disconnected != NULL)
+	    gzochid_application_callback_free (session_handler->disconnected);
+	  free (session_handler);
 	}
       
       if (err != NULL)
