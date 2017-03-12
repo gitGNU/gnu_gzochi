@@ -193,9 +193,8 @@ scheme_managed_record_deserializer (gzochid_application_context *context,
   int vec_len = gzochi_common_io_read_int (in->data, 0);
   SCM vec = SCM_EOL, port = SCM_EOL, record = SCM_EOL;
   SCM exception_var = scm_make_variable (SCM_UNSPECIFIED);
-  GList *args = g_list_append 
-    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "data");
-
+  GList *args = NULL;
+  
   g_byte_array_remove_range (in, 0, 4);
 
   if (vec_len > in->len)
@@ -209,6 +208,9 @@ scheme_managed_record_deserializer (gzochid_application_context *context,
   vec = scm_take_u8vector (in->data, vec_len);
   port = scm_open_bytevector_input_port (vec, SCM_BOOL_F);
 
+  args = g_list_append
+    (g_list_append (g_list_append (NULL, "gzochi"), "private"), "data");
+  
   record = gzochid_scheme_invoke_callback
     (context, 
      NULL,
