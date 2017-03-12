@@ -638,8 +638,6 @@ void gzochid_schedule_durable_task_handle
   guint64 *oid = NULL;
   GError *local_err = NULL;
 
-  gzochid_auth_identity *cloned_identity = NULL;
-
   gzochid_application_task *transactional_task = NULL;
   gzochid_application_task *catch_task = NULL;
   gzochid_application_task *cleanup_task = NULL;
@@ -689,15 +687,13 @@ void gzochid_schedule_durable_task_handle
   
   tx_context = join_transaction (app_context);
   
-  cloned_identity = gzochid_auth_identity_ref (task_handle->identity);
-
   transactional_task = gzochid_application_task_new
-    (app_context, cloned_identity, durable_task_application_worker,
+    (app_context, task_handle->identity, durable_task_application_worker,
      durable_task);
   catch_task = gzochid_application_task_new
-    (app_context, cloned_identity, durable_task_catch_worker, oid);
+    (app_context, task_handle->identity, durable_task_catch_worker, oid);
   cleanup_task = gzochid_application_task_new
-    (app_context, cloned_identity, durable_task_cleanup_worker, oid);
+    (app_context, task_handle->identity, durable_task_cleanup_worker, oid);
   execution = gzochid_transactional_application_task_timed_execution_new 
     (transactional_task, catch_task, cleanup_task, app_context->tx_timeout);
 
@@ -709,7 +705,7 @@ void gzochid_schedule_durable_task_handle
   gzochid_application_task_unref (cleanup_task);
   
   application_task = gzochid_application_task_new
-    (app_context, cloned_identity,
+    (app_context, task_handle->identity,
      gzochid_application_resubmitting_transactional_task_worker, execution);
 
   tx_context->scheduled_tasks = g_list_append 
