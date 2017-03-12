@@ -1,5 +1,5 @@
 /* mock-data.c: Test-time replacements for data.c routines.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ static gzochid_data_managed_reference *
 create_empty_reference (gzochid_application_context *context, guint64 oid, 
  gzochid_io_serialization *serialization)
 {
-  guint64 *oid_ptr = malloc (sizeof (guint64));
+  guint64 *oid_ptr = g_memdup (&oid, sizeof (guint64));
   gzochid_data_managed_reference *reference = 
     calloc (1, sizeof (gzochid_data_managed_reference));
 
@@ -41,8 +41,6 @@ create_empty_reference (gzochid_application_context *context, guint64 oid,
   reference->state = GZOCHID_MANAGED_REFERENCE_STATE_EMPTY;
   reference->serialization = serialization;
 
-  oid_ptr = g_memdup (&oid, sizeof (guint64));
- 
   g_hash_table_insert (oids_to_references, oid_ptr, reference);
   
   return reference;

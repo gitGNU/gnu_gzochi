@@ -64,6 +64,12 @@ application_context_init (gzochid_application_context *context)
 static void
 application_context_clear (gzochid_application_context *context)
 {
+  gzochid_storage_engine_interface_mem.close_store (context->meta);
+  gzochid_storage_engine_interface_mem.close_store (context->oids);
+  gzochid_storage_engine_interface_mem.close_store (context->names);
+
+  gzochid_storage_engine_interface_mem.close_context (context->storage_context);
+  
   gzochid_oid_allocation_strategy_free (context->oid_strategy);
   
   gzochid_auth_identity_cache_destroy (context->identity_cache);
@@ -259,8 +265,10 @@ test_task_chain_simple ()
   g_assert_cmpstr (test_worker_string->str, ==, "abc");  
 
   gzochid_schedule_task_queue_stop (app_context->task_queue);
+  gzochid_schedule_task_queue_free (app_context->task_queue);
 
   g_thread_pool_free (pool, TRUE, TRUE);
+  application_context_clear (app_context);
   gzochid_application_context_free (app_context);
   gzochid_auth_identity_unref (identity);
 }
