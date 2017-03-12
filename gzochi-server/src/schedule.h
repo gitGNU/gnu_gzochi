@@ -1,5 +1,5 @@
 /* schedule.h: Prototypes and declarations for schedule.c
- * Copyright (C) 2015 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -27,6 +27,12 @@ typedef struct _gzochid_task_queue gzochid_task_queue;
 gpointer gzochid_schedule_task_executor (gpointer);
 
 gzochid_task_queue *gzochid_schedule_task_queue_new (GThreadPool *);
+
+/* Frees the resources used by the specified `gzochid_task_queue'. The queue
+   should be stopped before this function is called. */
+
+void gzochid_schedule_task_queue_free (gzochid_task_queue *);
+
 void gzochid_schedule_task_queue_start (gzochid_task_queue *);
 
 /* Stops the thread feeding tasks from the specified task queue. Once this

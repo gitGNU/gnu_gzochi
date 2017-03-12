@@ -1,5 +1,5 @@
 /* schedule.c: Task execution and task queue management routines for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -18,6 +18,9 @@
 #include <assert.h>
 #include <glib.h>
 #include <libguile.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <sys/time.h>
 
 #include "schedule.h"
 #include "task.h"
@@ -89,6 +92,26 @@ gzochid_schedule_task_queue_new (GThreadPool *pool)
   return task_queue;
 }
 
+static void 
+free_pending_task (gzochid_pending_task *pending_task)
+{
+  g_mutex_clear (&pending_task->mutex);
+  g_cond_clear (&pending_task->cond);
+
+  free (pending_task);
+}
+
+void
+gzochid_schedule_task_queue_free (gzochid_task_queue *task_queue)
+{
+  g_cond_clear (&task_queue->cond);
+  g_mutex_clear (&task_queue->mutex);
+
+  g_queue_free_full (task_queue->queue, (GDestroyNotify) free_pending_task);
+
+  free (task_queue);
+}
+
 static void *
 pending_task_executor_inner (void *data)
 {
@@ -99,15 +122,6 @@ pending_task_executor_inner (void *data)
   task->worker (task->data, user_data);
 
   return NULL;
-}
-
-static void 
-free_pending_task (gzochid_pending_task *pending_task)
-{
-  g_mutex_clear (&pending_task->mutex);
-  g_cond_clear (&pending_task->cond);
-
-  free (pending_task);
 }
 
 static void 
