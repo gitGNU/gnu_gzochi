@@ -1,5 +1,5 @@
 /* test-lock-mem.c: Test routines for lock-mem.c in gzochid.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -286,6 +286,22 @@ test_range_lock_conflict_with_range_lock (test_lock_table_fixture *fixture,
 }
 
 static void
+test_range_lock_compatible_with_write (test_lock_table_fixture *fixture,
+				       gconstpointer user_data)
+{
+  GBytes *from = g_bytes_new_static ("foo", 4);
+  GBytes *to = g_bytes_new_static ("foo2", 5);
+
+  gzochid_lock_check_and_set (fixture->lock_table, 1, from, TRUE, NULL);
+
+  g_assert (gzochid_lock_range_check_and_set
+	    (fixture->lock_table, 1, from, to, NULL));
+
+  g_bytes_unref (from);
+  g_bytes_unref (to);
+}
+
+static void
 test_range_lock_conflict_with_write (test_lock_table_fixture *fixture,
 				     gconstpointer user_data)
 {
@@ -459,6 +475,10 @@ main (int argc, char *argv[])
   g_test_add
     ("/lock-mem/range-lock/conflict-with-range-lock", test_lock_table_fixture,
      NULL, setup_lock_table, test_range_lock_conflict_with_range_lock,
+     teardown_lock_table);
+  g_test_add
+    ("/lock-mem/range-lock/compatible-with-write-lock", test_lock_table_fixture,
+     NULL, setup_lock_table, test_range_lock_compatible_with_write,
      teardown_lock_table);
   g_test_add
     ("/lock-mem/range-lock/conflict-with-write-lock", test_lock_table_fixture,

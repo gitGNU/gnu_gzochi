@@ -1,5 +1,5 @@
 /* lock-mem.c: In-memory lock table implementation for gzochi-metad
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -703,7 +703,7 @@ gzochid_lock_range_check_and_set (gzochid_lock_table *lock_table, guint node_id,
 	       if the key is locked for write, there'll only be a single 
 	       locker. */
 	    
-	    if (lock->for_write)
+	    if (lock->for_write && lock->node_id != node_id) 
 	      return lock_failure (lock->timestamp, ret_timestamp);
 	    
 	    point_iter = g_sequence_iter_next (point_iter);
