@@ -352,7 +352,7 @@ initialize_async_transactional (gpointer data)
 
       gzochid_schedule_execute_task (&task);
     }
-  else 
+  else if (context->metaclient == NULL)
     {
       gzochid_sweep_client_sessions (context, &err);
 
@@ -366,6 +366,11 @@ initialize_async_transactional (gpointer data)
 	}
       else gzochid_restart_tasks (context);
     }
+
+  /* TODO: This needs to be solved at some point; possibly by the same mechanism
+     that supports other singleton-oriented activities, e.g. task execution. */
+  
+  else g_message ("Not sweeping old sessions; running in distributed mode.");
 }
 
 static gboolean
