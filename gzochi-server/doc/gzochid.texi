@@ -1405,8 +1405,8 @@ context object @var{context}.
 @deffn {Scheme Procedure} gzochi:with-application context thunk
 Calls the zero-argument procedure @var{thunk} with the current
 application set temporarily to the application represented by the 
-application context object @var{context}. The value yielded by
-@code{thunk} is returned.
+application context object @var{context}. This function returns an
+unspecified value.
 
 The application that was current before calling 
 @code{gzochi:with-application} (or @code{#f} if there was none) will
