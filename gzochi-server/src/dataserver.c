@@ -584,8 +584,7 @@ gzochi_metad_dataserver_process_changeset (GzochiMetadDataServer *server,
 	  break;
 	}
 
-      if (!gzochid_lock_check_and_set
-	  (store->locks, node_id, change.key, TRUE, NULL))
+      if (!gzochid_lock_check (store->locks, node_id, change.key, TRUE))
 	{
 	  g_set_error
 	    (err, GZOCHI_METAD_DATASERVER_ERROR,
