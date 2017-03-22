@@ -1,5 +1,5 @@
 /* storage-mem.c: Database storage routines for gzochid (in-memory)
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -3193,6 +3193,7 @@ static void
 transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 		 char *key, size_t key_len, char *value, size_t value_len)
 {
+  GError *err = NULL;
   btree_node *node = NULL;
   btree_transaction *btx = tx->txn;
   gboolean rollback = FALSE;
@@ -3208,7 +3209,6 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       
       if (page != NULL)
 	{
-	  GError *err = NULL;
 
 	  put_internal
 	    (btx, store->database, node, (unsigned char *) key, key_len,
@@ -3231,7 +3231,14 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 
   if (rollback)
     {
-      g_warning ("Failed to store key %s in transaction.", key);
+      if (err != NULL)
+	{
+	  g_warning
+	    ("Failed to store key %s in transaction: %s", key, err->message);
+	  g_error_free (err);
+	}
+      else g_warning ("Failed to store key %s in transaction.", key);
+
       mark_for_rollback (tx, TRUE);
     }
 }
