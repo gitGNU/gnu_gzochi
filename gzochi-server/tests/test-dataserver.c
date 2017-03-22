@@ -1,5 +1,5 @@
 /* test-dataserver.c: Tests for dataserver.c in gzochi-metad.
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -428,6 +428,18 @@ test_release_all (dataserver_fixture *fixture, gconstpointer user_data)
 }
 
 static void
+obtain_lock (GzochiMetadDataServer *server, const char *app, const char *store,
+	     GBytes *key)
+{
+  GError *err = NULL;
+  gzochid_data_response *response =  gzochi_metad_dataserver_request_value
+    (server, 1, app, store, key, TRUE, &err);
+
+  g_assert_no_error (err);
+  gzochid_data_response_free (response);
+}
+
+static void
 test_process_changeset (dataserver_fixture *fixture, gconstpointer user_data)
 {
   GError *err = NULL;
@@ -492,6 +504,14 @@ test_process_changeset (dataserver_fixture *fixture, gconstpointer user_data)
   test_storage_open (test_context, "oids", GZOCHID_STORAGE_CREATE);
   test_storage_open (test_context, "names", GZOCHID_STORAGE_CREATE);
 
+  obtain_lock (fixture->server, "test", "oids", object_change1.key);
+  obtain_lock (fixture->server, "test", "oids", object_change2.key);
+  obtain_lock (fixture->server, "test", "oids", object_change3.key);
+
+  obtain_lock (fixture->server, "test", "names", binding_change1.key);
+  obtain_lock (fixture->server, "test", "names", binding_change2.key);
+  obtain_lock (fixture->server, "test", "names", binding_change3.key);
+  
   put (oids, "1", 2, "foo", 4);
   put (oids, "2", 2, "bar", 4);
 
