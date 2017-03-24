@@ -1,0 +1,23 @@
+This folder contains various supplemental files useful for operating and
+debugging gzochid, the gzochi application server and gzochi-metad, the gzochi
+meta server.
+
+Wireshark Lua protocol dissectors =============================================
+
+Wireshark (https://www.wireshark.org/) is a network protocol analyzer and
+front-end for libpcap. This folder includes two Lua scripts that integrate with
+Wireshark as plugins for its "protocol dissector" framework, which allows a
+packet capture that includes traffic from a gzochi server cluster to be rendered
+in an interactive, human-readable format. `game-protocol.lua' decodes the
+protocol used for communication between client applications and gzochid;
+`meta-protocol.lua' decodes the protocol used for communication between gzochid
+and gzochi-metad. Use these plugins to trace the conversations the take place
+between the components of a gzochi application as gameplay events are processed.
+
+Add the plugins to your `init.lua' file or have Wireshark load them via a
+command line argument:
+
+  $ wireshark -X lua_script:game-protocol.lua
+
+Initiate a capture (or open a saved capture file) and then select "Decode As..."
+from the "Analyze" menu.
