@@ -141,8 +141,8 @@
 
   `NULL'-terminated string: Name of the game application that owns the session
   8 bytes: The big-endian encoding of the target session oid
-  2 bytes: The big-endian encoding of the length of the key; the key bytes 
-    follow
+  2 bytes: The big-endian encoding of the length of the message; the message
+    bytes follow
 */
 
 #define GZOCHID_SESSION_PROTOCOL_RELAY_MESSAGE_FROM 0x64
@@ -236,8 +236,8 @@
   
   `NULL'-terminated string: Name of the game application that owns the session
   8 bytes: The big-endian encoding of the target session oid
-  2 bytes: The big-endian encoding of the length of the key; the key bytes 
-    follow
+  2 bytes: The big-endian encoding of the length of the message; the message 
+    bytes follow
 */
 
 #define GZOCHID_SESSION_PROTOCOL_RELAY_MESSAGE_TO 0x65
