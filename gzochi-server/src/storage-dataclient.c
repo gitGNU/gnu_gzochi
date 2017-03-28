@@ -1,5 +1,5 @@
 /* storage-dataclient.c: Dataclient-based caching storage engine for gzochid
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -246,6 +246,24 @@ struct _dataclient_environment
   GList *evicted_key_ranges; 
   
   GMutex mutex; /* Protects the eviction lists. */
+  GMutex lock_table_mutex; /* Protects the lock tables and value cache. */
+
+  /* `dataclient_qualified_key' keys to `dataclient_locks'. */
+
+  GHashTable *locks; 
+
+  /* `dataclient_qualified_key' keys to `dataclient_lock_requests'. */
+  
+  GHashTable *read_lock_requests; 
+
+  /* `dataclient_qualified_key' keys to `dataclient_lock_requests'. */
+  
+  GHashTable *write_lock_requests; 
+
+  /* A read-through cache of `dataclient_qualified_key' keys to `GBytes' 
+     values. */
+
+  GHashTable *value_cache;  
 };
 
 typedef struct _dataclient_environment dataclient_environment;
@@ -259,27 +277,14 @@ struct _dataclient_database
 {
   char *name; /* The store name. */
   
-  GMutex mutex; /* Protects the lock and lock request tables. */
+  GMutex mutex; /* Protects the range lock and range lock request tables. */
   
-  GHashTable *locks; /* `GBytes' keys to `dataclient_locks'. */
   gzochid_itree *range_locks; /* `GBytes' bounds to `dataclient_range_locks'. */
   
-  /* `GBytes' keys to `dataclient_lock_requests'. */
-  
-  GHashTable *read_lock_requests; 
-
-  /* `GBytes' keys to `dataclient_lock_requests'. */
-  
-  GHashTable *write_lock_requests; 
-
   /* `GBytes' bounds to `dataclient_range_lock_requests'. */
   
   gzochid_itree *range_lock_requests;
 
-  /* A read-through cache of `GBytes' keys to `GBytes' values. */
-
-  GHashTable *value_cache;
-  
   gzochid_storage_store *delegate_store; /* The delegate mem store. */
 };
 
@@ -976,14 +981,15 @@ callback_data_free (dataclient_callback_data *callback_data)
   that the lock may have been acquired. (The awoken thread will need to check
   the lock table itself to make sure.)
   
-  The caller of this function must hold the mutex of the store that owns the
-  lock table. 
- */
+  The caller of this function must hold the lock table mutex of the environment
+  that encompasses the target lock table.
+*/
 
 static inline void
-notify_waiters (GHashTable *lock_table, GBytes *key)
+notify_waiters (GHashTable *lock_table, dataclient_qualified_key *qualified_key)
 {
-  dataclient_lock_request *lock_request = g_hash_table_lookup (lock_table, key);
+  dataclient_lock_request *lock_request = g_hash_table_lookup
+    (lock_table, qualified_key);
       
   if (lock_request != NULL)
     {
@@ -1002,15 +1008,16 @@ lock_success_callback (GBytes *data, gpointer user_data)
 {
   dataclient_callback_data *callback_data = user_data;
   dataclient_database *database = callback_data->store->database;
-  
+  dataclient_environment *environment =
+    callback_data->store->context->environment;
   dataclient_qualified_key qualified_key = (dataclient_qualified_key)
     { database->name, callback_data->key };
   
   dataclient_lock *lock = NULL;
   
-  g_mutex_lock (&database->mutex);
+  g_mutex_lock (&environment->lock_table_mutex);
     
-  lock = g_hash_table_lookup (database->locks, callback_data->key);  
+  lock = g_hash_table_lookup (environment->locks, &qualified_key);
   
   if (lock != NULL)
     {
@@ -1023,7 +1030,7 @@ lock_success_callback (GBytes *data, gpointer user_data)
   /* Otherwise create a new lock. */
   
   else g_hash_table_insert
-	 (database->locks, g_bytes_ref (callback_data->key),
+	 (environment->locks, dataclient_qualified_key_copy (&qualified_key),
 	  lock_new (&qualified_key, callback_data->for_write));
 
   if (data != NULL)
@@ -1034,22 +1041,22 @@ lock_success_callback (GBytes *data, gpointer user_data)
        the mem store. */
     
     g_hash_table_insert
-      (database->value_cache, g_bytes_ref (callback_data->key),
+      (environment->value_cache, dataclient_qualified_key_copy (&qualified_key),
        g_bytes_ref (data));
   
   if (callback_data->for_write)
     {
-      notify_waiters (database->write_lock_requests, callback_data->key);
-      g_hash_table_remove (database->write_lock_requests, callback_data->key);
+      notify_waiters (environment->write_lock_requests, &qualified_key);
+      g_hash_table_remove (environment->write_lock_requests, &qualified_key);
     }
 
   /* Always notify threads waiting for read locks - they'll be happy with a
      write lock as well. */
   
-  notify_waiters (database->read_lock_requests, callback_data->key);
-  g_hash_table_remove (database->read_lock_requests, callback_data->key);
+  notify_waiters (environment->read_lock_requests, &qualified_key);
+  g_hash_table_remove (environment->read_lock_requests, &qualified_key);
 
-  g_mutex_unlock (&database->mutex);
+  g_mutex_unlock (&environment->lock_table_mutex);
 }
 
 /* The "failure" callback for point lock requests. Resets the request state of
@@ -1062,14 +1069,19 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
 {
   dataclient_callback_data *callback_data = user_data;
   dataclient_database *database = callback_data->store->database;
+  dataclient_environment *environment =
+    callback_data->store->context->environment;
+  dataclient_qualified_key qualified_key =
+    { database->name, callback_data->key };
+ 
   dataclient_lock_request *lock_request = NULL;
 
-  g_mutex_lock (&database->mutex);
+  g_mutex_lock (&environment->lock_table_mutex);
   
   if (callback_data->for_write)
     {
       lock_request = g_hash_table_lookup
-	(database->write_lock_requests, callback_data->key);
+	(environment->write_lock_requests, &qualified_key);
 
       /* There may be no lock request if there are no longer any threads waiting
 	 for the lock. */
@@ -1081,7 +1093,7 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
 	    + wait_time.tv_sec * 1000
 	    + wait_time.tv_usec / 1000;
 	  
-	  notify_waiters (database->write_lock_requests, callback_data->key);
+	  notify_waiters (environment->write_lock_requests, &qualified_key);
 	}
     }
 
@@ -1089,7 +1101,7 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
      for the lock. */
 
   lock_request = g_hash_table_lookup
-    (database->read_lock_requests, callback_data->key);
+    (environment->read_lock_requests, &qualified_key);
 
   if (lock_request != NULL)
     {      
@@ -1098,7 +1110,7 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
 	+ wait_time.tv_sec * 1000
 	+ wait_time.tv_usec / 1000;
 
-      notify_waiters (database->read_lock_requests, callback_data->key);
+      notify_waiters (environment->read_lock_requests, &qualified_key);
     }
 
   /* The release callback won't be called for this request, so free the callback
@@ -1106,7 +1118,7 @@ lock_failure_callback (struct timeval wait_time, gpointer user_data)
   
   callback_data_free (callback_data);
   
-  g_mutex_unlock (&database->mutex);
+  g_mutex_unlock (&environment->lock_table_mutex);
 }
 
 /* The "release" callback for point locks. Removes a reference to the lock and
@@ -1120,21 +1132,20 @@ lock_release_callback (gpointer user_data)
   gzochid_storage_store *store = callback_data->store;
   dataclient_environment *environment = store->context->environment;
   dataclient_database *database = store->database;
+  dataclient_qualified_key qualified_key = (dataclient_qualified_key)
+    { database->name, callback_data->key };
 
   /* Grab the environment's mutex before the store's mutex; important to always
      take these in the same order. */
   
   g_mutex_lock (&environment->mutex);
-  g_mutex_lock (&database->mutex);
+  g_mutex_lock (&environment->lock_table_mutex);
   
-  lock = g_hash_table_lookup (database->locks, callback_data->key);
+  lock = g_hash_table_lookup (environment->locks, &qualified_key);
 
   if (lock != NULL)
     {
-      dataclient_qualified_key qualified_key = (dataclient_qualified_key)
-	{ database->name, callback_data->key };
-      
-      g_hash_table_remove (database->locks, callback_data->key);      
+      g_hash_table_remove (environment->locks, &qualified_key);      
 
       /*
 	Are there additional references to this key? I.e., are there any 
@@ -1146,7 +1157,7 @@ lock_release_callback (gpointer user_data)
 	the throughout of transactions that _are_ bounded.
       */
       
-      if (! lock_unref (store->context->environment, lock)
+      if (! lock_unref (environment, lock)
 	  && g_list_find_custom (environment->evicted_keys, &qualified_key,
 				 dataclient_qualified_key_compare) == NULL)
 
@@ -1157,11 +1168,11 @@ lock_release_callback (gpointer user_data)
 	   dataclient_evicted_key_new (database->name, callback_data->key));
     }
 
-  g_hash_table_remove (database->value_cache, callback_data->key);
+  g_hash_table_remove (environment->value_cache, &qualified_key);
 
   callback_data_free (callback_data);
 
-  g_mutex_unlock (&database->mutex);
+  g_mutex_unlock (&environment->lock_table_mutex);
   g_mutex_unlock (&environment->mutex);
 }
 
@@ -1238,27 +1249,25 @@ lock_request_new (const char *store, GBytes *key, gboolean for_write)
   add that lock to the specified transaction's set of local locks, and obtain a
   non-exclusive read lock on it. 
 
-  To ensure that this operation is properly synchronous, the store's lock table
-  mutex must be held by the caller of this function.
+  To ensure that this operation is properly synchronous, the environment's lock
+  table mutex must be held by the caller of this function.
 */
 
 static inline gboolean
-check_and_set_lock (dataclient_transaction *tx, dataclient_database *database,
-		    GBytes *key, gboolean for_write)
+check_and_set_lock (dataclient_environment *env, dataclient_transaction *tx,
+		    dataclient_qualified_key *qualified_key, gboolean for_write)
 {
-  dataclient_qualified_key qualified_key = (dataclient_qualified_key)
-    { database->name, key };
-  dataclient_lock *lock = g_hash_table_lookup (database->locks, key);
-      
+  dataclient_lock *lock = g_hash_table_lookup (env->locks, qualified_key);
+  
   if (lock != NULL && (!for_write || lock->for_write))
     {
-      if (! g_hash_table_contains (tx->locks, &qualified_key))
+      if (! g_hash_table_contains (tx->locks, qualified_key))
 	  
 	/* If everything is properly synchronized, it should be impossible for
 	   this block to be entered while a lock is being reaped. */	     
 	
 	g_hash_table_insert
-	  (tx->locks, dataclient_qualified_key_copy (&qualified_key),
+	  (tx->locks, dataclient_qualified_key_copy (qualified_key),
 	   lock_ref (lock));
 	  
       return TRUE;
@@ -1283,7 +1292,7 @@ check_and_set_lock (dataclient_transaction *tx, dataclient_database *database,
      described above.
 
   Returns `TRUE' if the lock was already held or could be obtained within the
-  lifespan of hte current transaction, `FALSE' otherwise.
+  lifespan of the current transaction, `FALSE' otherwise.
 */
 
 static gboolean
@@ -1295,8 +1304,7 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
   dataclient_transaction *dataclient_tx = tx->txn;  
   GBytes *key_bytes = g_bytes_new (key, key_len);
 
-  dataclient_qualified_key qualified_key = (dataclient_qualified_key)
-    { database->name, key_bytes };
+  dataclient_qualified_key qualified_key = { database->name, key_bytes };
   
   dataclient_lock *lock = g_hash_table_lookup
     (dataclient_tx->locks, &qualified_key);
@@ -1312,15 +1320,16 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
     }
 
   g_mutex_lock (&environment->mutex);
-  g_mutex_lock (&database->mutex);
-
+  g_mutex_lock (&environment->lock_table_mutex);
+  
   /* Make a synchronous attempt to seize a reference to the local cache / 
      proxy's instance of the lock, if it exists. */
   
-  if (check_and_set_lock (dataclient_tx, database, key_bytes, for_write))
+  if (check_and_set_lock
+      (environment, dataclient_tx, &qualified_key, for_write))
     {
       g_bytes_unref (key_bytes);
-      g_mutex_unlock (&database->mutex);
+      g_mutex_unlock (&environment->lock_table_mutex);
       g_mutex_unlock (&environment->mutex);
       return TRUE;
     }
@@ -1360,9 +1369,9 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	 
 	  g_hash_table_insert
 	    (for_write
-	     ? database->write_lock_requests
-	     : database->read_lock_requests,
-	     g_bytes_ref (key_bytes), lock_request);
+	     ? environment->write_lock_requests
+	     : environment->read_lock_requests,
+	     dataclient_qualified_key_copy (&qualified_key), lock_request);
 	  
 	  g_mutex_lock (&lock_request->mutex);
 	}
@@ -1377,22 +1386,21 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	}
 
       /* Once the request mutex is held it's safe to release these. */
-      
-      g_mutex_unlock (&database->mutex);
+
+      g_mutex_unlock (&environment->lock_table_mutex);
       g_mutex_unlock (&environment->mutex);
     }
   else
     {
-      /* Release the environment mutex, since we're done with the eviction
-	 list. */
-      
+      /* Release the general environment mutex, since we're done with the 
+	 eviction list. */
+
       g_mutex_unlock (&environment->mutex);
       
       lock_request = g_hash_table_lookup
 	(for_write
-	 ? database->write_lock_requests
-	 : database->read_lock_requests,
-	 key_bytes);
+	 ? environment->write_lock_requests
+	 : environment->read_lock_requests, &qualified_key);
 
       /* Is there a lock request in the store's request table? */
       
@@ -1410,14 +1418,14 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 
 	  g_hash_table_insert
 	    (for_write
-	     ? database->write_lock_requests
-	     : database->read_lock_requests,
-	     g_bytes_ref (key_bytes), lock_request);
+	     ? environment->write_lock_requests
+	     : environment->read_lock_requests,
+	     dataclient_qualified_key_copy (&qualified_key), lock_request);
 	  
 	  g_mutex_lock (&lock_request->mutex);
 	}
 
-      g_mutex_unlock (&database->mutex);
+      g_mutex_unlock (&environment->lock_table_mutex);
     }
   
   while (TRUE)
@@ -1435,6 +1443,8 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	  
 	  tx->rollback = TRUE;
 	  tx->should_retry = TRUE;
+
+	  g_mutex_unlock (&lock_request->mutex);
 	}
       else
 	{
@@ -1445,8 +1455,6 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	      
 	      if (now >= lock_request->next_request_time)
 		{
-		  dataclient_environment *environment =
-		    store->context->environment;
 		  dataclient_callback_data *callback_data =
 		    create_callback_data
 		    (store, lock_request->key->key, lock_request->for_write);
@@ -1482,13 +1490,19 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	    (&lock_request->cond, &lock_request->mutex,
 	     dataclient_tx->end_time);
 
+	  /* The only real purpose of the lock request mutex is to synchronize
+	     the condition waiting above. So it's safe to release this here and
+	     grab it again below if we need to re-enter the loop. */
+	  
+	  g_mutex_unlock (&lock_request->mutex);
+
 	  /* ...and see if it was successful. */
 
-	  g_mutex_lock (&database->mutex);
+	  g_mutex_lock (&environment->lock_table_mutex);	  
 	  acquired_lock = check_and_set_lock
-	    (dataclient_tx, database, lock_request->key->key,
+	    (environment, dataclient_tx, &qualified_key,
 	     lock_request->for_write);
-	  g_mutex_unlock (&database->mutex);
+	  g_mutex_unlock (&environment->lock_table_mutex);
 	}
       
       if (acquired_lock || !should_continue)
@@ -1499,8 +1513,7 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	     manipulating the eviction list. */
 	  
 	  g_mutex_lock (&environment->mutex);
-	  g_mutex_lock (&database->mutex);
-	  g_mutex_unlock (&lock_request->mutex);
+	  g_mutex_lock (&environment->lock_table_mutex);
 
 	  /* Whether or not the attempt to obtain the lock was successful or 
 	     not, we need to relinquish our hold on the lock request. */
@@ -1510,10 +1523,10 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	      /* ...and if we were the last interested party, clean it up. */
 	      
 	      GHashTable *table = for_write
-		? database->write_lock_requests
-		: database->read_lock_requests;
+		? environment->write_lock_requests
+		: environment->read_lock_requests;
 
-	      g_hash_table_remove (table, key_bytes);
+	      g_hash_table_remove (table, &qualified_key);
 
 	      evicted_key = find_evicted_key (environment, &qualified_key);
 
@@ -1522,11 +1535,12 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	    }
 
 	  g_bytes_unref (key_bytes);
-	  g_mutex_unlock (&database->mutex);
+	  g_mutex_unlock (&environment->lock_table_mutex);
 	  g_mutex_unlock (&environment->mutex);
 
 	  return acquired_lock;
 	}
+      else g_mutex_lock (&lock_request->mutex);
     }
 }
 
@@ -2113,7 +2127,29 @@ initialize (char *path)
   environment->delegate_iface = &gzochid_storage_engine_interface_mem;
   environment->delegate_context =
     environment->delegate_iface->initialize (path);
+
+  g_mutex_init (&environment->mutex);
+  g_mutex_init (&environment->lock_table_mutex);
   
+  /* The lock table. */
+
+  environment->locks = g_hash_table_new_full
+    (dataclient_qualified_key_hash, dataclient_qualified_key_equal,
+     dataclient_qualified_key_free, NULL);
+
+  /* The lock request tables. */
+  
+  environment->read_lock_requests = g_hash_table_new_full
+    (dataclient_qualified_key_hash, dataclient_qualified_key_equal,
+     dataclient_qualified_key_free, NULL);
+  environment->write_lock_requests = g_hash_table_new_full
+    (dataclient_qualified_key_hash, dataclient_qualified_key_equal,
+     dataclient_qualified_key_free, NULL);
+
+  environment->value_cache = g_hash_table_new_full
+    (dataclient_qualified_key_hash, dataclient_qualified_key_equal,
+     dataclient_qualified_key_free, (GDestroyNotify) g_bytes_unref);
+
   context->environment = environment;
   
   return context;
@@ -2132,7 +2168,13 @@ close_context (gzochid_storage_context *context)
     g_object_unref (environment->client);
   
   g_free (environment->app_name);
+
+  g_hash_table_destroy (environment->locks);
+  g_hash_table_destroy (environment->read_lock_requests);
+  g_hash_table_destroy (environment->write_lock_requests);
   
+  g_hash_table_destroy (environment->value_cache);
+
   free (context->environment);  
   free (context);
 }
@@ -2159,29 +2201,18 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
 
   database->name = g_path_get_basename (path);
 
-  /* The lock tables. */
+  /* The range lock table. */
 
-  database->locks = g_hash_table_new_full
-    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref, NULL);
   database->range_locks = gzochid_itree_new
     (gzochid_util_bytes_compare_null_first,
      gzochid_util_bytes_compare_null_last);
 
-  /* The lock request tables. */
+  /* The range lock request table. */
   
-  database->read_lock_requests = g_hash_table_new_full
-    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref, NULL);
-  database->write_lock_requests = g_hash_table_new_full
-    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref, NULL);
-
   database->range_lock_requests = gzochid_itree_new
     (gzochid_util_bytes_compare_null_first,
      gzochid_util_bytes_compare_null_last);
 
-  database->value_cache = g_hash_table_new_full
-    (g_bytes_hash, g_bytes_equal, (GDestroyNotify) g_bytes_unref,
-     (GDestroyNotify) g_bytes_unref);
-  
   g_mutex_init (&database->mutex);
 
   /* The delegate B+tree store. */
@@ -2215,7 +2246,6 @@ close_store (gzochid_storage_store *store)
   dataclient_database *database = store->database;
 
   free (database->name);
-  g_hash_table_destroy (database->locks);
 
   /* Walk the interval tree and free any of the range locks. */
   
@@ -2223,10 +2253,7 @@ close_store (gzochid_storage_store *store)
     (database->range_locks, NULL, NULL, free_range_lock_visitor, NULL);
   gzochid_itree_free (database->range_locks);
   
-  g_hash_table_destroy (database->read_lock_requests);
-  g_hash_table_destroy (database->write_lock_requests);
   gzochid_itree_free (database->range_lock_requests);  
-  g_hash_table_destroy (database->value_cache);
   
   g_mutex_clear (&database->mutex);
 
@@ -2420,16 +2447,20 @@ transaction_commit (gzochid_storage_transaction *tx)
       (env->client, env->app_name, txn->changeset);
 
   /* For each key deleted in this transacton, remove it from the cache. */
+
+  g_mutex_lock (&env->lock_table_mutex);
   
   while (deleted_key_ptr != NULL)
     {
       dataclient_callback_data *key = deleted_key_ptr->data;
       dataclient_database *database = key->store->database;
+      dataclient_qualified_key qualified_key = { database->name, key->key };
       
-      g_hash_table_remove (database->value_cache, key->key);
+      g_hash_table_remove (env->value_cache, &qualified_key);
       deleted_key_ptr = deleted_key_ptr->next;
     }
 
+  g_mutex_unlock (&env->lock_table_mutex);
   cleanup_transaction (tx);
 }
 
@@ -2523,16 +2554,20 @@ is_deleted (gzochid_storage_transaction *tx, gzochid_storage_store *store,
   return ret;
 }
 
-/* Retrieves the value (if any) bound to the specified key in the dataclient
-   cache for the target store. */
+/*
+  Retrieves the value (if any) bound to the specified key in the dataclient
+  cache for the target environment.
+  
+  Requires that the caller hold the environment's lock table mutex.
+*/
 
 static unsigned char *
-get_from_cache (dataclient_database *database, unsigned char *key,
-		size_t key_len, size_t *value_len)
+get_from_cache (dataclient_environment *environment,
+		dataclient_qualified_key *qualified_key, size_t *value_len)
 {
   unsigned char *ret = NULL;
-  GBytes *cache_key = g_bytes_new_static (key, key_len);
-  GBytes *value = g_hash_table_lookup (database->value_cache, cache_key);
+  GBytes *value = g_hash_table_lookup
+    (environment->value_cache, qualified_key);
   
   if (value != NULL)
     {
@@ -2545,8 +2580,6 @@ get_from_cache (dataclient_database *database, unsigned char *key,
       if (value_len != NULL)
 	*value_len = tmp_len;
     }
-  
-  g_bytes_unref (cache_key);
 
   return ret;
 }
@@ -2573,9 +2606,18 @@ transaction_get (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	 it in this transaction?) Check the cache. */
 
       if (ret == NULL && !tx->rollback && !is_deleted (tx, store, key, key_len))
-	return (char *) get_from_cache
-	  (database, (unsigned char *) key, key_len, value_len);
-      else return ret;
+	{
+	  GBytes *key_bytes = g_bytes_new_static (key, key_len);
+	  dataclient_qualified_key qualified_key =
+	    { database->name, key_bytes };
+	  
+	  ret = (char *) get_from_cache
+	    (environment, &qualified_key, value_len);
+
+	  g_bytes_unref (key_bytes);
+	}
+
+      return ret;
     }
   else return NULL;
 }
@@ -2604,8 +2646,17 @@ transaction_get_for_update (gzochid_storage_transaction *tx,
 	 it in this transaction?) Check the cache. */
       
       if (ret == NULL && !tx->rollback && !is_deleted (tx, store, key, key_len))
-	return (char *) get_from_cache
-	  (database, (unsigned char *) key, key_len, value_len);
+	{
+	  GBytes *key_bytes = g_bytes_new_static (key, key_len);
+	  dataclient_qualified_key qualified_key =
+	    { database->name, key_bytes };
+	  
+	  ret = (char *) get_from_cache
+	    (environment, &qualified_key, value_len);
+
+	  g_bytes_unref (key_bytes);
+	}
+      
       return ret;
     }
   else return NULL;
@@ -2669,8 +2720,10 @@ transaction_delete (gzochid_storage_transaction *tx,
       if (ret == GZOCHID_STORAGE_ENOTFOUND)
 	{
 	  GBytes *key_bytes = g_bytes_new_static (key, key_len);
+	  dataclient_qualified_key qualified_key =
+	    { database->name, key_bytes };
 	  
-	  if (g_hash_table_contains (database->value_cache, key_bytes)
+	  if (g_hash_table_contains (environment->value_cache, &qualified_key)
 	      && !is_deleted_bytes (tx, store, key_bytes))
 	    ret = 0;
 
