@@ -1024,7 +1024,12 @@ lock_success_callback (GBytes *data, gpointer user_data)
       /* If the lock already exists, conditionally upgrade it. */
       
       if (callback_data->for_write)
-	lock->for_write = TRUE;
+
+	/* Need to bump the lock's ref count, since an additional success 
+	   callback indicates that another release callback will be 
+	   forthcoming. */
+	
+	lock_ref (lock)->for_write = TRUE;
     }
 
   /* Otherwise create a new lock. */
@@ -1145,8 +1150,6 @@ lock_release_callback (gpointer user_data)
 
   if (lock != NULL)
     {
-      g_hash_table_remove (environment->locks, &qualified_key);      
-
       /*
 	Are there additional references to this key? I.e., are there any 
 	active transactions still using it?
@@ -1157,15 +1160,22 @@ lock_release_callback (gpointer user_data)
 	the throughout of transactions that _are_ bounded.
       */
       
-      if (! lock_unref (environment, lock)
-	  && g_list_find_custom (environment->evicted_keys, &qualified_key,
-				 dataclient_qualified_key_compare) == NULL)
+      if (! lock_unref (environment, lock))
+	{
+	  if (g_list_find_custom (environment->evicted_keys, &qualified_key,
+				  dataclient_qualified_key_compare) == NULL)
 
-	/* If so, add the key to the list of in-progress evictions.  */
+	    /* If so, add the key to the list of in-progress evictions.  */
 	
-	environment->evicted_keys = g_list_prepend
-	  (environment->evicted_keys,
-	   dataclient_evicted_key_new (database->name, callback_data->key));
+	    environment->evicted_keys = g_list_prepend
+	      (environment->evicted_keys,
+	       dataclient_evicted_key_new (database->name, callback_data->key));
+	}
+      
+      /* If this was the last reference to the lock, remove it from the lock
+	 table. */
+      
+      else g_hash_table_remove (environment->locks, &qualified_key);
     }
 
   g_hash_table_remove (environment->value_cache, &qualified_key);
@@ -2363,14 +2373,19 @@ transaction_begin_timed (gzochid_storage_context *context,
 }
 
 /* A `GHFunc' implementation for use with `GHashTables' whose values are 
-   `dataclient_lock' objects; calls `lock_unref' on the value, passing the
-   user data argument as the `dataclient_environment' to which the lock
-   belongs. */
+   `dataclient_lock' objects; calls `lock_unref' on the value, using the
+   `dataclient_environment' from the composite user data argument as context;
+   the keys for released locks are added to the user data `GPtrArray' array. */
 
 static void
 lock_unref_ghfunc (gpointer key, gpointer value, gpointer user_data)
 {
-  lock_unref (user_data, value);
+  gpointer *args = user_data;
+  dataclient_environment *environment = args[0];
+  GPtrArray *released_keys = args[1];
+  
+  if (lock_unref (environment, value))
+    g_ptr_array_add (released_keys, key);
 }
 
 /*
@@ -2399,11 +2414,26 @@ cleanup_transaction (gzochid_storage_transaction *tx)
 {
   dataclient_transaction *txn = tx->txn;
   dataclient_environment *env = tx->context->environment;
+  GPtrArray *released_keys = g_ptr_array_new ();
+  gpointer args[2] = { env, released_keys };
+  gint i = 0;
 
   /* Unref all the locks in the table. Need to pass the environment as context,
      so this can't be done as a `GDestroyNotify' on the value. */
+
+  g_mutex_lock (&env->lock_table_mutex);
+  g_hash_table_foreach (txn->locks, lock_unref_ghfunc, args);
+
+  for (; i < released_keys->len; i++)
+    {
+      dataclient_qualified_key *qualified_key =
+	g_ptr_array_index (released_keys, i);
+      g_hash_table_remove (env->locks, qualified_key);
+    }
+
+  g_ptr_array_unref (released_keys);
+  g_mutex_unlock (&env->lock_table_mutex);
   
-  g_hash_table_foreach (txn->locks, lock_unref_ghfunc, env);  
   g_hash_table_destroy (txn->locks);
 
   /* Unref all the range locks in the tree. */
