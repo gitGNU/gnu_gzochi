@@ -1064,7 +1064,8 @@ effective_key (btree_node *node, gboolean write)
   For readers, it is the default page unless a scratch datum is present.
   
   This function assumes its call originates within the scope of a transaction 
-  that holds at least a read lock on the specified node. 
+  that holds at least a read lock on the target node; if the page for writers is
+  requested, the transaction must hold a write lock. 
 */
 
 static btree_page *
@@ -3037,6 +3038,8 @@ transaction_prepare (gzochid_storage_transaction *tx)
   If any of the operations above cannot be completed (inserting new leaf nodes
   may trigger splitting of internal nodes) the provided `GError' argument is set
   accordingly.
+
+  The caller must hold a write lock on the target node.
 */
 
 static void
@@ -3209,7 +3212,6 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       
       if (page != NULL)
 	{
-
 	  put_internal
 	    (btx, store->database, node, (unsigned char *) key, key_len,
 	     (unsigned char *) value, value_len, &err);
@@ -3260,7 +3262,7 @@ transaction_delete (gzochid_storage_transaction *tx,
 
   node = search (btx, store->database, key, key_len);
 
-  if (node != NULL)
+  if (node != NULL && tx_lock_node (node, btx, TRUE, NULL) == SUCCESS)
     {
       btree_page *page = effective_page (node, TRUE);
 
