@@ -353,6 +353,8 @@ dispatch_submit_changeset (gzochi_metad_dataserver_client *client,
     {
       g_warning ("Failed to process changeset from %d/%s: %s", client->node_id,
 		 changeset->app, local_err->message);
+
+      gzochid_data_changeset_free (changeset);
       g_error_free (local_err);
       g_bytes_unref (bytes);
       return FALSE;
