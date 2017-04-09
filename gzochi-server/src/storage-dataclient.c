@@ -1415,10 +1415,7 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       /* Is there a lock request in the store's request table? */
       
       if (lock_request != NULL)
-	{
-	  g_mutex_lock (&lock_request->mutex);
-	  lock_request_ref (lock_request);
-	}
+	lock_request_ref (lock_request);
       else 
 	{
 	  /* If not, create one. */
@@ -1431,11 +1428,10 @@ ensure_lock (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 	     ? environment->write_lock_requests
 	     : environment->read_lock_requests,
 	     dataclient_qualified_key_copy (&qualified_key), lock_request);
-	  
-	  g_mutex_lock (&lock_request->mutex);
 	}
 
-      g_mutex_unlock (&environment->lock_table_mutex);
+      g_mutex_unlock (&environment->lock_table_mutex);	 
+      g_mutex_lock (&lock_request->mutex);
     }
   
   while (TRUE)
@@ -1982,11 +1978,7 @@ ensure_range_lock (gzochid_storage_transaction *tx,
       /* Is there a range lock request in the store's request tree? */
 
       if (request_search_context.range_lock_request != NULL)
-	{
-	  g_mutex_lock (&request_search_context.range_lock_request->mutex);
-	  range_lock_request_ref (request_search_context.range_lock_request);
-	  g_mutex_unlock (&database->mutex);
-	}
+	range_lock_request_ref (request_search_context.range_lock_request);
       else 
 	{
 	  /* If not, create one. */
@@ -1997,10 +1989,10 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 	  gzochid_itree_insert
 	    (database->range_lock_requests, key_bytes, NULL,
 	     range_lock_request);
-	  
-	  g_mutex_lock (&range_lock_request->mutex);
-	  g_mutex_unlock (&database->mutex);
 	}
+
+      g_mutex_lock (&request_search_context.range_lock_request->mutex);
+      g_mutex_unlock (&database->mutex);
     }
 
   while (TRUE)
