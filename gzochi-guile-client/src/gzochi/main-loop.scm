@@ -1,5 +1,5 @@
 ;; gzochi/main-loop.scm: A main loop implementation
-;; Copyright (C) 2015 Julian Graham
+;; Copyright (C) 2017 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -48,8 +48,7 @@
 	  (ice-9 optargs) 
 	  (ice-9 threads) 
 	  (rnrs)
-	  (srfi :1) 
-	  (srfi :18))
+	  (srfi :1))
 
 ;; This is a simple "main loop" implementation that gzochi client instances
 ;; created with (gzochi client) may be plugged into, along with other sources of
@@ -221,7 +220,8 @@
 	    port/fd->source
 	    sources-mutex)
     (protocol (lambda (p) 
-		(lambda () (p (list) #f (make-eqv-hashtable) (make-mutex))))))
+		(lambda ()
+		  (p (list) #f (make-eqv-hashtable) (make-mutex 'recursive))))))
 
 ;; Add the specified source to the specified main loop. This procedure may be
 ;; called while the main loop is running; the new source will be included in the

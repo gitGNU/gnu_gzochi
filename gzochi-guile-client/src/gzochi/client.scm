@@ -1,5 +1,5 @@
 ;; gzochi/client.scm: The Scheme gzochi reference client library
-;; Copyright (C) 2015 Julian Graham
+;; Copyright (C) 2017 Julian Graham
 ;;
 ;; gzochi is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
@@ -30,8 +30,7 @@
 	  (gzochi client protocol)
 	  (gzochi main-loop)
 	  (ice-9 threads)
-	  (rnrs)
-	  (srfi :18))
+	  (rnrs))
 
 ;; This is a reference implementation of a client for the gzochi game
 ;; development framework. It handles the connection lifecycle and network
