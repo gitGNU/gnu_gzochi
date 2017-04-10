@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <glib.h>
 #include <glib-object.h>
+#include <gzochi-common.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -608,6 +609,8 @@ find_evicted_key (dataclient_environment *environment,
   Upon hitting zero, the data client for the specified environment is notified
   that the lock should be released. The lock itself is also freed, via 
   `free_lock'.
+
+  The caller must hold the environment's mutex.
 */
 
 static gboolean
@@ -648,14 +651,10 @@ lock_unref (dataclient_environment *environment, dataclient_lock *lock)
 
 	  /* Remove the key from the eviction list... */
 
-	  g_mutex_lock (&environment->mutex);
-	  
 	  environment->evicted_keys = g_list_remove
 	    (environment->evicted_keys, evicted_key);
 	  
 	  dataclient_evicted_key_free (evicted_key); /* ...and free it. */
-
-	  g_mutex_unlock (&environment->mutex);
 	}
 
       return TRUE;
@@ -999,6 +998,60 @@ notify_waiters (GHashTable *lock_table, dataclient_qualified_key *qualified_key)
     }
 }
 
+/* Returns a copy of the specified buffer, with an eight-byte prefix giving the
+   current timestamp. The new buffer should be freed via `free' when no longer
+   needed. */
+
+static unsigned char *
+prefix_with_timestamp (const unsigned char *src, size_t src_len, size_t *len)
+{
+  unsigned char *dst = malloc (sizeof (unsigned char) * (src_len + 8));
+
+  gzochi_common_io_write_long (g_get_monotonic_time (), dst, 0);
+  memcpy (dst + 8, src, src_len);
+
+  if (len != NULL)
+    *len = src_len + 8;
+
+  return dst;
+}
+
+/* Returns a copy of the specified `GBytes', with an eight-byte prefix giving
+   the current timestamp. The new `GBytes' should be released via 
+   `g_bytes_unref' when no longer needed. */
+
+static GBytes *
+prefix_bytes_with_timestamp (GBytes *src)
+{
+  size_t src_len = 0, dst_len = 0;
+  const unsigned char *src_data = g_bytes_get_data (src, &src_len);
+  unsigned char *dst_data = prefix_with_timestamp (src_data, src_len, &dst_len);
+
+  return g_bytes_new_take (dst_data, dst_len);
+}
+
+/* Returns a newly-allocated eight-byte buffer containing an encoding of the
+   current timestamp. The buffer should be freed via `free' when no longer
+   needed. */
+
+static unsigned char *
+create_empty_timestamped_value ()
+{
+  unsigned char *ts_bytes = malloc (sizeof (unsigned char) * 8);
+  gzochi_common_io_write_long (g_get_monotonic_time (), ts_bytes, 0);
+  return ts_bytes;
+}
+
+/* Returns a newly-allocated `GBytes' containing an encoding of the current
+   timestamp. The `GBytes' should be released via `g_bytes_unref' when no longer
+   needed. */
+
+static GBytes *
+create_empty_timestamped_bytes ()
+{
+  return g_bytes_new_take (create_empty_timestamped_value (), 8);
+}
+
 /* The "success" callback for point lock requests. Adds the lock to the store's
    lock table and notifies any waiting transaction threads so that they can add
    the lock to their local lock tables. */
@@ -1006,6 +1059,7 @@ notify_waiters (GHashTable *lock_table, dataclient_qualified_key *qualified_key)
 static void
 lock_success_callback (GBytes *data, gpointer user_data)
 {
+  GBytes *prefixed_data = NULL;
   dataclient_callback_data *callback_data = user_data;
   dataclient_database *database = callback_data->store->database;
   dataclient_environment *environment =
@@ -1038,16 +1092,19 @@ lock_success_callback (GBytes *data, gpointer user_data)
 	 (environment->locks, dataclient_qualified_key_copy (&qualified_key),
 	  lock_new (&qualified_key, callback_data->for_write));
 
-  if (data != NULL)
+  /* If there's data, we can't insert it directly into the mem store since 
+     doing so requires a transaction and may induce contention. Instead, we add
+     the value (if it exists) along with an 8-byte timestamp prefix to the
+     fallback cache, which will be consulted by readers as part of the lookup
+     process against the mem store. */
 
-    /* If there's data, don't insert it directly into the mem store (since 
-       doing so requires a transaction and may induce contention) put it in the
-       fallback cache, which will be consulted by readers if there's a miss in
-       the mem store. */
-    
-    g_hash_table_insert
-      (environment->value_cache, dataclient_qualified_key_copy (&qualified_key),
-       g_bytes_ref (data));
+  if (data != NULL)
+    prefixed_data = prefix_bytes_with_timestamp (data);
+  else prefixed_data = create_empty_timestamped_bytes ();
+  
+  g_hash_table_insert
+    (environment->value_cache, dataclient_qualified_key_copy (&qualified_key),
+     prefixed_data);
   
   if (callback_data->for_write)
     {
@@ -1175,10 +1232,12 @@ lock_release_callback (gpointer user_data)
       /* If this was the last reference to the lock, remove it from the lock
 	 table. */
       
-      else g_hash_table_remove (environment->locks, &qualified_key);
+      else
+	{
+	  g_hash_table_remove (environment->locks, &qualified_key);
+	  g_hash_table_remove (environment->value_cache, &qualified_key);
+	}
     }
-
-  g_hash_table_remove (environment->value_cache, &qualified_key);
 
   callback_data_free (callback_data);
 
@@ -1978,7 +2037,10 @@ ensure_range_lock (gzochid_storage_transaction *tx,
       /* Is there a range lock request in the store's request tree? */
 
       if (request_search_context.range_lock_request != NULL)
-	range_lock_request_ref (request_search_context.range_lock_request);
+	{
+	  range_lock_request_ref (request_search_context.range_lock_request);
+	  g_mutex_lock (&request_search_context.range_lock_request->mutex);
+	}
       else 
 	{
 	  /* If not, create one. */
@@ -1989,9 +2051,10 @@ ensure_range_lock (gzochid_storage_transaction *tx,
 	  gzochid_itree_insert
 	    (database->range_lock_requests, key_bytes, NULL,
 	     range_lock_request);
+
+	  g_mutex_lock (&range_lock_request->mutex);
 	}
 
-      g_mutex_lock (&request_search_context.range_lock_request->mutex);
       g_mutex_unlock (&database->mutex);
     }
 
@@ -2413,6 +2476,7 @@ cleanup_transaction (gzochid_storage_transaction *tx)
   /* Unref all the locks in the table. Need to pass the environment as context,
      so this can't be done as a `GDestroyNotify' on the value. */
 
+  g_mutex_lock (&env->mutex);
   g_mutex_lock (&env->lock_table_mutex);
   g_hash_table_foreach (txn->locks, lock_unref_ghfunc, args);
 
@@ -2425,6 +2489,7 @@ cleanup_transaction (gzochid_storage_transaction *tx)
 
   g_ptr_array_unref (released_keys);
   g_mutex_unlock (&env->lock_table_mutex);
+  g_mutex_unlock (&env->mutex);
   
   g_hash_table_destroy (txn->locks);
 
@@ -2576,72 +2641,165 @@ is_deleted (gzochid_storage_transaction *tx, gzochid_storage_store *store,
   return ret;
 }
 
-/*
-  Retrieves the value (if any) bound to the specified key in the dataclient
-  cache for the target environment.
-  
-  Requires that the caller hold the environment's lock table mutex.
-*/
+/* Returns the timestamp-prefixed value in the value cache (if any) setting the
+   specified size pointer if available. The returned buffer is owned by the 
+   cache and should not be modified or freed. */
 
-static unsigned char *
-get_from_cache (dataclient_environment *environment,
-		dataclient_qualified_key *qualified_key, size_t *value_len)
+static const unsigned char *
+get_prefixed_cache_value (dataclient_environment *environment,
+			  dataclient_qualified_key *qualified_key,
+			  size_t *value_len)
 {
-  unsigned char *ret = NULL;
   GBytes *value = g_hash_table_lookup
     (environment->value_cache, qualified_key);
   
   if (value != NULL)
-    {
-      size_t tmp_len = 0;
-      gconstpointer value_data = g_bytes_get_data (value, &tmp_len);
-      
-      ret = malloc (sizeof (unsigned char) * tmp_len);
-      memcpy (ret, value_data, tmp_len);
-      
-      if (value_len != NULL)
-	*value_len = tmp_len;
-    }
-
-  return ret;
+    return g_bytes_get_data (value, value_len);
+  else return NULL;
 }
+
+/* If there is a timestamp-prefixed non-zero-length value in the value cache 
+   for the specified key, return a copy of that value with the timestamp prefix
+   removed. Otherwise, return `NULL'. The returned buffer should be freed via
+   `free' when no longer needed. */
+
+static unsigned char *
+get_value_from_cache (dataclient_environment *environment,
+		      dataclient_qualified_key *qualified_key,
+		      size_t *value_len)
+{
+  size_t prefixed_value_len = 0;
+  const unsigned char *prefixed_value = get_prefixed_cache_value
+    (environment, qualified_key, &prefixed_value_len);
+
+  if (prefixed_value == NULL || prefixed_value_len <= 8)
+    return NULL;
+  else
+    {
+      size_t ret_value_len = prefixed_value_len - 8;
+
+      if (value_len != NULL)
+	*value_len = ret_value_len;
+      return g_memdup (prefixed_value + 8, ret_value_len);
+    }
+}
+
+/* If there is a timestamp-prefixed value in the value cache for the specified
+   key, return its timestamp. Otherwise, return zero. */
+
+static gint64
+get_timestamp_from_cache (dataclient_environment *environment,
+			  dataclient_qualified_key *qualified_key)
+{
+  size_t prefixed_value_len = 0;
+  const unsigned char *prefixed_value = get_prefixed_cache_value
+    (environment, qualified_key, &prefixed_value_len);
+
+  if (prefixed_value == NULL)
+    return 0;
+  else
+    {
+      assert (prefixed_value_len >= 8);
+      return gzochi_common_io_read_long (prefixed_value, 0);
+    }
+}
+
+/*
+  Ensures that the desired lock level is established for the specified key and
+  returns the "most recent" value associated with it - which may be `NULL' even
+  when there is a non-`NULL' value in the local store, in cases in which the
+  key was deleted on another node before the lock was re-established.
+
+  The buffer returned from this function should be freed via `free' when no
+  longer needed.
+*/
+
+static char *
+get_internal (gzochid_storage_transaction *tx, gzochid_storage_store *store,
+	      char *key, size_t key_len, size_t *value_len, gboolean for_write)
+{
+  if (ensure_lock (tx, store, key, key_len, for_write))
+    {
+      dataclient_transaction *dataclient_tx = tx->txn;
+      dataclient_environment *environment = tx->context->environment;
+      dataclient_database *database = store->database;
+
+      char *store_value = NULL;
+      size_t store_value_len = 0;
+      
+      if (is_deleted (tx, store, key, key_len))
+	return NULL;
+
+      if (for_write)
+	store_value = environment->delegate_iface->transaction_get_for_update
+	  (dataclient_tx->delegate_tx, database->delegate_store, key, key_len,
+	   &store_value_len);
+      else store_value = environment->delegate_iface->transaction_get
+	     (dataclient_tx->delegate_tx, database->delegate_store, key,
+	      key_len, &store_value_len);
+      
+      propagate_transaction_status (tx);
+
+      if (!tx->rollback)
+	{
+	  GBytes *key_bytes = g_bytes_new_static (key, key_len);
+	  dataclient_qualified_key qualified_key =
+	    { database->name, key_bytes };
+	  
+	  gint64 store_timestamp = 0;	  
+	  gint64 cache_timestamp = get_timestamp_from_cache
+	    (environment, &qualified_key);
+
+	  if (store_value != NULL)
+	    {
+	      assert (store_value_len > 8);
+	      store_timestamp = gzochi_common_io_read_long
+		((unsigned char *) store_value, 0);
+	    }
+
+	  /* Is the cache more authoritative than the delegate store? */
+	  
+	  if (cache_timestamp > store_timestamp)
+	    {
+	      char *ret = (char *) get_value_from_cache
+		(environment, &qualified_key, value_len);
+
+	      if (store_value != NULL)
+		free (store_value);
+
+	      g_bytes_unref (key_bytes);
+	      return ret;
+	    }
+	  else
+	    {
+	      g_bytes_unref (key_bytes);
+	      
+	      if (store_value != NULL)
+		{
+		  size_t ret_value_len = store_value_len - 8;
+		  char *ret = g_memdup (store_value + 8, ret_value_len);
+		  
+		  if (value_len != NULL)
+		    *value_len = ret_value_len;
+		  
+		  free (store_value);
+		  return ret;
+		}
+	    }
+	}
+    }
+  
+  return NULL;
+}
+	   
 
 /* Returns the value for the specified key or `NULL' if none exists. */
 
 static char *
 transaction_get (gzochid_storage_transaction *tx, gzochid_storage_store *store,
 		 char *key, size_t key_len, size_t *value_len)
-{  
-  if (ensure_lock (tx, store, key, key_len, FALSE))
-    {
-      dataclient_transaction *dataclient_tx = tx->txn;
-      dataclient_environment *environment = tx->context->environment;
-      dataclient_database *database = store->database;
-      
-      char *ret = environment->delegate_iface->transaction_get
-	(dataclient_tx->delegate_tx, database->delegate_store, key, key_len,
-	 value_len);
-
-      propagate_transaction_status (tx);
-
-      /* Didn't find a value in the mem store? (And we haven't already deleted 
-	 it in this transaction?) Check the cache. */
-
-      if (ret == NULL && !tx->rollback && !is_deleted (tx, store, key, key_len))
-	{
-	  GBytes *key_bytes = g_bytes_new_static (key, key_len);
-	  dataclient_qualified_key qualified_key =
-	    { database->name, key_bytes };
-	  
-	  ret = (char *) get_from_cache
-	    (environment, &qualified_key, value_len);
-
-	  g_bytes_unref (key_bytes);
-	}
-
-      return ret;
-    }
-  else return NULL;
+{
+  return get_internal (tx, store, key, key_len, value_len, FALSE);
 }
 
 /* Returns the value for the specified key or `NULL' if none exists. If the key
@@ -2651,37 +2809,8 @@ static char *
 transaction_get_for_update (gzochid_storage_transaction *tx,
 			    gzochid_storage_store *store, char *key,
 			    size_t key_len, size_t *value_len)
-{  
-  if (ensure_lock (tx, store, key, key_len, TRUE))
-    {
-      dataclient_transaction *dataclient_tx = tx->txn;
-      dataclient_environment *environment = tx->context->environment;
-      dataclient_database *database = store->database;
-      
-      char *ret = environment->delegate_iface->transaction_get_for_update
-	(dataclient_tx->delegate_tx, database->delegate_store, key, key_len,
-	 value_len);
-
-      propagate_transaction_status (tx);
-
-      /* Didn't find a value in the mem store? (And we haven't already deleted 
-	 it in this transaction?) Check the cache. */
-      
-      if (ret == NULL && !tx->rollback && !is_deleted (tx, store, key, key_len))
-	{
-	  GBytes *key_bytes = g_bytes_new_static (key, key_len);
-	  dataclient_qualified_key qualified_key =
-	    { database->name, key_bytes };
-	  
-	  ret = (char *) get_from_cache
-	    (environment, &qualified_key, value_len);
-
-	  g_bytes_unref (key_bytes);
-	}
-      
-      return ret;
-    }
-  else return NULL;
+{
+  return get_internal (tx, store, key, key_len, value_len, TRUE);
 }
 
 /* Inserts or updates the value for the specified key. */
@@ -2697,11 +2826,16 @@ transaction_put (gzochid_storage_transaction *tx, gzochid_storage_store *store,
       dataclient_database *database = store->database;
 
       gzochid_data_change change;
+
+      unsigned char *prefixed_value = prefix_with_timestamp
+	((unsigned char *) value, value_len, NULL);
       
       environment->delegate_iface->transaction_put
 	(dataclient_tx->delegate_tx, database->delegate_store, key, key_len,
-	 value, value_len);
+	 (char *) prefixed_value, value_len + 8);
 
+      free (prefixed_value);
+      
       propagate_transaction_status (tx);
 
       if (!tx->rollback)

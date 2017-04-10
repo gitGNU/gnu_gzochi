@@ -1398,6 +1398,83 @@ test_range_lock_release_eviction (dataclient_storage_fixture *fixture,
   g_bytes_unref (key_bytes);
 }
 
+static void
+test_cache_store_consistency (dataclient_storage_fixture *fixture,
+			      gconstpointer user_data)
+{
+  GBytes *key_bytes = g_bytes_new_static ("foo", 4);
+  GBytes *value1_bytes = g_bytes_new_static ("bar", 4);
+  GBytes *value2_bytes = g_bytes_new_static ("baz", 4);
+  GBytes *value3_bytes = g_bytes_new_static ("quux", 4);
+
+  char *value = NULL;
+  size_t value_len = 0;
+  GBytes *value_bytes = NULL;
+  
+  gzochid_storage_transaction *tx = fixture->iface->transaction_begin
+    (fixture->storage_context);
+
+  dataclient_storage_response *response1 =
+    create_success_response (value1_bytes);
+  dataclient_storage_response *response2 =
+    create_success_response (value1_bytes);
+  dataclient_storage_response *response3 =
+    create_success_response (value3_bytes);
+  
+  fixture->dataclient->responses = g_list_append
+    (g_list_append (fixture->dataclient->responses, response1), response2);
+
+  g_mutex_lock (&fixture->dataclient->process_response_mutex);
+
+  value = fixture->iface->transaction_get (tx, fixture->store, "foo", 4, NULL);
+  g_cond_wait (&fixture->dataclient->process_response_cond,
+	       &fixture->dataclient->process_response_mutex);
+  
+  g_mutex_unlock (&fixture->dataclient->process_response_mutex);
+  
+  free (value);
+  fixture->iface->transaction_put (tx, fixture->store, "foo", 4, "baz", 4);
+
+  fixture->iface->transaction_prepare (tx);
+  fixture->iface->transaction_commit (tx);
+
+  /* One release for the read lock, the other for the write lock. */
+  
+  release_key (fixture->dataclient, "test", "test", key_bytes);
+  release_key (fixture->dataclient, "test", "test", key_bytes);
+  
+  tx = fixture->iface->transaction_begin (fixture->storage_context);
+  
+  fixture->dataclient->responses = g_list_append
+    (fixture->dataclient->responses, response3);
+
+  g_mutex_lock (&fixture->dataclient->process_response_mutex);
+
+  value = fixture->iface->transaction_get
+    (tx, fixture->store, "foo", 4, &value_len);
+  g_cond_wait (&fixture->dataclient->process_response_cond,
+	       &fixture->dataclient->process_response_mutex);  
+  
+  g_mutex_unlock (&fixture->dataclient->process_response_mutex);
+
+  fixture->iface->transaction_rollback (tx);
+  
+  value_bytes = g_bytes_new_static (value, value_len);
+  g_assert (g_bytes_equal (value3_bytes, value_bytes));
+  
+  free_response (response1);
+  free_response (response2);
+  free_response (response3);
+  
+  g_bytes_unref (key_bytes);
+  g_bytes_unref (value1_bytes);
+  g_bytes_unref (value2_bytes);
+  g_bytes_unref (value3_bytes);
+  g_bytes_unref (value_bytes);
+  
+  free (value);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -1535,6 +1612,11 @@ main (int argc, char *argv[])
     ("/storage-dataclient/range-lock-release/eviction",
      dataclient_storage_fixture, NULL, dataclient_storage_fixture_setup,
      test_range_lock_release_eviction, dataclient_storage_fixture_teardown);
+
+  g_test_add
+    ("/storage-dataclient/consistency/cache-store",
+     dataclient_storage_fixture, NULL, dataclient_storage_fixture_setup,
+     test_cache_store_consistency, dataclient_storage_fixture_teardown);
   
   return g_test_run ();
 }
