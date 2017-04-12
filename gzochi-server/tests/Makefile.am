@@ -456,6 +456,7 @@ test_storage_dataclient_CFLAGS = -I$(top_srcdir)/src \
 test_storage_dataclient_SOURCES = test-storage-dataclient.c
 test_storage_dataclient_LDADD = \
 	$(top_builddir)/src/libgzochid_la-itree.o \
+	$(top_builddir)/src/libgzochid_la-log.o \
 	$(top_builddir)/src/libgzochid_la-storage-dataclient.o \
 	$(top_builddir)/src/libgzochid_la-storage-mem.o \
 	$(top_builddir)/src/libgzochid_la-util.o \

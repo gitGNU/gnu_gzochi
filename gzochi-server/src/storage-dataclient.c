@@ -28,8 +28,14 @@
 #include "gzochid-storage.h"
 #include "itree.h"
 #include "lock.h"
+#include "log.h"
 #include "storage-mem.h"
 #include "util.h"
+
+#ifdef G_LOG_DOMAIN
+#undef G_LOG_DOMAIN
+#endif /* G_LOG_DOMAIN */
+#define G_LOG_DOMAIN "gzochid.storage/dataclient"
 
 /*
   The following data structures and functions form an implementation of a
@@ -44,7 +50,24 @@
   managed by the built-in "mem" storage engine, where they can be manipulated as
   usual by application transactions. Upon transaction commit, any changes to the
   store are transmitted to the meta server for durable persistence.
+
+  Locks are only held temporarily; once a lock's (or range lock's) timeout 
+  expires - and once all current transactions using it have committed or rolled
+  back - the lock is explicitly released via the data client. 
 */
+
+/*
+  The maximum number of keys that can be released before a sweep of the delegate
+  store is triggered.
+
+  To avoid contention on the store, keys are not removed from the underlying 
+  store when they are released. Instead, timestamps are used to make sure that
+  clients see the most recent version of a key, even in the case of deletions.
+  Over time, old values may build up in the store, and so they must be 
+  periodically be "purged" to control the size of the store.
+*/
+
+#define DEFAULT_PURGE_THRESHOLD 1024
 
 /* Combines a key with the store to which it belongs, to disambiguate it in
    contexts in which keys are not otherwise partitioned. */
@@ -56,6 +79,17 @@ struct _dataclient_qualified_key
 };
 
 typedef struct _dataclient_qualified_key dataclient_qualified_key;
+
+/* Combines a `dataclient_qualified_key' with a timestamp to support 
+   conditionally purging it from the underlying store. */
+
+struct _dataclient_purgeable_key
+{
+  dataclient_qualified_key *qualified_key; /* The purgeable key. */
+  gint64 release_timestamp; /* The time at which the key was released. */
+};
+
+typedef struct _dataclient_purgeable_key dataclient_purgeable_key;
 
 /* Combines a key range with the store to which it belongs, to disambiguate it
    in contexts in which keys are not otherwise partitioned. */
@@ -242,6 +276,16 @@ struct _dataclient_environment
 
   GHashTable *databases; /* Map of `char *' to `dataclient_database' structs. */
   GList *transactions; /* List of `dataclient_transaction' structs. */
+  GPtrArray *purgeable_keys; /* Array of `dataclient_qualified_key' pointers. */
+  unsigned int purge_threshold; /* Maximum size of the purgeable key array. */
+  
+  /* Flag to indicate whether a key purge is in progress. */
+  
+  gboolean purging_keys;
+
+  GMutex purge_mutex; /* Mutex to protect the purgeable key sweep. */
+  GCond purge_cond; /* Condition variable to protect the purgeable key sweep. */
+  
   GList *evicted_keys; /* List of `dataclient_evicted_key' structs. */
 
   /* List of `dataclient_evicted_key_range' structs. */
@@ -432,6 +476,34 @@ static gint dataclient_qualified_key_compare (gconstpointer a, gconstpointer b)
   gint ret = strcmp (key_a->store, key_b->store);
 
   return ret == 0 ? g_bytes_compare (key_a->key, key_b->key) : ret;
+}
+
+/* Create and return a new `dataclient_purgeable_key' structure with the 
+   specifed `dataclient_qualified_key' (which is copied) and the current 
+   monotonic time. The memory used by this structure should be freed via 
+   `dataclient_purgeable_key_free' when no longer in use. */
+
+static dataclient_purgeable_key *
+dataclient_purgeable_key_new (dataclient_qualified_key *k)
+{
+  dataclient_purgeable_key *pk = malloc (sizeof (dataclient_purgeable_key));
+
+  pk->qualified_key = dataclient_qualified_key_copy (k);
+  pk->release_timestamp = g_get_monotonic_time ();
+  
+  return pk;
+}
+
+/* Frees the specified `dataclient_purgeable_key'. Can be used as a 
+   `GDestroyNotify' where appropriate. */
+
+static void
+dataclient_purgeable_key_free (gpointer k)
+{
+  dataclient_purgeable_key *pk = k;
+  
+  dataclient_qualified_key_free (pk->qualified_key);
+  free (pk);
 }
 
 /* Create and return a new `dataclient_qualified_key_range' structure with the 
@@ -1199,6 +1271,8 @@ lock_release_callback (gpointer user_data)
   dataclient_qualified_key qualified_key = (dataclient_qualified_key)
     { database->name, callback_data->key };
 
+  gboolean purgeable = FALSE;
+  
   /* Grab the environment's mutex before the store's mutex; important to always
      take these in the same order. */
   
@@ -1238,13 +1312,27 @@ lock_release_callback (gpointer user_data)
 	{
 	  g_hash_table_remove (environment->locks, &qualified_key);
 	  g_hash_table_remove (environment->value_cache, &qualified_key);
+	  purgeable = TRUE;
 	}
     }
 
-  callback_data_free (callback_data);
-
   g_mutex_unlock (&environment->lock_table_mutex);
   g_mutex_unlock (&environment->mutex);
+
+  /* It's probably not a good idea to grab the purge mutex while holding those
+     other mutexes. But we're not grabbing the purge mutex to preserve data
+     integrity (the timestamping system ensures that) but merely to serialize
+     reads and writes against the purge list. */
+  
+  if (purgeable)
+    {
+      g_mutex_lock (&environment->purge_mutex);
+      g_ptr_array_add (environment->purgeable_keys,
+		       dataclient_purgeable_key_new (&qualified_key));
+      g_mutex_unlock (&environment->purge_mutex);
+    }
+  
+  callback_data_free (callback_data);
 }
 
 /*
@@ -2219,6 +2307,15 @@ initialize (char *path)
     (dataclient_qualified_key_hash, dataclient_qualified_key_equal,
      dataclient_qualified_key_free, (GDestroyNotify) g_bytes_unref);
 
+  /* The purgeable key management structures. */
+
+  g_mutex_init (&environment->purge_mutex);
+  g_cond_init (&environment->purge_cond);
+  
+  environment->purgeable_keys = g_ptr_array_new_with_free_func
+    (dataclient_purgeable_key_free);
+  environment->purge_threshold = DEFAULT_PURGE_THRESHOLD;
+  
   context->environment = environment;
   
   return context;
@@ -2246,6 +2343,10 @@ close_context (gzochid_storage_context *context)
   
   g_hash_table_destroy (environment->value_cache);
 
+  g_mutex_clear (&environment->purge_mutex);
+  g_cond_clear (&environment->purge_cond);
+  g_ptr_array_free (environment->purgeable_keys, TRUE);  
+  
   free (context->environment);  
   free (context);
 }
@@ -2294,7 +2395,13 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
   store->context = context;
   store->database = database;
 
+  /* Hold the purge mutex to ensure serialized acccess ot the databases table
+     during a key page. */
+  
+  g_mutex_lock (&environment->purge_mutex);
   g_hash_table_insert (environment->databases, database->name, database);
+  g_mutex_unlock (&environment->purge_mutex);
+  
   return store;
 }
 
@@ -2317,7 +2424,13 @@ close_store (gzochid_storage_store *store)
   dataclient_environment *environment = store->context->environment;
   dataclient_database *database = store->database;
 
+  /* Hold the purge mutex to ensure serialized acccess ot the databases table
+     during a key page. */
+
+  g_mutex_lock (&environment->purge_mutex);
   g_hash_table_remove (environment->databases, database->name);
+  g_mutex_unlock (&environment->purge_mutex);
+  
   free (database->name);
 
   /* Walk the interval tree and free any of the range locks. */
@@ -2402,7 +2515,22 @@ create_transaction (gzochid_storage_context *context,
   
   tx->context = context;
   tx->txn = txn;
+
+  /* Don't allow new transactions to start if a key purge is in progress. */
+  
+  g_mutex_lock (&environment->purge_mutex);
+
+  if (environment->purging_keys)
+    {
+      g_debug
+	("Waiting to start transaction; purge of stale keys is in progress.");
+
+      while (environment->purging_keys)
+	g_cond_wait (&environment->purge_cond, &environment->purge_mutex);
+    }
+  
   environment->transactions = g_list_prepend (environment->transactions, txn);
+  g_mutex_unlock (&environment->purge_mutex);
   
   return tx;
 }
@@ -2471,6 +2599,172 @@ range_lock_unref_search_func (gpointer from, gpointer to, gpointer data,
   return FALSE;
 }
 
+/* Returns the timestamp-prefixed value in the value cache (if any) setting the
+   specified size pointer if available. The returned buffer is owned by the 
+   cache and should not be modified or freed. */
+
+static const unsigned char *
+get_prefixed_cache_value (dataclient_environment *environment,
+			  dataclient_qualified_key *qualified_key,
+			  size_t *value_len)
+{
+  GBytes *value = g_hash_table_lookup
+    (environment->value_cache, qualified_key);
+  
+  if (value != NULL)
+    return g_bytes_get_data (value, value_len);
+  else return NULL;
+}
+
+/* If there is a timestamp-prefixed non-zero-length value in the value cache 
+   for the specified key, return a copy of that value with the timestamp prefix
+   removed. Otherwise, return `NULL'. The returned buffer should be freed via
+   `free' when no longer needed. */
+
+static unsigned char *
+get_value_from_cache (dataclient_environment *environment,
+		      dataclient_qualified_key *qualified_key,
+		      size_t *value_len)
+{
+  size_t prefixed_value_len = 0;
+  const unsigned char *prefixed_value = get_prefixed_cache_value
+    (environment, qualified_key, &prefixed_value_len);
+
+  if (prefixed_value == NULL || prefixed_value_len <= 8)
+    return NULL;
+  else
+    {
+      size_t ret_value_len = prefixed_value_len - 8;
+
+      if (value_len != NULL)
+	*value_len = ret_value_len;
+      return g_memdup (prefixed_value + 8, ret_value_len);
+    }
+}
+
+/* If there is a timestamp-prefixed value in the value cache for the specified
+   key, return its timestamp. Otherwise, return zero. */
+
+static gint64
+get_timestamp_from_cache (dataclient_environment *environment,
+			  dataclient_qualified_key *qualified_key)
+{
+  size_t prefixed_value_len = 0;
+  const unsigned char *prefixed_value = get_prefixed_cache_value
+    (environment, qualified_key, &prefixed_value_len);
+
+  if (prefixed_value == NULL)
+    return 0;
+  else
+    {
+      assert (prefixed_value_len >= 8);
+      return gzochi_common_io_read_long (prefixed_value, 0);
+    }
+}
+
+/*
+  A `GFunc' to transactionally removes a key from one of the delegate stores 
+  managed by the specified environment, and from the value cache, if its release
+  timestamp is *more recent* than the timestamp on the value in the store / 
+  cache.
+
+  This function should only be called with the purge lock held, and with no 
+  other transactions active - i.e., during a properly-orchestrated purgeable key
+  sweep.
+*/
+
+static void
+purge_key (gpointer data, gpointer user_data)
+{
+  gpointer *args = user_data;
+  dataclient_environment *environment = args[0];
+  gzochid_storage_transaction *delegate_tx = args[1];  
+  
+  dataclient_purgeable_key *purgeable_key = data;
+  dataclient_database *database = g_hash_table_lookup
+    (environment->databases, purgeable_key->qualified_key->store);
+  
+  size_t key_len = 0;
+  const unsigned char *key = g_bytes_get_data
+    (purgeable_key->qualified_key->key, &key_len);
+  char *value = environment->delegate_iface->transaction_get
+    (delegate_tx, database->delegate_store, (char *) key, key_len, NULL);
+
+  /* The value may have naturally been removed from the store; or it may never
+     have been added. */
+  
+  if (value != NULL)
+    {
+      gint64 timestamp = gzochi_common_io_read_long
+	((unsigned char *) value, 0);
+      
+      if (timestamp <= purgeable_key->release_timestamp)
+	{
+	  if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+	    GZOCHID_WITH_FORMATTED_BYTES
+	      (purgeable_key->qualified_key->key, buf, 33,
+	       gzochid_trace ("Purging stored value for released key %s/%s/%s.",
+			      environment->app_name,
+			      purgeable_key->qualified_key->store, buf));
+	  
+	  int ret = environment->delegate_iface->transaction_delete
+	    (delegate_tx, database->delegate_store, (char *) key, key_len);
+	  assert (ret != GZOCHID_STORAGE_ETXFAILURE);	  
+	}
+
+      free (value);
+    }
+
+  /* Also remove the value (incl. deletion markers) from the cache, if
+     appropriate. */
+  
+  if (get_timestamp_from_cache (environment, purgeable_key->qualified_key) <=
+      purgeable_key->release_timestamp) 
+    {
+      if (gzochid_log_level_visible (G_LOG_DOMAIN, GZOCHID_LOG_LEVEL_TRACE))
+	GZOCHID_WITH_FORMATTED_BYTES
+	  (purgeable_key->qualified_key->key, buf, 33,
+	   gzochid_trace ("Purging cached value for released key %s/%s/%s.",
+			  environment->app_name,
+			  purgeable_key->qualified_key->store, buf));
+      
+      g_hash_table_remove
+	(environment->value_cache, purgeable_key->qualified_key);
+    }
+}
+
+/*
+  Initiates a transaction against the delegate store and uses it to 
+  conditionally delete (via `purge_key') all the keys in the purgeable key 
+  array.
+
+  This function should only be called with the purge lock held, and with no 
+  other transactions active - i.e., during a properly-orchestrated purgeable key
+  sweep.
+*/
+
+static void
+purge_keys (dataclient_environment *env)
+{
+  gzochid_storage_transaction *tx = env->delegate_iface->transaction_begin
+    (env->delegate_context);
+  gpointer args[2] = { env, tx };
+
+  g_debug ("Purging released keys for '%s'...", env->app_name);
+  
+  g_ptr_array_foreach (env->purgeable_keys, purge_key, args);
+  
+  env->delegate_iface->transaction_prepare (tx);
+  assert (!tx->rollback);
+  
+  env->delegate_iface->transaction_commit (tx);
+  g_debug ("Released key purge for '%s' complete.", env->app_name);
+  
+  g_ptr_array_free (env->purgeable_keys, TRUE);
+  env->purgeable_keys = g_ptr_array_new_with_free_func
+    (dataclient_purgeable_key_free);
+}
+
 /* Frees the resources allocated for the specified transaction and removes it
    from the enclosing dataclient environment. */
 
@@ -2513,7 +2807,39 @@ cleanup_transaction (gzochid_storage_transaction *tx)
   
   g_list_free_full (txn->deleted_keys, (GDestroyNotify) callback_data_free);
 
+  g_mutex_lock (&env->purge_mutex);
+
+  /* First remove the current transaction from the transaction list so it
+     doesn't show up as active. */
+  
   env->transactions = g_list_remove (env->transactions, txn); 
+
+  /* If the number of released keys has exceeded the purge threshold and there's
+     not already a purge in progress. */
+  
+  if (env->purgeable_keys->len > env->purge_threshold && !env->purging_keys)
+    {      
+      env->purging_keys = TRUE;
+
+      if (env->transactions != NULL)
+	{
+	  g_debug ("Awaiting transaction completion ahead of '%s' key purge.",
+		   env->app_name);
+	  
+	  while (env->transactions != NULL)
+	    g_cond_wait (&env->purge_cond, &env->purge_mutex);
+	}
+      
+      purge_keys (env);      
+      env->purging_keys = FALSE;
+    }
+
+  /* Wake up any transactions waiting to start - or completed transactions 
+     waiting to initiate a key purge. */
+  
+  g_cond_broadcast (&env->purge_cond);
+  g_mutex_unlock (&env->purge_mutex);
+  
   free (txn);
   free (tx);
 }
@@ -2650,69 +2976,6 @@ is_deleted (gzochid_storage_transaction *tx, gzochid_storage_store *store,
   
   g_bytes_unref (key_bytes);
   return ret;
-}
-
-/* Returns the timestamp-prefixed value in the value cache (if any) setting the
-   specified size pointer if available. The returned buffer is owned by the 
-   cache and should not be modified or freed. */
-
-static const unsigned char *
-get_prefixed_cache_value (dataclient_environment *environment,
-			  dataclient_qualified_key *qualified_key,
-			  size_t *value_len)
-{
-  GBytes *value = g_hash_table_lookup
-    (environment->value_cache, qualified_key);
-  
-  if (value != NULL)
-    return g_bytes_get_data (value, value_len);
-  else return NULL;
-}
-
-/* If there is a timestamp-prefixed non-zero-length value in the value cache 
-   for the specified key, return a copy of that value with the timestamp prefix
-   removed. Otherwise, return `NULL'. The returned buffer should be freed via
-   `free' when no longer needed. */
-
-static unsigned char *
-get_value_from_cache (dataclient_environment *environment,
-		      dataclient_qualified_key *qualified_key,
-		      size_t *value_len)
-{
-  size_t prefixed_value_len = 0;
-  const unsigned char *prefixed_value = get_prefixed_cache_value
-    (environment, qualified_key, &prefixed_value_len);
-
-  if (prefixed_value == NULL || prefixed_value_len <= 8)
-    return NULL;
-  else
-    {
-      size_t ret_value_len = prefixed_value_len - 8;
-
-      if (value_len != NULL)
-	*value_len = ret_value_len;
-      return g_memdup (prefixed_value + 8, ret_value_len);
-    }
-}
-
-/* If there is a timestamp-prefixed value in the value cache for the specified
-   key, return its timestamp. Otherwise, return zero. */
-
-static gint64
-get_timestamp_from_cache (dataclient_environment *environment,
-			  dataclient_qualified_key *qualified_key)
-{
-  size_t prefixed_value_len = 0;
-  const unsigned char *prefixed_value = get_prefixed_cache_value
-    (environment, qualified_key, &prefixed_value_len);
-
-  if (prefixed_value == NULL)
-    return 0;
-  else
-    {
-      assert (prefixed_value_len >= 8);
-      return gzochi_common_io_read_long (prefixed_value, 0);
-    }
 }
 
 /*
