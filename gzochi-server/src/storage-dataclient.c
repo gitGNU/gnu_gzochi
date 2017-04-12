@@ -240,6 +240,8 @@ struct _dataclient_environment
   
   GzochidDataClient *client;
 
+  GHashTable *databases; /* Map of `char *' to `dataclient_database' structs. */
+  GList *transactions; /* List of `dataclient_transaction' structs. */
   GList *evicted_keys; /* List of `dataclient_evicted_key' structs. */
 
   /* List of `dataclient_evicted_key_range' structs. */
@@ -2195,6 +2197,8 @@ initialize (char *path)
 
   g_mutex_init (&environment->mutex);
   g_mutex_init (&environment->lock_table_mutex);
+
+  environment->databases = g_hash_table_new (g_str_hash, g_str_equal);  
   
   /* The lock table. */
 
@@ -2234,6 +2238,8 @@ close_context (gzochid_storage_context *context)
   
   g_free (environment->app_name);
 
+  g_hash_table_destroy (environment->databases);
+  
   g_hash_table_destroy (environment->locks);
   g_hash_table_destroy (environment->read_lock_requests);
   g_hash_table_destroy (environment->write_lock_requests);
@@ -2288,6 +2294,7 @@ open (gzochid_storage_context *context, char *path, unsigned int flags)
   store->context = context;
   store->database = database;
 
+  g_hash_table_insert (environment->databases, database->name, database);
   return store;
 }
 
@@ -2310,6 +2317,7 @@ close_store (gzochid_storage_store *store)
   dataclient_environment *environment = store->context->environment;
   dataclient_database *database = store->database;
 
+  g_hash_table_remove (environment->databases, database->name);
   free (database->name);
 
   /* Walk the interval tree and free any of the range locks. */
@@ -2368,6 +2376,7 @@ static gzochid_storage_transaction *
 create_transaction (gzochid_storage_context *context,
 		    gzochid_storage_transaction *delegate_tx, gint64 end_time)
 {
+  dataclient_environment *environment = context->environment;
   gzochid_storage_transaction *tx =
     calloc (1, sizeof (gzochid_storage_transaction));
   dataclient_transaction *txn = calloc (1, sizeof (dataclient_transaction));
@@ -2393,6 +2402,7 @@ create_transaction (gzochid_storage_context *context,
   
   tx->context = context;
   tx->txn = txn;
+  environment->transactions = g_list_prepend (environment->transactions, txn);
   
   return tx;
 }
@@ -2503,6 +2513,7 @@ cleanup_transaction (gzochid_storage_transaction *tx)
   
   g_list_free_full (txn->deleted_keys, (GDestroyNotify) callback_data_free);
 
+  env->transactions = g_list_remove (env->transactions, txn); 
   free (txn);
   free (tx);
 }
