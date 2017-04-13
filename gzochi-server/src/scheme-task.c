@@ -1,5 +1,5 @@
 /* scheme-task.c: Scheme callback handlers and interface to gzochi Scheme API
- * Copyright (C) 2016 Julian Graham
+ * Copyright (C) 2017 Julian Graham
  *
  * gzochi is free software: you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by
@@ -297,10 +297,12 @@ gzochid_scheme_application_logged_in_worker
 
       session_handler = gzochid_with_application_context 
 	(context, identity, unpack_handler, handler);
-      
-      gzochid_client_session_set_handler (session, session_handler);
-      gzochid_client_session_set_handler_scm_oid
-	(session, handler_reference->oid);
+
+      /* Important to mark the session before setting the handlers on it. If the
+	 mark fails, the code below will attempt to clean up the handlers
+	 explicitly. But the data manager already knows about the session and
+	 the associated finalizer will attempt to clean up any non-`NULL' 
+	 handlers it finds during finalizaiton. */
       
       gzochid_data_mark 
 	(context, &gzochid_client_session_serialization, session, &err);
@@ -313,6 +315,12 @@ gzochid_scheme_application_logged_in_worker
 	    gzochid_data_create_reference 
 	    (context, &gzochid_scm_location_aware_serialization, 
 	     scm_session_reloc, &err);
+
+	  /* Now it's safe to install the handlers. */
+	  
+	  gzochid_client_session_set_handler (session, session_handler);
+	  gzochid_client_session_set_handler_scm_oid
+	    (session, handler_reference->oid);
 
 	  if (err == NULL)
 	    {
