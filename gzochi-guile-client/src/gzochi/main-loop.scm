@@ -44,7 +44,7 @@
 	  gzochi:main-loop-run
 	  gzochi:main-loop-stop)
 
-  (import (only (guile) hashv select sort) 
+  (import (only (guile) hashv make-mutex select sort) 
 	  (ice-9 optargs) 
 	  (ice-9 threads) 
 	  (rnrs)
