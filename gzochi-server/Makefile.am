@@ -2,7 +2,7 @@
 #
 # Makefile.am: Automake input file.
 #
-# Copyright (C) 2015 Julian Graham
+# Copyright (C) 2017 Julian Graham
 #
 # This is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,4 +26,7 @@ dist_noinst_DATA = benchmarks/echo-chamber/README \
 	benchmarks/echo-chamber/client.scm \
 	benchmarks/echo-chamber/echo-chamber.sh \
 	benchmarks/echo-chamber/game.xml benchmarks/echo-chamber/gzochid.conf \
-	benchmarks/echo-chamber/server.scm
+	benchmarks/echo-chamber/server.scm \
+	contrib/game-protocol.lua \
+	contrib/meta-protocol.lua \
+	contrib/README
