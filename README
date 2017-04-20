@@ -1,4 +1,4 @@
-This is version 0.10.1 of the gzochi game development framework.
+This is version 0.11 of the gzochi game development framework.
 
 gzochi is a framework for developing massively multiplayer online games. A
 server container provides services to deployed games, which are written in 
