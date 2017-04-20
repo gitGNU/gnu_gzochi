@@ -1,9 +1,82 @@
 gzochid NEWS -- history of user-visible changes
-Copyright (C) 2016 Julian Graham
+Copyright (C) 2017 Julian Graham
 See the end of copying conditions.
 
 Send comments, questions, and bug reports to gzochi-devel@nongnu.org
 
+Changes in 0.11 (since 0.10.1):
+
+* Changes to the distribution
+
+** Protocol dissectors for client-server and server-server protocols
+
+A pair of Wireshark protocol dissectors in Lua, one for the "game" protocol
+(used for client-application server communication) and one for the "meta"
+protocol (used for application server-meta server communication) are now
+included in the distribution, and can be used for debugging and auditing. See
+the `README' file in the `contrib' folder for more information.
+
+* Notable changes
+
+** Better application server status reporting in meta server admin console
+
+The admin web console for the gzochi meta server now lists all connected
+application server nodes, and links to their respective admin web consoles, if
+available.
+
+Likewise, if the meta server is running an admin web console, a link to it will
+appear in the web console for any connected application server nodes, allowing
+the cluster to be traversed via web browser.
+
+** Thread cleanup and documentation of gzochid thread pools
+
+The gzochid container now runs fewer threads: 3 threads are required for the
+base container services, plus the threads in the game task execution thread pool
+(and their accompanying Guile GC threads). The `thread_pool.max_threads'
+setting, which controls the size of this pool, is now documented in the
+`gzochid.comf' file, as well as in the gzochid reference manual.
+
+** Cooperative lock release for distributed storage engine
+
+Building upon the initial implementation of the distributed data storage engine
+in the most recent minor release, the storage engine now operates using a
+cooperative lock release algorithm, such that locks on individual objects and
+ranges of keys are seized by an application server node for a configurable
+period of time and then released once this period expires and all active
+transactions using a given lock have completed. Consequently, access to
+application data is now shared by all nodes in the cluster.
+
+** Distributed message delivery for sessions and channels
+
+The container services behind the `session' and `channel' abstractions now
+behave correctly in a multi-node server cluster, relaying messages through the
+meta server as necessary, such that game application code doesn't need to be
+aware of the location of client sessions for message recipients or the
+distribution of channel membership across the cluster to be able to send
+messages to them.
+
+** More and finer-grained logging
+
+Many more log statements have been added throughout gzochid and gzochi-metad,
+especially at the `DEBUG' level and below, and many system components have been
+partitioned by GLib log domain, adding a great deal more precision to the log
+system.
+
+There is a new log level (`TRACE') for extremely detailed logs about operations
+on individual keys, messages, client events, etc.
+
+To "turn up" the logging for gzochid or gzochi-metad, use the
+`priority.threshold' option in the configuration file, or set the
+`G_MESSAGES_DEBUG' environment variable appropriately.
+
+* Bug fixes
+
+** Intermittent failure of `test-storage-dataclient'.
+** gzochid admin console should hide store browser in distributed mode
+** valgrind warning during mem store delete: Use of uninitialized value
+** In distributed mode, the dataclient storage engine gives inconsistent resp.
+
+
 Changes in 0.10.1 (since 0.10):
 
 * Bug fixes
@@ -560,7 +633,7 @@ API counterparts) from the `(gzochi data)' and `(gzochi)' libraries:
 
 Copyright information:
 
-Copyright (C) 2016 Julian Graham
+Copyright (C) 2017 Julian Graham
 
    Permission is granted to anyone to make or distribute verbatim copies
    of this document as received, in any medium, provided that the
